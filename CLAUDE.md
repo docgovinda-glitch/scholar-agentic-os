@@ -48,8 +48,8 @@ server.ts                 Express entry: helmet/CSP, rate limit, body limits, ro
                           Vite middleware in dev, static dist/ in prod, /api/health
 server/routes/            HTTP routes (index.ts exports register*Routes); project/ holds per-workflow
                           routers (agentic/, assignment/, thesis, proposal, presentation, journal_compliance…)
-server/src/aiEngine/      Two-router AI access: omniRouter, userRouter/adminRouter, credentialVault
-                          (MASTER_KEY-wrapped provider creds), credits/quotas/entitlements, provider health
+server/src/aiEngine/      userKeyVault (a user's own keys, MASTER_KEY-wrapped), admin/user admin, opportunity agent
+server/src/ai/            routerBridge (chain per request from the x-ai-keyring header), aiEndpointGuard (SSRF)
 server/src/middleware/    auth (Supabase JWT via service role), requireAdmin, captchaVerify, rateLimit,
                           uploadGuard, rejectClientCredentials, errorHandler
 server/src/research|discovery|services/  scholarly retrieval, deep research, RAG, scholarBrain
@@ -60,7 +60,8 @@ src/desk/                 Main UI by feature (thesis, journal, assignment, vault
 src/app/                  Client-side engines: mesh/ (agent registry + executor, ag## agents),
                           conductor/, citation/, manuscript/, review/, coherence/, studio/ …
 src/domain/               Pure domain models/schemas (zod) — no React, no I/O
-src/platform/             gateway/ (AI provider adapters) and warden/ (policy/classification)
+src/platform/             router/ (the one AI engine: adapters, fallback, key rotation, model listing/curation),
+                          completion.ts (the Completer app modules receive), warden/ (policy/classification, used by the mesh)
 src/citation_compliance/  Formatters (APA7, IEEE, MLA9, Chicago, Harvard, Vancouver) + BibTeX/RIS importers
 src/services/             Client services (auth, vault, store, offline, crypto, serverWarmup …)
 supabase/                 schema*.sql, migrations/ (timestamped), functions/ (Deno Edge Functions,
@@ -70,7 +71,7 @@ supabase/                 schema*.sql, migrations/ (timestamped), functions/ (De
 - Path alias `@/*` → repo root (not `src/`).
 - Server code imports shared modules from `src/` (citation formatters, document_intelligence, mesh agents) — keep those modules free of browser-only APIs.
 - **Supabase**: Auth (GoTrue), Postgres with RLS, private storage buckets, Edge Functions (Resend email, search proxies). The server persists through Supabase's HTTPS Data API (`server/src/supabaseRest.ts`) using `VITE_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`; `DATABASE_URL` direct Postgres is an optional fallback only.
-- **AI**: every call goes through one router chain (`server/src/ai/routerBridge.ts`): Premium resources (admin-managed pool, credits) → the user's own keys → their local model (browser hand-off). The server never serves a normal request from a server-held env key. 37 cloud providers (`src/config/providerCatalog.ts`) and 9 local runners; LangGraph for the brief scanner. Request bodies must never carry provider credentials (`rejectClientCredentials`); a user's own key reaches the server only as transient `x-ai-*` / `x-ai-keyring` headers on AI routes (`routeUsesClientAi` in `src/desk/api/client.ts`). Every catalog provider routes through `src/platform/router/providerMap.ts`; no model name is hard-coded: models come live from the provider's own list (`server/src/ai/liveModels.ts`), failover is model-then-connection with empty-answer detection, and the signed-in user's account connections are used on any device (`server/src/ai/accountAi.ts`). The Journal Writer's older pipeline runs through `server/src/ai/studioAi.ts`. Details: `docs/AI-SYSTEM.md` §2.0.
+- **AI**: AI Access has two tiers, Local and BYOK (Premium is "Coming soon" in the UI and has no code). One engine, `src/platform/router`; every workspace reads one central setting (keys + model per provider). 37 cloud providers (`src/config/providerCatalog.ts`) and the local runners map onto the router (`providerMap`); models are listed live from the provider (`/api/ai/models`), never named in code, and a provider with no chosen model uses the best one it lists ("auto"). The server also reads the signed-in user's saved keys (`accountAi`), so a new device works on its first request. App modules (`src/app/*`) take a `Completer` (`src/platform/completion.ts`): the server builds it in `server/src/ai/browserHandoff.ts`, the browser in `src/desk/ai/completer.ts`. LangChain/LangGraph for graph workflows. Request bodies must never carry provider credentials (`rejectClientCredentials`); a user's own key reaches the server only as transient `x-ai-*` headers on AI routes (`routeUsesClientAi` in `src/desk/api/client.ts`).
 - Deeper docs (kept in step with the code; update them in the same PR as the change): `docs/README.md` (index), `docs/ARCHITECTURE.md`, `docs/API.md`, `docs/DATA-MODEL.md`, `docs/WORKFLOWS.md`, `docs/AI-SYSTEM.md`, `docs/AI-CALL-MAP.md`, `docs/UI-UX.md`, `docs/DEVELOPMENT.md`, `docs/DEPLOYMENT.md`, `SYSTEM_MAP.md`, `SETUP.md`, `RUNBOOK.md`. Security history (dated records, not current behaviour): `AUDIT.md`, `ROTATION_RUNBOOK.md`, `HOTFIX*_DEPLOY.md`.
 
 ## Slides & Keynotes (Presentation Studio, OT-22)

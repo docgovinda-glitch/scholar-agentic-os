@@ -33,8 +33,7 @@ import {
 import http from "node:http";
 import { LOCAL_RUNNERS } from "./src/config/localRunnerCatalog.ts";
 import { registerAiRunRoutes } from "./server/routes/aiRun.ts";
-import { premiumPort } from "./server/src/ai/premiumPort.ts";
-import { aiRouteDecorator, configureRouterBridge } from "./server/src/ai/routerBridge.ts";
+import { aiRouteDecorator } from "./server/src/ai/routerBridge.ts";
 import { registerHealthRoutes, registerAdminRoutes, registerAuthRoutes, registerAIRoutes, registerStudioRoutes, registerProjectRoutes, registerDraftingRoutes, registerAiAccessRoutes, registerSearchRoutes, registerVaultRoutes, registerPresentationRoutes, registerSupabaseProxy, registerSupabaseWsProxy } from "./server/routes/index.ts";
 
 if (!process.env.VITEST && process.env.NODE_ENV !== "test") {
@@ -140,88 +139,6 @@ app.use(
   })
 );
 
-// ─────────────────────────────────────────────────────────
-// GENERIC CLOUD-PROVIDER PROXY (src/config/providerCatalog.ts driven)
-// ─────────────────────────────────────────────────────────
-//
-// Replaces five near-identical `if (aiProvider === "openai" | "deepseek" |
-// "groq" | "together" | "openrouter")` blocks that differed only in a URL and
-// a default model string. That copy-paste shape is what produced the Qwen bug:
-// Qwen had a client adapter and a streaming branch here, but nobody added the
-// sixth non-streaming block, so every non-streaming Qwen request returned
-// `400 Unsupported provider: qwen` regardless of how valid the user's key was
-// — and because the client's health check never inspected response.ok, the UI
-// reported it as a vague "degraded — Unexpected response" instead. Driving
-// both endpoints off the shared catalog removes that whole class of bug and
-// means a new provider needs no server change at all.
-
-/**
- * Guards the optional client-supplied base URL.
- *
- * Cloudflare Workers AI embeds the user's account id in its address, so the
- * catalog cannot know the full URL ahead of time and the client has to send
- * it. That makes this endpoint an SSRF surface: without a check, a caller
- * could point the proxy at cloud metadata services (169.254.169.254) or hosts
- * inside the deployment's private network and read the response. So an
- * override is accepted only when it is HTTPS and resolves to a public
- * hostname; anything else falls back to the catalog's own base URL.
- */
-function isSafeOutboundBaseUrl(raw: string): boolean {
-  let url: URL;
-  try {
-    url = new URL(raw);
-  } catch {
-    return false;
-  }
-  if (url.protocol !== "https:") return false;
-
-  const host = url.hostname.toLowerCase();
-  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".internal")) return false;
-  if (host === "[::1]" || host === "::1") return false;
-
-  // Literal IPv4 addresses in private / link-local / loopback ranges.
-  const v4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-  if (v4) {
-    const [a, b] = [Number(v4[1]), Number(v4[2])];
-    if (a === 127 || a === 10 || a === 0) return false;
-    if (a === 169 && b === 254) return false;
-    if (a === 192 && b === 168) return false;
-    if (a === 172 && b >= 16 && b <= 31) return false;
-  }
-  return true;
-}
-
-function resolveProviderChatUrl(spec: CloudProviderSpec, baseUrlOverride?: string): string | null {
-  if (baseUrlOverride && isSafeOutboundBaseUrl(baseUrlOverride)) {
-    return chatUrl(spec, baseUrlOverride);
-  }
-  // Providers whose catalog entry has no base URL (Cloudflare) are unusable
-  // without a valid override — better an explicit error than a request to "".
-  if (!spec.baseUrl) return null;
-  return chatUrl(spec);
-}
-
-function openAICompatibleBody(
-  spec: CloudProviderSpec,
-  opts: {
-    model?: string;
-    systemInstruction?: string;
-    prompt: string;
-    temperature?: number;
-    stream?: boolean;
-  }
-): string {
-  return JSON.stringify({
-    model: opts.model || spec.defaultModel,
-    messages: [
-      { role: "system", content: opts.systemInstruction || "You are a helpful assistant." },
-      { role: "user", content: opts.prompt },
-    ],
-    temperature: opts.temperature ?? 0.5,
-    ...(opts.stream ? { stream: true } : {}),
-  });
-}
-
 // Zero-Retention Privacy Guard: Client-held BYOK keys in transient headers
 // are never logged, persisted, or leaked to console or disk.
 app.use((req, _res, next) => {
@@ -311,11 +228,10 @@ registerAdminRoutes(app);
 registerAuthRoutes(app);
 // Unified AI router: one streaming endpoint for every feature (src/platform/router).
 app.use(["/api/ai/run", "/api/ai/models"], aiAbuseLimit);
-registerAiRunRoutes(app, { premium: premiumPort });
+registerAiRunRoutes(app);
 // Every other AI call site runs through the same router (server/src/ai/routerBridge.ts);
 // their JSON responses carry an `aiRoute` summary of which model answered and why.
-configureRouterBridge({ premium: premiumPort });
-app.use(["/api/ai", "/api/drafting", "/api/projects/:id/agent", "/api/projects/:id/agentic", "/api/projects/:id/assignment", "/api/projects/:id/thesis", "/api/projects/:id/proposal", "/api/projects/:id/presentation", "/api/presentations"], aiRouteDecorator);
+app.use(["/api/ai", "/api/drafting", "/api/projects/:id/agent", "/api/projects/:id/agentic", "/api/projects/:id/assignment", "/api/projects/:id/thesis", "/api/projects/:id/proposal", "/api/projects/:id/presentation", "/api/projects/:id/manuscript", "/api/projects/:id/journal-requirements", "/api/projects/:id/cover-letter", "/api/projects/:id/anonymization", "/api/studio/refine", "/api/presentations"], aiRouteDecorator);
 registerAIRoutes(app, aiAbuseLimit, citationStyleRegistry);
 registerStudioRoutes(app, studioLimit);
 registerProjectRoutes(app, projectLimit);

@@ -2,8 +2,7 @@
  * Central scholarBrain Orchestrator
  *
  * Core engine unifying all 5 Scholar OS workspaces:
- * 1. Unified Client-Owned AI Execution: Resolves transient client headers (x-ai-provider,
- *    x-ai-model, x-ai-api-key, x-ai-base-url) with zero hardcoded models and zero server keys.
+ * 1. Unified Client-Owned AI Execution: Resolves the request's x-ai-keyring header with zero hardcoded models and zero server keys.
  * 2. Unified Live Scholarly & Vault Discovery: Queries OpenAlex, Crossref, EuropePMC/PubMed,
  *    arXiv, and project Knowledge Vault + uploaded primary user datasets ([CITE:src_id] / [CITE:user_data_id]).
  * 3. Unified Citation Lock & Chronological Scrubber: Strips hallucinated (Author, Year) strings
@@ -14,18 +13,13 @@
  */
 
 import { NoAiConnectedError, routedText, RouterHandoffError, toRouterTask } from "../ai/routerBridge.ts";
-import { completeWithFailover, streamWithFailover } from "../../../src/platform/gateway/gateway.ts";
-import type { CandidateProvider } from "../../../src/platform/gateway/types.ts";
-import { resolveClientAiConfig } from "../ai/clientAiConfig.ts";
 import { BrowserAiRequiredError, LocalModelUnreachableError, NoClientAiProviderError } from "../ai/aiRouteErrors.ts";
 import {
   createChallengeTokenForRequest,
   readVerifiedBrowserResult,
   type LlmRequestLike,
 } from "../../utils/llm.ts";
-import { defaultPolicy } from "../../../src/platform/warden/policy.ts";
-import { recordConsent, type EgressPolicy } from "../../../src/platform/warden/warden.ts";
-import type { TaskClass } from "../../../src/platform/warden/types.ts";
+import type { CompletionTask as TaskClass } from "../../../src/platform/completion.ts";
 import { applyScholarGuardrails } from "../../../src/shared/scholarGuardrails.ts";
 import { parseAndRepairLLMJson } from "../../../src/shared/llmJsonParser.ts";
 import { chunkAndRerankEvidence } from "./semanticRagEngine.ts";
@@ -37,14 +31,10 @@ import { ag26WorkflowCoordinator } from "../../../src/app/mesh/agents/ag26Workfl
 import { issue, revoke } from "../../../src/services/capabilities/capabilities.ts";
 import { initialProjectGateState } from "../../../src/app/conductor/conductor.ts";
 import {
-  getCandidates,
   callOpenRouterJSON as rawCallOpenRouterJSON,
   callOpenRouterText as rawCallOpenRouterText,
   handOffBeforeStream as rawHandOffBeforeStream,
   streamOpenRouterJSON as rawStreamOpenRouterJSON,
-  buildAuthorizedPolicy,
-  resolveRequestAiConfig,
-  getPremiumAiPolicy,
   signLlmChallenge,
   computePromptHash,
   generateGeminiEmbedding,
@@ -81,13 +71,6 @@ import {
 
 export type CitationStyleKey = "apa7" | "harvard" | "ieee" | "chicago" | "mla9" | "vancouver" | "oscola";
 
-export interface ClientAiHeaders {
-  provider?: string;
-  model?: string;
-  apiKey?: string;
-  baseUrl?: string;
-}
-
 export interface ScholarBrainAiRequestLike {
   headers?: Record<string, string | string[] | undefined>;
   body?: unknown;
@@ -98,7 +81,6 @@ export interface ScholarBrainAiRequestLike {
 
 export interface ScholarBrainCompleteOptions {
   req?: ScholarBrainAiRequestLike;
-  headers?: ClientAiHeaders;
   systemPrompt?: string;
   userPrompt: string;
   taskClass?: TaskClass;
@@ -181,23 +163,6 @@ export interface UnifiedCitationScrubResult extends ScrubResult {
   formattedText: string;
   referencesLedger: string;
   hallucinatedCitationsStripped: string[];
-}
-
-/**
- * Extracts transient client-owned AI credentials from incoming headers.
- * Never persists keys and never reads server env AI keys.
- */
-export function extractTransientClientAiConfig(
-  req?: ScholarBrainAiRequestLike,
-  overrides?: ClientAiHeaders
-): {
-  candidates: CandidateProvider[];
-  provider?: string;
-  model?: string;
-  localModelBrowserOnly: boolean;
-} {
-  const { candidates, provider, model, localModelBrowserOnly } = resolveClientAiConfig(req?.headers, overrides);
-  return { candidates, provider, model, localModelBrowserOnly };
 }
 
 /**
@@ -322,10 +287,6 @@ function cachedLiveDiscovery(query: string, maxResults: number): Promise<LiveDra
  * because generic text calls (JSON, code, citations) must not be rewritten.
  */
 export {
-  getCandidates,
-  buildAuthorizedPolicy,
-  resolveRequestAiConfig,
-  getPremiumAiPolicy,
   signLlmChallenge,
   computePromptHash,
   generateGeminiEmbedding,
@@ -380,10 +341,6 @@ export const scholarBrain = {
   callJSON: (...args: Parameters<typeof callOpenRouterJSON>) => callOpenRouterJSON(...args),
   callText: (...args: Parameters<typeof callOpenRouterText>) => callOpenRouterText(...args),
   streamJSON: (...args: Parameters<typeof streamOpenRouterJSON>) => streamOpenRouterJSON(...args),
-  getCandidates: (...args: Parameters<typeof getCandidates>) => getCandidates(...args),
-  buildAuthorizedPolicy: (...args: Parameters<typeof buildAuthorizedPolicy>) => buildAuthorizedPolicy(...args),
-  resolveRequestAiConfig: (...args: Parameters<typeof resolveRequestAiConfig>) => resolveRequestAiConfig(...args),
-  getPremiumAiPolicy: (...args: Parameters<typeof getPremiumAiPolicy>) => getPremiumAiPolicy(...args),
   signLlmChallenge: (...args: Parameters<typeof signLlmChallenge>) => signLlmChallenge(...args),
   computePromptHash: (...args: Parameters<typeof computePromptHash>) => computePromptHash(...args),
   generateGeminiEmbedding: (...args: Parameters<typeof generateGeminiEmbedding>) => generateGeminiEmbedding(...args),
@@ -405,15 +362,7 @@ export const scholarBrain = {
       ? `${voicePrompt}\n\n[TASK DIRECTIVES]\n${options.systemPrompt}`
       : voicePrompt;
 
-    // Explicit settings (options.headers) read as the legacy x-ai-* headers.
-    const o = options.headers;
-    const explicit: Record<string, string> = {};
-    if (o?.provider) explicit["x-ai-provider"] = o.provider;
-    if (o?.model) explicit["x-ai-model"] = o.model;
-    if (o?.apiKey) explicit["x-ai-api-key"] = o.apiKey;
-    if (o?.baseUrl) explicit["x-ai-base-url"] = o.baseUrl;
-    const baseReq = options.req ?? {};
-    const req = (Object.keys(explicit).length ? { ...baseReq, headers: { ...(baseReq.headers ?? {}), ...explicit } } : (options.req ?? { headers: {} })) as LlmRequestLike;
+    const req = (options.req ?? { headers: {} }) as LlmRequestLike;
     const browserPayload = () => ({
       challengeToken: createChallengeTokenForRequest(req, fullSystemPrompt, options.userPrompt),
       systemPrompt: fullSystemPrompt,

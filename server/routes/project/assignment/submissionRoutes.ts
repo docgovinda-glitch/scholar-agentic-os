@@ -6,8 +6,8 @@ import {
   normalizeUnicodeNFC,
 } from "../../../src/utils/scholarlyVoiceGuard.ts";
 import { getProjectStore } from "../../../../src/services/store/projectStore.ts";
-import { callOpenRouterJSON, callOpenRouterText, getCandidates, buildAuthorizedPolicy, resolveRequestAiConfig } from "../../../src/services/scholarBrain.ts";
-import { completeWithFailover } from "../../../../src/platform/gateway/gateway.ts";
+import { callOpenRouterJSON, callOpenRouterText } from "../../../src/services/scholarBrain.ts";
+import { requestKeyring } from "../../../src/ai/routerBridge.ts";
 import { scholarBrain } from "../../../src/services/scholarBrain.ts";
 import {
   auditDocumentLineByLine,
@@ -480,8 +480,7 @@ Explain predicted marks, highlight priority fixes needed to step up to the next 
   userPrompt += `CURRENT STUDENT QUERY / ACTION:\n"${message}"\n\nRespond as ${personaName} (${personaRole}). Provide concise, highly actionable, academically rigorous markdown advice.`;
 
   // Attempt live LLM candidate invocation if configured
-  const candidates = getCandidates(req);
-  if (candidates.length > 0) {
+  if ((await requestKeyring(req as never)).length > 0) {
     try {
       const brainResult = await scholarBrain.complete({
         req,

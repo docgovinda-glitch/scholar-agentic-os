@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { keyringHeader } from "../../test/aiTestKit.ts";
 
 vi.mock("../../src/middleware/auth.ts", () => ({
   requireAuth: (req: { user?: { id: string; email: string } }, _res: unknown, next: () => void) => {
@@ -63,8 +64,7 @@ Classical realism and neorealism share core assumptions regarding anarchy, survi
 
       const res = await request(app)
         .post("/api/ai/agent")
-        .set("x-ai-provider", "gemini")
-        .set("x-ai-api-key", "test-key")
+        .set(keyringHeader("gemini", "test-model", "test-key"))
         .send({
           prompt: "Explain the difference between realism and neorealism in international relations",
           mode: "normal",
@@ -145,8 +145,7 @@ In parallel, economic cooperation has expanded into cross-border retail digital 
 
       const res = await request(app)
         .post("/api/ai/agent")
-        .set("x-ai-provider", "gemini")
-        .set("x-ai-api-key", "test-key")
+        .set(keyringHeader("gemini", "test-model", "test-key"))
         .send({
           prompt: "What are the latest diplomatic and economic developments between Nepal and India?",
           mode: "search",
@@ -238,8 +237,7 @@ While Indian strategic planners emphasize shared cultural ties and security sens
 
       const res = await request(app)
         .post("/api/ai/agent")
-        .set("x-ai-provider", "gemini")
-        .set("x-ai-api-key", "test-key")
+        .set(keyringHeader("gemini", "test-model", "test-key"))
         .send({
           prompt: "Conduct a deep research analysis of India's strategic engagement with Nepal since 1950",
           mode: "deep-research",
@@ -316,8 +314,7 @@ Archival diplomatic records in your Knowledge Vault demonstrate how early tariff
 
       const res = await request(app)
         .post("/api/ai/agent")
-        .set("x-ai-provider", "gemini")
-        .set("x-ai-api-key", "test-key")
+        .set(keyringHeader("gemini", "test-model", "test-key"))
         .send({
           prompt: "Compare my uploaded policy brief and Vault notes with recent Nepal-India trade statistics",
           mode: "search",
@@ -436,9 +433,7 @@ In several competitive Senate and gubernatorial races (including Pennsylvania, A
 
       const res = await request(app)
         .post("/api/ai/agent")
-        .set("x-ai-provider", "gemini")
-        .set("x-ai-model", "gemini-2.5-flash -- unverified")
-        .set("x-ai-api-key", "test-key")
+        .set(keyringHeader("gemini", "gemini-2.5-flash -- unverified", "test-key"))
         .send({
           prompt: "Why Republican Lost mid term elections in United States?",
           citationStyle: "apa",

@@ -12,7 +12,7 @@
  *
  * 2. `requireScope(scope)` — is this admin allowed to do THIS specific
  *    thing. admin_users.scopes (a text[] column) holds a subset of SCOPES
- *    per admin, so the main admin can grant someone "manage_premium" without
+ *    per admin, so the main admin can grant someone "manage_opportunities" without
  *    also handing them "manage_admins". A route with no requireScope call
  *    (dashboard/usage/audit) is readable by any admin regardless of scopes —
  *    those are low-risk, transparency-oriented views, not mutations.
@@ -37,9 +37,6 @@ import type { AuthenticatedUser } from "./auth";
  * ROSTER v2" comment), so a new scope never needs a migration.
  */
 export const SCOPES = [
-  "manage_providers",
-  "manage_premium",
-  "manage_budget",
   "manage_opportunities",
   "manage_users",
   "manage_admins",

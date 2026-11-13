@@ -6,7 +6,6 @@ import JournalHeaderActions from "./JournalHeaderActions";
 import { useAiAccess } from "../aiAccess/useAiAccess";
 import Tray from "../regions/Tray";
 import AiExhaustedModal from "./AiExhaustedModal";
-import { subscribeExecutionState, type ExecutionScope } from "../../services/executionState";
 import { useUnsavedChangesGuard } from "../../hooks/useUnsavedChangesGuard";
 import AppleStudioHeader, { type AppleStudioPhaseId } from "../../components/ui/AppleStudioShell";
 import { safeParseAnswerField } from "../../shared/projectStateSchema";
@@ -37,8 +36,6 @@ function ResearchWorkspaceInner({
     setMode,
     error,
     isLoading,
-    manualModelOverride,
-    setManualModelOverride,
     aiExhaustedError,
     setAiExhaustedError,
     fallbackToast,
@@ -76,14 +73,6 @@ function ResearchWorkspaceInner({
     ? (defaultProvider.selectedModel ? `${defaultProvider.name} - ${defaultProvider.selectedModel}` : defaultProvider.name) 
     : "Automatic";
 
-  const [liveExecution, setLiveExecution] = useState<ExecutionScope | null>(null);
-
-  React.useEffect(() => {
-    return subscribeExecutionState((scope) => {
-      setLiveExecution(scope);
-    });
-  }, []);
-
   // Live Header Telemetry Strip Metrics
   const targetWords = React.useMemo(() => {
     const bp = safeParseAnswerField<{ targetTotalWords?: number } | null>(
@@ -120,10 +109,6 @@ function ResearchWorkspaceInner({
     );
     return (Array.isArray(datasets) ? datasets.length : 0) + (Array.isArray(vault) ? vault.length : 0);
   }, [project?.answers]);
-
-  const activeModelDisplay = manualModelOverride
-    ? (manualModelOverride.modelId || manualModelOverride.providerId)
-    : (defaultProvider?.selectedModel ? `${defaultProvider.name} - ${defaultProvider.selectedModel}` : (defaultProvider?.name || "Client AI: Auto"));
 
   const autosaveVersion = project?.version || 1;
   // The assistant follows the view on screen, not the last saved stage.
@@ -204,6 +189,7 @@ function ResearchWorkspaceInner({
         }}
         // Words, sources and the model are shown by the journal's own header controls below.
         onOpenAiAccess={onOpenAiAccess}
+        aiWorkspace="journal"
         autosaveStatus="saved"
         projectVersion={autosaveVersion}
         zenMode={isZenMode}
@@ -215,12 +201,6 @@ function ResearchWorkspaceInner({
             actualWords={actualWords}
             targetWords={targetWords}
             sourcesCount={totalVerifiedSourcesAndData}
-            connected={connected}
-            defaultModelText={defaultModelText}
-            activeModelDisplay={activeModelDisplay}
-            manualModelOverride={manualModelOverride}
-            onModelOverride={setManualModelOverride}
-            liveExecution={liveExecution}
             activityOpen={trayOpen}
             onToggleActivity={() => setTrayOpen((o) => !o)}
             onOpenVault={onOpenVault}

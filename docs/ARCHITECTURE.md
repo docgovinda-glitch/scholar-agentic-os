@@ -97,7 +97,7 @@ Ownership is enforced in application code: the server holds the service-role key
 
 ### 3.5 Shared code
 
-The server imports from `src/` (citation formatters, `document_intelligence`, mesh agents, `platform/` gateway, router and warden, `config/` catalogs). Those modules must stay free of browser-only APIs. SSRF-sensitive fetches of user-supplied URLs go through `server/utils/ssrfGuard.ts` (HTTP/HTTPS only, DNS pre-resolution with private-range blocking, connection pinning, per-hop redirect validation, 2 MB and 8 s caps).
+The server imports from `src/` (citation formatters, `document_intelligence`, mesh agents, `platform/` router, completion and warden, `config/` catalogs). Those modules must stay free of browser-only APIs. SSRF-sensitive fetches of user-supplied URLs go through `server/utils/ssrfGuard.ts` (HTTP/HTTPS only, DNS pre-resolution with private-range blocking, connection pinning, per-hop redirect validation, 2 MB and 8 s caps).
 
 ## 4. Client layer
 
@@ -128,7 +128,7 @@ The server imports from `src/` (citation formatters, `document_intelligence`, me
 | `src/app/` | Client engines: `atlas` (output-type catalog), `conductor` (gates), `mesh` (agent registry and executor), `citation`, `manuscript`, `review`, `coherence`, `rubric`, `studio`, `journal`, `anonymization`, `coverLetter`, `export` |
 | `src/domain/` | Pure models and zod schemas; no React and no I/O |
 | `src/features/` | `slides` (Presentation Studio and Gamma card engine), `coursework` (style engine, legacy coursework components), `drafting`, `sources`, `understand` |
-| `src/platform/` | `gateway/` (provider adapters, failover), `router/` (request router, circuit breaker, model curation, SSE bridge), `warden/` (egress policy, consent) |
+| `src/platform/` | `router/` (the one AI engine: adapters, failover, key rotation, circuit breaker, model listing and curation, SSE bridge), `completion.ts` (the `Completer` app modules use), `warden/` (egress policy, used by the mesh agents) |
 | `src/services/` | Auth, Supabase client, vault, store, offline queue, crypto, capabilities, AI settings and diagnostics |
 | `src/citation_compliance/` | Formatters, validation, CSL engine, BibTeX/RIS importers |
 | `src/config/` | `providerCatalog.ts`, `modelCatalog.ts`, `localRunnerCatalog.ts` |

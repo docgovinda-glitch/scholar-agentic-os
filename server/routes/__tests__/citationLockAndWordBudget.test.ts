@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { keyringHeader } from "../../test/aiTestKit.ts";
 
 export const TEST_USER_ID = "11111111-1111-4111-8111-111111111111";
 vi.mock("../../src/middleware/auth.ts", () => ({
@@ -26,7 +27,7 @@ vi.mock("../../src/ai/routerBridge.ts", async (importOriginal) => {
 });
 
 /** Headers that give the request a (mocked) BYOK provider. */
-const AI_HEADERS = { "x-ai-provider": "openai", "x-ai-model": "gpt-4o-mini", "x-ai-api-key": "test-key" };
+const AI_HEADERS = keyringHeader("openai", "gpt-4o-mini", "test-key");
 
 /** A stand-in AI draft of about `words` words with varied sentence lengths. */
 function fakeAiDraft(lead: string, words: number): string {

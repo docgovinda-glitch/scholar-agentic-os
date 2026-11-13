@@ -65,7 +65,7 @@ A navigational map of the repository: where things live and where to start when 
 | :--- | :--- |
 | Lint gates | `verify-contrast.mjs`, `verify-csp-hash.mjs`, `verify-no-pure-black.mjs`, `verify-no-raw-hex-classes.mjs` |
 | Build | `verify-chunk-budget.mjs`, `slide-parity/`, `verify-scholar-presentation-mega.mjs` |
-| Database | `db/replay-migrations.sh`, `db/schema-diff.sh`, `db/schema-fingerprint.sql`, `db/supabase-stub.sql`, `db/test-credits.sql`, `verify-local-supabase.sh`, `apply-*-migration.ts`, `migrate-jsonb-to-relational.ts`, `create_bucket.ts` |
+| Database | `db/replay-migrations.sh`, `db/schema-diff.sh`, `db/schema-fingerprint.sql`, `db/supabase-stub.sql`, `verify-local-supabase.sh`, `apply-*-migration.ts`, `migrate-jsonb-to-relational.ts`, `create_bucket.ts` |
 | Operations | `smoke-prod.mjs`, `smoke-prod.sh`, `verify-deployment-readiness.sh`, `rewrap-platform-credentials.ts`, `reset-all-vaults.ts`, `migrate-users-to-supabase.ts`, `seedAiRegistry.ts`, `e2e-setup.mjs` |
 
 ## 6. Where to start

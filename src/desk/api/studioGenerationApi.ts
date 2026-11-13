@@ -1,3 +1,5 @@
+import { runAiText } from "../ai/aiRun";
+import { liveAiStatus } from "../ai/liveAiStatus";
 import { authedFetch, authedJsonFetch, json, UnauthenticatedError } from "./client";
 import { providersWithStoredKey } from "../../services/userAiSettings";
 import type {
@@ -13,22 +15,7 @@ import type {
 } from "../types";
 import type { AiOperationalStatus } from "./types";
 
-export class StudioConsentRequiredError extends Error {
-  readonly kind = "consent_required" as const;
-  constructor(reason: string, public readonly provider?: string) {
-    super(reason);
-    this.name = "StudioConsentRequiredError";
-  }
-}
-
-export class StudioDeniedError extends Error {
-  readonly kind = "denied" as const;
-  constructor(reason: string) {
-    super(reason);
-    this.name = "StudioDeniedError";
-  }
-}
-
+/** The server answered that no AI connection is set up (HTTP 400, code ai_provider_required). */
 export class StudioNoAiSourceError extends Error {
   readonly kind = "no_ai_source" as const;
   constructor(reason: string) {
@@ -37,60 +24,54 @@ export class StudioNoAiSourceError extends Error {
   }
 }
 
-export async function refinePassage(params: {
-  sessionId: string;
-  passageId: string;
-  text: string;
-  level: InterventionLevel;
-  l1?: string;
-  voiceProfile?: VoiceProfile;
-  provider?: string;
-  model?: string;
-  useEngine?: "premium";
-}): Promise<StudioRefineResult> {
-  const res = await authedJsonFetch("/api/studio/refine", "POST", params);
-  if (res.status === 428) {
-    const body = await res.json().catch(() => ({}));
-    throw new StudioConsentRequiredError((body as { reason?: string; provider?: string }).reason || "Consent required.", (body as { provider?: string }).provider);
+/**
+ * POSTs an AI feature. When the user's next model is on their own computer the
+ * server cannot reach it and answers 426 with the exact prompt; the browser
+ * runs it and re-sends the request with the result. A feature with several
+ * model calls (coherence passes, review lenses) takes one round trip per call.
+ */
+async function postAi(url: string, body: Record<string, unknown>): Promise<Response> {
+  const browserResults: Array<{ challengeToken: string; llmResult: string }> = [];
+  for (let round = 0; round < 40; round++) {
+    const res = await authedJsonFetch(url, "POST", { ...body, browserResults }, { skipLlmFallback: true });
+    if (res.status !== 426) return res;
+    const data = (await res.json().catch(() => null)) as { requireFrontendLLM?: boolean; challengeToken?: string; systemPrompt?: string; userPrompt?: string; taskType?: string } | null;
+    if (!data?.requireFrontendLLM || !data.challengeToken) throw new Error("The server asked for a browser AI step it could not describe.");
+    const run = liveAiStatus.begin();
+    let llmResult: string;
+    try {
+      llmResult = await runAiText(
+        { task: "reasoning", messages: [...(data.systemPrompt ? [{ role: "system" as const, content: data.systemPrompt }] : []), { role: "user" as const, content: data.userPrompt ?? "" }] },
+        run.signal,
+        (ev) => run.publish(ev)
+      );
+    } catch (err) {
+      run.end(err);
+      throw err;
+    }
+    run.end();
+    browserResults.push({ challengeToken: data.challengeToken, llmResult });
   }
-  if (res.status === 403) {
-    const body = await res.json().catch(() => ({}));
-    throw new StudioDeniedError((body as { reason?: string }).reason || "Denied by privacy policy.");
-  }
-  if (res.status === 402) {
-    const body = await res.json().catch(() => ({}));
-    throw new StudioNoAiSourceError((body as { error?: string }).error || "No AI source is currently available.");
-  }
-  return json<StudioRefineResult>(res);
+  throw new Error("This step needed more AI calls than expected and was stopped.");
 }
 
-export async function grantStudioConsent(sessionId: string, provider: string): Promise<void> {
-  await authedJsonFetch("/api/studio/consent", "POST", { sessionId, provider }).then((r) => json(r));
+/** Reads a JSON answer, turning "no AI connected" into StudioNoAiSourceError so panels can point to AI Access. */
+async function aiJson<T>(res: Response): Promise<T> {
+  if (res.status === 400) {
+    const body = (await res.json().catch(() => ({}))) as { code?: string; error?: string };
+    if (body.code === "ai_provider_required") throw new StudioNoAiSourceError(body.error || "No AI is connected.");
+    throw new Error(body.error || "Request failed (400)");
+  }
+  return json<T>(res);
 }
 
 export async function extractJournalRequirements(params: {
   projectId: string;
   guidelinesText: string;
-  provider?: string;
-  apiKey?: string;
-  model?: string;
-  useEngine?: "premium";
 }): Promise<{ proposal: JournalRequirementsProposal }> {
   const { projectId, ...requestBody } = params;
-  const res = await authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/journal-requirements/extract`, "POST", requestBody);
-  if (res.status === 428) {
-    const errBody = await res.json().catch(() => ({}));
-    throw new StudioConsentRequiredError((errBody as { reason?: string; provider?: string }).reason || "Consent required.", (errBody as { provider?: string }).provider);
-  }
-  if (res.status === 403) {
-    const errBody = await res.json().catch(() => ({}));
-    throw new StudioDeniedError((errBody as { reason?: string }).reason || "Denied by privacy policy.");
-  }
-  if (res.status === 402) {
-    const errBody = await res.json().catch(() => ({}));
-    throw new StudioNoAiSourceError((errBody as { error?: string }).error || "No AI source is currently available.");
-  }
-  return json<{ proposal: JournalRequirementsProposal }>(res);
+  const res = await postAi(`/api/projects/${encodeURIComponent(projectId)}/journal-requirements/extract`, requestBody);
+  return aiJson<{ proposal: JournalRequirementsProposal }>(res);
 }
 
 export async function getManuscriptJob(projectId: string): Promise<GenerationJob | null> {
@@ -105,50 +86,18 @@ export function startManuscriptJob(projectId: string): Promise<GenerationJob> {
 
 export async function generateNextSection(params: {
   projectId: string;
-  provider?: string;
-  apiKey?: string;
-  model?: string;
-  useEngine?: "premium";
 }): Promise<{ generationJob: GenerationJob }> {
   const { projectId, ...requestBody } = params;
-  const res = await authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/manuscript/next-section`, "POST", requestBody);
-  if (res.status === 428) {
-    const errBody = await res.json().catch(() => ({}));
-    throw new StudioConsentRequiredError((errBody as { reason?: string; provider?: string }).reason || "Consent required.", (errBody as { provider?: string }).provider);
-  }
-  if (res.status === 403) {
-    const errBody = await res.json().catch(() => ({}));
-    throw new StudioDeniedError((errBody as { reason?: string }).reason || "Denied by privacy policy.");
-  }
-  if (res.status === 402) {
-    const errBody = await res.json().catch(() => ({}));
-    throw new StudioNoAiSourceError((errBody as { error?: string }).error || "No AI source is currently available.");
-  }
-  return json<{ generationJob: GenerationJob }>(res);
+  const res = await postAi(`/api/projects/${encodeURIComponent(projectId)}/manuscript/next-section`, requestBody);
+  return aiJson<{ generationJob: GenerationJob }>(res);
 }
 
 export async function runCoherenceCheck(params: {
   projectId: string;
-  provider?: string;
-  apiKey?: string;
-  model?: string;
-  useEngine?: "premium";
 }): Promise<{ generationJob: GenerationJob }> {
   const { projectId, ...requestBody } = params;
-  const res = await authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/manuscript/coherence-check`, "POST", requestBody);
-  if (res.status === 428) {
-    const errBody = await res.json().catch(() => ({}));
-    throw new StudioConsentRequiredError((errBody as { reason?: string; provider?: string }).reason || "Consent required.", (errBody as { provider?: string }).provider);
-  }
-  if (res.status === 403) {
-    const errBody = await res.json().catch(() => ({}));
-    throw new StudioDeniedError((errBody as { reason?: string }).reason || "Denied by privacy policy.");
-  }
-  if (res.status === 402) {
-    const errBody = await res.json().catch(() => ({}));
-    throw new StudioNoAiSourceError((errBody as { error?: string }).error || "No AI source is currently available.");
-  }
-  return json<{ generationJob: GenerationJob }>(res);
+  const res = await postAi(`/api/projects/${encodeURIComponent(projectId)}/manuscript/coherence-check`, requestBody);
+  return aiJson<{ generationJob: GenerationJob }>(res);
 }
 
 export function getPeerReviewHistory(projectId: string): Promise<PeerReviewHistory> {
@@ -157,27 +106,11 @@ export function getPeerReviewHistory(projectId: string): Promise<PeerReviewHisto
 
 export async function runPeerReview(params: {
   projectId: string;
-  provider?: string;
-  apiKey?: string;
-  model?: string;
-  useEngine?: "premium";
   lenses?: ReviewLens[];
 }): Promise<{ peerReviewHistory: PeerReviewHistory; gates: GateSummary[] }> {
   const { projectId, ...requestBody } = params;
-  const res = await authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/manuscript/peer-review`, "POST", requestBody);
-  if (res.status === 428) {
-    const errBody = await res.json().catch(() => ({}));
-    throw new StudioConsentRequiredError((errBody as { reason?: string; provider?: string }).reason || "Consent required.", (errBody as { provider?: string }).provider);
-  }
-  if (res.status === 403) {
-    const errBody = await res.json().catch(() => ({}));
-    throw new StudioDeniedError((errBody as { reason?: string }).reason || "Denied by privacy policy.");
-  }
-  if (res.status === 402) {
-    const errBody = await res.json().catch(() => ({}));
-    throw new StudioNoAiSourceError((errBody as { error?: string }).error || "No AI source is currently available.");
-  }
-  return json<{ peerReviewHistory: PeerReviewHistory; gates: GateSummary[] }>(res);
+  const res = await postAi(`/api/projects/${encodeURIComponent(projectId)}/manuscript/peer-review`, requestBody);
+  return aiJson<{ peerReviewHistory: PeerReviewHistory; gates: GateSummary[] }>(res);
 }
 
 export function pauseManuscriptJob(projectId: string): Promise<GenerationJob> {
@@ -196,26 +129,10 @@ export async function getCoverLetter(projectId: string): Promise<CoverLetter | n
 
 export async function generateCoverLetter(params: {
   projectId: string;
-  provider?: string;
-  apiKey?: string;
-  model?: string;
-  useEngine?: "premium";
 }): Promise<{ coverLetter: CoverLetter }> {
   const { projectId, ...requestBody } = params;
-  const res = await authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/cover-letter`, "POST", requestBody);
-  if (res.status === 428) {
-    const errBody = await res.json().catch(() => ({}));
-    throw new StudioConsentRequiredError((errBody as { reason?: string; provider?: string }).reason || "Consent required.", (errBody as { provider?: string }).provider);
-  }
-  if (res.status === 403) {
-    const errBody = await res.json().catch(() => ({}));
-    throw new StudioDeniedError((errBody as { reason?: string }).reason || "Denied by privacy policy.");
-  }
-  if (res.status === 402) {
-    const errBody = await res.json().catch(() => ({}));
-    throw new StudioNoAiSourceError((errBody as { error?: string }).error || "No AI source is currently available.");
-  }
-  return json<{ coverLetter: CoverLetter }>(res);
+  const res = await postAi(`/api/projects/${encodeURIComponent(projectId)}/cover-letter`, requestBody);
+  return aiJson<{ coverLetter: CoverLetter }>(res);
 }
 
 export async function exportProject(projectId: string, format: "docx" | "odt" | "pdf"): Promise<Blob> {

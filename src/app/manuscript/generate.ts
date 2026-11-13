@@ -26,11 +26,9 @@
  * not just requested in the prompt.
  */
 
-import { complete, GatewayDenied } from "../../platform/gateway/gateway";
-import type { EgressPolicy } from "../../platform/warden/warden";
+import type { Completer } from "../../platform/completion";
 import type { GeneratedSection, SectionPlan } from "../../domain/manuscript/types";
 
-export { GatewayDenied } from "../../platform/gateway/gateway";
 
 export interface CitableEvidenceForGeneration {
   id: string;
@@ -51,11 +49,8 @@ export interface SectionContextPacket {
 
 export interface GenerateSectionInput {
   packet: SectionContextPacket;
-  provider?: string;
-  apiKey?: string;
-  model?: string;
-  scopeId?: string;
-  policy?: EgressPolicy;
+  /** Runs the model; see src/platform/completion.ts. */
+  complete: Completer;
 }
 
 export interface GenerateSectionUsage {
@@ -147,26 +142,14 @@ function tryParseResponse(raw: string): ParsedResponse | undefined {
 }
 
 export async function generateSection(input: GenerateSectionInput): Promise<GenerateSectionResult> {
-  if (!input.provider || !input.apiKey) {
-    throw new Error("Manuscript generation requires a model provider and API key.");
-  }
 
-  const result = await complete(
+  const result = await input.complete(
     {
-      provider: input.provider,
-      apiKey: input.apiKey,
-      model: input.model,
       taskClass: "drafting",
-      scopeId: input.scopeId,
       systemPrompt: systemPrompt(input.packet),
       userPrompt: `Write the "${input.packet.section.title}" section now.`,
-      segments: [
-        { label: "Research context (article-level)", text: input.packet.researchContext },
-        { label: "Approved evidence corpus", text: input.packet.citableEvidence.map((e) => e.quote).join("\n") },
-      ],
       responseFormat: "json",
-    },
-    input.policy
+    }
   );
 
   const parsed = tryParseResponse(result.text);

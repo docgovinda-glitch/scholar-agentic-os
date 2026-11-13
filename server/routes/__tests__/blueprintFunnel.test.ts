@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { keyringHeader } from "../../test/aiTestKit.ts";
 
 const TEST_USER_ID = "11111111-1111-4111-8111-111111111111";
 vi.mock("../../src/middleware/auth.ts", () => ({
@@ -26,7 +27,7 @@ import { app } from "../../../server.ts";
 import { __resetProjectStoreForTests } from "../../../src/app/conductor/projectStore.ts";
 import { getProjectStore, type ProjectRecord } from "../../../src/services/store/projectStore.ts";
 
-const AI_HEADERS = { "x-ai-provider": "openai", "x-ai-model": "gpt-4o-mini", "x-ai-api-key": "test-key" };
+const AI_HEADERS = keyringHeader("openai", "gpt-4o-mini", "test-key");
 async function project(id: string) {
   const rec: ProjectRecord = {
     projectId: id, ownerId: TEST_USER_ID, schemaVersion: 1, outputTypeId: "OT-10", answers: {}, gates: [],

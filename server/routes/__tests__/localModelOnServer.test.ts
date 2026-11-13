@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
+import { keyringHeader } from "../../test/aiTestKit.ts";
 
 const TEST_USER_ID = "44444444-4444-4444-8444-444444444444";
 vi.mock("../../src/middleware/auth.ts", () => ({
@@ -10,7 +11,7 @@ vi.mock("../../src/middleware/auth.ts", () => ({
 
 import request from "supertest";
 import { app } from "../../../server.ts";
-import { resolveClientAiConfig, serverCanReachLocalModels } from "../../src/ai/clientAiConfig.ts";
+import { serverCanReachLocalModels } from "../../src/ai/serverLocalAccess.ts";
 import { scholarBrain } from "../../src/services/scholarBrain.ts";
 import {
   BrowserAiRequiredError,
@@ -28,7 +29,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const LOCAL = { "x-ai-provider": "ollama", "x-ai-base-url": "http://localhost:11434" };
+const LOCAL = keyringHeader("ollama", "test-model", undefined, "http://localhost:11434");
 
 describe("local models are never called from a deployed server", () => {
   it("is reachable in development and tests, not in production", () => {
@@ -44,16 +45,6 @@ describe("local models are never called from a deployed server", () => {
     }
   });
 
-  it("yields no server candidate for any catalog runner, and flags browser-only", () => {
-    process.env.ALLOW_SERVER_LOCAL_AI = "false";
-    for (const provider of ["ollama", "lmstudio", "jan", "llamacpp", "koboldcpp", "textgenwebui"]) {
-      const cfg = resolveClientAiConfig({ "x-ai-provider": provider });
-      expect(cfg.candidates).toEqual([]);
-      expect(cfg.localModelBrowserOnly).toBe(true);
-    }
-    // Cloud keys are unaffected.
-    expect(resolveClientAiConfig({ "x-ai-provider": "openai", "x-ai-api-key": "k" }).candidates).toHaveLength(1);
-  });
 
   it("scholarBrain says the local model is unreachable instead of calling the server's localhost", async () => {
     process.env.ALLOW_SERVER_LOCAL_AI = "false";

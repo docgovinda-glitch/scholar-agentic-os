@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
 import {
-  StudioConsentRequiredError,
-  StudioDeniedError,
   StudioNoAiSourceError,
   generateCoverLetter as callGenerateCoverLetter,
   generateNextSection,
@@ -14,8 +12,6 @@ import {
   runPeerReview as callPeerReview,
   startManuscriptJob,
 } from "../api";
-import { routeDecision } from "../aiAccess/aiAccessApi";
-import { readProviderKey } from "../../services/userAiSettings";
 import { auditStyleCompliance, type StyleAuditReport } from "../../features/coursework/services/styleEngineService";
 import type { CoherenceDimension, CoverLetter, GeneratedSection, GenerationJob, PeerReviewHistory, ReviewLens } from "../types";
 
@@ -52,74 +48,22 @@ const STATE_LABEL: Record<GenerationJob["state"], string> = {
   failed: "Failed",
 };
 
-/** Same routing/fallback walk as JournalRequirementsPanel's runExtraction — see that component's own comment for why "local" is skipped and why a consent/deny verdict stops the walk immediately rather than being treated as "this provider is down". */
-/**
- * Walks the Scholar AI Engine's routing decision, trying each candidate in
- * order — same discipline as JournalRequirementsPanel's runExtraction:
- * "local" is skipped (no local-execution pipeline for either of this
- * panel's calls), a consent/deny verdict stops the walk immediately since
- * it's a privacy answer rather than "this provider is down", and every
- * other failure just falls through to the next candidate.
- */
-async function walkRoutingCandidates<T>(
-  call: (byok: { provider: string; apiKey: string; model?: string } | { useEngine: "premium" }) => Promise<T>
-): Promise<T> {
-  const decision = await routeDecision("reasoning");
-  if (!decision.ok) {
-    throw new StudioNoAiSourceError(decision.reasoning);
-  }
-
-  const candidates = [decision.choice, ...decision.fallbacks];
-  let lastError: Error = new StudioNoAiSourceError("No AI source is currently available.");
-
-  for (const choice of candidates) {
-    if (choice.tier === "local") continue;
-    try {
-      if (choice.tier === "premium") {
-        return await call({ useEngine: "premium" });
-      }
-      const apiKey = await readProviderKey(choice.providerId);
-      if (!apiKey) {
-        lastError = new StudioNoAiSourceError(
-          `${choice.providerId} is connected but its key isn't stored on this device. Open AI Access to reconnect it.`
-        );
-        continue;
-      }
-      return await call({ provider: choice.providerId, apiKey, model: choice.modelId });
-    } catch (e) {
-      if (e instanceof StudioConsentRequiredError || e instanceof StudioDeniedError) throw e;
-      lastError = e as Error;
-    }
-  }
-  throw lastError;
+// Each call runs on the server over the user's AI Access connections, which
+// rotates keys and falls back on its own (src/platform/router).
+async function runGeneration(projectId: string): Promise<GenerationJob> {
+  return (await generateNextSection({ projectId })).generationJob;
 }
 
-function runGeneration(projectId: string): Promise<GenerationJob> {
-  return walkRoutingCandidates(async (byok) => {
-    const { generationJob } = await generateNextSection({ projectId, ...byok });
-    return generationJob;
-  });
+async function runCoherence(projectId: string): Promise<GenerationJob> {
+  return (await runCoherenceCheck({ projectId })).generationJob;
 }
 
-function runCoherence(projectId: string): Promise<GenerationJob> {
-  return walkRoutingCandidates(async (byok) => {
-    const { generationJob } = await runCoherenceCheck({ projectId, ...byok });
-    return generationJob;
-  });
+async function runReview(projectId: string): Promise<PeerReviewHistory> {
+  return (await callPeerReview({ projectId })).peerReviewHistory;
 }
 
-function runReview(projectId: string): Promise<PeerReviewHistory> {
-  return walkRoutingCandidates(async (byok) => {
-    const { peerReviewHistory } = await callPeerReview({ projectId, ...byok });
-    return peerReviewHistory;
-  });
-}
-
-function runCoverLetter(projectId: string): Promise<CoverLetter> {
-  return walkRoutingCandidates(async (byok) => {
-    const { coverLetter } = await callGenerateCoverLetter({ projectId, ...byok });
-    return coverLetter;
-  });
+async function runCoverLetter(projectId: string): Promise<CoverLetter> {
+  return (await callGenerateCoverLetter({ projectId })).coverLetter;
 }
 
 export default function ManuscriptGenerationPanel({

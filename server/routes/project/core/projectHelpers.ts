@@ -74,8 +74,6 @@ import { countWords, MIN_GUIDELINES_WORDS } from "../../../../src/domain/journal
 import type { JournalRequirements, JournalRequirementsProposal } from "../../../../src/domain/journal/types.ts";
 import { isOutputTypeEnabled, MAINTENANCE_MESSAGE } from "../../outputTypeAccess.ts";
 import { extractJournalRequirements } from "../../../../src/app/journal/extract.ts";
-import { estimateMaxCreditsForInput } from "../../../src/aiEngine/creditPolicy.ts";
-import { runPremium, type PremiumOutcome } from "../../../src/ai/premium.ts";
 import { allocateWordBudget } from "../../../../src/domain/manuscript/wordBudget.ts";
 import type { GeneratedSection, SectionPlan } from "../../../../src/domain/manuscript/types.ts";
 import {
@@ -141,23 +139,6 @@ export function isValidJournalRequirementsInput(
   return JournalRequirementsInputSchema.safeParse(value).success;
 }
 
-export { DEDUCT_FAILURE_MESSAGES, recordPremiumUsage } from "../../../src/ai/premium.ts";
-
-/** Journal requirements extraction on Premium. Steps and their reasons: server/src/ai/premium.ts. */
-export async function runPremiumJournalExtraction(
-  userId: string,
-  extractInput: Omit<Parameters<typeof extractJournalRequirements>[0], "provider" | "apiKey" | "model">
-): Promise<PremiumOutcome<Awaited<ReturnType<typeof extractJournalRequirements>>>> {
-  return runPremium({
-    userId,
-    estimatedCredits: estimateMaxCreditsForInput(extractInput.guidelinesText),
-    taskType: "journal_requirements_extraction",
-    describe: (label) => `journal requirements extraction: ${label}`,
-    call: (target) => extractJournalRequirements({ ...extractInput, ...target }),
-    usageOf: (result) => result.usage,
-  });
-}
-
 /**
  * Builds one section's context packet (src/app/manuscript/generate.ts) from
  * the project's own state: intake answers as the research context, the
@@ -193,93 +174,6 @@ export function buildSectionContextPacket(record: ProjectRecord, section: Sectio
     priorSectionMemory,
     citableEvidence,
   };
-}
-
-/** One manuscript section on Premium. Steps and their reasons: server/src/ai/premium.ts. */
-export async function runPremiumSectionGeneration(
-  userId: string,
-  packet: SectionContextPacket,
-  policy: import("../../../../src/platform/warden/warden.ts").EgressPolicy
-): Promise<PremiumOutcome<Awaited<ReturnType<typeof generateSection>>>> {
-  return runPremium({
-    userId,
-    estimatedCredits: estimateMaxCreditsForInput(packet.researchContext + packet.section.guidance),
-    taskType: "manuscript_generation",
-    describe: (label) => `manuscript generation: ${label} (${packet.section.key})`,
-    call: (target) => generateSection({ packet, ...target, policy }),
-    usageOf: (result) => result.usage,
-  });
-}
-
-/** The global coherence pass on Premium; a failed resource falls through to the next. Steps and their reasons: server/src/ai/premium.ts. */
-export async function runPremiumCoherenceCheck(
-  userId: string,
-  sections: GeneratedSection[],
-  dimensions: CoherenceDimension[] | undefined,
-  policy: import("../../../../src/platform/warden/warden.ts").EgressPolicy
-): Promise<PremiumOutcome<Awaited<ReturnType<typeof checkCoherence>>>> {
-  const combinedText = sections.map((s) => s.text).join("\n");
-  // checkCoherence doesn't report usage, so the estimate is what is charged.
-  return runPremium({
-    userId,
-    estimatedCredits: estimateMaxCreditsForInput(combinedText) * (dimensions?.length ?? COHERENCE_DIMENSIONS.length),
-    taskType: "coherence_check",
-    describe: (label) => `coherence check: ${label}`,
-    call: (target) => checkCoherence({ sections, ...target, policy, dimensions }),
-  });
-}
-
-/** Peer review on Premium. Steps and their reasons: server/src/ai/premium.ts. */
-export async function runPremiumPeerReview(
-  userId: string,
-  sections: GeneratedSection[],
-  roundNumber: number,
-  journalRequirements: { journalName: string } | undefined,
-  lenses: ReviewLens[] | undefined,
-  policy: import("../../../../src/platform/warden/warden.ts").EgressPolicy
-): Promise<PremiumOutcome<Awaited<ReturnType<typeof runPeerReview>>>> {
-  const combinedText = sections.map((s) => s.text).join("\n");
-  // runPeerReview doesn't report usage, so the estimate is what is charged.
-  return runPremium({
-    userId,
-    estimatedCredits: estimateMaxCreditsForInput(combinedText) * (lenses?.length ?? REVIEW_LENSES.length),
-    taskType: "peer_review",
-    describe: (label) => `peer review: ${label}`,
-    call: (target) => runPeerReview({ sections, roundNumber, journalRequirements, ...target, policy, lenses }),
-  });
-}
-
-/** Cover letter on Premium. Steps and their reasons: server/src/ai/premium.ts. */
-export async function runPremiumCoverLetter(
-  userId: string,
-  document: CanonicalDocument,
-  journalRequirements: JournalRequirements,
-  policy: import("../../../../src/platform/warden/warden.ts").EgressPolicy
-): Promise<PremiumOutcome<Awaited<ReturnType<typeof generateCoverLetter>>>> {
-  const combinedText = document.blocks.map((b) => b.text).join("\n");
-  return runPremium({
-    userId,
-    estimatedCredits: estimateMaxCreditsForInput(combinedText),
-    taskType: "cover_letter",
-    describe: (label) => `cover letter: ${label}`,
-    call: (target) => generateCoverLetter({ document, journalRequirements, ...target, policy }),
-  });
-}
-
-/** Anonymisation proposal on Premium. Steps and their reasons: server/src/ai/premium.ts. */
-export async function runPremiumAnonymization(
-  userId: string,
-  document: CanonicalDocument,
-  policy: import("../../../../src/platform/warden/warden.ts").EgressPolicy
-): Promise<PremiumOutcome<Awaited<ReturnType<typeof proposeAnonymization>>>> {
-  const combinedText = document.blocks.map((b) => b.text).join("\n");
-  return runPremium({
-    userId,
-    estimatedCredits: estimateMaxCreditsForInput(combinedText),
-    taskType: "anonymization_propose",
-    describe: (label) => `anonymization proposal: ${label}`,
-    call: (target) => proposeAnonymization({ document, ...target, policy }),
-  });
 }
 
 /**

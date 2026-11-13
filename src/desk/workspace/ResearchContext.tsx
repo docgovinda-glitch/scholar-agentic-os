@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect, Rea
 import type { CanonicalDocument, OutputTypeSpec, ProjectView, RubricReport } from "../types";
 import type { ResearchStage, StageStatus, JournalStudioMode } from "./types";
 import { isResearchStage, getStudioModeForStage, isStudioMode, JOURNAL_STUDIO_MODES } from "./types";
-import { getDocument, getOutputTypeSpec, getProject, getRubric, saveIntakeAnswers, setGlobalManualModelOverride, UnauthenticatedError } from "../api";
+import { getDocument, getOutputTypeSpec, getProject, getRubric, saveIntakeAnswers, UnauthenticatedError } from "../api";
 import { computeStageStatuses } from "./utils";
 import { getSupabaseClient, isSupabaseConfigured } from "../../services/supabaseClient";
 
@@ -21,8 +21,6 @@ interface ResearchContextValue {
   advanceStage: (nextStage: ResearchStage) => void;
   error: string | null;
   isLoading: boolean;
-  manualModelOverride: { providerId: string; modelId?: string } | null;
-  setManualModelOverride: (override: { providerId: string; modelId?: string } | null) => void;
   chapterId: string | null;
   setChapterId: (id: string | null) => void;
   aiExhaustedError: string | null;
@@ -62,7 +60,6 @@ export function ResearchProvider({
   const [outputType, setOutputType] = useState<OutputTypeSpec | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [manualModelOverride, setManualModelOverride] = useState<{ providerId: string; modelId?: string } | null>(null);
   const [aiExhaustedError, setAiExhaustedError] = useState<string | null>(null);
   const [fallbackToast, setFallbackToast] = useState<string | null>(null);
 
@@ -240,9 +237,6 @@ export function ResearchProvider({
     }
   }, [currentStage, onStageChangeCallback, project?.answers, projectId]);
 
-  useEffect(() => {
-    setGlobalManualModelOverride(manualModelOverride);
-  }, [manualModelOverride]);
 
   const advanceStage = useCallback(async (nextStage: ResearchStage) => {
     if (!isResearchStage(nextStage)) {
@@ -294,8 +288,6 @@ export function ResearchProvider({
     advanceStage,
     error,
     isLoading,
-    manualModelOverride,
-    setManualModelOverride,
     chapterId,
     setChapterId,
     aiExhaustedError,

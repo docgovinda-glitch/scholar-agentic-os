@@ -8,6 +8,7 @@
  * No model name appears here: a provider with a key but no saved model is
  * included as "auto" and the server picks from the provider's live list.
  */
+import { keyIdsFor, parseKeyId } from "../../config/keySlots";
 import { resolveRouterTarget } from "./providerMap";
 import type { ProviderId } from "./types";
 
@@ -20,6 +21,8 @@ export interface KeyringEntry {
   apiKey?: string;
   baseUrl?: string;
   label?: string;
+  /** Which of the provider's keys this is (1 = main). A backup key has its own circuit, so one spent key never skips the next. */
+  slot?: number;
   contextWindow?: number;
   maxOutputTokens?: number;
 }
@@ -65,26 +68,33 @@ export function assembleKeyring(settings: AssembleSettings, providersWithKey: st
     return endpoint ? endpoint.replace(/[^\x20-\x7E]/g, "").trim() : "";
   };
 
-  const order = [settings.provider, ...providersWithKey.filter((p) => p !== settings.provider)];
+  // Backup keys ("openai#2") ride along with their provider; they are not providers of their own.
+  const order = [settings.provider, ...providersWithKey.filter((p) => p !== settings.provider && parseKeyId(p).slot === 1)];
   const entries: KeyringEntry[] = [];
   const seen = new Set<string>();
   for (const id of order) {
     if (!id || LOCAL[id]) continue;
-    const key = cleanApiKey(keyOf(id));
-    if (!key) continue;
     const target = resolveRouterTarget(id, endpointOf(id));
     if (!target.ok || seen.has(target.target.via)) continue; // e.g. Cloudflare without its address
-    seen.add(target.target.via);
     const choice = pick(id);
-    entries.push({
-      provider: target.target.provider,
-      via: target.target.via,
-      apiKey: key,
-      model: choice?.model ?? "auto",
-      ...(choice?.contextWindow ? { contextWindow: choice.contextWindow } : {}),
-      ...(choice?.maxOutputTokens ? { maxOutputTokens: choice.maxOutputTokens } : {}),
-      ...(target.target.baseUrl ? { baseUrl: target.target.baseUrl } : {}),
-    });
+    let added = false;
+    // The main key first, then any backup keys: a key that runs out hands over to the next.
+    for (const [index, keyId] of keyIdsFor(id).entries()) {
+      const key = cleanApiKey(keyOf(keyId));
+      if (!key) continue;
+      added = true;
+      entries.push({
+        provider: target.target.provider,
+        via: target.target.via,
+        apiKey: key,
+        model: choice?.model ?? "auto",
+        ...(choice?.contextWindow ? { contextWindow: choice.contextWindow } : {}),
+        ...(choice?.maxOutputTokens ? { maxOutputTokens: choice.maxOutputTokens } : {}),
+        ...(target.target.baseUrl ? { baseUrl: target.target.baseUrl } : {}),
+        ...(index > 0 ? { slot: index + 1, label: `${choice?.model && choice.model !== "auto" ? choice.model : target.target.name} · backup key ${index + 1}` } : {}),
+      });
+    }
+    if (added) seen.add(target.target.via);
   }
   for (const id of Object.keys(LOCAL)) {
     const choice = pick(id);

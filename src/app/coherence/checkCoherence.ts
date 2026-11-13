@@ -14,21 +14,16 @@
  * same fact as "no issues were found."
  */
 
-import { complete, GatewayDenied } from "../../platform/gateway/gateway";
-import type { EgressPolicy } from "../../platform/warden/warden";
+import { CompletionInterrupted, type Completer } from "../../platform/completion";
 import { COHERENCE_DIMENSIONS } from "../../domain/coherence/types";
 import type { CoherenceDimension, CoherenceIssue, CoherenceReport, CoherenceSeverity } from "../../domain/coherence/types";
 import type { GeneratedSection } from "../../domain/manuscript/types";
 
-export { GatewayDenied } from "../../platform/gateway/gateway";
 
 export interface CheckCoherenceInput {
   sections: GeneratedSection[];
-  provider?: string;
-  apiKey?: string;
-  model?: string;
-  scopeId?: string;
-  policy?: EgressPolicy;
+  /** Runs the model; see src/platform/completion.ts. */
+  complete: Completer;
   /** Defaults to every dimension; a caller may re-run just one failed pass. */
   dimensions?: CoherenceDimension[];
 }
@@ -77,9 +72,6 @@ function tryParseIssues(raw: string): ParsedIssue[] | undefined {
 }
 
 async function runPass(dimension: CoherenceDimension, sections: GeneratedSection[], input: CheckCoherenceInput): Promise<CoherenceIssue[]> {
-  if (!input.provider || !input.apiKey) {
-    throw new Error("The coherence pass requires a model provider and API key.");
-  }
 
   const systemPrompt = [
     "You are reviewing a complete academic manuscript draft, section by section, for ONE specific kind of cross-section consistency problem.",
@@ -89,19 +81,13 @@ async function runPass(dimension: CoherenceDimension, sections: GeneratedSection
     '"sectionKeys" must list every section key (given as each segment\'s label below) genuinely involved in the issue.',
   ].join("\n");
 
-  const result = await complete(
+  const result = await input.complete(
     {
-      provider: input.provider,
-      apiKey: input.apiKey,
-      model: input.model,
       taskClass: "verification",
-      scopeId: input.scopeId,
       systemPrompt,
       userPrompt: `Review the manuscript below for ${dimension.replace("_", " ")} issues.`,
-      segments: sections.map((s) => ({ label: s.key, text: `${s.title}\n\n${s.text}` })),
       responseFormat: "json",
-    },
-    input.policy
+    }
   );
 
   const parsed = tryParseIssues(result.text);
@@ -128,7 +114,7 @@ export async function checkCoherence(input: CheckCoherenceInput): Promise<Cohere
       issues.push(...passIssues);
       passesRun.push(dimension);
     } catch (err) {
-      if (err instanceof GatewayDenied) throw err; // a consent/deny verdict stops the whole check, same discipline as every other AI route
+      if (err instanceof CompletionInterrupted) throw err;
       passErrors[dimension] = err instanceof Error ? err.message : "Unknown error";
     }
   }

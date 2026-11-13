@@ -41,10 +41,11 @@ import {
   storeProviderKey,
   type UserAiSettings,
 } from "../../services/userAiSettings";
+import { keyIdsFor } from "../../config/keySlots";
 import { removeKeyFromAccount, saveKeyToAccount, syncKeysWithAccount } from "./accountKeys";
 import { addConnection, getAiAccessStatus, removeConnection, verifyProviderKey, type AiAccessStatus, type LiveModelOption, type VerifyKeyResult } from "./aiAccessApi";
 
-export type ConnectionTier = "local" | "free" | "byok";
+export type ConnectionTier = "local" | "byok";
 
 /** A provider as AI Access shows it: catalogue facts joined to this user's live state. */
 export interface ProviderView {
@@ -80,7 +81,6 @@ export interface AiAccessState {
   local: ProviderView[];
   /** Everything currently connected, across tiers. */
   connected: ProviderView[];
-  premiumActive: boolean;
 }
 
 /** What connecting a provider found out, for the screen to show. */
@@ -195,7 +195,6 @@ export function useAiAccess() {
 
   const { cloud, local } = useMemo(build, [build]);
   const connected = useMemo(() => [...local, ...cloud].filter((p) => p.connected), [cloud, local]);
-  const premiumActive = status?.entitlement.active ?? false;
 
   /** Verify a key with the provider, store it on this device, and record the connection. */
   const connectCloud = useCallback(
@@ -284,8 +283,11 @@ export function useAiAccess() {
   const disconnect = useCallback(
     async (providerId: string) => {
       await removeConnection(providerId);
-      await removeKeyFromAccount(providerId);
-      forgetProviderKey(providerId);
+      // The main key and every backup key.
+      for (const keyId of keyIdsFor(providerId)) {
+        await removeKeyFromAccount(keyId);
+        forgetProviderKey(keyId);
+      }
       setKeyed(providersWithStoredKey());
       await refresh();
     },
@@ -327,7 +329,6 @@ export function useAiAccess() {
     cloud,
     local,
     connected,
-    premiumActive,
     refresh,
     connectCloud,
     connectLocal,

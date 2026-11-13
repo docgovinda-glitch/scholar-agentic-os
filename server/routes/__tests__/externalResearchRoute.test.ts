@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { keyringHeader } from "../../test/aiTestKit.ts";
 
 const TEST_USER_ID = "33333333-3333-4333-8333-333333333333";
 vi.mock("../../src/middleware/auth.ts", () => ({
@@ -114,7 +115,7 @@ describe("POST /api/projects/:id/agent/literature (P1-7, retired)", () => {
   it("no longer exists, so no LLM can be asked to generate sources", async () => {
     const res = await request(app)
       .post(`/api/projects/${PROJECT_ID}/agent/literature`)
-      .set("x-ai-provider", "ollama")
+      .set(keyringHeader("ollama"))
       .send({});
     expect(res.status).toBe(404);
     expect(llmCalls).not.toHaveBeenCalled();

@@ -9,8 +9,8 @@ import {
   normalizeUnicodeNFC,
 } from "../../../src/utils/scholarlyVoiceGuard.ts";
 import { getProjectStore } from "../../../../src/services/store/projectStore.ts";
-import { callOpenRouterJSON, callOpenRouterText, getCandidates, buildAuthorizedPolicy, resolveRequestAiConfig } from "../../../src/services/scholarBrain.ts";
-import { completeWithFailover } from "../../../../src/platform/gateway/gateway.ts";
+import { callOpenRouterJSON, callOpenRouterText } from "../../../src/services/scholarBrain.ts";
+import { requestKeyring } from "../../../src/ai/routerBridge.ts";
 import { scholarBrain } from "../../../src/services/scholarBrain.ts";
 import {
   auditDocumentLineByLine,

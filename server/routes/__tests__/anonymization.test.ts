@@ -16,6 +16,7 @@ vi.mock("../../src/middleware/auth.ts", () => ({
 }));
 
 import request from "supertest";
+import { AI_HEADERS, useFetchBackedAi } from "../../test/aiTestKit.ts";
 import { app } from "../../../server.ts";
 import { __resetProjectStoreForTests } from "../../../src/app/conductor/projectStore.ts";
 import { __resetSessionPoliciesForTests } from "../../../src/app/studio/sessionPolicyStore.ts";
@@ -28,6 +29,7 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "sb_secret_test";
 const originalFetch = global.fetch;
 
 beforeEach(() => {
+  useFetchBackedAi();
   __resetProjectStoreForTests();
   __resetSessionPoliciesForTests();
   __resetRateLimitStore();
@@ -73,17 +75,16 @@ const ACK_PROPOSAL = {
 describe("POST /api/projects/:id/anonymization/propose", () => {
   it("400s when no document has been submitted yet", async () => {
     const projectId = await createProject();
-    const res = await request(app).post(`/api/projects/${projectId}/anonymization/propose`).send({ provider: "openai", apiKey: "sk-test" });
+    const res = await request(app).post(`/api/projects/${projectId}/anonymization/propose`).set(AI_HEADERS).send({});
     expect(res.status).toBe(400);
   });
 
   it("proposes and persists an anonymization report via BYOK", async () => {
     const projectId = await createProject();
     await request(app).put(`/api/projects/${projectId}/document`).send({ document: otTenDocument() });
-    await grantConsent(projectId, "openai");
 
     global.fetch = vi.fn().mockResolvedValue(proposalsResponse([ACK_PROPOSAL]));
-    const res = await request(app).post(`/api/projects/${projectId}/anonymization/propose`).send({ provider: "openai", apiKey: "sk-test" });
+    const res = await request(app).post(`/api/projects/${projectId}/anonymization/propose`).set(AI_HEADERS).send({});
 
     expect(res.status).toBe(200);
     expect(res.body.anonymizationReport.proposals).toHaveLength(1);
@@ -101,33 +102,14 @@ describe("POST /api/projects/:id/anonymization/propose", () => {
     expect(res.body).toEqual({ report: null, anonymizedDocument: null });
   });
 
-  it("402s a non-entitled Premium user, never reaching the provider", async () => {
-    global.fetch = vi.fn((input: RequestInfo | URL) => {
-      const url = typeof input === "string" ? input : input.toString();
-      const respondJson = (body: unknown, status = 200) => Promise.resolve({ ok: status < 300, status, text: async () => JSON.stringify(body), json: async () => body } as Response);
-      if (url.includes("/rest/v1/user_entitlements")) return respondJson([]);
-      if (url.includes("/rest/v1/user_ai_connections")) return respondJson([]);
-      if (url.includes("/rest/v1/provider_health")) return respondJson([]);
-      if (url.includes("/rest/v1/ai_providers")) return respondJson([]);
-      return respondJson({}, 500);
-    }) as unknown as typeof fetch;
-
-    const projectId = await createProject();
-    await request(app).put(`/api/projects/${projectId}/document`).send({ document: otTenDocument() });
-
-    const res = await request(app).post(`/api/projects/${projectId}/anonymization/propose`).send({ useEngine: "premium" });
-    expect(res.status).toBe(402);
-    expect(res.body.error).toMatch(/Premium subscription/i);
-  });
 });
 
 describe("POST /api/projects/:id/anonymization/apply", () => {
   async function projectWithProposal(): Promise<string> {
     const projectId = await createProject();
     await request(app).put(`/api/projects/${projectId}/document`).send({ document: otTenDocument() });
-    await grantConsent(projectId, "openai");
     global.fetch = vi.fn().mockResolvedValue(proposalsResponse([ACK_PROPOSAL]));
-    await request(app).post(`/api/projects/${projectId}/anonymization/propose`).send({ provider: "openai", apiKey: "sk-test" });
+    await request(app).post(`/api/projects/${projectId}/anonymization/propose`).set(AI_HEADERS).send({});
     return projectId;
   }
 

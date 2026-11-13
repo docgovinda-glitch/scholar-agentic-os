@@ -46,7 +46,7 @@ function app() {
 
 beforeEach(() => {
   calls.length = 0;
-  configureRouterBridge({ adapters: { openai: fake, anthropic: fake, google: fake }, breaker: new CircuitBreaker(new MemoryBreakerStore()), premium: undefined });
+  configureRouterBridge({ adapters: { openai: fake, anthropic: fake, google: fake }, breaker: new CircuitBreaker(new MemoryBreakerStore()) });
 });
 
 describe("existing AI steps through the router", () => {
@@ -59,10 +59,26 @@ describe("existing AI steps through the router", () => {
     expect(JSON.stringify(res.body)).not.toContain(SECRET);
   });
 
-  it("legacy single-provider headers still work (gemini → google)", async () => {
-    const res = await request(app()).post("/step").set({ "x-ai-provider": "gemini", "x-ai-model": "flash-x", "x-ai-api-key": SECRET }).send({});
-    expect(res.body.text).toBe("ok from flash-x");
-    expect(calls).toEqual(["google:flash-x"]);
+
+  it("switches to a backup key of the same provider when the main key is out of quota, and reports it", async () => {
+    const keyAware: ProviderAdapter = {
+      async *stream(c: Candidate): AsyncIterable<AdapterChunk> {
+        calls.push(`${c.id}`);
+        if (c.credential?.apiKey === "main-key") throw new ProviderHttpError(429, "You exceeded your current quota, please check your billing details");
+        yield { type: "text", text: "answered with the backup key" };
+      },
+    };
+    configureRouterBridge({ adapters: { openai: keyAware } });
+    const res = await request(app()).post("/step")
+      .set("x-ai-keyring", ring([
+        { provider: "openai", model: "m1", apiKey: "main-key" },
+        { provider: "openai", model: "m1", apiKey: "backup-key", slot: 2, label: "m1 · backup key 2" },
+      ])).send({});
+    expect(res.status).toBe(200);
+    expect(res.body.text).toBe("answered with the backup key");
+    expect(calls).toEqual(["byok:openai:m1", "byok:openai:m1#2"]);
+    expect(res.body.aiRoute.answeredBy.label).toBe("m1 · backup key 2");
+    expect(res.body.aiRoute.notices.map((n: { text: string }) => n.text).join(" ")).toMatch(/quota/);
   });
 
   it("no AI connected keeps the browser hand-off (426 with a signed challenge)", async () => {
@@ -75,7 +91,7 @@ describe("existing AI steps through the router", () => {
   it("a provider failure is never silently handed to the browser: all keys failing is an error", async () => {
     const res = await request(app()).post("/step").set("x-ai-keyring", ring([{ provider: "openai", model: "bad-only", apiKey: SECRET }])).send({});
     expect(res.status).toBe(502);
-    expect(res.body.error).toMatch(/All models failed.*Overloaded/);
+    expect(res.body.error).toMatch(/All connected AI models failed.*Overloaded/);
   });
 
   it("on a deployed server, a local model next in line is handed to the browser", async () => {
@@ -94,7 +110,7 @@ describe("existing AI steps through the router", () => {
     process.env.ALLOW_SERVER_LOCAL_AI = "true";
     configureRouterBridge({ adapters: { openai: fake, lmstudio: fake } });
     try {
-      const res = await request(app()).post("/step").set({ "x-ai-provider": "lmstudio", "x-ai-model": "stub" }).send({});
+      const res = await request(app()).post("/step").set("x-ai-keyring", ring([{ provider: "lmstudio", model: "stub" }])).send({});
       expect(res.status).toBe(200);
       expect(res.body.text).toBe("ok from stub");
       expect(res.body.aiRoute.answeredBy.lane).toBe("local");
@@ -112,14 +128,6 @@ describe("existing AI steps through the router", () => {
     expect(text).toContain('"text":"ok from good-1"');
   });
 
-  it("puts the legacy primary provider first unless the keyring already has it", () => {
-    const ring = Buffer.from(JSON.stringify([{ provider: "anthropic", model: "a1", apiKey: "k1" }])).toString("base64url");
-    const merged = keyringFromRequest({ headers: { "x-ai-keyring": ring, "x-ai-provider": "openrouter", "x-ai-model": "r1", "x-ai-api-key": "k2", "x-ai-base-url": "https://openrouter.example/api/v1" } });
-    expect(merged.map((e) => `${e.provider}:${e.model}`)).toEqual(["custom:r1", "anthropic:a1"]);
-
-    const same = keyringFromRequest({ headers: { "x-ai-keyring": ring, "x-ai-provider": "anthropic", "x-ai-model": "a1", "x-ai-api-key": "k1" } });
-    expect(same).toHaveLength(1);
-  });
 
   it("a custom local-runner address is used, not the default (P1-13)", async () => {
     const saved = process.env.ALLOW_SERVER_LOCAL_AI;
@@ -134,84 +142,11 @@ describe("existing AI steps through the router", () => {
     };
     configureRouterBridge({ adapters: { ollama: recorder } });
     try {
-      const res = await request(app()).post("/step").set({ "x-ai-provider": "ollama", "x-ai-model": "llama", "x-ai-base-url": "http://10.0.0.7:11500" }).send({});
+      const res = await request(app()).post("/step").set("x-ai-keyring", ring([{ provider: "ollama", model: "llama", baseUrl: "http://10.0.0.7:11500" }])).send({});
       expect(res.status).toBe(200);
       expect(seen).toEqual(["http://10.0.0.7:11500"]);
     } finally {
       if (saved === undefined) delete process.env.ALLOW_SERVER_LOCAL_AI; else process.env.ALLOW_SERVER_LOCAL_AI = saved;
     }
-  });
-});
-
-
-describe("legacy single-provider headers for every catalog provider", () => {
-  const ringOf = (headers: Record<string, string>) => keyringFromRequest({ headers });
-  it("maps a catalog provider to its endpoint and leaves the model to the live list", () => {
-    expect(ringOf({ "x-ai-provider": "openrouter", "x-ai-api-key": "k" })).toEqual([expect.objectContaining({ provider: "custom", via: "openrouter", model: "auto", baseUrl: "https://openrouter.ai/api/v1" })]);
-    expect(ringOf({ "x-ai-provider": "claude", "x-ai-api-key": "k" })).toEqual([expect.objectContaining({ provider: "anthropic", model: "auto" })]);
-    expect(ringOf({ "x-ai-provider": "gemini", "x-ai-api-key": "k", "x-ai-model": "gemini-x" })).toEqual([expect.objectContaining({ provider: "google", model: "gemini-x" })]);
-  });
-  it("does not duplicate a connection the keyring already holds", () => {
-    const ring = Buffer.from(JSON.stringify([{ provider: "custom", via: "openrouter", model: "m1", apiKey: "k", baseUrl: "https://openrouter.ai/api/v1" }])).toString("base64url");
-    expect(ringOf({ "x-ai-keyring": ring, "x-ai-provider": "openrouter", "x-ai-api-key": "k" }).length).toBe(1);
-  });
-  it("keeps a self-hosted http endpoint for the server guard to decide on, instead of dropping the connection", () => {
-    expect(ringOf({ "x-ai-provider": "my-llm", "x-ai-api-key": "k", "x-ai-model": "m", "x-ai-base-url": "http://10.0.0.5:8000/v1/chat/completions" })).toEqual([expect.objectContaining({ provider: "custom", model: "m", baseUrl: "http://10.0.0.5:8000/v1" })]);
-  });
-  it("ignores a provider that needs an address it was not given", () => {
-    expect(ringOf({ "x-ai-provider": "cloudflare", "x-ai-api-key": "k" })).toEqual([]);
-  });
-});
-
-import { routedText, DEFAULT_OUTPUT_BY_TASK } from "../routerBridge";
-import type { Request } from "express";
-
-describe("using the provider's allowance efficiently", () => {
-  const reqWith = (entry: Record<string, unknown>) => ({ headers: { "x-ai-keyring": ring([{ provider: "openai", model: "m", apiKey: SECRET, ...entry }]) }, user: undefined }) as unknown as Request;
-  const seen: Array<{ max: number; messages: unknown[] }> = [];
-  function install(script: Array<{ text: string; finish: "stop" | "length" }>) {
-    seen.length = 0;
-    let n = 0;
-    configureRouterBridge({
-      adapters: { openai: { async *stream(_c, r, max): AsyncIterable<AdapterChunk> {
-        seen.push({ max, messages: r.messages });
-        const step = script[Math.min(n++, script.length - 1)];
-        yield { type: "text", text: step.text };
-        yield { type: "finish", reason: step.finish };
-      } } },
-      breaker: new CircuitBreaker(new MemoryBreakerStore()),
-    });
-  }
-
-  it("asks for a roomy output limit on long tasks and a small one on quick tasks, bounded by the model's own limit", async () => {
-    install([{ text: "ok", finish: "stop" }]);
-    await routedText(reqWith({ maxOutputTokens: 100_000, contextWindow: 200_000 }), { task: "drafting", userPrompt: "write" });
-    expect(seen[0].max).toBe(DEFAULT_OUTPUT_BY_TASK.drafting);
-    await routedText(reqWith({ maxOutputTokens: 100_000, contextWindow: 200_000 }), { task: "fast", userPrompt: "label" });
-    expect(seen[1].max).toBe(DEFAULT_OUTPUT_BY_TASK.fast);
-    await routedText(reqWith({ maxOutputTokens: 6_000 }), { task: "drafting", userPrompt: "write" });
-    expect(seen[2].max).toBe(6_000);
-  });
-
-  it("continues an answer cut off at the output limit, so a long draft arrives whole", async () => {
-    install([{ text: "First half, ", finish: "length" }, { text: "second half.", finish: "stop" }]);
-    const text = await routedText(reqWith({}), { task: "drafting", userPrompt: "write" });
-    expect(text).toBe("First half, second half.");
-    expect(seen.length).toBe(2);
-    const second = seen[1].messages as Array<{ role: string; content: string }>;
-    expect(second.at(-2)).toMatchObject({ role: "assistant", content: "First half, " });
-    expect(second.at(-1)?.content).toMatch(/Continue exactly where it stopped/);
-  });
-
-  it("stops after two continuations, and keeps what was written if a continuation fails", async () => {
-    install([{ text: "a", finish: "length" }, { text: "b", finish: "length" }, { text: "c", finish: "length" }, { text: "d", finish: "stop" }]);
-    expect(await routedText(reqWith({}), { task: "drafting", userPrompt: "write" })).toBe("abc");
-    expect(seen.length).toBe(3);
-  });
-
-  it("does not continue when the caller asked for a short answer", async () => {
-    install([{ text: "short", finish: "length" }, { text: "more", finish: "stop" }]);
-    expect(await routedText(reqWith({}), { task: "drafting", userPrompt: "write", maxOutputTokens: 300 })).toBe("short");
-    expect(seen.length).toBe(1);
   });
 });

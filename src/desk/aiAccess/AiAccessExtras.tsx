@@ -6,7 +6,6 @@ import { routeDecision, type RoutingDecision, type RoutingTaskType } from "./aiA
 
 /** A provider id as the person knows it. */
 export function providerLabel(id: string): string {
-  if (id === "premium") return "Scholar Core Premium";
   return getCloudProvider(id)?.name ?? getLocalRunner(id)?.name ?? id;
 }
 
@@ -31,7 +30,7 @@ export function LiveRouting({ refreshKey, privacy }: { refreshKey: string; priva
     setLoading(true);
     Promise.all(
       TASKS.map((t) =>
-        routeDecision(t.type, privacy)
+        routeDecision(t.type)
           .then((d) => [t.type, d] as const)
           .catch((e: unknown) => [t.type, { error: e instanceof Error ? e.message : "Routing could not be checked." }] as const)
       )

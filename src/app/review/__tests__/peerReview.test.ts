@@ -1,6 +1,6 @@
+import { fetchCompleter } from "../../../test/fetchCompleter";
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { runPeerReview, GatewayDenied } from "../peerReview";
-import { defaultPolicy, recordConsent, markRestricted } from "../../../platform/warden/warden";
+import { runPeerReview } from "../peerReview";
 import type { GeneratedSection } from "../../../domain/manuscript/types";
 
 const originalFetch = global.fetch;
@@ -9,7 +9,6 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const CONSENTED_POLICY = recordConsent(defaultPolicy(), "openai");
 
 function section(key: string, title: string, text: string): GeneratedSection {
   return { key, title, text, wordCount: 10, memory: "m", citedEvidenceIds: [], generatedAt: "now" };
@@ -32,7 +31,7 @@ function mockModelResponses(responses: unknown[]) {
 describe("runPeerReview", () => {
   it("runs all seven lenses by default and stamps the given round number", async () => {
     mockModelResponses([{ findings: [], overallAssessment: "Fine on this dimension." }]);
-    const round = await runPeerReview({ sections: SECTIONS, roundNumber: 1, provider: "openai", apiKey: "sk-test", policy: CONSENTED_POLICY });
+    const round = await runPeerReview({ sections: SECTIONS, roundNumber: 1, complete: fetchCompleter });
     expect(round.roundNumber).toBe(1);
     expect(round.lensesRun).toEqual(["contribution", "literature", "methodology", "evidence", "argument", "citation", "journal_fit"]);
     expect(round.lensReviews).toHaveLength(7);
@@ -43,7 +42,7 @@ describe("runPeerReview", () => {
     mockModelResponses([
       { findings: [{ summary: "Overstated novelty.", detail: "This has been shown before in [prior work].", severity: "major", sectionKeys: ["introduction"] }], overallAssessment: "The contribution is weaker than claimed." },
     ]);
-    const round = await runPeerReview({ sections: SECTIONS, roundNumber: 1, provider: "openai", apiKey: "sk-test", policy: CONSENTED_POLICY, lenses: ["contribution"] });
+    const round = await runPeerReview({ sections: SECTIONS, roundNumber: 1, complete: fetchCompleter, lenses: ["contribution"] });
     expect(round.lensReviews[0].findings).toHaveLength(1);
     expect(round.lensReviews[0].findings[0].severity).toBe("major");
     expect(round.lensReviews[0].overallAssessment).toContain("weaker than claimed");
@@ -59,28 +58,16 @@ describe("runPeerReview", () => {
       return Promise.resolve({ ok: true, json: async () => ({ choices: [{ message: { content: JSON.stringify({ findings: [], overallAssessment: "ok" }) } }] }) } as Response);
     }) as unknown as typeof fetch;
 
-    const round = await runPeerReview({ sections: SECTIONS, roundNumber: 1, provider: "openai", apiKey: "sk-test", policy: CONSENTED_POLICY, lenses: ["contribution", "literature", "methodology"] });
+    const round = await runPeerReview({ sections: SECTIONS, roundNumber: 1, complete: fetchCompleter, lenses: ["contribution", "literature", "methodology"] });
     expect(round.lensesRun).toEqual(["contribution", "methodology"]);
     expect(round.lensErrors.literature).toMatch(/could not be parsed/i);
   });
 
   it("rejects a lens response with no overallAssessment as unparseable rather than defaulting one", async () => {
     mockModelResponses([{ findings: [] }]);
-    const round = await runPeerReview({ sections: SECTIONS, roundNumber: 1, provider: "openai", apiKey: "sk-test", policy: CONSENTED_POLICY, lenses: ["evidence"] });
+    const round = await runPeerReview({ sections: SECTIONS, roundNumber: 1, complete: fetchCompleter, lenses: ["evidence"] });
     expect(round.lensesRun).toEqual([]);
     expect(round.lensErrors.evidence).toMatch(/could not be parsed/i);
   });
 
-  it("propagates GatewayDenied for a restricted scope rather than treating it as a per-lens failure", async () => {
-    global.fetch = vi.fn();
-    const restrictedPolicy = markRestricted(defaultPolicy(), "embargoed-project");
-    let caught: unknown;
-    try {
-      await runPeerReview({ sections: SECTIONS, roundNumber: 1, provider: "openai", apiKey: "sk-test", policy: restrictedPolicy, scopeId: "embargoed-project" });
-    } catch (e) {
-      caught = e;
-    }
-    expect(caught).toBeInstanceOf(GatewayDenied);
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
 });

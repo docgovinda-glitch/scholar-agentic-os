@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { getProfile, saveProfileFields, updatePassword, type ProfileFields } from "../../services/supabaseAuthService";
-import { getAiAccessStatus } from "../aiAccess/aiAccessApi";
 import { EDUCATION_LEVELS, USER_TYPES } from "../../config/accountSchema";
 import { Field, PhoneField, SelectField } from "../auth/AuthLayout";
 import { e164Problem, DEFAULT_COUNTRY_ISO2, findCountry } from "../../config/countries";
@@ -35,12 +34,9 @@ export function stripDialCode(dialCode: string, rawPhone: string): string {
  */
 export default function AccountSettingsScreen({
   onClose,
-  onManagePremium,
   initialTab = "personal",
 }: {
   onClose: () => void;
-  /** Optional: wired by DeskApp to open AI Access on its Premium section. Omitted in tests that don't exercise it. */
-  onManagePremium?: () => void;
   /** Initial active tab. Defaults to 'personal'. */
   initialTab?: SettingsTab;
 }) {
@@ -65,7 +61,6 @@ export default function AccountSettingsScreen({
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSaved, setPasswordSaved] = useState(false);
 
-  const [isPremium, setIsPremium] = useState(false);
 
   useEffect(() => {
     getProfile()
@@ -86,9 +81,6 @@ export default function AccountSettingsScreen({
       })
       .catch((e) => setLoadError((e as Error).message));
 
-    getAiAccessStatus()
-      .then((status) => setIsPremium(Boolean(status.entitlement?.active)))
-      .catch(() => setIsPremium(false));
   }, []);
 
   useEffect(() => {
@@ -177,7 +169,7 @@ export default function AccountSettingsScreen({
               Account Settings
             </h1>
             <span className="text-[10px] font-medium text-[color:var(--text-muted)] bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] px-2 py-0.5 rounded-full">
-              {isPremium ? "Premium Plan" : "Free Plan"}
+              Free Plan
             </span>
           </div>
           <button
@@ -264,9 +256,7 @@ export default function AccountSettingsScreen({
                 </svg>
                 <span>Subscription</span>
               </div>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded font-semibold ${isPremium ? "bg-amber-500/15 text-amber-600 dark:text-amber-400" : "bg-[color:var(--surface-raised)] text-[color:var(--text-muted)]"}`}>
-                {isPremium ? "PRO" : "FREE"}
-              </span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded font-semibold bg-[color:var(--surface-raised)] text-[color:var(--text-muted)]">FREE</span>
             </button>
           </nav>
 
@@ -402,27 +392,12 @@ export default function AccountSettingsScreen({
                       </div>
                     </div>
 
-                    {/* Strategic Repetition of Subscription & Purchasing Info */}
-                    <div className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-3.5 mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-xs font-semibold text-[color:var(--text-primary)]">Subscription</h3>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isPremium ? "bg-amber-500/15 text-amber-600 dark:text-amber-400" : "bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]"}`}>
-                            Current Plan: <span className="font-medium">{isPremium ? "Premium" : "Free"}</span>
-                          </span>
-                        </div>
-                        <p className="mt-1 text-[11px] text-[color:var(--text-muted)]">
-                          {isPremium ? "Full access to multi-agent editorial intelligence." : "Upgrade for unlimited AI routing and deep research tools."}
-                        </p>
+                    <div className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-3.5 mt-4">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-xs font-semibold text-[color:var(--text-primary)]">Premium</h3>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]">Coming soon</span>
                       </div>
-                      <button
-                        type="button"
-                        onClick={onManagePremium}
-                        disabled={!onManagePremium}
-                        className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] px-3 py-1.5 text-xs font-semibold text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] disabled:opacity-60 cursor-pointer whitespace-nowrap transition-colors"
-                      >
-                        {isPremium ? "Manage Premium Plan" : "Upgrade to Premium"}
-                      </button>
+                      <p className="mt-1 text-[11px] text-[color:var(--text-muted)]">Everything works today with your own AI: connect a local model or your own API key in AI Access.</p>
                     </div>
                   </form>
                 )}
@@ -523,54 +498,10 @@ export default function AccountSettingsScreen({
                 </p>
               </div>
 
-              {/* Active Plan Card */}
-              <div className="rounded-2xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-semibold text-[color:var(--text-secondary)] uppercase tracking-wider">
-                      Current Tier
-                    </span>
-                    <h3 className="text-lg font-bold text-[color:var(--text-primary)] mt-0.5">
-                      {isPremium ? "Scholar Premium" : "Scholar Free"}
-                    </h3>
-                  </div>
-                  <span className={`text-xs font-bold px-3 py-1 rounded-full ${isPremium ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20" : "bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] border border-[color:var(--border-subtle)]"}`}>
-                    {isPremium ? "★ Active" : "Basic"}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[color:var(--border-subtle)]">
-                  <div className="flex items-start gap-2.5 text-xs text-[color:var(--text-secondary)]">
-                    <span className="text-emerald-500 font-bold">✓</span>
-                    <span>Multi-model academic intelligence (Claude 3.7, GPT-4o, Gemini 2.5)</span>
-                  </div>
-                  <div className="flex items-start gap-2.5 text-xs text-[color:var(--text-secondary)]">
-                    <span className="text-emerald-500 font-bold">✓</span>
-                    <span>Knowledge Vault with encrypted cloud drive citation sync</span>
-                  </div>
-                  <div className="flex items-start gap-2.5 text-xs text-[color:var(--text-secondary)]">
-                    <span className="text-emerald-500 font-bold">✓</span>
-                    <span>Editorial compliance checking and journal style formatting</span>
-                  </div>
-                  <div className="flex items-start gap-2.5 text-xs text-[color:var(--text-secondary)]">
-                    <span className="text-emerald-500 font-bold">✓</span>
-                    <span>Priority background agent compute and task execution</span>
-                  </div>
-                </div>
-
-                <div className="pt-3 flex items-center justify-between">
-                  <span className="text-xs text-[color:var(--text-muted)]">
-                    {isPremium ? "Billed annually or centrally managed" : "Upgrade anytime to unlock full capacity"}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={onManagePremium}
-                    disabled={!onManagePremium}
-                    className="rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-4 py-2 text-xs font-semibold text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] disabled:opacity-60 cursor-pointer shadow-xs transition-colors"
-                  >
-                    {isPremium ? "Manage Subscription Tier" : "Upgrade Plan"}
-                  </button>
-                </div>
+              <div className="rounded-2xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-5 space-y-2">
+                <h3 className="text-lg font-bold text-[color:var(--text-primary)]">Scholar Core Premium</h3>
+                <span className="inline-flex text-xs font-bold px-3 py-1 rounded-full bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] border border-[color:var(--border-subtle)]">Coming soon</span>
+                <p className="text-xs text-[color:var(--text-muted)]">A platform-managed AI service is planned. For now, connect a local model or your own API key in AI Access.</p>
               </div>
             </div>
           </div>

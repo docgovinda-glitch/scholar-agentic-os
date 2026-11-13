@@ -18,8 +18,8 @@
  *   6. DIFF        — assembled into a RefinementDiff for the client to render
  *
  * This module lives in src/app — the architectural test in
- * src/platform/__tests__/architecture.test.ts asserts it never calls
- * fetch() directly, only through platform/gateway.
+ * src/platform/__tests__/architecture.test.ts asserts it never makes network
+ * calls itself; the model runs through the Completer it is given (platform/completion).
  */
 
 import { excludeQuotedRanges } from "../../domain/language/quotations";
@@ -28,7 +28,6 @@ import { applyMeaningGuard } from "../../domain/language/meaningGuard";
 import { detectVoiceDrift } from "../../domain/language/voiceProfile";
 import { isDeterministicLevel } from "../../domain/language/types";
 import type { DiffChange, RefinementDiff } from "../../domain/language/types";
-import { complete, GatewayDenied } from "../../platform/gateway/gateway";
 import { buildSystemPrompt } from "./prompts";
 import {
   fallbackDiff,
@@ -38,7 +37,6 @@ import {
 } from "./structuredDiff";
 import type { StudioRefineInput, StudioRefineResult, StudioRefineUsage } from "./types";
 
-export { GatewayDenied } from "../../platform/gateway/gateway";
 export type { StudioRefineInput, StudioRefineResult, StudioRefineUsage } from "./types";
 
 async function refineDeterministic(text: string): Promise<DiffChange[]> {
@@ -47,10 +45,8 @@ async function refineDeterministic(text: string): Promise<DiffChange[]> {
 }
 
 async function refineWithModel(input: StudioRefineInput): Promise<{ changes: DiffChange[]; usage: StudioRefineUsage }> {
-  if (!input.provider || !input.apiKey) {
-    throw new Error(
-      `Level "${input.level}" requires a model provider and API key. Only "proofread" runs without one.`
-    );
+  if (!input.complete) {
+    throw new Error(`Level "${input.level}" needs an AI connection. Only "proofread" runs without one.`);
   }
 
   const systemPrompt =
@@ -64,20 +60,11 @@ async function refineWithModel(input: StudioRefineInput): Promise<{ changes: Dif
     "\n\n" +
     structuredResponseInstruction();
 
-  const result = await complete(
-    {
-      provider: input.provider,
-      apiKey: input.apiKey,
-      model: input.model,
-      taskClass: "refinement",
-      scopeId: input.scopeId,
-      systemPrompt,
-      userPrompt: input.text,
-      segments: [{ label: "Your text: selected passage", text: input.text }],
-      local: input.local,
-    },
-    input.policy
-  );
+  const result = await input.complete({
+    taskClass: "refinement",
+    systemPrompt,
+    userPrompt: input.text,
+  });
 
   const structured = tryParseStructuredResponse(result.text);
   let changes: DiffChange[];

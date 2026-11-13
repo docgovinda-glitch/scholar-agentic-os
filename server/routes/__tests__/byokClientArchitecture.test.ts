@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { keyringHeader } from "../../test/aiTestKit.ts";
 import request from "supertest";
 import {
   getCandidates,
@@ -34,29 +35,13 @@ describe("Strict Client-Owned BYOK Architecture Tests", () => {
   });
 
   describe("Pillar 1: Zero Server-Sponsored AI Credentials", () => {
-    it("getCandidates() without req strictly returns empty array, ignoring server env keys", () => {
-      const candidates = getCandidates();
-      expect(candidates).toEqual([]);
-      expect(candidates.length).toBe(0);
-    });
 
-    it("getCandidates(req) without x-ai headers returns empty array, never falling back to server keys", () => {
-      const mockReq = { headers: {} } as any;
-      const candidates = getCandidates(mockReq);
-      expect(candidates).toEqual([]);
-    });
 
-    it("isServerAiAuthorized returns false when user has not provided request-scoped key", async () => {
-      const mockReq = { headers: {} } as any;
-      expect(await isServerAiAuthorized(mockReq)).toBe(false);
-    });
 
     it("GET /api/ai/status reports BYOK tier and active model if provided via headers", async () => {
       const res = await request(app)
         .get("/api/ai/status")
-        .set("x-ai-provider", "anthropic")
-        .set("x-ai-model", "claude-3-7-sonnet-20250219")
-        .set("x-ai-api-key", "sk-ant-test-key-1234");
+        .set(keyringHeader("anthropic", "claude-3-7-sonnet-20250219", "sk-ant-test-key-1234"));
 
       expect(res.status).toBe(200);
       expect(res.body.tier).toBe("byok");
@@ -72,73 +57,6 @@ describe("Strict Client-Owned BYOK Architecture Tests", () => {
       expect(res.body.tier).toBe("byok");
       expect(res.body.configured).toBe(false);
       expect(res.body.serverSponsoredAi).toBe(false);
-    });
-  });
-
-  describe("Pillar 2: Dynamic Model Discovery Proxy (/api/ai-access/models)", () => {
-    it("rejects SSRF attempts targeting invalid non-http/https protocols", async () => {
-      const res = await request(app)
-        .post("/api/ai-access/models")
-        .send({
-          providerId: "custom",
-          url: "file:///etc/passwd",
-        });
-
-      expect([400, 403]).toContain(res.status);
-    });
-
-    it("returns parsed models when querying an OpenAI-compatible /v1/models endpoint", async () => {
-      const mockFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-        new Response(JSON.stringify({ data: [{ id: "gpt-4o", created: 1715367049 }, { id: "gpt-4o-mini", created: 1715367050 }] }), { status: 200 })
-      );
-
-      const res = await request(app)
-        .post("/api/ai-access/models")
-        .send({
-          providerId: "openai",
-          url: "https://api.openai.com/v1/models",
-          apiKey: "sk-test-client-key",
-        });
-
-      expect(res.status).toBe(200);
-      expect(res.body.ok).toBe(true);
-      expect(Array.isArray(res.body.models)).toBe(true);
-      expect(res.body.models).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ id: "gpt-4o" }),
-          expect.objectContaining({ id: "gpt-4o-mini" }),
-        ])
-      );
-      expect(mockFetch).toHaveBeenCalledTimes(1);
-    });
-
-    it("does not fetch a local runner's address from the server (it is the user's machine, and a way into the server's own network)", async () => {
-      const mockFetch = vi.spyOn(globalThis, "fetch");
-      mockFetch.mockClear();
-      const res = await request(app)
-        .post("/api/ai-access/models")
-        .send({ providerId: "ollama", url: "http://localhost:11434/api/tags" });
-
-      expect(res.status).toBe(400);
-      expect(res.body.error).toMatch(/browser/i);
-      expect(mockFetch).not.toHaveBeenCalled();
-    });
-
-    it("supports local runner configuration with localhost base-url and default model", async () => {
-      const mockReq = {
-        headers: {
-          "x-ai-provider": "ollama",
-          "x-ai-base-url": "http://localhost:11434",
-          "x-ai-model": "qwen2.5-coder:32b",
-        },
-      } as any;
-
-      const candidates = getCandidates(mockReq);
-      expect(candidates.length).toBe(1);
-      expect(candidates[0].provider).toBe("ollama");
-      expect(candidates[0].model).toBe("qwen2.5-coder:32b");
-      expect(candidates[0].baseUrl).toBe("http://localhost:11434");
-      expect(await isServerAiAuthorized(mockReq)).toBe(true);
     });
   });
 });

@@ -14,7 +14,8 @@ if (!process.env.USE_REAL_STORE_IN_TESTS) {
 
 const originalFetch = globalThis.fetch;
 
-if (typeof originalFetch === "function") {
+// LIVE_PROVIDER_TESTS=1 opts in to real provider calls (server/test/live); a normal `npm test` stays offline.
+if (typeof originalFetch === "function" && process.env.LIVE_PROVIDER_TESTS !== "1") {
   const guardedFetch: typeof fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const rawUrl =
       typeof input === "string"

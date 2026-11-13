@@ -86,4 +86,41 @@ describe("router", () => {
     }
     expect(ev.at(-1)).toMatchObject({ type: "cancelled", candidateId: "a" });
   });
+
+  describe("running out of quota", () => {
+    const outOfQuota = (): ProviderAdapter => ({
+      // eslint-disable-next-line require-yield
+      async *stream(): AsyncIterable<AdapterChunk> { throw new ProviderHttpError(429, "You exceeded your current quota, check your billing"); },
+    });
+    const run = (chain: Candidate[], adapter: ProviderAdapter) =>
+      collect(route(req(), chain, new AbortController().signal, { site: "server", adapters: { openai: adapter }, breaker: new CircuitBreaker(new MemoryBreakerStore()), sleep: noSleep }));
+
+    it("moves straight to the next key without retrying a key that is out of quota", async () => {
+      const calls: string[] = [];
+      const adapter: ProviderAdapter = {
+        async *stream(c): AsyncIterable<AdapterChunk> {
+          calls.push(c.id);
+          if (c.id === "a") throw new ProviderHttpError(429, "You exceeded your current quota");
+          yield { type: "text", text: "ok" };
+          yield { type: "finish", reason: "stop" };
+        },
+      };
+      const ev = await run([cand("a"), cand("b")], adapter);
+      expect(calls).toEqual(["a", "b"]);
+      expect(ev.find((e) => e.type === "fallback")).toMatchObject({ from: "a", to: "b", reason: "quota" });
+      expect(ev.at(-1)?.type).toBe("done");
+    });
+
+    it("tells the user their one key is out of quota and what to do", async () => {
+      const ev = await run([cand("a")], outOfQuota());
+      const last = ev.at(-1);
+      expect(last).toMatchObject({ type: "error", code: "exhausted" });
+      expect((last as { message: string }).message).toMatch(/run out of quota or credits.*Add another key or provider in AI Access/);
+    });
+
+    it("says every connected AI is out of quota when all keys are", async () => {
+      const ev = await run([cand("a"), cand("b")], outOfQuota());
+      expect((ev.at(-1) as { message: string }).message).toMatch(/Every connected AI has run out of quota/);
+    });
+  });
 });

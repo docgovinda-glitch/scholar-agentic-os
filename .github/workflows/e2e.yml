@@ -43,8 +43,6 @@ jobs:
           supabase status -o env | grep -E '^(API_URL|ANON_KEY|SERVICE_ROLE_KEY|DB_URL)=' | sed 's/"//g' >> "$GITHUB_ENV"
       - name: Build the database from the repo
         run: scripts/db/replay-migrations.sh "$DB_URL"
-      - name: Credit balance and ledger stay in step
-        run: psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/db/test-credits.sql
       - name: Create E2E test accounts
         run: node scripts/e2e-setup.mjs
         env:

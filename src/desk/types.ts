@@ -134,14 +134,6 @@ export interface StudioRefineUsage {
   outputTokensEstimate: number;
 }
 
-/** Mirrors src/app/studio/types.ts's StudioAiSource. */
-export interface StudioAiSource {
-  tier: "premium";
-  provider: string;
-  model: string;
-  creditsUsed: number;
-}
-
 /** Mirrors src/domain/journal/types.ts's JournalRequirements. */
 export interface JournalRequirements {
   journalName: string;
@@ -322,7 +314,6 @@ export interface StudioRefineResult {
   contentChangeCount: number;
   languageChangeCount: number;
   usage?: StudioRefineUsage;
-  aiSource?: StudioAiSource;
 }
 
 /** Thrown-shaped, not a real Error — matches the 428/403 bodies studio.ts sends. */

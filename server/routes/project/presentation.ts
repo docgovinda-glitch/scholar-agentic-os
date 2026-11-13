@@ -14,7 +14,7 @@ import {
   type VisualType,
 } from "../../../src/shared/presentationBrief.ts";
 import { asyncRoute, loadOwnedProject, getSharedStore } from "../project.ts";
-import { getCandidates } from "../../src/services/scholarBrain.ts";
+import { requestKeyring } from "../../src/ai/routerBridge.ts";
 import {
   sanitizeScholarlyText,
   normalizeUnicodeNFC,
@@ -26,7 +26,6 @@ import {
   sendAiFailure,
   UnusableAiResponseError,
 } from "../../src/ai/aiRouteErrors.ts";
-import { resolveClientAiConfig } from "../../src/ai/clientAiConfig.ts";
 import {
   memoryDecks,
   setMemoryDeck,
@@ -344,9 +343,8 @@ router.post(
     const derivedTitle = material.trim() ? deriveDocumentTitle(material, fileName) : topic;
     const fallback = () => ({ ...buildOutlineFromBrief(material.trim() ? material : topic, slideCount, topic || derivedTitle), generatedBy: "brief-grounded" as const });
 
-    const candidates = getCandidates(req);
-    const browserLocalAi = resolveClientAiConfig(req.headers).localModelBrowserOnly;
-    if (candidates.length > 0 || browserLocalAi) {
+    // Any connection counts, including one saved to the account and a local model only the browser can reach (426 hand-off).
+    if ((await requestKeyring(req as never)).length > 0) {
       try {
         const raw = await scholarBrain.presentationOutline({
           req,
@@ -500,11 +498,8 @@ router.post(
       vaultSources,
     }).catch(() => []);
 
-    const candidates = getCandidates(req);
-    // A local model only the user's browser can reach still gets the AI deck (426 hand-off).
-    const browserLocalAi = resolveClientAiConfig(req.headers).localModelBrowserOnly;
-
-    if (candidates.length > 0 || browserLocalAi) {
+    // Any connection counts, including a local model only the browser can reach (426 hand-off).
+    if ((await requestKeyring(req as never)).length > 0) {
       try {
         const systemPrompt = `You design presentation decks in the style of Gamma: each slide is a visual card, not a wall of bullets.
 Write a ${requestedSlides}-card deck for the given topic and material.

@@ -1,6 +1,7 @@
-import { runWithUserAi } from "../src/ai/studioAi.ts";
 import crypto from "crypto";
 import express from "express";
+import { requestCompleter } from "../src/ai/browserHandoff.ts";
+import { sendAiFailure } from "../src/ai/aiRouteErrors.ts";
 import { catalog } from "../../src/app/atlas/atlas.ts";
 import {
   computeG0ExitCriteria,
@@ -38,15 +39,13 @@ import { removeSource, claimsDependingOnSource } from "../../src/domain/claim/gr
 import { countWords, MIN_GUIDELINES_WORDS } from "../../src/domain/journal/types.ts";
 import type { JournalRequirements } from "../../src/domain/journal/types.ts";
 import { isOutputTypeEnabled, MAINTENANCE_MESSAGE } from "./outputTypeAccess.ts";
-import { extractJournalRequirements, GatewayDenied } from "../../src/app/journal/extract.ts";
-import { getPolicyForSession } from "../../src/app/studio/sessionPolicyStore.ts";
+import { extractJournalRequirements } from "../../src/app/journal/extract.ts";
 import { getSupabaseRestConfig, SupabaseTable } from "../src/supabaseRest.ts";
 import { summarize } from "../../src/app/conductor/conductor.ts";
 
 import {
   isValidDocument,
   isValidJournalRequirementsInput,
-  runPremiumJournalExtraction,
   recomputeG1,
   recomputeG2 as _recomputeG2,
   recomputeG3,
@@ -616,7 +615,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     app.post("/api/projects/:id/journal-requirements/extract", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
-    const { guidelinesText, provider, apiKey, model, useEngine } = req.body ?? {};
+    const { guidelinesText } = req.body ?? {};
 
     if (typeof guidelinesText !== "string" || countWords(guidelinesText) < MIN_GUIDELINES_WORDS) {
       return res.status(400).json({
@@ -625,42 +624,16 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     }
 
     const baseInput = { guidelinesText, scopeId: record.projectId };
-    const wantsPremium = useEngine === "premium" && typeof provider !== "string" && typeof apiKey !== "string";
 
-    if (wantsPremium) {
-      const userId = currentUserId(req);
-      let outcome: Awaited<ReturnType<typeof runPremiumJournalExtraction>>;
-      try {
-        outcome = await runPremiumJournalExtraction(userId, baseInput);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Unknown error";
-        return res.status(503).json({ error: `Premium routing is unavailable right now: ${message}` });
-      }
-
-      if (!outcome.ok) {
-        if (outcome.status === 428) {
-          return res.status(428).json({ error: "consent_required", reason: outcome.error, provider: outcome.provider });
-        }
-        if (outcome.status === 403) {
-          return res.status(403).json({ error: "denied", reason: outcome.error });
-        }
-        return res.status(outcome.status).json({ error: outcome.error });
-      }
-      return res.json({ proposal: outcome.result.proposal, aiSource: outcome.aiSource });
-    }
 
     try {
-      const result = await runWithUserAi(req, { task: "reasoning", explicit: { provider, apiKey, model } }, (ai) => extractJournalRequirements({ ...baseInput, ...ai }));
+      const result = await extractJournalRequirements({
+        ...baseInput,
+        complete: requestCompleter(req),
+      });
       return res.json({ proposal: result.proposal });
     } catch (err) {
-      if (err instanceof GatewayDenied) {
-        if (err.requiresConsent) {
-          return res.status(428).json({ error: "consent_required", reason: err.message, provider });
-        }
-        return res.status(403).json({ error: "denied", reason: err.message });
-      }
-      const message = err instanceof Error ? err.message : "Unknown error";
-      return res.status(500).json({ error: message });
+      return sendAiFailure(res, err, "Journal requirements extraction");
     }
   }));
 

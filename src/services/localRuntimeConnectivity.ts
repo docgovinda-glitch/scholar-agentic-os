@@ -1,6 +1,15 @@
 import { runnerHealthUrl, type LocalRunnerSpec } from "../config/localRunnerCatalog";
 import { probeRunner } from "./localRunnerProbe";
-import { probeReachability } from "./aiErrors";
+
+/** A no-cors request tells "blocked by the browser" (the server answered) from "nothing there". */
+async function probeReachability(url: string, timeoutMs = 3000): Promise<"cors_blocked" | "unreachable"> {
+  try {
+    await fetch(url, { mode: "no-cors", signal: AbortSignal.timeout(timeoutMs) });
+    return "cors_blocked";
+  } catch {
+    return "unreachable";
+  }
+}
 
 export type ConnectivityDiagnosis = "reachable" | "reachable-but-blocked" | "unreachable" | "unknown";
 

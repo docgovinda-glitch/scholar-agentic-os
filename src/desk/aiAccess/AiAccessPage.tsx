@@ -1,6 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
 import { LiveRouting, QuickStart, providerLabel } from "./AiAccessExtras";
-import { PREMIUM_SCOPE_SENTENCE } from "./premiumScope";
 import { getCloudProvider, providerAccessFacts, CLOUD_PROVIDERS, type CloudProviderSpec } from "../../config/providerCatalog";
 import { getLocalRunner, LOCAL_RUNNERS, type LocalRunnerSpec } from "../../config/localRunnerCatalog";
 import {
@@ -16,14 +15,6 @@ import ManualHardwareForm from "./ManualHardwareForm";
 import { useAiAccess, type ProviderView } from "./useAiAccess";
 import OnboardingProgress from "../setup/OnboardingProgress";
 import {
-  getPremiumCatalog,
-  getOfferedPlans,
-  getMyPremiumRequest,
-  requestPremium,
-  withdrawPremiumRequest,
-  type PremiumCatalog,
-  type OfferedPlan,
-  type MyPremiumRequest,
 } from "./aiAccessApi";
 import CredentialResetNotice from "../security/CredentialResetNotice";
 
@@ -33,7 +24,7 @@ import CredentialResetNotice from "../security/CredentialResetNotice";
  * Modernized 4-tab architecture:
  * 1. Overview
  * 2. Providers (Merges Local, Free, and Pro)
- * 3. Subscription (Replaces Premium)
+ * 3. Premium (coming soon)
  * 4. Preferences (Merges Models and Settings)
  */
 
@@ -53,7 +44,7 @@ export function normalizeSectionId(sec?: string): SectionId {
 const SECTIONS: Array<{ id: SectionId; label: string }> = [
   { id: "overview", label: "Overview" },
   { id: "providers", label: "Providers" },
-  { id: "subscription", label: "Subscription" },
+  { id: "subscription", label: "Premium" },
   { id: "preferences", label: "Preferences" },
 ];
 
@@ -299,7 +290,7 @@ function SectionPane({
     case "providers":
       return <ProvidersSection access={access} onOpen={onOpen} />;
     case "subscription":
-      return <SubscriptionSection access={access} />;
+      return <SubscriptionSection />;
     case "preferences":
       return <PreferencesSection access={access} onOpen={onOpen} />;
   }
@@ -329,7 +320,6 @@ function OverviewSection({
   const counts = useMemo(
     () => ({
       local: access.local.filter((p) => p.connected).length,
-      free: access.cloud.filter((p) => p.connected && p.tier === "free").length,
       byok: access.cloud.filter((p) => p.connected && p.tier === "byok").length,
     }),
     [access.cloud, access.local]
@@ -357,7 +347,7 @@ function OverviewSection({
             </span>
           </div>
           <p className="text-xs text-slate-500 dark:text-neutral-400 leading-normal">
-            {counts.local} local, {counts.free + counts.byok} cloud accounts
+            {counts.local} local, {counts.byok} cloud accounts
           </p>
         </button>
 
@@ -368,20 +358,14 @@ function OverviewSection({
         >
           <div className="flex items-center justify-between gap-2">
             <span className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">
-              Subscription
+              Premium
             </span>
-            <span
-              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 border ${
-                access.premiumActive
-                  ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200/80 dark:border-emerald-800/60"
-                  : "bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-400 border-slate-200 dark:border-neutral-700"
-              }`}
-            >
-              {access.premiumActive ? "Active" : "Not subscribed"}
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 border bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-400 border-slate-200 dark:border-neutral-700">
+              Coming soon
             </span>
           </div>
           <p className="text-xs text-slate-500 dark:text-neutral-400 leading-normal">
-            {access.premiumActive ? "Provided by Scholar Core" : "Core-hosted model pool"}
+            Platform-managed AI
           </p>
         </button>
 
@@ -471,13 +455,8 @@ function OverviewSection({
         <>
           <QuickStart onOpen={onOpen} />
           <p className="text-xs text-slate-500 dark:text-neutral-400">
-            Prefer not to manage an account?{" "}
-            <button type="button" onClick={() => onGo("subscription")} className="underline cursor-pointer">
-              Scholar Core Premium
-            </button>{" "}
-            provides the AI for you. Or{" "}
             <button type="button" onClick={() => onGo("providers")} className="underline cursor-pointer">
-              browse all providers
+              Browse all providers
             </button>
             .
           </p>
@@ -792,232 +771,20 @@ function ProvidersSection({
   );
 }
 
-/* ── 3. Subscription Section (Replaces Premium) ──────────────────────────── */
+/* ── 3. Premium (coming soon) ────────────────────────────────────────────── */
 
-function SubscriptionSection({ access }: { access: ReturnType<typeof useAiAccess> }) {
-  const [catalog, setCatalog] = useState<PremiumCatalog | null>(null);
-  const [plans, setPlans] = useState<OfferedPlan[]>([]);
-  const [myRequest, setMyRequest] = useState<MyPremiumRequest | null>(null);
-  const [chosenPlan, setChosenPlan] = useState("");
-  const [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const [loadError, setLoadError] = useState(false);
-
-  function reload() {
-    setLoadError(false);
-    const failed = () => setLoadError(true);
-    getPremiumCatalog().then(setCatalog).catch(() => { setCatalog(null); failed(); });
-    getOfferedPlans().then(setPlans).catch(() => { setPlans([]); failed(); });
-    getMyPremiumRequest().then(setMyRequest).catch(() => { setMyRequest(null); failed(); });
-  }
-  useEffect(reload, []);
-
-  async function submit() {
-    setBusy(true);
-    setError(null);
-    try {
-      await requestPremium(chosenPlan || undefined, note.trim() || undefined);
-      setNote("");
-      reload();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function withdraw() {
-    setBusy(true);
-    try {
-      await withdrawPremiumRequest();
-      reload();
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const q = access.status?.quota;
-  const b = access.status?.creditBalance;
-  const pending = myRequest?.status === "pending";
-  const expiry = access.status?.entitlement.expiry;
-  const expiresInDays = expiry ? Math.ceil((Date.parse(expiry) - Date.now()) / 86_400_000) : null;
-
+function SubscriptionSection() {
   return (
-    <div className="space-y-5">
-      <SectionHeading
-        title="Subscription"
-        blurb="AI paid for by Scholar Core. You never enter a key — requests run on Scholar Core's own infrastructure."
-      />
-
-      {loadError && (
-        <div role="alert" className="rounded-[var(--radius-md)] border border-[color:var(--state-warning)] p-3 text-xs text-[color:var(--text-primary)] flex items-center justify-between gap-3">
-          <span>Some subscription details couldn't be loaded, so plans or your request may be missing below.</span>
-          <button type="button" onClick={reload} className="shrink-0 px-3 py-1 rounded-lg border border-[color:var(--border-control)] font-semibold hover:bg-[color:var(--surface-hover)] cursor-pointer">
-            Try again
-          </button>
-        </div>
-      )}
-
-      <section
-        className={`rounded-[var(--radius-md)] border p-4 ${
-          access.premiumActive
-            ? "border-[color:var(--state-success)] bg-[color:var(--state-success-subtle)]"
-            : "border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)]"
-        }`}
-      >
-        <h3 className="text-sm font-semibold text-[color:var(--text-primary)]">
-          Subscription status: {access.premiumActive ? "Active" : "Not subscribed"}
-        </h3>
-        <p className="mt-1 text-xs text-[color:var(--text-secondary)]">
-          {access.premiumActive
-            ? `Nothing to configure. In the features it covers, Scholar Core uses Premium automatically when it is the best available source. ${PREMIUM_SCOPE_SENTENCE}`
-            : "Your status is verified on Scholar Core's server on every request — this page cannot switch it on."}
+    <div className="space-y-4 text-left">
+      <SectionHeading title="Premium" blurb="A platform-managed AI service is planned." />
+      <section className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-5">
+        <span className="inline-flex items-center rounded-full border border-[color:var(--border-subtle)] px-2.5 py-0.5 text-xs font-semibold text-[color:var(--text-secondary)]">
+          Coming soon
+        </span>
+        <p className="mt-3 text-sm text-[color:var(--text-secondary)]">
+          Premium is not available yet. Everything in Scholar Core works today with your own AI: connect a local model or your own API key in Providers.
         </p>
-        {access.premiumActive && expiresInDays !== null && expiresInDays <= 14 && (
-          <p className="mt-2 text-xs font-medium text-[color:var(--state-warning)]">
-            {expiresInDays <= 0
-              ? "Your Premium subscription has expired."
-              : `Your Premium subscription ends in ${expiresInDays} day${expiresInDays === 1 ? "" : "s"}. Contact an administrator to renew.`}
-          </p>
-        )}
       </section>
-
-      {access.premiumActive && q && (
-        <section className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-4">
-          <h3 className="text-sm font-semibold text-[color:var(--text-primary)]">Your allowance</h3>
-          <dl className="mt-2 grid grid-cols-2 gap-2 text-xs text-[color:var(--text-secondary)]">
-            <Stat label="Balance" value={b?.balance ?? 0} />
-            <Stat label="Per-task cap" value={q.perTaskMaxCredits ?? "Unlimited"} />
-            <Stat label="Daily" value={`${b?.daily_used ?? 0} / ${q.dailyCredits ?? "\u221e"}`} />
-            <Stat label="Weekly" value={`${b?.weekly_used ?? 0} / ${q.weeklyCredits ?? "\u221e"}`} />
-            <Stat label="Monthly" value={`${b?.monthly_used ?? 0} / ${q.monthlyCredits ?? "\u221e"}`} />
-            <Stat label="At once" value={q.concurrencyLimit} />
-          </dl>
-        </section>
-      )}
-
-      {access.premiumActive && (
-        <section className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-4">
-          <h3 className="text-sm font-semibold text-[color:var(--text-primary)]">What your plan includes</h3>
-          {catalog && catalog.resources.length === 0 && (
-            <p className="mt-2 text-sm text-[color:var(--text-muted)]">Your plan does not grant any Premium AI yet.</p>
-          )}
-          <ul className="mt-2 space-y-2">
-            {catalog?.resources.map((r) => (
-              <li key={r.id} className="rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] px-3 py-2">
-                <p className="text-sm font-medium text-[color:var(--text-primary)]">{r.label}</p>
-                {r.description && <p className="mt-0.5 text-xs text-[color:var(--text-muted)]">{r.description}</p>}
-                {r.capabilities.length > 0 && (
-                  <p className="mt-1 flex flex-wrap gap-1">
-                    {r.capabilities.map((c) => (
-                      <Chip key={c} tone="neutral">
-                        {c}
-                      </Chip>
-                    ))}
-                  </p>
-                )}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {!access.premiumActive && (
-        <section className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-4">
-          <h3 className="text-sm font-semibold text-[color:var(--text-primary)]">Request Premium</h3>
-
-          {pending ? (
-            <>
-              <p className="mt-2 text-sm text-[color:var(--text-secondary)]">
-                Your request is waiting for an administrator's decision.
-              </p>
-              <button
-                type="button"
-                onClick={() => void withdraw()}
-                disabled={busy}
-                className="mt-3 rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] px-3 py-1.5 text-xs font-medium text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] disabled:opacity-60 cursor-pointer"
-              >
-                Withdraw request
-              </button>
-            </>
-          ) : (
-            <>
-              {myRequest?.status === "declined" && (
-                <p className="mt-2 text-sm text-[color:var(--state-warning)]">
-                  A previous request was declined{myRequest.decision_note ? `: ${myRequest.decision_note}` : "."} You can ask again.
-                </p>
-              )}
-              {plans.length > 0 ? (
-                <>
-                  <p className="mt-1 text-xs text-[color:var(--text-muted)]">Choose the plan you would like.</p>
-                  <ul className="mt-2 space-y-2">
-                    {plans.map((p) => (
-                      <li key={p.id}>
-                        <label className="flex cursor-pointer items-start gap-2 rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] px-3 py-2">
-                          <input
-                            type="radio"
-                            name="plan"
-                            value={p.id}
-                            checked={chosenPlan === p.id}
-                            onChange={() => setChosenPlan(p.id)}
-                            className="mt-1"
-                          />
-                          <span className="min-w-0">
-                            <span className="block text-sm font-medium text-[color:var(--text-primary)]">{p.name}</span>
-                            {p.description && <span className="block text-xs text-[color:var(--text-muted)]">{p.description}</span>}
-                            <span className="mt-0.5 block text-xs text-[color:var(--text-secondary)]">
-                              {p.monthlyCredits ?? "\u221e"} credits/month
-                              {p.dailyCredits ? ` \u00b7 ${p.dailyCredits}/day` : ""}
-                            </span>
-                          </span>
-                        </label>
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              ) : (
-                <p className="mt-2 text-sm text-[color:var(--text-muted)]">
-                  No plans are being offered right now. You can still send a request and an administrator will follow up.
-                </p>
-              )}
-              <label htmlFor="premium-note" className="mt-3 block text-xs font-medium text-[color:var(--text-primary)]">
-                Anything you want to add (optional)
-              </label>
-              <textarea
-                id="premium-note"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                rows={2}
-                className="mt-1 w-full rounded-[var(--radius-sm)] border border-[color:var(--border-control)] bg-[color:var(--surface-inset)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
-              />
-              {error && (
-                <p role="alert" className="mt-2 text-sm text-[color:var(--state-danger)]">
-                  {error}
-                </p>
-              )}
-              <button
-                type="button"
-                onClick={() => void submit()}
-                disabled={busy}
-                className="mt-3 rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-4 py-2 text-sm font-semibold text-[color:var(--text-inverse)] disabled:opacity-60 cursor-pointer"
-              >
-                {busy ? "Sending\u2026" : "Request Premium"}
-              </button>
-            </>
-          )}
-        </section>
-      )}
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div>
-      <dt className="text-[color:var(--text-muted)]">{label}</dt>
-      <dd className="font-medium text-[color:var(--text-primary)]">{value}</dd>
     </div>
   );
 }
@@ -1173,7 +940,6 @@ function PreferencesSection({
                 <ul className="space-y-1 text-[11px] text-[color:var(--text-muted)] list-disc pl-3">
                   <li>Your API keys are saved to your account, each encrypted with its own key that is wrapped by a server-held master key, so they work on every device you sign in on. Each device keeps an encrypted copy in its browser storage. Removing a provider deletes its key from your account and, at their next sign-in, from your other devices.</li>
                   <li>When an AI step runs on Scholar Core&apos;s server (project agents, drafting, Ask Scholar and Deep Research), your key is sent over HTTPS in a request header for that request only, used in memory, and never logged or stored. Other requests never include it.</li>
-                  <li>Premium uses Scholar Core&apos;s own keys, held server-side. They are never sent to your browser. {PREMIUM_SCOPE_SENTENCE}</li>
                   <li>Local runners receive your text directly from this device; it never reaches Scholar Core&apos;s servers.</li>
                 </ul>
               </div>

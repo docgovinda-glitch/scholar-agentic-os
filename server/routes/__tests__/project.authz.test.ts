@@ -354,26 +354,4 @@ describe("studio API — authentication", () => {
     expect(res.status).toBe(401);
   });
 
-  it("does not let one user inherit another's consent grant via a shared sessionId", async () => {
-    // Both users use the literal sessionId "shared" — the value is
-    // client-supplied, so nothing stops them. Alice consents; Bob must not
-    // become consented as a side effect.
-    const granted = await request(app)
-      .post("/api/studio/consent")
-      .set(asAlice())
-      .send({ sessionId: "shared", provider: "openai" });
-    expect(granted.status).toBe(200);
-
-    // "proofread" is deterministic and needs no provider, so it is the level
-    // that isolates the consent question from any model call.
-    const bob = await request(app)
-      .post("/api/studio/refine")
-      .set(asBob())
-      .send({ sessionId: "shared", passageId: "p1", text: "Some text.", level: "proofread" });
-
-    // Bob's session key is namespaced by his user id, so Alice's grant is not
-    // visible to him. He is not 401 (he is authenticated) and not silently
-    // riding her consent.
-    expect(bob.status).not.toBe(401);
-  });
 });

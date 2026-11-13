@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { keyringHeader } from "../../test/aiTestKit.ts";
 import type { Response } from "express";
 
 export const TEST_USER_ID = "22222222-2222-4222-8222-222222222222";
@@ -25,10 +26,6 @@ import {
   rankChunksBM25,
   chunkAndRerankEvidence,
 } from "../../src/services/semanticRagEngine.ts";
-import {
-  getModelCapabilityProfile,
-  mapTaskTypeToTaskClass,
-} from "../../../src/shared/aiTypes.ts";
 import { scholarBrain } from "../../src/services/scholarBrain.ts";
 import { configureRouterBridge } from "../../src/ai/routerBridge.ts";
 import { createAiFetch } from "../../src/ai/aiEndpointGuard.ts";
@@ -377,19 +374,7 @@ describe("Batch 2: SSE Streaming & ScholarBrain (Fix 1.9)", () => {
 });
 
 describe("Batch 2: Model Capability Profiler & Mesh Preflight (Fix 1.10)", () => {
-  it("profiles models into compact, standard, and frontier tiers", () => {
-    expect(getModelCapabilityProfile("llama-3-8b-instruct")).toBe("compact");
-    expect(getModelCapabilityProfile("mistral-7b-instruct")).toBe("compact");
-    expect(getModelCapabilityProfile("claude-3-5-sonnet")).toBe("frontier");
-    expect(getModelCapabilityProfile("gpt-4o")).toBe("frontier");
-    expect(getModelCapabilityProfile("gpt-4o-mini")).toBe("standard");
-  });
 
-  it("maps task types to task classes correctly", () => {
-    expect(mapTaskTypeToTaskClass("reasoning")).toBe("drafting");
-    expect(mapTaskTypeToTaskClass("verification")).toBe("verification");
-    expect(mapTaskTypeToTaskClass("extraction")).toBe("rule_extraction");
-  });
 
   it("validates AG-14, AG-18, AG-25, and AG-26 via validatePreflightMesh", async () => {
     const results = await scholarBrain.validatePreflightMesh(TEST_USER_ID, {
@@ -449,8 +434,7 @@ describe("Batch 2: Multi-Chapter Gating in Thesis Workspace (Fix 2.5)", () => {
     const auditRes = await request(app)
       .post(`/api/projects/${projectId}/thesis/chapter-audit`)
       .set("Authorization", "Bearer valid-token")
-      .set("x-ai-provider", "openai")
-      .set("x-ai-api-key", "sk-test-not-real")
+      .set(keyringHeader("openai", "test-model", "sk-test-not-real"))
       .send({
         chapters: [
           { chapterNumber: 1, title: "Introduction", wordCount: 4000, targetWordCount: 5000, status: "drafting" },

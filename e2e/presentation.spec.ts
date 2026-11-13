@@ -6,8 +6,10 @@ import JSZip from "jszip";
 
 async function buildDeck(page: import("@playwright/test").Page) {
   await page.goto("/presentation");
-  await page.getByLabel(/^Title/).fill("Climate migration in South Asia");
-  await page.getByRole("button", { name: "Starter outline without AI" }).click();
+  // Step 01 drafts an outline from the topic (offline here: no AI is configured), then Design, then the studio.
+  await page.getByPlaceholder(/Branches of quantum computing/).fill("Climate migration in South Asia");
+  await page.getByRole("button", { name: "Generate outline" }).click();
+  await page.getByRole("button", { name: /Proceed to Design/ }).click();
   await page.getByRole("button", { name: /03 Edit Slides/ }).first().click();
   await expect(page.getByTestId("wysiwyg-slide-card")).toBeVisible();
 }
@@ -28,7 +30,8 @@ test("switching layouts keeps the card's text", async ({ page }) => {
   );
   expect(lines.length).toBeGreaterThan(0);
   const headline = lines.sort((a, b) => b.length - a.length)[0];
-  for (const layout of ["bento", "list", "comparison", "timeline", "statement"]) {
+  // Layouts offered depend on the card; these four are available for the deck's second card.
+  for (const layout of ["bento", "list", "comparison", "timeline"]) {
     await page.getByTestId(`layout-option-${layout}`).click();
     // The headline survives every layout switch (layouts convert content, never replace it).
     await expect(card).toContainText(headline);

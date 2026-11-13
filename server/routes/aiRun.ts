@@ -2,13 +2,12 @@
  * One AI endpoint for every feature: POST /api/ai/run streams router events
  * (SSE), GET /api/ai/models returns the curated model list for the user's keys.
  *
- * Chain per request: the user's Premium resources (when entitled and within
- * quota) → the user's own keys in their order → their local model (handed to
- * the browser). `preferLane: "byok"` puts the user's own keys first.
+ * Chain per request: the user's own keys in their order → their local model
+ * (handed to the browser).
  *
  * Keys: BYOK keys arrive per request in the `x-ai-keyring` header (base64url
  * JSON). They live in memory for that request only: never stored, logged or
- * returned. Premium keys come from the vault and never leave the server.
+ * returned. 
  *
  * A base URL the user names is screened (`aiEndpointGuard`): https only, public
  * addresses only, connection pinned. A blocked endpoint is skipped with a reason.
@@ -18,7 +17,7 @@ import type express from "express";
 import { z } from "zod";
 import { requireAuth } from "../src/middleware/auth.ts";
 import { getCloudProvider } from "../../src/config/providerCatalog.ts";
-import { serverCanReachLocalModels } from "../src/ai/clientAiConfig.ts";
+import { serverCanReachLocalModels } from "../src/ai/serverLocalAccess.ts";
 import { route, type RouterOptions } from "../../src/platform/router/router.ts";
 import { pipeToSse } from "../../src/platform/router/sseBridge.ts";
 import { CircuitBreaker, MemoryBreakerStore } from "../../src/platform/router/circuitBreaker.ts";
@@ -43,6 +42,8 @@ const keyringEntry = z.object({
   contextWindow: z.number().int().positive().max(10_000_000).optional(),
   maxOutputTokens: z.number().int().positive().max(1_000_000).optional(),
   label: z.string().max(120).optional(),
+  /** Which of the provider's keys this is (1 = main), so a backup key has its own id and circuit. */
+  slot: z.number().int().min(1).max(9).optional(),
 });
 export type KeyringEntry = z.infer<typeof keyringEntry>;
 
@@ -74,21 +75,11 @@ const runBody = z.object({
   desiredOutputTokens: z.number().int().positive().max(200_000).default(4096),
   minOutputTokens: z.number().int().positive().max(200_000).default(256),
   temperature: z.number().min(0).max(2).optional(),
-  preferLane: z.enum(["auto", "byok", "premium"]).default("auto"),
 });
-
-/** Premium hooks, injected so the route can be tested without a database. */
-export interface PremiumPort {
-  /** Ordered Premium candidates for this user and task, or a reason they get none. */
-  candidates(userId: string, task: RouteRequest["task"]): Promise<{ candidates: Candidate[]; unavailable?: string }>;
-  /** Charge for a finished Premium request. Returns false when the charge was refused. */
-  charge(userId: string, candidate: Candidate, usage: { inputTokens: number; outputTokens: number }, requestId: string): Promise<boolean>;
-}
 
 export interface AiRunDeps {
   adapters?: RouterOptions["adapters"];
   breaker?: CircuitBreaker;
-  premium?: PremiumPort;
   routerOptions?: Partial<RouterOptions>;
   listModels?: typeof listLiveModels;
 }
@@ -100,10 +91,11 @@ const DEFAULT_MAX_OUT = 8_192;
 
 export function keyringToCandidates(entries: KeyringEntry[]): Candidate[] {
   return entries.map((e) => ({
-    id: `${LOCAL.has(e.provider) ? "local" : "byok"}:${e.via ?? e.provider}:${e.model}`,
+    id: `${LOCAL.has(e.provider) ? "local" : "byok"}:${e.via ?? e.provider}:${e.model}${e.slot && e.slot > 1 ? `#${e.slot}` : ""}`,
     lane: LOCAL.has(e.provider) ? "local" : "byok",
     provider: e.provider,
-    group: e.via ?? e.provider,
+    // A backup key is its own group: when one key runs out, the next key of the same provider still gets its turn.
+    group: `${e.via ?? e.provider}${e.slot && e.slot > 1 ? `#${e.slot}` : ""}`,
     model: e.model,
     label: e.label ?? `${e.model}${LOCAL.has(e.provider) ? " on your device" : e.via ? ` · ${getCloudProvider(e.via)?.name ?? e.via} key` : " · your key"}`,
     contextWindow: e.contextWindow ?? DEFAULT_CONTEXT,
@@ -152,10 +144,7 @@ export function registerAiRunRoutes(app: express.Express, deps: AiRunDeps = {}):
     const expanded = await expandKeyring(keyring, body.task);
     const screened = await screenCandidates(keyringToCandidates(expanded.entries));
     const own = screened.kept;
-    const premium = deps.premium ? await deps.premium.candidates(userId, body.task).catch(() => ({ candidates: [] as Candidate[], unavailable: "Premium is temporarily unavailable." })) : { candidates: [] as Candidate[] };
-    const cloudOwn = own.filter((c) => c.lane === "byok");
-    const local = own.filter((c) => c.lane === "local");
-    const chain = body.preferLane === "byok" ? [...cloudOwn, ...premium.candidates, ...local] : [...premium.candidates, ...cloudOwn, ...local];
+    const chain = [...own.filter((c) => c.lane === "byok"), ...own.filter((c) => c.lane === "local")];
 
     if (chain.length === 0 && screened.blocked.length) {
       res.status(400).json({ error: screened.blocked.map((b) => `${b.label}: ${b.reason}`).join("; "), code: "ai_endpoint_blocked" });
@@ -167,7 +156,7 @@ export function registerAiRunRoutes(app: express.Express, deps: AiRunDeps = {}):
     }
     if (chain.length === 0) {
       res.status(400).json({
-        error: premium.unavailable ? `${premium.unavailable} Add your own AI key or a local model in AI Access.` : "No AI is connected. Add your own AI key or a local model in AI Access.",
+        error: "No AI is connected. Add your own AI key or a local model in AI Access.",
         code: "ai_provider_required",
       });
       return;
@@ -197,10 +186,6 @@ export function registerAiRunRoutes(app: express.Express, deps: AiRunDeps = {}):
           const c = byId.get(ev.candidateId);
           if (c && ev.outputTokens > 50) recordSpeed(`${c.provider}:${c.model}`, ev.tokensPerSecond);
         }
-        if (ev.type === "done" && ev.lane === "premium" && deps.premium) {
-          const c = byId.get(ev.candidateId);
-          if (c) await deps.premium.charge(userId, c, ev.usage, request.requestId).catch(() => false);
-        }
         yield ev;
       }
     });
@@ -211,7 +196,7 @@ export function registerAiRunRoutes(app: express.Express, deps: AiRunDeps = {}):
     try { keyring = parseKeyring(req.headers["x-ai-keyring"]); } catch (e) { res.status(400).json({ error: (e as Error).message }); return; }
     const speeds = measuredSpeeds();
     const results = await Promise.all(
-      keyring.filter((k) => !LOCAL.has(k.provider)).map(async (k) => {
+      keyring.filter((k, i) => !LOCAL.has(k.provider) && keyring.findIndex((o) => (o.via ?? o.provider) === (k.via ?? k.provider) && o.baseUrl === k.baseUrl) === i).map(async (k) => {
         const group = k.via ?? k.provider;
         const cacheKey = createHash("sha256").update(`${k.provider}\0${group}\0${k.baseUrl ?? ""}\0${k.apiKey ?? ""}`).digest("hex");
         const hit = modelCache.get(cacheKey);

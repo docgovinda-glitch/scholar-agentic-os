@@ -1,3 +1,4 @@
+import { AiModelSwitcher } from "./ai/AiModelSwitcher";
 import React, { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
@@ -3032,6 +3033,7 @@ export default function ProjectListScreen({
           {/* Top Bar Right: AI Assistant Toggle & Active Provider Status */}
           <div className="flex items-center gap-2.5">
             {/* Active AI Status Pill */}
+            {userEmail && <AiModelSwitcher workspace="ask-scholar" className="hidden sm:block" />}
             {userEmail ? (
               <button
                 type="button"

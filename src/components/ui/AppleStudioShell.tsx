@@ -1,3 +1,5 @@
+import { AiModelSwitcher } from "../../desk/ai/AiModelSwitcher";
+import type { WorkspaceId } from "../../desk/ai/modelChoices";
 import React, { useState, useEffect } from "react";
 import {
   ChevronLeft,
@@ -57,6 +59,8 @@ export interface AppleStudioHeaderProps {
   aiModelLabel?: string;
   /** Click handler for AI model badge */
   onOpenAiAccess?: () => void;
+  /** Shows the shared AI model switcher, tuned for this workspace. */
+  aiWorkspace?: WorkspaceId;
   /** Autosave state */
   autosaveStatus?: AutosaveState | string;
   /** Project version for autosave badge */
@@ -105,6 +109,7 @@ export function AppleStudioHeader({
   metricLabel,
   aiModelLabel,
   onOpenAiAccess,
+  aiWorkspace,
   autosaveStatus = "saved",
   projectVersion,
   lastSavedTime,
@@ -329,6 +334,7 @@ export function AppleStudioHeader({
           </button>
         )}
 
+        {aiWorkspace && <AiModelSwitcher workspace={aiWorkspace} />}
         {rightActions}
       </div>
     </div>

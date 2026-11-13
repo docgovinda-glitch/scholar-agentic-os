@@ -17,6 +17,7 @@ vi.mock("../../src/middleware/auth.ts", () => ({
 }));
 
 import request from "supertest";
+import { AI_HEADERS, useFetchBackedAi } from "../../test/aiTestKit.ts";
 import { app } from "../../../server.ts";
 import { __resetProjectStoreForTests } from "../../../src/app/conductor/projectStore.ts";
 import { __resetAuditLogForTests } from "../../../src/platform/warden/warden.ts";
@@ -31,6 +32,7 @@ const originalFetch = global.fetch;
 const originalMasterKey = process.env.MASTER_KEY;
 
 beforeEach(() => {
+  useFetchBackedAi();
   __resetProjectStoreForTests();
   __resetAuditLogForTests();
   __resetRateLimitStore();
@@ -135,7 +137,7 @@ describe("POST /api/projects/:id/journal-requirements/extract — validation", (
   it("404s for a project the caller does not own", async () => {
     const res = await request(app)
       .post(`/api/projects/not-a-real-project/journal-requirements/extract`)
-      .send({ guidelinesText: GUIDELINES_TEXT, provider: "openai", apiKey: "sk-test" });
+      .set(AI_HEADERS).send({ guidelinesText: GUIDELINES_TEXT });
     expect(res.status).toBe(404);
   });
 });
@@ -147,7 +149,7 @@ describe("POST /api/projects/:id/journal-requirements/extract — BYOK path", ()
 
     const res = await request(app)
       .post(`/api/projects/${projectId}/journal-requirements/extract`)
-      .send({ guidelinesText: GUIDELINES_TEXT, provider: "openai", apiKey: "sk-test" });
+      .set(AI_HEADERS).send({ guidelinesText: GUIDELINES_TEXT });
 
     expect(res.status).toBe(200);
     expect(res.body.proposal.journalName).toBe("Nature Test Journal");
@@ -161,7 +163,7 @@ describe("POST /api/projects/:id/journal-requirements/extract — BYOK path", ()
 
     await request(app)
       .post(`/api/projects/${projectId}/journal-requirements/extract`)
-      .send({ guidelinesText: GUIDELINES_TEXT, provider: "openai", apiKey: "sk-test" });
+      .set(AI_HEADERS).send({ guidelinesText: GUIDELINES_TEXT });
 
     const res = await request(app).get(`/api/projects/${projectId}/journal-requirements`);
     expect(res.status).toBe(404);
@@ -179,14 +181,14 @@ describe("POST /api/projects/:id/journal-requirements/extract — BYOK path", ()
 
     const res = await request(app)
       .post(`/api/projects/${projectId}/journal-requirements/extract`)
-      .send({ guidelinesText: GUIDELINES_TEXT, provider: "openai", apiKey: "sk-test" });
+      .set(AI_HEADERS).send({ guidelinesText: GUIDELINES_TEXT });
 
     expect(res.status).toBe(200);
     expect(res.body.proposal.citationStyle).toBeUndefined();
     expect(res.body.proposal.unresolvedFields).toEqual(["citationStyle", "wordLimit"]);
   });
 
-  it("500s with a real error, never a fabricated proposal, when the model's response can't be parsed", async () => {
+  it("502s with a real error, never a fabricated proposal, when the model's response can't be parsed", async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -196,18 +198,19 @@ describe("POST /api/projects/:id/journal-requirements/extract — BYOK path", ()
 
     const res = await request(app)
       .post(`/api/projects/${projectId}/journal-requirements/extract`)
-      .send({ guidelinesText: GUIDELINES_TEXT, provider: "openai", apiKey: "sk-test" });
+      .set(AI_HEADERS).send({ guidelinesText: GUIDELINES_TEXT });
 
-    expect(res.status).toBe(500);
-    expect(res.body.error).toMatch(/could not be parsed/i);
+    expect(res.status).toBe(502);
+    expect(res.body.error).toMatch(/could not be generated/i);
   });
 
-  it("500s when no provider/apiKey is supplied and useEngine is not premium", async () => {
+  it("400s with ai_provider_required when no AI is connected", async () => {
     const projectId = await createProject();
     const res = await request(app)
       .post(`/api/projects/${projectId}/journal-requirements/extract`)
       .send({ guidelinesText: GUIDELINES_TEXT });
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("ai_provider_required");
   });
 });
 
@@ -304,84 +307,3 @@ function mockDb(db: MockDb) {
   }) as unknown as typeof fetch;
 }
 
-describe("POST /api/projects/:id/journal-requirements/extract — Premium path", () => {
-  it("402s a non-entitled user, never reaching the provider", async () => {
-    mockDb({ entitlement: [] });
-    const projectId = await createProject();
-
-    const res = await request(app)
-      .post(`/api/projects/${projectId}/journal-requirements/extract`)
-      .send({ guidelinesText: GUIDELINES_TEXT, useEngine: "premium" });
-
-    expect(res.status).toBe(402);
-    expect(res.body.error).toMatch(/Premium subscription/i);
-  });
-
-  it("succeeds for an entitled user, deducts credits, and reports aiSource — same shape Studio's Premium path uses", async () => {
-    mockDb({
-      entitlement: ACTIVE_ENTITLEMENT,
-      platformCredentials: [encryptedCredentialRow("openai", "sk-platform-test-key")],
-      providers: [{ id: "openai", metadata: { defaultModel: "gpt-4o-mini" }, premium_enabled: true }],
-      resources: [RESOURCE("r1", "openai", "gpt-4o-mini")],
-      balance: [{ balance: 500 }],
-      plans: PLAN,
-      overrides: [],
-      deductResult: "ok",
-      providerResponse: () => providerJsonResponse(VALID_PROPOSAL_JSON),
-    });
-    const projectId = await createProject();
-
-    const res = await request(app)
-      .post(`/api/projects/${projectId}/journal-requirements/extract`)
-      .send({ guidelinesText: GUIDELINES_TEXT, useEngine: "premium" });
-
-    expect(res.status).toBe(200);
-    expect(res.body.proposal.journalName).toBe("Nature Test Journal");
-    expect(res.body.aiSource.tier).toBe("premium");
-    expect(res.body.aiSource.creditsUsed).toBeGreaterThan(0);
-    expect(res.body.aiSource.provider).toBe("Resource r1");
-  });
-
-  it("502s and deducts nothing when the provider call fails with no fallback", async () => {
-    const db: MockDb = {
-      entitlement: ACTIVE_ENTITLEMENT,
-      platformCredentials: [encryptedCredentialRow("openai", "sk-platform-test-key")],
-      providers: [{ id: "openai", metadata: {}, premium_enabled: true }],
-      resources: [RESOURCE("r1", "openai", null)],
-      balance: [{ balance: 500 }],
-      plans: PLAN,
-      overrides: [],
-      providerResponse: () => ({ ok: false, status: 500, text: async () => "provider down", json: async () => ({}) }) as Response,
-      capturedWrites: {},
-    };
-    mockDb(db);
-    const projectId = await createProject();
-
-    const res = await request(app)
-      .post(`/api/projects/${projectId}/journal-requirements/extract`)
-      .send({ guidelinesText: GUIDELINES_TEXT, useEngine: "premium" });
-
-    expect(res.status).toBe(502);
-    expect(db.capturedWrites["deduct_credits_calls"] ?? []).toEqual([]);
-  });
-
-  it("402s naming quota exhaustion when entitled but this period's balance is zero", async () => {
-    mockDb({
-      entitlement: ACTIVE_ENTITLEMENT,
-      platformCredentials: [{ provider_id: "openai", status: "active" }],
-      providers: [{ id: "openai", metadata: {}, premium_enabled: true }],
-      resources: [RESOURCE("r1", "openai", null)],
-      balance: [{ balance: 0 }],
-      plans: PLAN,
-      overrides: [],
-    });
-    const projectId = await createProject();
-
-    const res = await request(app)
-      .post(`/api/projects/${projectId}/journal-requirements/extract`)
-      .send({ guidelinesText: GUIDELINES_TEXT, useEngine: "premium" });
-
-    expect(res.status).toBe(402);
-    expect(res.body.error).toMatch(/quota.*exhausted/i);
-  });
-});

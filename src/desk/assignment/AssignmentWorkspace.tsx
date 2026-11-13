@@ -526,6 +526,7 @@ function AssignmentWorkspaceInner({
         }}
         metricLabel={`${(currentWordCount || 0).toLocaleString()} / ${(targetWordCount || 0).toLocaleString()} words`}
         onOpenAiAccess={onOpenAiAccess}
+        aiWorkspace="coursework"
         autosaveStatus={saveStatus}
         hidePhaseTabs
         projectVersion={project?.version}

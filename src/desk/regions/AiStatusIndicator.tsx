@@ -56,7 +56,7 @@ export const AiStatusIndicator: React.FC = () => {
   }
 
   const isLocal = choice.tier === "local";
-  const displayProvider = choice.providerId === "premium" ? "Scholar Premium" : choice.providerId;
+  const displayProvider = choice.providerId;
 
   return (
     <div 

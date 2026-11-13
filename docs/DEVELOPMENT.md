@@ -35,14 +35,14 @@ For local work leave `VITE_CAPTCHA_SITE_KEY` empty: the placeholder value in `.e
 
 `.husky/pre-commit` runs `npm run lint`. `package.json` has no `prepare` script, so enable the hook once per clone with `npx husky`.
 
-`scripts/` also holds operational tools (`smoke-prod.mjs`/`.sh`, `verify-deployment-readiness.sh`, `verify-local-supabase.sh`, `db/replay-migrations.sh`, `db/schema-diff.sh`, `db/test-credits.sql`, `rewrap-platform-credentials.ts`, `reset-all-vaults.ts`, `create_bucket.ts`); read the header comment of each before running it, and never point them at production without the procedure in [`../RUNBOOK.md`](../RUNBOOK.md).
+`scripts/` also holds operational tools (`smoke-prod.mjs`/`.sh`, `verify-deployment-readiness.sh`, `verify-local-supabase.sh`, `db/replay-migrations.sh`, `db/schema-diff.sh`, `rewrap-platform-credentials.ts`, `reset-all-vaults.ts`, `create_bucket.ts`); read the header comment of each before running it, and never point them at production without the procedure in [`../RUNBOOK.md`](../RUNBOOK.md).
 
 ## 4. Tests
 
 - Unit and route tests live in `__tests__/` folders next to the code (`src/**`, `server/**`); Vitest 4 with jsdom, Testing Library and `src/testSetup.ts`. `e2e/**` is excluded from Vitest.
 - `src/__tests__/singleBrainGuardian.test.ts` fails the suite if the single-brain rules are broken ([`AI-SYSTEM.md`](AI-SYSTEM.md) §1).
 - Some tests need real credentials or network and fail without them (`authIntegration`, `liveNetworkDiagnostics`, `productionFinalAcceptance`, `AddSourceModal`, `selfServiceAuthConflict6`). Do not mock away their purpose; confirm your change adds no new failures.
-- Database SQL is exercised by `scripts/db/replay-migrations.sh` and `scripts/db/test-credits.sql` against a local Supabase (never hosted).
+- Database SQL is exercised by `scripts/db/replay-migrations.sh` against a local Supabase (never hosted).
 - End-to-end specs: sign-in, privacy, every workspace, AI drafting with a stand-in AI server (`e2e/stub-ai/server.mjs`), Presentation Studio, accessibility and keyboard.
 - GitHub workflows: `ci.yml` (lint, `npm audit --omit=dev --audit-level=high`, test, build on PRs to `main`), `e2e.yml`, `slide-parity.yml`, `deploy.yml`, `uptime.yml` ([`DEPLOYMENT.md`](DEPLOYMENT.md)).
 

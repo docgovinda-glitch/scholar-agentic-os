@@ -385,7 +385,7 @@ describe("Journal Rebuild Step B — 5-Mode Navigation, Mode 1 Word Budgeter & M
   });
 
   describe("4. Live Header Telemetry Strip (ResearchWorkspace)", () => {
-    it("renders live actual words / target words, verified sources & data, active client model, and autosave version", async () => {
+    it("renders live actual words / target words, verified sources & data, the AI model switcher, and autosave version", async () => {
       render(
         <ResearchWorkspace
           projectId="proj-step-b"
@@ -397,7 +397,7 @@ describe("Journal Rebuild Step B — 5-Mode Navigation, Mode 1 Word Budgeter & M
       await waitFor(() => {
         expect(screen.getByTitle("Actual Words / Target Words")).toBeInTheDocument();
         expect(screen.getByTitle("Verified Sources & User Datasets")).toBeInTheDocument();
-        expect(screen.getByTitle(/Active Client AI Model/i)).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "AI model" })).toBeInTheDocument();
         expect(screen.getByTitle(/Autosave Status v3/i)).toBeInTheDocument();
       });
 

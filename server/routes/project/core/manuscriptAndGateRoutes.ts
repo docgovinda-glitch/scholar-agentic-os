@@ -1,4 +1,6 @@
 import express from "express";
+import { requestCompleter } from "../../../src/ai/browserHandoff.ts";
+import { sendAiFailure, BrowserAiRequiredError } from "../../../src/ai/aiRouteErrors.ts";
 import { catalog } from "../../../../src/app/atlas/atlas.ts";
 import {
   computeG4ExitCriteria,
@@ -28,15 +30,13 @@ import {
   pauseJob,
   GenerationJobError,
 } from "../../../../src/domain/manuscript/stateMachine.ts";
-import { generateSection, GatewayDenied } from "../../../../src/app/manuscript/generate.ts";
-import { runWithUserAi } from "../../../src/ai/studioAi.ts";
+import { generateSection } from "../../../../src/app/manuscript/generate.ts";
 import { checkCoherence } from "../../../../src/app/coherence/checkCoherence.ts";
 import type { CoherenceDimension } from "../../../../src/domain/coherence/types.ts";
 import { COHERENCE_DIMENSIONS } from "../../../../src/domain/coherence/types.ts";
 import { runPeerReview } from "../../../../src/app/review/peerReview.ts";
 import type { ReviewLens } from "../../../../src/domain/review/types.ts";
 import { REVIEW_LENSES } from "../../../../src/domain/review/types.ts";
-import { getPolicyForSession } from "../../../../src/app/studio/sessionPolicyStore.ts";
 import { generateCoverLetter } from "../../../../src/app/coverLetter/generateCoverLetter.ts";
 import { proposeAnonymization } from "../../../../src/app/anonymization/proposeAnonymization.ts";
 import { applyAnonymization, AnonymizationApplyError } from "../../../../src/app/anonymization/applyAnonymization.ts";
@@ -45,11 +45,6 @@ import { withProjectLock } from "../../../src/concurrency/projectLock.ts";
 import {
   isGateId,
   buildSectionContextPacket,
-  runPremiumSectionGeneration,
-  runPremiumCoherenceCheck,
-  runPremiumPeerReview,
-  runPremiumCoverLetter,
-  runPremiumAnonymization,
   recomputeG3,
   recomputeG4,
   recomputeG6,
@@ -117,7 +112,7 @@ export function registerManuscriptAndGateRoutes(
 
   /**
    * Generate exactly the next planned section and append it to the job —
-   * the actual checkpoint. Body: { provider?, apiKey?, model?, useEngine? },
+   * the actual checkpoint. Body: { provider?, apiKey?, model?? },
    * same BYOK-vs-Premium shape as every other AI-backed route in this file.
    * Drafting is content-bearing (platform/warden/classify.ts), so a BYOK
    * call here goes through the same session-scoped consent flow Studio uses
@@ -152,62 +147,28 @@ export function registerManuscriptAndGateRoutes(
         return res.status(409).json({ error: "Every planned section is already generated." });
       }
 
-      const { provider, apiKey, model, useEngine } = req.body ?? {};
       const packet = buildSectionContextPacket(record, planned);
-      const wantsPremium = useEngine === "premium" && typeof provider !== "string" && typeof apiKey !== "string";
-      const policy = getPolicyForSession(`${currentUserId(req)}:manuscript:${record.projectId}`);
 
       async function checkpoint(generatedSection: Awaited<ReturnType<typeof generateSection>>["section"]) {
         const generationJob = appendSection(record!.generationJob!, generatedSection);
         return store.save({ ...record!, generationJob });
       }
 
-      if (wantsPremium) {
-        const userId = currentUserId(req);
-        let outcome: Awaited<ReturnType<typeof runPremiumSectionGeneration>>;
-        try {
-          outcome = await runPremiumSectionGeneration(userId, packet, policy);
-        } catch (err) {
-          const message = err instanceof Error ? err.message : "Unknown error";
-          return res.status(503).json({ error: `Premium routing is unavailable right now: ${message}` });
-        }
-
-        if (!outcome.ok) {
-          if (outcome.status === 428) {
-            return res.status(428).json({ error: "consent_required", reason: outcome.error, provider: outcome.provider });
-          }
-          if (outcome.status === 403) {
-            return res.status(403).json({ error: "denied", reason: outcome.error });
-          }
-          if (outcome.status === 502) {
-            const generationJob = failJob(record.generationJob, outcome.error);
-            await store.save({ ...record, generationJob });
-          }
-          return res.status(outcome.status).json({ error: outcome.error });
-        }
-        const updated = await checkpoint(outcome.result.section);
-        return res.json({ generationJob: updated.generationJob, aiSource: outcome.aiSource });
-      }
 
       try {
-        const result = await runWithUserAi(req, { task: "drafting", explicit: { provider, apiKey, model } }, (ai) => generateSection({
+        const result = await generateSection({
           packet,
-          ...ai,
-          policy,
-        }));
+        complete: requestCompleter(req),
+        });
         const updated = await checkpoint(result.section);
         return res.json({ generationJob: updated.generationJob });
       } catch (err) {
-        if (err instanceof GatewayDenied) {
-          if (err.requiresConsent) {
-            return res.status(428).json({ error: "consent_required", reason: err.message, provider });
-          }
-          return res.status(403).json({ error: "denied", reason: err.message });
-        }
+        // A browser hand-off is not a failure: the job stays as it was until the browser answers.
+        if (err instanceof BrowserAiRequiredError) return sendAiFailure(res, err, "Section generation");
         const message = err instanceof Error ? err.message : "Unknown error";
         const generationJob = failJob(record.generationJob, message);
         await store.save({ ...record, generationJob });
-        return res.status(500).json({ error: message });
+        return sendAiFailure(res, err, "Section generation");
       }
     });
   }));
@@ -251,7 +212,7 @@ export function registerManuscriptAndGateRoutes(
    * generated so far — multi-pass (up to 3 separate model calls, one per
    * CoherenceDimension), never one call asked to judge the whole
    * manuscript's consistency at once. Body:
-   * { provider?, apiKey?, model?, useEngine?, dimensions? }. `dimensions`
+   * { provider?, apiKey?, model??, dimensions? }. `dimensions`
    * lets a caller re-run just one failed pass instead of all three. Stores
    * the result on the job (coherenceReport) so it survives a refresh, same
    * as everything else this engine checkpoints.
@@ -265,54 +226,29 @@ export function registerManuscriptAndGateRoutes(
       if (!record.generationJob) {
         return res.status(404).json({ error: `Project "${req.params.id}" has no generation job started yet.` });
       }
-      const { provider, apiKey, model, useEngine, dimensions } = req.body ?? {};
+      const { dimensions } = req.body ?? {};
       if (dimensions !== undefined && (!Array.isArray(dimensions) || !dimensions.every((d) => COHERENCE_DIMENSIONS.includes(d)))) {
         return res.status(400).json({ error: `Invalid field: dimensions. Must be a subset of: ${COHERENCE_DIMENSIONS.join(", ")}` });
       }
 
       const sections = record.generationJob.sections;
-      const wantsPremium = useEngine === "premium" && typeof provider !== "string" && typeof apiKey !== "string";
-      const policy = getPolicyForSession(`${currentUserId(req)}:manuscript:${record.projectId}`);
 
       async function saveReport(coherenceReport: Awaited<ReturnType<typeof checkCoherence>>) {
         const generationJob = { ...record!.generationJob!, coherenceReport };
         return store.save({ ...record!, generationJob });
       }
 
-      if (wantsPremium) {
-        const userId = currentUserId(req);
-        let outcome: Awaited<ReturnType<typeof runPremiumCoherenceCheck>>;
-        try {
-          outcome = await runPremiumCoherenceCheck(userId, sections, dimensions, policy);
-        } catch (err) {
-          const message = err instanceof Error ? err.message : "Unknown error";
-          return res.status(503).json({ error: `Premium routing is unavailable right now: ${message}` });
-        }
-        if (!outcome.ok) {
-          if (outcome.status === 428) return res.status(428).json({ error: "consent_required", reason: outcome.error, provider: outcome.provider });
-          if (outcome.status === 403) return res.status(403).json({ error: "denied", reason: outcome.error });
-          return res.status(outcome.status).json({ error: outcome.error });
-        }
-        const updated = await saveReport(outcome.result);
-        return res.json({ generationJob: updated.generationJob, aiSource: outcome.aiSource });
-      }
 
       try {
-        const coherenceReport = await runWithUserAi(req, { task: "reasoning", explicit: { provider, apiKey, model } }, (ai) => checkCoherence({
+        const coherenceReport = await checkCoherence({
           sections,
-          ...ai,
-          policy,
+        complete: requestCompleter(req),
           dimensions,
-        }));
+        });
         const updated = await saveReport(coherenceReport);
         return res.json({ generationJob: updated.generationJob });
       } catch (err) {
-        if (err instanceof GatewayDenied) {
-          if (err.requiresConsent) return res.status(428).json({ error: "consent_required", reason: err.message, provider });
-          return res.status(403).json({ error: "denied", reason: err.message });
-        }
-        const message = err instanceof Error ? err.message : "Unknown error";
-        return res.status(500).json({ error: message });
+        return sendAiFailure(res, err, "This step");
       }
     });
   }));
@@ -321,7 +257,7 @@ export function registerManuscriptAndGateRoutes(
    * Multi-lens adversarial peer review (domain/review) over every section
    * generated so far — up to seven separate model calls, one per
    * ReviewLens, each instructed to be genuinely critical rather than
-   * praise-optimized. Body: { provider?, apiKey?, model?, useEngine?,
+   * praise-optimized. Body: { provider?, apiKey?, model??,
    * lenses? }. Every call APPENDS a new round to peerReviewHistory.rounds —
    * never overwrites a prior one, so an author can compare round N against
    * round N-1 after revising. `lenses` lets a caller re-run just one failed
@@ -336,7 +272,7 @@ export function registerManuscriptAndGateRoutes(
       if (!record.generationJob) {
         return res.status(404).json({ error: `Project "${req.params.id}" has no generation job started yet.` });
       }
-      const { provider, apiKey, model, useEngine, lenses } = req.body ?? {};
+      const { lenses } = req.body ?? {};
       if (lenses !== undefined && (!Array.isArray(lenses) || !lenses.every((l) => REVIEW_LENSES.includes(l)))) {
         return res.status(400).json({ error: `Invalid field: lenses. Must be a subset of: ${REVIEW_LENSES.join(", ")}` });
       }
@@ -344,8 +280,6 @@ export function registerManuscriptAndGateRoutes(
       const sections = record.generationJob.sections;
       const roundNumber = record.peerReviewHistory.rounds.length + 1;
       const journalRequirements = record.journalRequirements ? { journalName: record.journalRequirements.journalName } : undefined;
-      const wantsPremium = useEngine === "premium" && typeof provider !== "string" && typeof apiKey !== "string";
-      const policy = getPolicyForSession(`${currentUserId(req)}:manuscript:${record.projectId}`);
 
       async function saveRound(round: Awaited<ReturnType<typeof runPeerReview>>) {
         const peerReviewHistory = { rounds: [...record!.peerReviewHistory.rounds, round] };
@@ -353,48 +287,20 @@ export function registerManuscriptAndGateRoutes(
         return store.save({ ...record!, peerReviewHistory, gates });
       }
 
-      if (wantsPremium) {
-        const userId = currentUserId(req);
-        let outcome: Awaited<ReturnType<typeof runPremiumPeerReview>>;
-        try {
-          outcome = await runPremiumPeerReview(userId, sections, roundNumber, journalRequirements, lenses, policy);
-        } catch (err) {
-          const message = err instanceof Error ? err.message : "Unknown error";
-          return res.status(503).json({ error: `Premium routing is unavailable right now: ${message}` });
-        }
-        if (!outcome.ok) {
-          if (outcome.status === 428) return res.status(428).json({ error: "consent_required", reason: outcome.error, provider: outcome.provider });
-          if (outcome.status === 403) return res.status(403).json({ error: "denied", reason: outcome.error });
-          return res.status(outcome.status).json({ error: outcome.error });
-        }
-        try {
-          const updated = await saveRound(outcome.result);
-          return res.json({ peerReviewHistory: updated.peerReviewHistory, gates: summarize(updated.gates), aiSource: outcome.aiSource });
-        } catch (err) {
-          if (err instanceof GateTransitionError) return res.status(409).json({ error: err.message });
-          throw err;
-        }
-      }
 
       try {
-        const round = await runWithUserAi(req, { task: "reasoning", explicit: { provider, apiKey, model } }, (ai) => runPeerReview({
+        const round = await runPeerReview({
           sections,
           roundNumber,
           journalRequirements,
-          ...ai,
-          policy,
+        complete: requestCompleter(req),
           lenses,
-        }));
+        });
         const updated = await saveRound(round);
         return res.json({ peerReviewHistory: updated.peerReviewHistory, gates: summarize(updated.gates) });
       } catch (err) {
-        if (err instanceof GatewayDenied) {
-          if (err.requiresConsent) return res.status(428).json({ error: "consent_required", reason: err.message, provider });
-          return res.status(403).json({ error: "denied", reason: err.message });
-        }
         if (err instanceof GateTransitionError) return res.status(409).json({ error: err.message });
-        const message = err instanceof Error ? err.message : "Unknown error";
-        return res.status(500).json({ error: message });
+        return sendAiFailure(res, err, "This step");
       }
     });
   }));
@@ -458,7 +364,7 @@ export function registerManuscriptAndGateRoutes(
    * manuscript engine's per-section checkpointing — there is no
    * cross-call state to persist. Overwrites any previous cover letter
    * (domain/coverLetter — one per project, not a version history). Body:
-   * { provider?, apiKey?, model?, useEngine? }, same BYOK-vs-Premium shape
+   * { provider?, apiKey?, model?? }, same BYOK-vs-Premium shape
    * and 428/403/402 status mapping as every other AI-backed route here.
    */
   app.post("/api/projects/:id/cover-letter", projectLimit, asyncRoute(async (req, res) => {
@@ -476,46 +382,20 @@ export function registerManuscriptAndGateRoutes(
       if (!record.journalRequirements) {
         return res.status(400).json({ error: "Cannot generate a cover letter before journal requirements are captured (the target journal is what the letter is addressed to)." });
       }
-      const { provider, apiKey, model, useEngine } = req.body ?? {};
       const document = record.document;
       const journalRequirements = record.journalRequirements;
-      const wantsPremium = useEngine === "premium" && typeof provider !== "string" && typeof apiKey !== "string";
-      const policy = getPolicyForSession(`${currentUserId(req)}:manuscript:${record.projectId}`);
 
-      if (wantsPremium) {
-        const userId = currentUserId(req);
-        let outcome: Awaited<ReturnType<typeof runPremiumCoverLetter>>;
-        try {
-          outcome = await runPremiumCoverLetter(userId, document, journalRequirements, policy);
-        } catch (err) {
-          const message = err instanceof Error ? err.message : "Unknown error";
-          return res.status(503).json({ error: `Premium routing is unavailable right now: ${message}` });
-        }
-        if (!outcome.ok) {
-          if (outcome.status === 428) return res.status(428).json({ error: "consent_required", reason: outcome.error, provider: outcome.provider });
-          if (outcome.status === 403) return res.status(403).json({ error: "denied", reason: outcome.error });
-          return res.status(outcome.status).json({ error: outcome.error });
-        }
-        const updated = await store.save({ ...record, coverLetter: outcome.result.coverLetter });
-        return res.json({ coverLetter: updated.coverLetter, aiSource: outcome.aiSource });
-      }
 
       try {
-        const { coverLetter } = await runWithUserAi(req, { task: "drafting", explicit: { provider, apiKey, model } }, (ai) => generateCoverLetter({
+        const { coverLetter } = await generateCoverLetter({
           document,
           journalRequirements,
-          ...ai,
-          policy,
-        }));
+        complete: requestCompleter(req),
+        });
         const updated = await store.save({ ...record, coverLetter });
         return res.json({ coverLetter: updated.coverLetter });
       } catch (err) {
-        if (err instanceof GatewayDenied) {
-          if (err.requiresConsent) return res.status(428).json({ error: "consent_required", reason: err.message, provider });
-          return res.status(403).json({ error: "denied", reason: err.message });
-        }
-        const message = err instanceof Error ? err.message : "Unknown error";
-        return res.status(500).json({ error: message });
+        return sendAiFailure(res, err, "This step");
       }
     });
   }));
@@ -538,7 +418,7 @@ export function registerManuscriptAndGateRoutes(
    * applied to any document. Overwrites any previous proposal report
    * (domain/anonymization — one report per project, superseded on
    * regeneration, same as coverLetter). Body: { provider?, apiKey?,
-   * model?, useEngine? }, same BYOK-vs-Premium shape as every other
+   * model?? }, same BYOK-vs-Premium shape as every other
    * AI-backed route here.
    */
   app.post("/api/projects/:id/anonymization/propose", projectLimit, asyncRoute(async (req, res) => {
@@ -547,44 +427,18 @@ export function registerManuscriptAndGateRoutes(
     if (!record.document) {
       return res.status(400).json({ error: "Cannot propose anonymization for a project with no document submitted yet." });
     }
-    const { provider, apiKey, model, useEngine } = req.body ?? {};
     const document = record.document;
-    const wantsPremium = useEngine === "premium" && typeof provider !== "string" && typeof apiKey !== "string";
-    const policy = getPolicyForSession(`${currentUserId(req)}:manuscript:${record.projectId}`);
 
-    if (wantsPremium) {
-      const userId = currentUserId(req);
-      let outcome: Awaited<ReturnType<typeof runPremiumAnonymization>>;
-      try {
-        outcome = await runPremiumAnonymization(userId, document, policy);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Unknown error";
-        return res.status(503).json({ error: `Premium routing is unavailable right now: ${message}` });
-      }
-      if (!outcome.ok) {
-        if (outcome.status === 428) return res.status(428).json({ error: "consent_required", reason: outcome.error, provider: outcome.provider });
-        if (outcome.status === 403) return res.status(403).json({ error: "denied", reason: outcome.error });
-        return res.status(outcome.status).json({ error: outcome.error });
-      }
-      const updated = await store.save({ ...record, anonymizationReport: outcome.result });
-      return res.json({ anonymizationReport: updated.anonymizationReport, aiSource: outcome.aiSource });
-    }
 
     try {
-      const anonymizationReport = await runWithUserAi(req, { task: "reasoning", explicit: { provider, apiKey, model } }, (ai) => proposeAnonymization({
+      const anonymizationReport = await proposeAnonymization({
         document,
-          ...ai,
-        policy,
-      }));
+        complete: requestCompleter(req),
+      });
       const updated = await store.save({ ...record, anonymizationReport });
       return res.json({ anonymizationReport: updated.anonymizationReport });
     } catch (err) {
-      if (err instanceof GatewayDenied) {
-        if (err.requiresConsent) return res.status(428).json({ error: "consent_required", reason: err.message, provider });
-        return res.status(403).json({ error: "denied", reason: err.message });
-      }
-      const message = err instanceof Error ? err.message : "Unknown error";
-      return res.status(500).json({ error: message });
+      return sendAiFailure(res, err, "This step");
     }
   }));
 

@@ -12,22 +12,17 @@
  * classify.ts), not "drafting" (which generates new prose).
  */
 
-import { complete, GatewayDenied } from "../../platform/gateway/gateway";
-import type { EgressPolicy } from "../../platform/warden/warden";
+import type { Completer } from "../../platform/completion";
 import type { CanonicalDocument } from "../../domain/document/model";
 import type { AnonymizationReport, RedactionCategory, RedactionProposal } from "../../domain/anonymization/types";
 
-export { GatewayDenied } from "../../platform/gateway/gateway";
 
 const CATEGORIES: RedactionCategory[] = ["author_identity", "acknowledgement", "funding_statement", "self_citation", "metadata"];
 
 export interface ProposeAnonymizationInput {
   document: CanonicalDocument;
-  provider?: string;
-  apiKey?: string;
-  model?: string;
-  scopeId?: string;
-  policy?: EgressPolicy;
+  /** Runs the model; see src/platform/completion.ts. */
+  complete: Completer;
 }
 
 function systemPrompt(): string {
@@ -76,23 +71,14 @@ function tryParseProposals(raw: string): RedactionProposal[] | undefined {
 }
 
 export async function proposeAnonymization(input: ProposeAnonymizationInput): Promise<AnonymizationReport> {
-  if (!input.provider || !input.apiKey) {
-    throw new Error("Anonymization proposal generation requires a model provider and API key.");
-  }
 
-  const result = await complete(
+  const result = await input.complete(
     {
-      provider: input.provider,
-      apiKey: input.apiKey,
-      model: input.model,
       taskClass: "verification",
-      scopeId: input.scopeId,
       systemPrompt: systemPrompt(),
       userPrompt: "Identify every identity-revealing passage in the manuscript below and propose a neutral replacement for each.",
-      segments: input.document.blocks.map((b) => ({ label: b.id, text: b.text })),
       responseFormat: "json",
-    },
-    input.policy
+    }
   );
 
   const parsed = tryParseProposals(result.text);

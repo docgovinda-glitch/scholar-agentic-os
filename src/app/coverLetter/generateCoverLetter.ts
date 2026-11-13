@@ -14,22 +14,17 @@
  * existing content).
  */
 
-import { complete, GatewayDenied } from "../../platform/gateway/gateway";
-import type { EgressPolicy } from "../../platform/warden/warden";
+import type { Completer } from "../../platform/completion";
 import type { CanonicalDocument } from "../../domain/document/model";
 import type { JournalRequirements } from "../../domain/journal/types";
 import type { CoverLetter } from "../../domain/coverLetter/types";
 
-export { GatewayDenied } from "../../platform/gateway/gateway";
 
 export interface GenerateCoverLetterInput {
   document: CanonicalDocument;
   journalRequirements: JournalRequirements;
-  provider?: string;
-  apiKey?: string;
-  model?: string;
-  scopeId?: string;
-  policy?: EgressPolicy;
+  /** Runs the model; see src/platform/completion.ts. */
+  complete: Completer;
 }
 
 export interface GenerateCoverLetterUsage {
@@ -55,22 +50,13 @@ function systemPrompt(journalRequirements: JournalRequirements): string {
 }
 
 export async function generateCoverLetter(input: GenerateCoverLetterInput): Promise<GenerateCoverLetterResult> {
-  if (!input.provider || !input.apiKey) {
-    throw new Error("Cover letter generation requires a model provider and API key.");
-  }
 
-  const result = await complete(
+  const result = await input.complete(
     {
-      provider: input.provider,
-      apiKey: input.apiKey,
-      model: input.model,
       taskClass: "drafting",
-      scopeId: input.scopeId,
       systemPrompt: systemPrompt(input.journalRequirements),
       userPrompt: `Draft the cover letter for the manuscript titled "${input.document.title}".`,
-      segments: input.document.blocks.map((b) => ({ label: b.id, text: b.text })),
-    },
-    input.policy
+    }
   );
 
   if (result.text.trim().length === 0) {

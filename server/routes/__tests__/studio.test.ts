@@ -12,33 +12,6 @@ vi.mock("../../src/middleware/auth.ts", () => ({
     next();
   },
 }));
-vi.mock("../../src/aiEngine/userRouter.ts", () => ({
-  assembleUserCandidates: vi.fn().mockResolvedValue({
-    candidates: [{ id: "premium", tier: "platform", health: "healthy", costScore: 0, qualityScore: 100, latencyScore: 100 }],
-    premiumQuotaRemaining: 1000,
-    entitlementActive: true,
-    quota: null,
-  }),
-}));
-vi.mock("../../src/aiEngine/adminRouter.ts", () => ({
-  resolvePremiumResources: vi.fn().mockResolvedValue([
-    { providerId: "openai", credentialLabel: "primary", label: "OpenAI GPT-4", modelId: "gpt-4" },
-  ]),
-}));
-vi.mock("../../src/aiEngine/credentialVault.ts", () => ({
-  getDecryptedCredential: vi.fn().mockResolvedValue("sk-platform-mock-key"),
-}));
-vi.mock("../../src/aiEngine/creditEngine.ts", () => ({
-  deductCredits: vi.fn().mockResolvedValue("ok"),
-}));
-vi.mock("../../src/aiEngine/creditPolicy.ts", () => ({
-  estimateMaxCreditsForInput: vi.fn().mockReturnValue(1),
-  creditsForUsage: vi.fn().mockReturnValue(1),
-}));
-vi.mock("../../src/aiEngine/providerHealth.ts", () => ({
-  recordProviderFailure: vi.fn(),
-  recordProviderSuccess: vi.fn(),
-}));
 import request from "supertest";
 import { app } from "../../../server.ts";
 import { __resetSessionPoliciesForTests } from "../../../src/app/studio/sessionPolicyStore.ts";
@@ -216,36 +189,5 @@ describe("POST /api/studio/refine with a voiceProfile", () => {
     expect(res.status).toBe(200);
     expect(res.body.voiceDrift).toBeDefined();
     expect(res.body.voiceDrift.drifted).toBe(true);
-  });
-});
-
-describe("GET /api/studio/egress-audit", () => {
-  beforeEach(() => {
-    __resetSessionPoliciesForTests();
-    __resetAuditLogForTests();
-    __resetRateLimitStore();
-  });
-  afterEach(() => {
-    global.fetch = originalFetch;
-  });
-
-  it("reflects calls made through /api/studio/refine, content-free", async () => {
-    // Level 1 (proofread) makes no Warden evaluation at all — it's fully
-    // deterministic and never egresses (that's the point). Use a
-    // model-backed level so there is an evaluation to audit; the 428 is
-    // expected (no consent recorded) and the audit entry is written before
-    // that response is returned.
-    await request(app).post("/api/studio/refine").send({
-      sessionId: "s6",
-      passageId: "p7",
-      text: "a very secret sentence to refine",
-      level: "clarity",
-      useEngine: "premium",
-    });
-
-    const res = await request(app).get("/api/studio/egress-audit");
-    expect(res.status).toBe(200);
-    expect(res.body.entries.length).toBeGreaterThan(0);
-    expect(JSON.stringify(res.body.entries)).not.toContain("secret sentence");
   });
 });

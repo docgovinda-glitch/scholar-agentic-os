@@ -1,7 +1,7 @@
 /**
  * Architectural tests — enforce module boundaries and security invariants.
  *
- * Verifies that platform and app code route provider calls through the platform gateway.
+ * Verifies that provider calls happen only in the router (src/platform/router); app code asks a Completer.
  */
 
 import { describe, it, expect } from "vitest";
@@ -27,32 +27,27 @@ const PLATFORM_ROOT = resolve(process.cwd(), "src/platform");
 const APP_ROOT = resolve(process.cwd(), "src/app");
 
 describe("architecture: egress boundary", () => {
-  it("no file under src/platform, other than gateway/adapters.ts, constructs an outbound fetch() call", () => {
+  it("no file under src/platform, other than the router's adapters and model listers, constructs an outbound fetch() call", () => {
     const files = listFiles(PLATFORM_ROOT);
     const offenders: string[] = [];
     for (const file of files) {
-      if (file.endsWith(join("gateway", "adapters.ts"))) continue; // the one sanctioned call site
+      if (file.endsWith(join("router", "adapters.ts")) || file.endsWith(join("router", "modelListers.ts"))) continue; // the sanctioned call sites
       const content = readFileSync(file, "utf8");
       if (/\bfetch\s*\(/.test(content)) offenders.push(file);
     }
     expect(offenders).toEqual([]);
   });
 
-  it("no file under src/app calls fetch() directly against a model provider — it must go through platform/gateway", () => {
+  it("no file under src/app calls fetch() directly against a model provider — it must use a Completer (platform/completion)", () => {
     const files = listFiles(APP_ROOT);
     const offenders: string[] = [];
     for (const file of files) {
       const content = readFileSync(file, "utf8");
-      if (/\bfetch\s*\(/.test(content) && !content.includes("platform/gateway")) {
+      if (/\bfetch\s*\(/.test(content) && !content.includes("platform/completion")) {
         offenders.push(file);
       }
     }
     expect(offenders).toEqual([]);
-  });
-
-  it("platform/gateway's public entry point does not re-export the raw adapter factory", async () => {
-    const mod = await import("../gateway/gateway");
-    expect(Object.keys(mod)).not.toContain("getAdapter");
   });
 
   it("server/routes/studio.ts (the new architecture's route) does not call fetch() directly", () => {

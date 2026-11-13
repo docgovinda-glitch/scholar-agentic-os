@@ -85,7 +85,7 @@ describe("GET /api/ai-access/status", () => {
 describe("POST /api/ai-access/connections", () => {
   it("401s with no session", async () => {
     const app = await buildApp();
-    const res = await request(app).post("/api/ai-access/connections").send({ providerId: "gemini", tier: "free" });
+    const res = await request(app).post("/api/ai-access/connections").send({ providerId: "gemini", tier: "byok" });
     expect(res.status).toBe(401);
   });
 
@@ -94,7 +94,7 @@ describe("POST /api/ai-access/connections", () => {
     const res = await request(app)
       .post("/api/ai-access/connections")
       .set("Authorization", "Bearer alice-token")
-      .send({ providerId: "gemini", tier: "free", userId: "someone-elses-id" });
+      .send({ providerId: "gemini", tier: "byok", userId: "someone-elses-id" });
 
     expect(res.status).toBe(200);
     const writeCall = capture.urls.find((u) => u.includes("/rest/v1/user_ai_connections"));
@@ -153,7 +153,7 @@ describe("AI Access write routes answer instead of hanging when Supabase rejects
     const res = await request(app)
       .post("/api/ai-access/connections")
       .set("Authorization", "Bearer alice-token")
-      .send({ providerId: "gemini", tier: "free" });
+      .send({ providerId: "gemini", tier: "byok" });
 
     expect(res.status).toBe(503);
     expect(res.body.error).toBeTruthy();

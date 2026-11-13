@@ -19,7 +19,7 @@ import { Readable } from "node:stream";
 import { createRebindingSafeLookup, validateSafeUrl } from "../../utils/ssrfGuard.ts";
 import type { Candidate, ProviderAdapter, ProviderId } from "../../../src/platform/router/types.ts";
 import { defaultAdapters, ollamaAdapter, openAiCompatibleAdapter } from "../../../src/platform/router/adapters.ts";
-import { serverCanReachLocalModels } from "./clientAiConfig.ts";
+import { serverCanReachLocalModels } from "./serverLocalAccess.ts";
 import { CLOUD_PROVIDERS } from "../../../src/config/providerCatalog.ts";
 import { COHERE_COMPAT_BASE } from "../../../src/platform/router/providerMap.ts";
 

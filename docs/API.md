@@ -122,12 +122,11 @@ Export formats: `docx`, `odt`, `pdf`, `latex`, `typst`, `camera_ready_pdf`, `mar
 | POST | `/api/ai/agent` | Yes | Ask Scholar |
 | GET, POST | `/api/ai/threads` | Yes | Ask Scholar threads (held in server memory per user, merged by thread id) |
 | POST | `/api/drafting/section` | Yes | Section drafting |
-| POST | `/api/studio/voice-profile`, `/refine`, `/consent`, `/restrict` | Yes | Studio voice and refine |
-| GET | `/api/studio/egress-audit` | Yes | Egress audit |
+| POST | `/api/studio/voice-profile`, `/refine` | Yes | Studio voice and refine (`/refine` runs on the keyring) |
 
 ### 6.1 AI Access (`/api/ai-access`, all `requireAuth`, user-scoped)
 
-GET `/status`; POST `/connections`; DELETE `/connections/:providerId`; POST `/models`; GET `/keys`, `/keys/sync`; PUT, DELETE `/keys/:providerId`; POST `/route`; GET `/premium-catalog`, `/premium-plans`; GET, POST, DELETE `/premium-request`.
+GET `/status`; POST `/connections` (tier `local` or `byok`); DELETE `/connections/:providerId`; GET `/keys`, `/keys/sync`; PUT, DELETE `/keys/:keyId` (a provider id, or `provider#2` / `#3` for a backup key).
 
 ## 7. Search and Vault
 
@@ -146,9 +145,7 @@ GET `/`, `/:id`; POST `/`; PUT `/:id`; DELETE `/:id`; POST `/parse-document` (mu
 
 ## 9. Admin (`/api/admin/ai`, `requireAuth` then `requireAdmin`; scopes in [`PRODUCT.md`](PRODUCT.md) §1)
 
-- Read: GET `/whoami`, `/dashboard`, `/providers`, `/resources`, `/plans/:planId/resources`, `/models`, `/premium-plans`, `/premium-requests`, `/premium-subscribers`, `/quota-overrides/:userId`, `/usage`, `/budget`, `/platform-credentials`, `/opportunities`, `/admins`, `/users/search`, `/audit-log`.
-- Providers and resources: PATCH `/providers/:id`, `/models/:id`; POST `/resources`; PATCH, DELETE `/resources/:id`; PUT `/plans/:planId/resources`; POST `/premium-plans`.
-- Premium: POST `/premium-requests/:id/approve`, `/premium-requests/:id/decline`, `/entitlements/grant`, `/entitlements/revoke`, `/quota-overrides`, `/credits/grant`.
+- Read: GET `/whoami`, `/opportunities`, `/admins`, `/users/search`, `/audit-log`.
 - Budget and credentials: PATCH `/budget`; POST `/platform-credentials`; PATCH `/platform-credentials/:id/status`; DELETE `/platform-credentials/:id`.
 - Opportunities: POST `/opportunities/research`, `/opportunities/:id/review`.
 - People: POST `/admins`; DELETE `/admins/:userId`; PATCH `/admins/:userId/scopes`, `/users/:userId/status`; DELETE `/users/:userId`.

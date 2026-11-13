@@ -6,7 +6,7 @@ Tables, storage and state shapes. The authority is the SQL in `supabase/` (`sche
 
 - The server reaches Postgres through the Supabase Data API over HTTPS with the service-role key (`server/src/supabaseRest.ts`), or directly through `DATABASE_URL` as an optional fallback.
 - RLS is enabled on every table. Server-owned tables (for example `projects`) have **no** policies, so `anon` and `authenticated` can do nothing and only `service_role` can read or write; ownership is checked in application code (`loadOwnedProject` in `server/routes/project.ts`).
-- A few user-facing tables (`profiles`, `user_vaults`, `user_vault_items`, `user_cloud_integrations`, `api_credentials`, `project_files`, `project_activity`, `provider_health`, `premium_plans`, `ai_providers`, `ai_models`) also have policies; read each migration for the exact rules. Migration `20261028000000_hotfix2_db_storage_rpc_lockdown.sql` enabled RLS on three agentic tables, made all buckets private and restricted the account-lookup functions to `service_role`.
+- A few user-facing tables (`profiles`, `user_vaults`, `user_vault_items`, `user_cloud_integrations`, `api_credentials`, `project_files`, `project_activity`, `ai_providers`) also have policies; read each migration for the exact rules. Migration `20261028000000_hotfix2_db_storage_rpc_lockdown.sql` enabled RLS on three agentic tables, made all buckets private and restricted the account-lookup functions to `service_role`.
 - Database functions: `deduct_credits`, `grant_credits` (atomic credit accounting), `match_project_evidence` (pgvector similarity over `project_evidence.embedding`, 768 dimensions, HNSW index), `email_for_identifier`, `email_for_username`, `email_for_phone_e164`, `check_email_available`, `check_username_available`, `check_phone_available`, `submit_id_document`, `handle_new_user`, `handle_project_delete_cascade`, `enforce_account_status_admin_only`, `update_modified_column`.
 
 ## 2. Tables by area
@@ -71,16 +71,10 @@ The relational claim, evidence and source tables are written by `server/src/sync
 
 | Table | Purpose |
 | :--- | :--- |
-| `ai_providers`, `ai_models` | Registry mirrored from the code catalogs by `npm run seed:ai-registry`; `ai_providers` also has `premium_enabled`, `premium_models` |
-| `user_ai_connections` | A user's connected sources (`provider_id`, `tier`, `status`, `storage_mode`, `models_detected`) |
-| `user_provider_keys` | Saved user keys: `encrypted_cek`, `encrypted_key`, `masked_preview` |
+| `ai_providers` | Provider registry referenced by `user_ai_connections`; not mirrored from the code catalogs any more |
+| `user_ai_connections` | A user's connected sources (`provider_id`, `tier` is `local` or `byok`, `status`, `storage_mode`, `models_detected`). The Premium tables were dropped by `20261113000000_remove_premium_infrastructure.sql` |
+| `user_provider_keys` | Saved user keys, one row per main key (`openai`) or backup key (`openai#2`, `openai#3`): `encrypted_cek`, `encrypted_key`, `masked_preview` |
 | `hardware_profiles` | Detected device specs for local-model suggestions |
-| `ai_resources`, `plan_resources` | Platform resource pool and plan grants (two-router architecture) |
-| `premium_plans`, `premium_requests`, `user_entitlements`, `user_quota_overrides` | Plans (credits per month, week, day, per task, concurrency), requests, entitlements, overrides |
-| `credit_balances`, `credit_ledger`, `ai_usage_ledger` | Credit balances with daily, weekly and monthly usage, signed credit ledger, per-request usage records |
-| `provider_health` | Last status, latency and error per provider |
-| `platform_provider_credentials` | Platform keys (`encrypted_cek`, `encrypted_credential`, `masked_preview`, `status`) |
-| `platform_budgets` | Monthly budget and threshold percentages |
 | `ai_opportunities`, `opportunity_reviews` | Admin-reviewed free-credit and offer research |
 | `admin_audit_log` | Admin actions (`action`, `target_type`, `target_id`, `details`) |
 

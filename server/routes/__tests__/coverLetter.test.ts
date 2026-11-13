@@ -15,6 +15,7 @@ vi.mock("../../src/middleware/auth.ts", () => ({
 }));
 
 import request from "supertest";
+import { AI_HEADERS, keyringHeader, useFetchBackedAi } from "../../test/aiTestKit.ts";
 import { app } from "../../../server.ts";
 import { __resetProjectStoreForTests } from "../../../src/app/conductor/projectStore.ts";
 import { __resetSessionPoliciesForTests } from "../../../src/app/studio/sessionPolicyStore.ts";
@@ -27,6 +28,7 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "sb_secret_test";
 const originalFetch = global.fetch;
 
 beforeEach(() => {
+  useFetchBackedAi();
   __resetProjectStoreForTests();
   __resetSessionPoliciesForTests();
   __resetRateLimitStore();
@@ -65,7 +67,7 @@ function letterResponse(text: string) {
 describe("POST /api/projects/:id/cover-letter", () => {
   it("400s when no document has been submitted yet", async () => {
     const projectId = await createProject();
-    const res = await request(app).post(`/api/projects/${projectId}/cover-letter`).send({ provider: "openai", apiKey: "sk-test" });
+    const res = await request(app).post(`/api/projects/${projectId}/cover-letter`).set(AI_HEADERS).send({});
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/no document/i);
   });
@@ -73,7 +75,7 @@ describe("POST /api/projects/:id/cover-letter", () => {
   it("400s when no journal requirements have been captured yet", async () => {
     const projectId = await createProject();
     await request(app).put(`/api/projects/${projectId}/document`).send({ document: otTenDocument() });
-    const res = await request(app).post(`/api/projects/${projectId}/cover-letter`).send({ provider: "openai", apiKey: "sk-test" });
+    const res = await request(app).post(`/api/projects/${projectId}/cover-letter`).set(AI_HEADERS).send({});
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/journal requirements/i);
   });
@@ -82,10 +84,9 @@ describe("POST /api/projects/:id/cover-letter", () => {
     const projectId = await createProject();
     await request(app).put(`/api/projects/${projectId}/document`).send({ document: otTenDocument() });
     await request(app).put(`/api/projects/${projectId}/journal-requirements`).send({ journalName: "Water Research", citationStyle: "vancouver", requiredDeclarations: [] });
-    await grantConsent(projectId, "openai");
 
     global.fetch = vi.fn().mockResolvedValue(letterResponse("Dear Editor,\n\nWe submit our manuscript for your consideration.\n\nSincerely,"));
-    const res = await request(app).post(`/api/projects/${projectId}/cover-letter`).send({ provider: "openai", apiKey: "sk-test" });
+    const res = await request(app).post(`/api/projects/${projectId}/cover-letter`).set(AI_HEADERS).send({});
 
     expect(res.status).toBe(200);
     expect(res.body.coverLetter.text).toContain("Dear Editor");
@@ -100,13 +101,12 @@ describe("POST /api/projects/:id/cover-letter", () => {
     const projectId = await createProject();
     await request(app).put(`/api/projects/${projectId}/document`).send({ document: otTenDocument() });
     await request(app).put(`/api/projects/${projectId}/journal-requirements`).send({ journalName: "Water Research", citationStyle: "vancouver", requiredDeclarations: [] });
-    await grantConsent(projectId, "openai");
 
     global.fetch = vi.fn().mockResolvedValue(letterResponse("First draft of the letter."));
-    await request(app).post(`/api/projects/${projectId}/cover-letter`).send({ provider: "openai", apiKey: "sk-test" });
+    await request(app).post(`/api/projects/${projectId}/cover-letter`).set(AI_HEADERS).send({});
 
     global.fetch = vi.fn().mockResolvedValue(letterResponse("Second, revised letter."));
-    const res = await request(app).post(`/api/projects/${projectId}/cover-letter`).send({ provider: "openai", apiKey: "sk-test" });
+    const res = await request(app).post(`/api/projects/${projectId}/cover-letter`).set(AI_HEADERS).send({});
     expect(res.body.coverLetter.text).toBe("Second, revised letter.");
   });
 
@@ -116,23 +116,32 @@ describe("POST /api/projects/:id/cover-letter", () => {
     expect(res.status).toBe(404);
   });
 
-  it("402s a non-entitled Premium user, never reaching the provider", async () => {
-    global.fetch = vi.fn((input: RequestInfo | URL) => {
-      const url = typeof input === "string" ? input : input.toString();
-      const respondJson = (body: unknown, status = 200) => Promise.resolve({ ok: status < 300, status, text: async () => JSON.stringify(body), json: async () => body } as Response);
-      if (url.includes("/rest/v1/user_entitlements")) return respondJson([]);
-      if (url.includes("/rest/v1/user_ai_connections")) return respondJson([]);
-      if (url.includes("/rest/v1/provider_health")) return respondJson([]);
-      if (url.includes("/rest/v1/ai_providers")) return respondJson([]);
-      return respondJson({}, 500);
-    }) as unknown as typeof fetch;
 
-    const projectId = await createProject();
-    await request(app).put(`/api/projects/${projectId}/document`).send({ document: otTenDocument() });
-    await request(app).put(`/api/projects/${projectId}/journal-requirements`).send({ journalName: "Water Research", citationStyle: "vancouver", requiredDeclarations: [] });
+  it("hands the prompt to the browser when the user's AI is a local model, then saves the browser's answer", async () => {
+    const saved = process.env.ALLOW_SERVER_LOCAL_AI;
+    process.env.ALLOW_SERVER_LOCAL_AI = "false"; // as on a deployed server
+    try {
+      const projectId = await createProject();
+      await request(app).put(`/api/projects/${projectId}/document`).send({ document: otTenDocument() });
+      await request(app).put(`/api/projects/${projectId}/journal-requirements`).send({ journalName: "Water Research", citationStyle: "vancouver", requiredDeclarations: [] });
+      const local = keyringHeader("ollama", "llama");
 
-    const res = await request(app).post(`/api/projects/${projectId}/cover-letter`).send({ useEngine: "premium" });
-    expect(res.status).toBe(402);
-    expect(res.body.error).toMatch(/Premium subscription/i);
+      const first = await request(app).post(`/api/projects/${projectId}/cover-letter`).set(local).send({});
+      expect(first.status).toBe(426);
+      expect(first.body.requireFrontendLLM).toBe(true);
+      expect(first.body.challengeToken).toBeTruthy();
+
+      // A result signed for some other prompt is not accepted.
+      const forged = await request(app).post(`/api/projects/${projectId}/cover-letter`).set(local)
+        .send({ browserResults: [{ challengeToken: "not.a-token", llmResult: "Forged letter" }] });
+      expect(forged.status).toBe(426);
+
+      const second = await request(app).post(`/api/projects/${projectId}/cover-letter`).set(local)
+        .send({ browserResults: [{ challengeToken: first.body.challengeToken, llmResult: "Dear Editor, from my own computer." }] });
+      expect(second.status).toBe(200);
+      expect(second.body.coverLetter.text).toContain("from my own computer");
+    } finally {
+      if (saved === undefined) delete process.env.ALLOW_SERVER_LOCAL_AI; else process.env.ALLOW_SERVER_LOCAL_AI = saved;
+    }
   });
 });

@@ -14,6 +14,7 @@ vi.mock("../../src/middleware/auth.ts", () => ({
 }));
 
 import request from "supertest";
+import { AI_HEADERS, keyringHeader, useFetchBackedAi } from "../../test/aiTestKit.ts";
 import { app } from "../../../server.ts";
 import { __resetProjectStoreForTests } from "../../../src/app/conductor/projectStore.ts";
 import { __resetProjectStoreSelectionForTests } from "../../../src/services/store/projectStore.ts";
@@ -30,6 +31,7 @@ const originalFetch = global.fetch;
 const originalMasterKey = process.env.MASTER_KEY;
 
 beforeEach(() => {
+  useFetchBackedAi();
   // P1-6: Reset ALL layers of store caching to prevent cross-test-file
   // interference. Without both resets, the first test file to run wins the
   // module-level singleton and later files may see the wrong backend.
@@ -101,19 +103,18 @@ function passResponse(issues: unknown[]) {
 
 async function startJobWithTwoSections(projectId: string) {
   await request(app).post(`/api/projects/${projectId}/manuscript/start`).send({});
-  await grantConsent(projectId, "openai");
   global.fetch = vi.fn().mockResolvedValue({
     ok: true,
     json: async () => ({ choices: [{ message: { content: JSON.stringify({ text: "Section text.", memory: "m", citedEvidenceIds: [] }) } }] } ),
   } as Response);
-  await request(app).post(`/api/projects/${projectId}/manuscript/next-section`).send({ provider: "openai", apiKey: "sk-test" });
-  await request(app).post(`/api/projects/${projectId}/manuscript/next-section`).send({ provider: "openai", apiKey: "sk-test" });
+  await request(app).post(`/api/projects/${projectId}/manuscript/next-section`).set(AI_HEADERS).send({});
+  await request(app).post(`/api/projects/${projectId}/manuscript/next-section`).set(AI_HEADERS).send({});
 }
 
 describe("POST /api/projects/:id/manuscript/coherence-check", () => {
   it("404s when no job has been started", async () => {
     const projectId = await createProject();
-    const res = await request(app).post(`/api/projects/${projectId}/manuscript/coherence-check`).send({ provider: "openai", apiKey: "sk-test" });
+    const res = await request(app).post(`/api/projects/${projectId}/manuscript/coherence-check`).set(AI_HEADERS).send({});
     expect(res.status).toBe(404);
   });
 
@@ -122,7 +123,7 @@ describe("POST /api/projects/:id/manuscript/coherence-check", () => {
     await request(app).post(`/api/projects/${projectId}/manuscript/start`).send({});
     const res = await request(app)
       .post(`/api/projects/${projectId}/manuscript/coherence-check`)
-      .send({ provider: "openai", apiKey: "sk-test", dimensions: ["not-a-real-dimension"] });
+      .set(AI_HEADERS).send({ dimensions: ["not-a-real-dimension"] });
     expect(res.status).toBe(400);
   });
 
@@ -134,7 +135,7 @@ describe("POST /api/projects/:id/manuscript/coherence-check", () => {
 
     const res = await request(app)
       .post(`/api/projects/${projectId}/manuscript/coherence-check`)
-      .send({ provider: "openai", apiKey: "sk-test" });
+      .set(AI_HEADERS).send({});
 
     expect(res.status).toBe(200);
     expect(res.body.generationJob.coherenceReport.passesRun).toEqual(["terminology", "argument_continuity", "methodology"]);
@@ -151,74 +152,35 @@ describe("POST /api/projects/:id/manuscript/coherence-check", () => {
     global.fetch = vi.fn().mockResolvedValue(passResponse([]));
     const res = await request(app)
       .post(`/api/projects/${projectId}/manuscript/coherence-check`)
-      .send({ provider: "openai", apiKey: "sk-test", dimensions: ["methodology"] });
+      .set(AI_HEADERS).send({ dimensions: ["methodology"] });
 
     expect(res.status).toBe(200);
     expect(res.body.generationJob.coherenceReport.passesRun).toEqual(["methodology"]);
   });
 
-  it("402s a non-entitled Premium user, never reaching the provider", async () => {
-    global.fetch = vi.fn((input: RequestInfo | URL) => {
-      const url = typeof input === "string" ? input : input.toString();
-      const respondJson = (body: unknown, status = 200) => Promise.resolve({ ok: status < 300, status, text: async () => JSON.stringify(body), json: async () => body } as Response);
-      if (url.includes("/rest/v1/user_entitlements")) return respondJson([]);
-      if (url.includes("/rest/v1/user_ai_connections")) return respondJson([]);
-      if (url.includes("/rest/v1/provider_health")) return respondJson([]);
-      if (url.includes("/rest/v1/ai_providers")) return respondJson([]);
-      return respondJson({}, 500);
-    }) as unknown as typeof fetch;
 
-    const projectId = await createProject();
-    await request(app).post(`/api/projects/${projectId}/manuscript/start`).send({});
 
-    const res = await request(app).post(`/api/projects/${projectId}/manuscript/coherence-check`).send({ useEngine: "premium" });
-    expect(res.status).toBe(402);
-    expect(res.body.error).toMatch(/Premium subscription/i);
-  });
-
-  it("falls back to the next configured Premium resource when the first has no usable credential, and still succeeds", async () => {
-    const projectId = await createProject();
-    await startJobWithTwoSections(projectId); // checkCoherence needs 2+ sections to actually run a pass
-
-    let providerCalls = 0;
-    global.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
-      const url = typeof input === "string" ? input : input.toString();
-      const method = (init?.method ?? "GET").toUpperCase();
-      const respondJson = (body: unknown, status = 200) =>
-        Promise.resolve({ ok: status < 300, status, text: async () => JSON.stringify(body), json: async () => body } as Response);
-
-      if (url.includes("/rest/v1/user_entitlements")) return respondJson(ACTIVE_ENTITLEMENT);
-      if (url.includes("/rest/v1/user_ai_connections")) return respondJson([]);
-      if (url.includes("/rest/v1/platform_provider_credentials")) {
-        // "openai" is deliberately left unconfigured — no row for it — so
-        // the loop must skip it and try the next resolved resource.
-        const providerIdMatch = /provider_id=eq\.([^&]+)/.exec(url);
-        const wanted = providerIdMatch ? decodeURIComponent(providerIdMatch[1]) : undefined;
-        return respondJson(wanted === "mistral" ? [encryptedCredentialRow("mistral", "sk-mistral-test-key")] : []);
+  it("with a local-model-only user, runs each of the three passes through the browser, one round trip per pass", async () => {
+    const saved = process.env.ALLOW_SERVER_LOCAL_AI;
+    process.env.ALLOW_SERVER_LOCAL_AI = "false";
+    try {
+      const projectId = await createProject();
+      await startJobWithTwoSections(projectId);
+      const local = keyringHeader("ollama", "llama");
+      const browserResults: Array<{ challengeToken: string; llmResult: string }> = [];
+      let status = 0;
+      let body: any;
+      for (let round = 0; round < 6 && status !== 200; round++) {
+        const res = await request(app).post(`/api/projects/${projectId}/manuscript/coherence-check`).set(local).send({ browserResults });
+        status = res.status;
+        body = res.body;
+        if (status === 426) browserResults.push({ challengeToken: res.body.challengeToken, llmResult: JSON.stringify({ issues: [] }) });
       }
-      if (url.includes("/rest/v1/ai_providers")) return respondJson([{ id: "openai", metadata: {}, premium_enabled: true }, { id: "mistral", metadata: {}, premium_enabled: true }]);
-      if (url.includes("/rest/v1/ai_resources")) return respondJson([resourceRow("r1", "openai"), resourceRow("r2", "mistral")]);
-      if (url.includes("/rest/v1/plan_resources")) return respondJson([{ plan_id: "premium_basic", resource_id: "r1" }, { plan_id: "premium_basic", resource_id: "r2" }]);
-      if (url.includes("/rest/v1/provider_health")) {
-        if (method !== "GET") return respondJson(null, 201);
-        return respondJson([]);
-      }
-      if (url.includes("/rest/v1/credit_balances")) return respondJson([{ balance: 500 }]);
-      if (url.includes("/rest/v1/premium_plans")) return respondJson(PLAN);
-      if (url.includes("/rest/v1/user_quota_overrides")) return respondJson([]);
-      if (url.includes("/rest/v1/ai_usage_ledger")) return respondJson(null, 201);
-      if (url.includes("/rest/v1/rpc/deduct_credits")) return respondJson("ok");
-
-      // The actual provider call — only ever reached for the configured (mistral) resource.
-      providerCalls++;
-      return Promise.resolve(passResponse([]));
-    }) as unknown as typeof fetch;
-
-    const res = await request(app).post(`/api/projects/${projectId}/manuscript/coherence-check`).send({ useEngine: "premium" });
-    expect(res.status).toBe(200);
-    expect(res.body.aiSource.provider).toMatch(/^Resource /);
-    expect(res.body.generationJob.coherenceReport.passesRun).toEqual(["terminology", "argument_continuity", "methodology"]);
-    // One provider call per dimension — all three succeeded on the configured (mistral) resource, openai never reached.
-    expect(providerCalls).toBe(3);
+      expect(status).toBe(200);
+      expect(browserResults).toHaveLength(3);
+      expect(body.generationJob.coherenceReport.passesRun).toEqual(["terminology", "argument_continuity", "methodology"]);
+    } finally {
+      if (saved === undefined) delete process.env.ALLOW_SERVER_LOCAL_AI; else process.env.ALLOW_SERVER_LOCAL_AI = saved;
+    }
   });
 });

@@ -158,9 +158,9 @@ describe("getAdminInfo", () => {
   });
 
   it("returns a regular admin's own granted scopes, filtered to known ones", async () => {
-    mockFetch(() => textResponse(200, JSON.stringify([{ user_id: "u1", scopes: ["manage_premium", "not_a_real_scope"] }])));
+    mockFetch(() => textResponse(200, JSON.stringify([{ user_id: "u1", scopes: ["manage_opportunities", "not_a_real_scope"] }])));
     const info = await getAdminInfo({ id: "u1", email: "a@example.com" });
-    expect(info).toEqual({ isAdmin: true, isMainAdmin: false, scopes: ["manage_premium"] });
+    expect(info).toEqual({ isAdmin: true, isMainAdmin: false, scopes: ["manage_opportunities"] });
   });
 
   it("returns isAdmin:false with no scopes for a non-admin", async () => {
@@ -197,7 +197,7 @@ describe("requireScope", () => {
   });
 
   it("403s an admin who lacks the specific required scope", async () => {
-    mockFetch(() => textResponse(200, JSON.stringify([{ user_id: "u1", scopes: ["manage_premium"] }])));
+    mockFetch(() => textResponse(200, JSON.stringify([{ user_id: "u1", scopes: ["manage_opportunities"] }])));
     const req = { user: { id: "u1", email: "a@example.com" } } as any;
     const res = mockRes();
     const next = vi.fn();
@@ -238,7 +238,7 @@ describe("requireScopeInline", () => {
 
   it("403s when adminInfo.scopes doesn't include the required scope", () => {
     const res = mockRes();
-    const req = { adminInfo: { isAdmin: true, isMainAdmin: false, scopes: ["manage_premium"] } } as any;
+    const req = { adminInfo: { isAdmin: true, isMainAdmin: false, scopes: ["manage_opportunities"] } } as any;
     const ok = requireScopeInline(req, res as any, "manage_users");
     expect(ok).toBe(false);
     expect(res.statusCode).toBe(403);

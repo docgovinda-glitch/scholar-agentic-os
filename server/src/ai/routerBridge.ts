@@ -4,9 +4,8 @@
  * and Ask Scholar share one chain, one failover policy and one way of telling
  * the user what happened.
  *
- * - Chain per request: Premium resources (entitled, within quota) → the
- *   user's keys from `x-ai-keyring` (or the legacy single-provider x-ai-*
- *   headers) → their local model.
+ * - Chain per request: the user's keys from `x-ai-keyring` (plus any saved to
+ *   their account that the request did not send) → their local model.
  * - A provider failure moves to the next candidate with a visible event; it
  *   never silently hands the request to the browser. The browser hand-off
  *   (426) happens only when the next candidate really is a local model.
@@ -18,8 +17,7 @@ import type { NextFunction, Request, Response } from "express";
 import { route } from "../../../src/platform/router/router.ts";
 import { CircuitBreaker, MemoryBreakerStore } from "../../../src/platform/router/circuitBreaker.ts";
 import type { Candidate, ProviderAdapter, ProviderId, RouteRequest, RouterEvent, TaskClass } from "../../../src/platform/router/types.ts";
-import { keyringToCandidates, parseKeyring, type KeyringEntry, type PremiumPort } from "../../routes/aiRun.ts";
-import { resolveRouterTarget } from "../../../src/platform/router/providerMap.ts";
+import { keyringToCandidates, parseKeyring, type KeyringEntry } from "../../routes/aiRun.ts";
 import { expandKeyring, quarantineModel } from "./liveModels.ts";
 import { accountKeyring } from "./accountAi.ts";
 import { screenCandidates, serverAdapters } from "./aiEndpointGuard.ts";
@@ -49,43 +47,13 @@ export class NoAiConnectedError extends Error {
   constructor() { super("No AI is connected. Add your own AI key or a local model in AI Access."); this.name = "NoAiConnectedError"; }
 }
 
-interface BridgeDeps { adapters: Partial<Record<ProviderId, ProviderAdapter>>; breaker: CircuitBreaker; premium?: PremiumPort }
+interface BridgeDeps { adapters: Partial<Record<ProviderId, ProviderAdapter>>; breaker: CircuitBreaker }
 let deps: BridgeDeps = { adapters: serverAdapters(), breaker: new CircuitBreaker(new MemoryBreakerStore()) };
 export function configureRouterBridge(next: Partial<BridgeDeps>): void { deps = { ...deps, ...next }; }
 
-/**
- * The user's AI connections for this request: the keyring, with the legacy
- * single-provider headers (the user's primary choice) first when the keyring
- * does not already hold that provider and model.
- */
+/** The AI connections this request sent: the `x-ai-keyring` header, in the user's order. */
 export function keyringFromRequest(req: { headers?: Request["headers"] }): KeyringEntry[] {
-  const headers = req.headers ?? {};
-  const ring = parseKeyring(headers["x-ai-keyring"]);
-  const legacy = legacyEntry(headers);
-  if (!legacy) return ring;
-  // "auto" stands for whatever model the provider lists live, so any entry for the same connection covers it.
-  if (ring.some((e) => (e.via ?? e.provider) === (legacy.via ?? legacy.provider) && (legacy.model === "auto" || e.model === legacy.model))) return ring;
-  return [legacy, ...ring].slice(0, 8);
-}
-
-function legacyEntry(headers: Request["headers"]): KeyringEntry | undefined {
-  const h = (n: string) => {
-    const v = headers[n];
-    if (typeof v !== "string" || !v) return undefined;
-    const clean = v.replace(/[^\x20-\x7E]/g, "").trim();
-    return clean || undefined;
-  };
-  const named = h("x-ai-provider")?.toLowerCase();
-  if (!named) return undefined;
-  // A local runner may arrive without a model: the browser picks one on hand-off.
-  const rawModel = h("x-ai-model")?.split(/\s*(?:—|–|\u2014|\u2013)\s*/)[0]?.trim();
-  const model = rawModel && !/\s/.test(rawModel) ? rawModel : "auto";
-  if (named === "ollama" || named === "lmstudio") return { provider: named, model, baseUrl: h("x-ai-base-url") };
-  // Any catalog provider (all 37) resolves to its wire protocol and endpoint; no model name is assumed:
-  // a missing one is chosen from the provider's live list.
-  const target = resolveRouterTarget(named, h("x-ai-base-url"));
-  if (!target.ok) return undefined;
-  return { provider: target.target.provider, via: target.target.via, model, apiKey: h("x-ai-api-key"), baseUrl: target.target.baseUrl, label: undefined };
+  return parseKeyring(req.headers?.["x-ai-keyring"]);
 }
 
 type Scoped = Request & { user?: { id: string }; aiRoute?: AiRouteSummary };
@@ -136,8 +104,7 @@ export async function chainFor(req: Scoped, task: TaskClass): Promise<Candidate[
   const offered = keyringToCandidates(expanded.entries);
   const { kept: own, blocked } = await screenCandidates(offered);
   for (const b of blocked) (req.aiRoute ??= { notices: [] }).notices.push({ kind: "skipped", text: `Skipped ${b.label}: ${b.reason}` });
-  const premium = deps.premium && req.user?.id ? (await deps.premium.candidates(req.user.id, task).catch(() => ({ candidates: [] as Candidate[] }))).candidates : [];
-  const chain = [...premium, ...own.filter((c) => c.lane === "byok"), ...own.filter((c) => c.lane === "local")];
+  const chain = [...own.filter((c) => c.lane === "byok"), ...own.filter((c) => c.lane === "local")];
   if (!chain.length && blocked.length) {
     throw new RouterExhaustedError(blocked.map((b) => `${b.label}: ${b.reason}`).join("; "), "non_retryable");
   }
@@ -165,6 +132,20 @@ const CONTINUE_PROMPT = "Your last answer was cut off at the length limit. Conti
  * so a long section or report arrives whole instead of ending mid-sentence.
  */
 export async function routedText(req: Request, call: RoutedCall): Promise<string> {
+  return (await routedResult(req, call)).text;
+}
+
+export interface RoutedResult {
+  text: string;
+  label: string;
+  lane: Candidate["lane"];
+  provider: string;
+  model: string;
+  usage: { inputTokens: number; outputTokens: number };
+}
+
+/** Like `routedText`, and also says which connection answered. */
+export async function routedResult(req: Request, call: RoutedCall): Promise<RoutedResult> {
   const scoped = req as Scoped;
   scoped.aiRoute ??= { notices: [] };
   const images = call.images?.filter((i) => i.data) ?? [];
@@ -178,6 +159,8 @@ export async function routedText(req: Request, call: RoutedCall): Promise<string
   const byId = new Map(chain.map((c) => [c.id, c]));
   const base: RouteRequest["messages"] = [...(call.systemPrompt ? [{ role: "system" as const, content: call.systemPrompt }] : []), { role: "user" as const, content: userContent }];
 
+  let answered: Pick<RoutedResult, "label" | "lane" | "provider" | "model"> = { label: "router", lane: "byok", provider: "", model: "" };
+  const usage = { inputTokens: 0, outputTokens: 0 };
   const once = async (messages: RouteRequest["messages"]): Promise<{ text: string; finishReason: string }> => {
     const request: RouteRequest = {
       requestId: crypto.randomUUID(),
@@ -195,7 +178,9 @@ export async function routedText(req: Request, call: RoutedCall): Promise<string
       if (ev.type === "fallback" && ev.partialOutputDiscarded) text = "";
       if (ev.type === "done") {
         const c = byId.get(ev.candidateId);
-        if (c?.lane === "premium" && deps.premium && scoped.user?.id) await deps.premium.charge(scoped.user.id, c, ev.usage, request.requestId).catch(() => false);
+        answered = { label: ev.label, lane: ev.lane, provider: c?.group ?? c?.provider ?? "", model: c?.model ?? "" };
+        usage.inputTokens += ev.usage.inputTokens;
+        usage.outputTokens += ev.usage.outputTokens;
         // The router already treats an empty stream as a failure; this is the last line of defence.
         if (!text.trim()) throw new RouterExhaustedError("The AI returned an empty answer.", "exhausted");
         return { text, finishReason: ev.finishReason };
@@ -214,7 +199,7 @@ export async function routedText(req: Request, call: RoutedCall): Promise<string
     text += next.text;
     finishReason = next.finishReason;
   }
-  return text;
+  return { text, ...answered, usage };
 }
 
 /** Adds `aiRoute` to JSON responses of AI routes that ran through the router. */
@@ -246,8 +231,7 @@ export async function routedCompletion(req: Request, call: RoutedCall): Promise<
 }
 
 /**
- * Where this request's AI would run, without calling it: "server" (Premium or
- * a cloud key), "browser" (the first choice is the user's local model) or
+ * Where this request's AI would run, without calling it: "server" (a cloud key), "browser" (the first choice is the user's local model) or
  * "none". Lets a route hand off before doing expensive retrieval.
  */
 export async function aiAvailability(req: Request, task: TaskClass): Promise<"server" | "browser" | "none"> {

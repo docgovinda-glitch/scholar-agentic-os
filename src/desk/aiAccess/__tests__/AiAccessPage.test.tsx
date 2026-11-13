@@ -17,6 +17,13 @@ const status = {
   creditBalance: null,
 };
 
+// Models come live from the provider (src/desk/ai/modelChoices.ts); the page never names one.
+vi.mock("../../ai/modelChoices", () => ({
+  fetchModelsForKey: vi.fn(async () => ({
+    models: [{ id: "live-model-a", provider: "groq", family: "f", tier: "balanced", version: [1], badges: [] }],
+  })),
+}));
+
 vi.mock("../aiAccessApi", () => ({
   getAiAccessStatus: vi.fn(async () => status),
   addConnection: vi.fn(async () => ({ success: true })),
@@ -77,9 +84,9 @@ function renderPage() {
 }
 
 describe("AI Access navigation", () => {
-  it("offers 4 action-oriented tabs: Overview, Providers, Subscription, Preferences", async () => {
+  it("offers 4 action-oriented tabs: Overview, Providers, Premium, Preferences", async () => {
     renderPage();
-    for (const label of ["Overview", "Providers", "Subscription", "Preferences"]) {
+    for (const label of ["Overview", "Providers", "Premium", "Preferences"]) {
       expect(await screen.findByRole("button", { name: label })).toBeInTheDocument();
     }
     expect(screen.queryByRole("button", { name: "Local AI" })).not.toBeInTheDocument();
@@ -188,41 +195,24 @@ describe("Per-provider configuration", () => {
     expect(await screen.findByText("Account required")).toBeInTheDocument();
   });
 
-  it("offers a real model dropdown for a provider, not a free-text field, with Advanced as an opt-in escape hatch", async () => {
+
+
+  it("lists the models the provider reports for the key, with Advanced as an opt-in escape hatch", async () => {
     renderPage();
     fireEvent.click(await screen.findByRole("button", { name: "Providers" }));
     fireEvent.click(await screen.findByText("Groq"));
-
-    const advancedToggle = await screen.findByRole("checkbox", { name: /Advanced: use a custom model ID/i });
-    expect(advancedToggle).not.toBeChecked();
-
-    // The primary control is a real <select>, listing real catalog models —
-    // not an <input> a user has to already know a model id to fill in.
-    const select = screen.getByRole("combobox");
-    const optionValues = Array.from((select as HTMLSelectElement).options).map((o) => o.value);
-    // Nothing is pre-selected on a model name: the first choice is "best available", picked live.
-    expect(optionValues[0]).toBe("");
-    expect((select as HTMLSelectElement).value).toBe("");
-    expect(optionValues).toContain("openai/gpt-oss-120b");
-    expect(screen.queryByPlaceholderText(/Exact model id/i)).not.toBeInTheDocument();
-
-    // Checking Advanced swaps in the free-text field, pre-filled with the
-    // select's current value so switching modes never loses the choice.
-    fireEvent.click(advancedToggle);
-    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
-    const customInput = screen.getByPlaceholderText(/Exact model id/i) as HTMLInputElement;
-    expect(customInput.value).toBe("");
-  });
-
-  it("labels a deprecated model in the dropdown rather than presenting it as current", async () => {
-    renderPage();
-    fireEvent.click(await screen.findByRole("button", { name: "Providers" }));
-    fireEvent.click(await screen.findByText("Anthropic Claude"));
+    const key = screen.getByPlaceholderText(/Paste your key/i);
+    fireEvent.change(key, { target: { value: "gsk_test_key" } });
+    fireEvent.blur(key);
 
     const select = (await screen.findByRole("combobox")) as HTMLSelectElement;
-    const deprecatedOption = Array.from(select.options).find((o) => o.value === "claude-opus-4-8");
-    expect(deprecatedOption?.textContent).toMatch(/deprecated/i);
+    expect(Array.from(select.options).map((o) => o.value)).toContain("live-model-a");
+    const advanced = screen.getByRole("checkbox", { name: /Advanced: use a custom model ID/i });
+    expect(advanced).not.toBeChecked();
+    fireEvent.click(advanced);
+    expect((screen.getByPlaceholderText(/Exact model id/i) as HTMLInputElement).value).toBe("live-model-a");
   });
+
 
   it("verifies a key before saving it, and records the connection", async () => {
     const api = await import("../aiAccessApi");
@@ -231,16 +221,20 @@ describe("Per-provider configuration", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Providers" }));
     fireEvent.click(await screen.findByText("Groq"));
-    fireEvent.change(screen.getByPlaceholderText(/Paste your key/i), { target: { value: "gsk_test_key" } });
+    const keyInput = screen.getByPlaceholderText(/Paste your key/i);
+    fireEvent.change(keyInput, { target: { value: "gsk_test_key" } });
+    fireEvent.blur(keyInput);
+    await screen.findByRole("combobox");
     fireEvent.click(screen.getByRole("button", { name: /Test and connect/i }));
 
-    await waitFor(() => expect(api.verifyProviderKey).toHaveBeenCalledWith("groq", "gsk_test_key"));
+    await waitFor(() => expect(api.verifyProviderKey).toHaveBeenCalled());
+    expect(vi.mocked(api.verifyProviderKey).mock.calls[0].slice(0, 2)).toEqual(["groq", "gsk_test_key"]);
     // The key is stored on this device and saved (encrypted) to the account
     // so it works on the person's other devices; the connection is recorded.
     const account = await import("../accountKeys");
     expect(store.storeProviderKey).toHaveBeenCalledWith("groq", "gsk_test_key");
     expect(account.saveKeyToAccount).toHaveBeenCalledWith("groq", "gsk_test_key");
-    expect(api.addConnection).toHaveBeenCalledWith("groq", "free", 7);
+    expect(api.addConnection).toHaveBeenCalledWith("groq", "byok", 7);
   });
 
   it("does not save anything when verification fails", async () => {
@@ -251,7 +245,10 @@ describe("Per-provider configuration", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Providers" }));
     fireEvent.click(await screen.findByText("Groq"));
-    fireEvent.change(screen.getByPlaceholderText(/Paste your key/i), { target: { value: "bad" } });
+    const badKey = screen.getByPlaceholderText(/Paste your key/i);
+    fireEvent.change(badKey, { target: { value: "bad" } });
+    fireEvent.blur(badKey);
+    await screen.findByRole("combobox");
     fireEvent.click(screen.getByRole("button", { name: /Test and connect/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/rejected by the provider/i);
@@ -266,7 +263,7 @@ describe("Multiple simultaneous connections", () => {
   it("shows every connected provider at once, across tiers", async () => {
     status.connections = [
       { provider_id: "ollama", tier: "local", status: "connected", models_detected: 2 },
-      { provider_id: "groq", tier: "free", status: "connected", models_detected: 9 },
+      { provider_id: "groq", tier: "byok", status: "connected", models_detected: 9 },
       { provider_id: "openai", tier: "byok", status: "connected", models_detected: 30 },
     ];
     renderPage();
@@ -279,51 +276,6 @@ describe("Multiple simultaneous connections", () => {
   });
 });
 
-describe("Subscription", () => {
-  it("never asks for an API key, and reports status as server-decided", async () => {
-    renderPage();
-    fireEvent.click(await screen.findByRole("button", { name: "Subscription" }));
-
-    expect(await screen.findByText(/Subscription status: Not subscribed/i)).toBeInTheDocument();
-    expect(screen.queryByPlaceholderText(/Paste your key/i)).not.toBeInTheDocument();
-    // Status is decided on the server; the pane offers a request rather than
-    // a switch.
-    expect(await screen.findByText(/verified on Scholar Core's server/i)).toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: /Request Premium/i })).toBeInTheDocument();
-  });
-
-  it("names Premium capabilities by the admin's label, never the provider behind them", async () => {
-    const api = await import("../aiAccessApi");
-    status.entitlement = { status: "active", active: true };
-    vi.mocked(api.getPremiumCatalog).mockResolvedValueOnce({
-      active: true,
-      planId: "premium_basic",
-      resources: [{ id: "r1", label: "Advanced writing", description: "Best quality drafting", capabilities: ["reasoning"] }],
-    });
-    renderPage();
-    fireEvent.click(await screen.findByRole("button", { name: "Subscription" }));
-
-    expect(await screen.findByText(/Subscription status: Active/i)).toBeInTheDocument();
-    expect(await screen.findByText("Advanced writing")).toBeInTheDocument();
-    // The provider-agnostic promise: nothing in this pane names a provider or
-    // a model, so an admin can re-point the capability freely.
-    expect(document.body.textContent).not.toMatch(/openai|gpt-4o|gemini/i);
-  });
-
-  it("lets a non-subscriber request Premium — the path that previously dead-ended", async () => {
-    const api = await import("../aiAccessApi");
-    vi.mocked(api.getOfferedPlans).mockResolvedValueOnce([
-      { id: "premium_basic", name: "Premium Basic", description: "For everyday writing", monthlyCredits: 5000, weeklyCredits: null, dailyCredits: 200, perTaskMaxCredits: 50, concurrencyLimit: 2 },
-    ]);
-    renderPage();
-    fireEvent.click(await screen.findByRole("button", { name: "Subscription" }));
-
-    fireEvent.click(await screen.findByLabelText(/Premium Basic/i));
-    fireEvent.click(screen.getByRole("button", { name: /Request Premium/i }));
-
-    await waitFor(() => expect(api.requestPremium).toHaveBeenCalledWith("premium_basic", undefined));
-  });
-});
 
 describe("Error handling", () => {
   it("surfaces the HTTP failure when an error response has no object body", async () => {
@@ -421,7 +373,7 @@ describe("AI Access upgrade: honest status, quick start, live routing", () => {
 
   it("shows which AI each task would use now, with fallbacks, from the live router", async () => {
     status.connections = [
-      { provider_id: "groq", tier: "free", status: "connected", models_detected: 9 },
+      { provider_id: "groq", tier: "byok", status: "connected", models_detected: 9 },
       { provider_id: "ollama", tier: "local", status: "connected", models_detected: 2 },
     ];
     renderPage();
@@ -437,7 +389,7 @@ describe("AI Access upgrade: honest status, quick start, live routing", () => {
   });
 
   it("filters providers to free-to-start and connected ones", async () => {
-    status.connections = [{ provider_id: "groq", tier: "free", status: "connected", models_detected: 9 }];
+    status.connections = [{ provider_id: "groq", tier: "byok", status: "connected", models_detected: 9 }];
     renderPage();
     fireEvent.click(await screen.findByRole("button", { name: "Providers" }));
     fireEvent.click(await screen.findByRole("button", { name: "Connected (1)" }));

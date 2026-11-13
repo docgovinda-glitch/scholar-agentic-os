@@ -36,13 +36,11 @@ describe("authedFetch: the AI keyring travels only with AI requests", () => {
     await authedFetch("/api/ai/agent", {
       method: "POST",
       headers: {
-        "x-ai-model": "gemini-2.5-flash — unverified",
-        "x-ai-api-key": "\u200Bsk-test-key•123\u200B",
+        "x-test-note": "gemini-2.5-flash — unverified \u200B•",
       },
     });
     const headers = sentHeaders();
-    expect(headers["x-ai-model"]).toBe("gemini-2.5-flash");
-    expect(headers["x-ai-api-key"]).toBe("sk-test-key123");
+    expect(headers["x-test-note"]).toBe("gemini-2.5-flash  unverified");
     for (const val of Object.values(headers)) {
       for (let i = 0; i < val.length; i++) {
         expect(val.charCodeAt(i)).toBeLessThanOrEqual(126);

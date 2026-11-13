@@ -50,7 +50,7 @@ function wasSkipped(userId: string): boolean {
 async function hasServerSideAiSource(): Promise<boolean> {
   try {
     const remote = await getAiAccessStatus();
-    return remote.connections.length > 0 || remote.entitlement.active;
+    return remote.connections.length > 0;
   } catch {
     return false;
   }

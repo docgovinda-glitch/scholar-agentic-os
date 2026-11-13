@@ -11,10 +11,10 @@ import {
   normalizeUnicodeNFC,
 } from "../../../src/utils/scholarlyVoiceGuard.ts";
 import { getProjectStore } from "../../../../src/services/store/projectStore.ts";
-import { callOpenRouterJSON, callOpenRouterText, getCandidates, buildAuthorizedPolicy, resolveRequestAiConfig, handOffBeforeStream } from "../../../src/services/scholarBrain.ts";
+import { callOpenRouterJSON, callOpenRouterText, handOffBeforeStream } from "../../../src/services/scholarBrain.ts";
+import { requestKeyring } from "../../../src/ai/routerBridge.ts";
 import { ensureParagraphBreaks } from "../../../../src/shared/proseParagraphs.ts";
 import { chunkPreservingWhitespace, openSseStream, paragraphRange, SSE_HEARTBEAT_MS, streamErrorMessage } from "../../../src/utils/sectionStream.ts";
-import { completeWithFailover } from "../../../../src/platform/gateway/gateway.ts";
 import { scholarBrain } from "../../../src/services/scholarBrain.ts";
 import { sendAiFailure, UnusableAiResponseError } from "../../../src/ai/aiRouteErrors.ts";
 import {
@@ -218,8 +218,7 @@ ${tutorialOrPeelRules}`;
     });
 
     let effectiveDraft = "";
-    const aiConfig = resolveRequestAiConfig(req);
-    if (aiConfig.candidates.length > 0) {
+    if ((await requestKeyring(req as never)).length > 0) {
       try {
         const brainResult = await scholarBrain.complete({
           req,

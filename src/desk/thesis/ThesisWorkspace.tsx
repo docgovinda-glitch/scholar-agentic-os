@@ -390,6 +390,7 @@ export default function ThesisWorkspace({
         metricLabel={`${writtenWords.toLocaleString()} / ${thesisData.targetWordCount.toLocaleString()} words (${progressPercent}%)`}
         aiModelLabel="Dissertation Advisor AI"
         onOpenAiAccess={onOpenAiAccess}
+        aiWorkspace="journal"
         autosaveStatus={saveStatus}
         projectVersion={projectVersion}
         lastSavedTime={lastSavedTime}

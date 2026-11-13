@@ -1,6 +1,6 @@
+import { fetchCompleter } from "../../../test/fetchCompleter";
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { proposeAnonymization, GatewayDenied } from "../proposeAnonymization";
-import { defaultPolicy, recordConsent, markRestricted } from "../../../platform/warden/warden";
+import { proposeAnonymization } from "../proposeAnonymization";
 import { emptyDocument } from "../../../domain/document/model";
 import { appendBlock } from "../../../domain/document/ops";
 
@@ -10,7 +10,6 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const CONSENTED_POLICY = recordConsent(defaultPolicy(), "openai");
 
 function mockModelResponse(content: unknown) {
   global.fetch = vi.fn().mockResolvedValue({
@@ -27,11 +26,6 @@ function docWithAcknowledgements() {
 }
 
 describe("app/anonymization: proposeAnonymization", () => {
-  it("throws without calling the model when no provider/apiKey is supplied", async () => {
-    global.fetch = vi.fn();
-    await expect(proposeAnonymization({ document: docWithAcknowledgements() })).rejects.toThrow(/provider and API key/i);
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
 
   it("parses a well-formed proposals response", async () => {
     mockModelResponse({
@@ -53,7 +47,7 @@ describe("app/anonymization: proposeAnonymization", () => {
       ],
     });
 
-    const report = await proposeAnonymization({ document: docWithAcknowledgements(), provider: "openai", apiKey: "sk-test", policy: CONSENTED_POLICY });
+    const report = await proposeAnonymization({ document: docWithAcknowledgements(), complete: fetchCompleter });
     expect(report.proposals).toHaveLength(2);
     expect(report.proposals[0].category).toBe("acknowledgement");
     expect(report.proposals[1].category).toBe("self_citation");
@@ -62,7 +56,7 @@ describe("app/anonymization: proposeAnonymization", () => {
 
   it("an empty proposals list is a valid, good outcome", async () => {
     mockModelResponse({ proposals: [] });
-    const report = await proposeAnonymization({ document: docWithAcknowledgements(), provider: "openai", apiKey: "sk-test", policy: CONSENTED_POLICY });
+    const report = await proposeAnonymization({ document: docWithAcknowledgements(), complete: fetchCompleter });
     expect(report.proposals).toEqual([]);
   });
 
@@ -72,7 +66,7 @@ describe("app/anonymization: proposeAnonymization", () => {
         { blockId: "no-such-block", category: "author_identity", originalText: "x", replacementText: "y", reason: "z" },
       ],
     });
-    const report = await proposeAnonymization({ document: docWithAcknowledgements(), provider: "openai", apiKey: "sk-test", policy: CONSENTED_POLICY });
+    const report = await proposeAnonymization({ document: docWithAcknowledgements(), complete: fetchCompleter });
     expect(report.proposals).toEqual([]);
   });
 
@@ -82,7 +76,7 @@ describe("app/anonymization: proposeAnonymization", () => {
         { blockId: "introduction", category: "self_citation", originalText: "text that does not appear anywhere", replacementText: "y", reason: "z" },
       ],
     });
-    const report = await proposeAnonymization({ document: docWithAcknowledgements(), provider: "openai", apiKey: "sk-test", policy: CONSENTED_POLICY });
+    const report = await proposeAnonymization({ document: docWithAcknowledgements(), complete: fetchCompleter });
     expect(report.proposals).toEqual([]);
   });
 
@@ -91,27 +85,15 @@ describe("app/anonymization: proposeAnonymization", () => {
       proposals: [{ blockId: "introduction", category: "not-a-real-category", originalText: "Our previous work", replacementText: "y", reason: "z" }],
     });
     await expect(
-      proposeAnonymization({ document: docWithAcknowledgements(), provider: "openai", apiKey: "sk-test", policy: CONSENTED_POLICY })
+      proposeAnonymization({ document: docWithAcknowledgements(), complete: fetchCompleter })
     ).rejects.toThrow(/could not be parsed/i);
   });
 
   it("never falls back to a heuristic on unparseable output — throws instead", async () => {
     mockModelResponse("Sure, here's what I found...");
     await expect(
-      proposeAnonymization({ document: docWithAcknowledgements(), provider: "openai", apiKey: "sk-test", policy: CONSENTED_POLICY })
+      proposeAnonymization({ document: docWithAcknowledgements(), complete: fetchCompleter })
     ).rejects.toThrow(/could not be parsed/i);
   });
 
-  it("propagates GatewayDenied for a restricted scope rather than swallowing it", async () => {
-    global.fetch = vi.fn();
-    const restrictedPolicy = markRestricted(defaultPolicy(), "embargoed-project");
-    let caught: unknown;
-    try {
-      await proposeAnonymization({ document: docWithAcknowledgements(), provider: "openai", apiKey: "sk-test", policy: restrictedPolicy, scopeId: "embargoed-project" });
-    } catch (e) {
-      caught = e;
-    }
-    expect(caught).toBeInstanceOf(GatewayDenied);
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
 });

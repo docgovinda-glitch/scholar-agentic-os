@@ -17,6 +17,7 @@
 
 import { forgetProviderKey, providersWithStoredKey, readProviderKey, storeProviderKey } from "./userAiSettings";
 import { getCloudProvider } from "../config/providerCatalog";
+import { parseKeyId } from "../config/keySlots";
 
 const SYNCED_STORAGE = "scholar-provider-keys-synced";
 
@@ -86,7 +87,7 @@ export async function syncAccountKeys(transport: AccountKeyTransport, store: Dev
   const inAccount = new Set(account.map((k) => k.providerId));
 
   for (const k of account) {
-    if (!getCloudProvider(k.providerId) || !k.apiKey) continue;
+    if (!getCloudProvider(parseKeyId(k.providerId).providerId) || !k.apiKey) continue;
     const local = await store.read(k.providerId);
     if (local !== k.apiKey) {
       await store.write(k.providerId, k.apiKey);
@@ -105,7 +106,7 @@ export async function syncAccountKeys(transport: AccountKeyTransport, store: Dev
       result.removed.push(providerId);
       continue;
     }
-    if (!getCloudProvider(providerId)) continue;
+    if (!getCloudProvider(parseKeyId(providerId).providerId)) continue;
     const key = await store.read(providerId);
     if (!key) continue;
     try {

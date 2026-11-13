@@ -1,22 +1,10 @@
 import { useState } from "react";
-import type { ModelSpec } from "../../config/modelCatalog";
+import type { CuratedModel } from "../../platform/router/modelCuration";
 
 /**
- * Model picker for a cloud provider's connection form — a real `<select>`
- * sourced from config/modelCatalog.ts, not the free-text `<input>` +
- * `<datalist>` this replaced. See ProviderDetail.tsx's own header comment
- * for why: a `<datalist>` never actually constrains the value, so "model
- * selection" had degraded into "type a name and hope."
- *
- * Deliberately NOT src/desk/auth/AuthLayout.tsx's SelectField: that
- * component is styled for auth/account forms (a different visual system)
- * and importing it here would pull the explicitly-out-of-scope Auth area
- * into this refactor for a ~15-line component. This one matches
- * ProviderDetail.tsx's own input styling exactly instead.
- *
- * "Advanced: use custom model ID" is unchecked by default — the dropdown is
- * the normal path; free text is an opt-in escape hatch for a model this
- * catalog doesn't list yet, never the default workflow.
+ * Model picker for a provider's connection form. Options are the models the
+ * provider itself reports for this key (see src/desk/ai/modelChoices.ts), so
+ * nothing here names a model. "Advanced" lets a user type an exact model id.
  */
 export default function ModelSelectField({
   id,
@@ -25,21 +13,17 @@ export default function ModelSelectField({
   onChange,
 }: {
   id: string;
-  models: ModelSpec[];
+  models: CuratedModel[];
   value: string;
   onChange: (modelId: string) => void;
 }) {
-  // Starts checked when the current value isn't one of the catalog's
-  // options — e.g. a previously-saved custom id, or a provider with zero
-  // catalog entries (falls back to CloudProviderSpec.defaultModel, which
-  // won't be in `models` either) — so the field a user's existing choice
-  // lives in is the one shown on load, not silently swapped out from under them.
-  // An empty value means "best available": the dropdown stays the way in, with that as its first option.
-  const [advanced, setAdvanced] = useState(() => models.length === 0 || (value !== "" && !models.some((m) => m.modelId === value)));
-
+  // The list is the default; typing an exact id is the user's own opt-in.
+  const [advanced, setAdvanced] = useState(false);
+  const showSelect = !advanced && models.length > 0;
+  const hasCurrent = value === "" || models.some((m) => m.id === value);
   return (
     <div className="space-y-2">
-      {!advanced && (
+      {showSelect && (
         <select
           id={id}
           value={value}
@@ -47,24 +31,21 @@ export default function ModelSelectField({
           className="w-full rounded-[var(--radius-sm)] border border-[color:var(--border-control)] bg-[color:var(--surface-inset)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
         >
           <option value="">Best available (chosen from the provider's live list)</option>
+          {!hasCurrent && <option value={value}>{value} (current)</option>}
           {models.map((m) => (
-            <option key={m.modelId} value={m.modelId}>
-              {optionLabel(m)}
+            <option key={m.id} value={m.id}>
+              {(m.displayName ?? m.id) + (m.badges.length ? ` · ${m.badges.map((b) => b.label).join(", ")}` : "")}
             </option>
           ))}
         </select>
       )}
-
-      <label className="flex items-center gap-2 text-xs text-[color:var(--text-secondary)]">
-        <input
-          type="checkbox"
-          checked={advanced}
-          onChange={(e) => setAdvanced(e.target.checked)}
-        />
-        Advanced: use a custom model ID
-      </label>
-
-      {advanced && (
+      {models.length > 0 && (
+        <label className="flex items-center gap-2 text-xs text-[color:var(--text-secondary)]">
+          <input type="checkbox" checked={advanced} onChange={(e) => setAdvanced(e.target.checked)} />
+          Advanced: use a custom model ID
+        </label>
+      )}
+      {!showSelect && (
         <input
           id={`${id}-custom`}
           value={value}
@@ -77,12 +58,4 @@ export default function ModelSelectField({
       )}
     </div>
   );
-}
-
-function optionLabel(m: ModelSpec): string {
-  let label = m.displayName;
-  if (m.status === "deprecated") label += " (deprecated)";
-  else if (m.status === "preview") label += " (preview)";
-  if (!m.verified) label += " — unverified";
-  return label;
 }

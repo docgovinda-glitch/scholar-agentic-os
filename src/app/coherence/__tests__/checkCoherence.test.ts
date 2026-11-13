@@ -1,6 +1,6 @@
+import { fetchCompleter } from "../../../test/fetchCompleter";
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { checkCoherence, GatewayDenied } from "../checkCoherence";
-import { defaultPolicy, recordConsent, markRestricted } from "../../../platform/warden/warden";
+import { checkCoherence } from "../checkCoherence";
 import type { GeneratedSection } from "../../../domain/manuscript/types";
 
 const originalFetch = global.fetch;
@@ -9,7 +9,6 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const CONSENTED_POLICY = recordConsent(defaultPolicy(), "openai");
 
 function section(key: string, title: string, text: string): GeneratedSection {
   return { key, title, text, wordCount: 10, memory: "m", citedEvidenceIds: [], generatedAt: "now" };
@@ -35,7 +34,7 @@ function mockModelResponses(responses: unknown[]) {
 describe("checkCoherence", () => {
   it("returns an empty report without calling the model when fewer than two sections exist", async () => {
     global.fetch = vi.fn();
-    const report = await checkCoherence({ sections: [section("introduction", "Introduction", "text")], provider: "openai", apiKey: "sk-test" });
+    const report = await checkCoherence({ sections: [section("introduction", "Introduction", "text")], complete: fetchCompleter });
     expect(report.issues).toEqual([]);
     expect(report.passesRun).toEqual([]);
     expect(global.fetch).not.toHaveBeenCalled();
@@ -48,7 +47,7 @@ describe("checkCoherence", () => {
       { issues: [{ description: "Participant count changes from 40 to 50.", sectionKeys: ["introduction", "methods"], severity: "major" }] },
     ]);
 
-    const report = await checkCoherence({ sections: SECTIONS, provider: "openai", apiKey: "sk-test", policy: CONSENTED_POLICY });
+    const report = await checkCoherence({ sections: SECTIONS, complete: fetchCompleter });
     expect(report.passesRun).toEqual(["terminology", "argument_continuity", "methodology"]);
     expect(report.issues).toHaveLength(2);
     expect(report.issues[0].dimension).toBe("terminology");
@@ -69,27 +68,15 @@ describe("checkCoherence", () => {
       } as Response);
     }) as unknown as typeof fetch;
 
-    const report = await checkCoherence({ sections: SECTIONS, provider: "openai", apiKey: "sk-test", policy: CONSENTED_POLICY });
+    const report = await checkCoherence({ sections: SECTIONS, complete: fetchCompleter });
     expect(report.passesRun).toEqual(["terminology", "methodology"]);
     expect(report.passErrors.argument_continuity).toMatch(/could not be parsed/i);
   });
 
-  it("propagates GatewayDenied for a restricted scope rather than treating it as a per-pass failure — 'verification' tasks classify as derived content (allowed by default), so the only way to reach a denial is a scope explicitly marked restricted", async () => {
-    global.fetch = vi.fn();
-    const restrictedPolicy = markRestricted(defaultPolicy(), "embargoed-project");
-    let caught: unknown;
-    try {
-      await checkCoherence({ sections: SECTIONS, provider: "openai", apiKey: "sk-test", policy: restrictedPolicy, scopeId: "embargoed-project" });
-    } catch (e) {
-      caught = e;
-    }
-    expect(caught).toBeInstanceOf(GatewayDenied);
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
 
   it("runs only the requested subset of dimensions when given one", async () => {
     mockModelResponses([{ issues: [] }]);
-    const report = await checkCoherence({ sections: SECTIONS, provider: "openai", apiKey: "sk-test", policy: CONSENTED_POLICY, dimensions: ["methodology"] });
+    const report = await checkCoherence({ sections: SECTIONS, complete: fetchCompleter, dimensions: ["methodology"] });
     expect(report.passesRun).toEqual(["methodology"]);
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });

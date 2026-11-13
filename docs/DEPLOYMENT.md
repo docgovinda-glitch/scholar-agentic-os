@@ -38,7 +38,7 @@ Local image: `docker build --build-arg VITE_SUPABASE_URL=... --build-arg VITE_SU
 | Workflow | Trigger | What it does |
 | :--- | :--- | :--- |
 | `ci.yml` "CI" | Pull requests to `main`, manual | `npm ci`, `npm run lint`, `npm audit --omit=dev --audit-level=high`, `npm test`, `npm run build` (Node 22, placeholder Supabase values) |
-| `e2e.yml` "E2E" | Pull requests, manual | Local Supabase from the CLI, `scripts/db/replay-migrations.sh`, `scripts/db/test-credits.sql`, `scripts/e2e-setup.mjs`, stub AI server, `npx playwright test`, production smoke suite against the local app |
+| `e2e.yml` "E2E" | Pull requests, manual | Local Supabase from the CLI, `scripts/db/replay-migrations.sh`, `scripts/e2e-setup.mjs`, stub AI server, `npx playwright test`, production smoke suite against the local app |
 | `ai-routing.yml` "AI routing" | Pull requests and pushes to `main` that touch AI code, manual | Typecheck and the fast AI suites: router, live models, failover, keyring and account keys, URL screening, the single-brain guardian, and the Journal Writer routes |
 | `db-migrate.yml` "Database migrations" | Changes under `supabase/migrations`, manual | Validates file names (timestamp, unique) and that applied migrations are never edited (pull requests); on `main`, if `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD` and `SUPABASE_PROJECT_REF` secrets exist, shows `supabase db push --dry-run` and then applies the pending migrations; without the secrets it validates and skips with a notice |
 | `slide-parity.yml` | Pull requests (path-filtered), manual | `node scripts/slide-parity/run.mjs` compares web and `.pptx` rendering |

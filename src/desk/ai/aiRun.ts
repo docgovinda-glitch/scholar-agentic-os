@@ -18,7 +18,6 @@ export interface AiRunInput {
   desiredOutputTokens?: number;
   minOutputTokens?: number;
   temperature?: number;
-  preferLane?: "auto" | "byok" | "premium";
 }
 
 export class AiRunError extends Error {
