@@ -40,7 +40,7 @@ import {
   assignmentStructureToOutlineTree,
   outlineTreeToAssignmentStructure,
 } from "../../../../src/desk/assignment/services/outlineService.ts";
-import { conductAskScholarResearchForOutline } from "../../../../src/desk/assignment/services/scholarlyDiscoveryService.ts";
+import { planBriefInquiries } from "../../../../src/domain/assignment/briefInquiryPlan.ts";
 import { sanitizeBrief } from "../../../../src/features/understand/services/briefSanitizer.ts";
 import { classifyScopeBoundaries, stripLineTags } from "../../../../src/features/understand/services/scopeClassifier.ts";
 import {
@@ -313,21 +313,8 @@ CRITICAL: You MUST divide the target word counts across the sections to strictly
       question.toLowerCase().includes("coursework");
 
     // 1. Conduct deep Ask Scholar literature and inquiry research
-    const askScholarResearch = conductAskScholarResearchForOutline({
-      question,
-      briefText,
-      assignmentType,
-      academicLevel,
-      targetWordCount: Number(targetWordCount) || 2000,
-    });
-
-    const sourcesSummary = askScholarResearch.sources
-      .slice(0, 6)
-      .map(
-        (s) =>
-          `  - ${s.citation}: "${s.title}" (${s.journalOrPublisher || "Academic Press"}, ${s.year}) [Role: ${s.role}] -> ${s.relevance || s.keyFinding || ""}`
-      )
-      .join("\n");
+    // 1. Brief-grounded inquiry plan (the brief's own questions; no catalogs or theory tables)
+    const askScholarResearch = planBriefInquiries({ question, briefText, assignmentType: String(assignmentType) });
 
     const inquiriesSummary = askScholarResearch.subQuestions
       .map((sq, idx) => `  Inquiry ${idx + 1}: "${sq}"`)
@@ -351,7 +338,7 @@ CORE ARCHITECTURAL RULES:
    - evidenceRequired: specific empirical data, observational cases, or literature needed
    - counterarguments: rival schools of thought or competing interpretations
    - expectedContribution: how this section drives towards defending the central thesis
-   - scholarlySources: citations from the verified Ask Scholar literature pool below
+   - scholarlySources: leave empty; sources are attached later from live discovery or the student's vault
 4. WORKSPACE ADAPTATION:
    ${
      isCourseworkWorkspace
@@ -372,9 +359,6 @@ ASSIGNMENT INTAKE:
 - Central Intellectual Problem: "${askScholarResearch.centralProblem}"
 - Core Analytical Inquiries:
 ${inquiriesSummary}
-- Discovered Ask Scholar Literature (Grounding Citations):
-${sourcesSummary}
-- Core Scholarly Debates: ${askScholarResearch.coreDebates.join(" | ")}
 
 ${customAllocationPrompt}
 
@@ -512,7 +496,12 @@ Return ONLY valid JSON matching:
       finalStructure.headings.forEach((h: any, hIdx: number) => {
         const mappingItem =
           askScholarResearch.questionMappingMatrix[hIdx] ||
-          askScholarResearch.questionMappingMatrix[hIdx % Math.max(1, askScholarResearch.questionMappingMatrix.length)];
+          askScholarResearch.questionMappingMatrix[hIdx % Math.max(1, askScholarResearch.questionMappingMatrix.length)] || {
+            assignmentQuestion: question,
+            analyticalObjective: askScholarResearch.centralProblem,
+            researchNeeded: `Sources that speak directly to ${h.title}`,
+            keyArguments: [],
+          };
         const headingSources = askScholarResearch.sources.slice(hIdx * 2, hIdx * 2 + 3);
 
         if (!h.purpose) h.purpose = `Investigate and substantiate ${h.title} to answer: "${mappingItem.assignmentQuestion}".`;
@@ -522,7 +511,7 @@ Return ONLY valid JSON matching:
         if (!h.evidenceRequired) h.evidenceRequired = mappingItem.researchNeeded;
         if (!h.keyArguments || h.keyArguments.length === 0) h.keyArguments = mappingItem.keyArguments;
         if (!h.counterarguments || h.counterarguments.length === 0) {
-          h.counterarguments = [askScholarResearch.coreDebates[hIdx % askScholarResearch.coreDebates.length] || "Alternative interpretations"];
+          h.counterarguments = [];
         }
         if (!h.expectedContribution) h.expectedContribution = `Directly answers inquiry dimension ${hIdx + 1} and substantiates the thesis.`;
         if (!h.scholarlySources || h.scholarlySources.length === 0) h.scholarlySources = headingSources;

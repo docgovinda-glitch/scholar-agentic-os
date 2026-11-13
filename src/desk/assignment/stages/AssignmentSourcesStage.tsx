@@ -5,9 +5,7 @@ import { ReferenceBarItem } from "../ReferenceBarItem";
 import { ApprovedReferencesShelf } from "../ApprovedReferencesShelf";
 import { CuratedSourceCard } from "../components/CuratedSourceCard";
 import { LectureUploadDropzone } from "../components/LectureUploadDropzone";
-import {
-  areSourcesRelevantToQuestion,
-} from "../services/scholarlyDiscoveryService";
+import { areSourcesRelevantToBrief } from "../../../utils/briefSourceQueries";
 import {
   discoverRealScholarlySourcesFromServer,
   discoverSourcesForAssignment,
@@ -345,7 +343,7 @@ export default function AssignmentSourcesStage({
   // Check if existing sources are mismatched with the current question
   const isMismatched = useMemo(() => {
     if (!sources || sources.length === 0 || !question || question.trim().length < 4) return false;
-    return !areSourcesRelevantToQuestion(sources, question);
+    return !areSourcesRelevantToBrief(sources, question);
   }, [sources, question]);
 
   const hasTopic = Boolean(question && question.trim().length >= 4);

@@ -76,6 +76,31 @@ describe("Single-Brain Architecture lock", () => {
     expect(offenders).toEqual([]);
   });
 
+  it("permanently bans subject literature catalogs and keyword-to-theory engines", () => {
+    // Sources come only from live discovery, the vault or uploads; frameworks only from AI or the student.
+    for (const gone of [
+      "src/desk/assignment/services/scholarlyDiscoveryService.ts",
+      "src/desk/assignment/services/catalogs",
+      "src/features/sources/services/citationValidationService.ts",
+    ]) {
+      expect(fs.existsSync(path.join(ROOT, gone)), gone).toBe(false);
+    }
+    const FORBIDDEN = [
+      /UN_PEACE_SECURITY_CATALOG/,
+      /IR_CHINA_GEOPOLITICS_CATALOG/,
+      /ORGANIZATIONAL_CULTURE_CATALOG/,
+      /APPROVED_ORGANIZATIONAL_CULTURE_LITERATURE/,
+      /CORE_SCHOLARLY_CATALOG/,
+      /"Structural Realism & Neorealism"/,
+    ];
+    const offenders: string[] = [];
+    for (const rel of productionFiles(["src", "server/routes", "server/src"])) {
+      const text = fs.readFileSync(path.join(ROOT, rel), "utf8");
+      if (FORBIDDEN.some((re) => re.test(text))) offenders.push(rel);
+    }
+    expect(offenders).toEqual([]);
+  });
+
   it("OT-22 (Presentation Studio) runs its AI only through scholarBrain", () => {
     for (const rel of ["server/routes/project/presentation.ts", "server/routes/presentations.ts"]) {
       const text = fs.readFileSync(path.join(ROOT, rel), "utf8");

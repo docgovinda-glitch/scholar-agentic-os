@@ -214,18 +214,9 @@ export function deconstructPrompt(
   }
 
   // 2. Extract analytical scope
-  let scope = "General Collegiate Analysis";
-  if (lower.includes("zappos") && (lower.includes("schein") || lower.includes("culture"))) {
-    scope = "Zappos Organizational Culture, Strategic Onboarding, and Schein's 3-Level Model";
-  } else if (lower.includes("ai") || lower.includes("artificial intelligence") || lower.includes("machine learning")) {
-    scope = "Technological Governance, Algorithmic Decision-Making, and Institutional Impact";
-  } else if (lower.includes("healthcare") || lower.includes("clinical") || lower.includes("medicine")) {
-    scope = "Clinical Practice, Health Systems Policy, and Patient Outcomes";
-  } else {
-    // Take the main subject clause
-    const cleanQ = question.replace(/^(?:critically\s+evaluate|evaluate|analyze|assess|examine)\s+/i, "");
-    scope = cleanQ.slice(0, 100).trim();
-  }
+  // Scope is the brief's own subject clause; no subject lookup tables.
+  const cleanQ = question.replace(/^(?:critically\s+evaluate|evaluate|analy[sz]e|assess|examine|discuss)\s+/i, "");
+  const scope = cleanQ.slice(0, 100).trim() || "General Collegiate Analysis";
 
   // 3. Extract core themes / sub-questions
   const extractedQuestions: string[] = [];

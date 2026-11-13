@@ -44,7 +44,6 @@ import {
 } from "../../../../src/desk/assignment/services/outlineService.ts";
 import { parseBriefQuestions } from "../../../../src/utils/briefQuestions.ts";
 import { buildSourceSearchQueries } from "../../../../src/utils/briefSourceQueries.ts";
-import { conductAskScholarResearchForOutline } from "../../../../src/desk/assignment/services/scholarlyDiscoveryService.ts";
 import { sanitizeBrief } from "../../../../src/features/understand/services/briefSanitizer.ts";
 import { classifyScopeBoundaries, stripLineTags } from "../../../../src/features/understand/services/scopeClassifier.ts";
 import {

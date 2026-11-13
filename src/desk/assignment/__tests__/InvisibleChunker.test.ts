@@ -118,7 +118,7 @@ describe("Invisible Chunker & Decomposition Service", () => {
     });
   });
 
-  it("tunes section titles, functions, and guidance to the assignment question (e.g. Quantum Computing)", () => {
+  it("tunes section titles, functions, and guidance to the assignment question (built from the question's own words)", () => {
     const rawTopic =
       "DEPARTMENT OF COMPUTER SCIENCE & QUANTUM INFORMATION SYSTEMS Advanced Assessment: Core Branches of Quantum Computing Honours / Postgraduate";
     const sections = decomposeWordBudget({
@@ -129,7 +129,8 @@ describe("Invisible Chunker & Decomposition Service", () => {
 
     expect(sections[0].title).toMatch(/Quantum/i);
     const body1 = sections.find((s) => s.id === "sec-body-1");
-    expect(body1?.title).toMatch(/Qubit|Decoherence/i);
+    // Built from the topic's own words; no subject template.
+    expect(body1?.title).toMatch(/Core Branches of Quantum Computing/i);
   });
 
   it("tuneSectionsToQuestion preserves existing drafted prose and word count while tuning titles", () => {

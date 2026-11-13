@@ -10,7 +10,7 @@ import {
 import type { CourseworkProgressEvent } from "../../types/orchestrator";
 import type { DiscoveredSource } from "../../../../desk/assignment/types";
 import { discoverRealScholarlySourcesFromServer } from "../../../../desk/assignment/services/realScholarlyDiscoveryService";
-import { generateCuratedLiteratureSources as fixtureSources } from "../../../../desk/assignment/services/scholarlyDiscoveryService";
+import { fixtureSources } from "../../../../desk/assignment/__tests__/fixtures/sourceFixtures";
 
 // Live discovery is a network call. Tests stand in for it with fixture
 // sources; the orchestrator itself never invents sources when it fails.

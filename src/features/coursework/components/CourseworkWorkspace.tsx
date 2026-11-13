@@ -352,7 +352,7 @@ export default function CourseworkWorkspace({
                   aria-label="Custom Rubric"
                   value={customRubric}
                   onChange={(e) => setCustomRubric(e.target.value)}
-                  placeholder="e.g. Must evaluate Schein cultural model with empirical counter-evidence"
+                  placeholder="e.g. Must apply the framework named in the brief, with counter-evidence"
                   className="w-full px-3 py-1.5 text-xs rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-[#141414] text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-blue-500"
                 />
               </div>

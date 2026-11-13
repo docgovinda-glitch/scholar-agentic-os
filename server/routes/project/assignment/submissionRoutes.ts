@@ -38,7 +38,6 @@ import {
   assignmentStructureToOutlineTree,
   outlineTreeToAssignmentStructure,
 } from "../../../../src/desk/assignment/services/outlineService.ts";
-import { conductAskScholarResearchForOutline } from "../../../../src/desk/assignment/services/scholarlyDiscoveryService.ts";
 import { sanitizeBrief } from "../../../../src/features/understand/services/briefSanitizer.ts";
 import { classifyScopeBoundaries, stripLineTags } from "../../../../src/features/understand/services/scopeClassifier.ts";
 import {
