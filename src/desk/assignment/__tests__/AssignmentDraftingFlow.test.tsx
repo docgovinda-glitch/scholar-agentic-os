@@ -9,6 +9,15 @@ import { AssignmentDraftingStage } from "../stages/AssignmentDraftingStage";
 import { AssignmentProvider } from "../context/AssignmentContext";
 import type { AssignmentDraftingSection } from "../types";
 
+// jsdom has no layout; ProseMirror measures the cursor when it scrolls to it.
+if (typeof Range !== "undefined") {
+  Range.prototype.getClientRects = Range.prototype.getClientRects || (() => ({ length: 0, item: () => null, [Symbol.iterator]: [][Symbol.iterator] }) as unknown as DOMRectList);
+  Range.prototype.getBoundingClientRect = Range.prototype.getBoundingClientRect || (() => ({ x: 0, y: 0, top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0, toJSON: () => ({}) }) as DOMRect);
+}
+if (typeof document !== "undefined" && !document.elementFromPoint) {
+  document.elementFromPoint = () => null;
+}
+
 const getProject = vi.fn();
 const getDocument = vi.fn();
 const getRubric = vi.fn();
@@ -183,35 +192,42 @@ describe("Assignment Phase 3: Drafting Engine Components & Flow", () => {
       expect(screen.queryByPlaceholderText(/Guide AI for this section/i)).not.toBeInTheDocument();
     });
 
-    it("edits the section text and saves each change", () => {
+    it("edits the section in the shared rich-text editor and saves each change", async () => {
       const onUpdate = vi.fn();
+      const source = { id: "src-9", title: "Governing algorithms", authors: ["Smith, J."], year: "2024", type: "journal_article", mainFinding: "", suggestedUse: "", citation: "", status: "kept" } as const;
       render(
         <DraftingActiveEditor
-          section={mockSections[1]}
+          section={{ ...mockSections[1], draftContent: "Existing *prose* here." }}
           onUpdateContent={onUpdate}
+          allApprovedSources={[source]}
         />
       );
 
       fireEvent.click(screen.getByRole("button", { name: /Edit text/i }));
-      const textarea = screen.getByLabelText("Section text");
-      fireEvent.change(textarea, { target: { value: "New manual prose paragraph (Smith, 2024)." } });
-      expect(onUpdate).toHaveBeenCalledWith("New manual prose paragraph (Smith, 2024).");
+      const box = await screen.findByRole("textbox", { name: "Section text" });
+      // Stored Markdown shows as real formatting, not asterisks.
+      expect(box.querySelector("em")).toHaveTextContent("prose");
+      expect(screen.getByRole("toolbar", { name: "Text formatting" })).toBeInTheDocument();
+      for (const name of ["Undo", "Redo", "Bold", "Italic", "Bulleted list", "Numbered list"]) {
+        expect(screen.getByRole("button", { name })).toBeInTheDocument();
+      }
+
+      // Inserting a citation goes through the editor and is saved as text.
+      fireEvent.click(screen.getByRole("button", { name: /^\+ Insert Citation$/ }));
+      fireEvent.click(screen.getByText("(Smith, 2024)"));
+      await waitFor(() => expect(onUpdate).toHaveBeenLastCalledWith(expect.stringContaining("(Smith, 2024)")));
+      expect(onUpdate.mock.calls.at(-1)?.[0]).toContain("*prose*");
     });
 
-    it("stays open while typing even though each save changes the section", () => {
-      // Each keystroke is saved, which hands the editor a section with new
-      // draftContent. That used to close the editor after the first letter.
+    it("stays open while saves change the section, and a different section opens fresh", async () => {
       const onUpdate = vi.fn();
       const { rerender } = render(<DraftingActiveEditor section={mockSections[1]} onUpdateContent={onUpdate} />);
       fireEvent.click(screen.getByRole("button", { name: /Edit text/i }));
-      fireEvent.change(screen.getByLabelText("Section text"), { target: { value: "E" } });
-      rerender(<DraftingActiveEditor section={{ ...mockSections[1], draftContent: "E" }} onUpdateContent={onUpdate} />);
-      fireEvent.change(screen.getByLabelText("Section text"), { target: { value: "Ec" } });
+      await screen.findByRole("textbox", { name: "Section text" });
       rerender(<DraftingActiveEditor section={{ ...mockSections[1], draftContent: "Ec" }} onUpdateContent={onUpdate} />);
-      expect(screen.getByLabelText("Section text")).toHaveValue("Ec");
-      // A different section opens fresh.
+      expect(screen.getByRole("textbox", { name: "Section text" })).toBeInTheDocument();
       rerender(<DraftingActiveEditor section={{ ...mockSections[0] }} onUpdateContent={onUpdate} />);
-      expect(screen.queryByLabelText("Section text")).toBeNull();
+      expect(screen.queryByRole("textbox", { name: "Section text" })).toBeNull();
     });
   });
 

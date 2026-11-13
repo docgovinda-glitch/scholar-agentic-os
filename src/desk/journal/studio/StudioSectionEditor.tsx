@@ -1,5 +1,5 @@
 import { useState, type RefObject } from "react";
-import SectionTextEditor, { type SectionEditorHandle } from "./SectionTextEditor";
+import SectionTextEditor, { type SectionEditorHandle } from "../../editor/SectionTextEditor";
 import { Loader2, Sparkles, Wand2 } from "lucide-react";
 import { countWords, SECTION_GUIDANCE, type ManuscriptUnit } from "../manuscriptModel";
 

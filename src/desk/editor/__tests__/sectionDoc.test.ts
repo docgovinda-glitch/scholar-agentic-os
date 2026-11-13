@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { docToText, normalizeSectionText, textToDoc } from "../studio/sectionDoc";
+import { docToText, normalizeSectionText, textToDoc } from "../sectionDoc";
 
 const roundTrip = (s: string) => docToText(textToDoc(s));
 

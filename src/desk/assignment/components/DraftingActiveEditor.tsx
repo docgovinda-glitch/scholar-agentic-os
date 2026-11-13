@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useLayoutEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import SectionTextEditor, { type SectionEditorHandle } from "../../editor/SectionTextEditor";
 import { showAppToast } from "../../../components/ui/FeedbackSystem";
 import type { AssignmentDraftingSection, DiscoveredSource } from "../types";
 import { splitProseIntoParagraphs } from "../../../shared/proseParagraphs";
@@ -9,7 +10,6 @@ import {
   BookOpen,
   ArrowRight,
   ArrowLeft,
-  RotateCcw,
   CheckCircle2,
   Loader2,
   TrendingUp,
@@ -19,15 +19,8 @@ import {
   Edit2,
   X,
   Copy,
-  ExternalLink,
   ChevronDown,
-  Quote,
-  Bold,
-  Italic,
-  Heading,
-  List,
   ShieldCheck,
-  Layers,
   Maximize2,
   Minimize2,
   Brain,
@@ -147,14 +140,6 @@ export function DraftingActiveEditor({
   const [showWriterBlockNudge, setShowWriterBlockNudge] = useState(false);
   const writerBlockTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Tone Enhancer State
-  const [toneEnhancement, setToneEnhancement] = useState<{
-    original: string;
-    enhanced: string;
-    start: number;
-    end: number;
-  } | null>(null);
-
   // Citation Inspector Popover State
   const [inspectedCitation, setInspectedCitation] = useState<{
     text: string;
@@ -164,7 +149,7 @@ export function DraftingActiveEditor({
 
   // Manual Mode Citation Inserter Dropdown State
   const [showCitationDropdown, setShowCitationDropdown] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<SectionEditorHandle>(null);
   const citationDropdownRef = useRef<HTMLDivElement>(null);
 
   // Combined pool of available sources
@@ -205,14 +190,6 @@ export function DraftingActiveEditor({
   useEffect(() => {
     if (isStreaming) setIsEditingManually(false);
   }, [isStreaming]);
-
-  // The writing box grows with the text instead of scrolling inside itself.
-  useLayoutEffect(() => {
-    const el = textareaRef.current;
-    if (!el || isZenMode) return;
-    el.style.height = "auto";
-    el.style.height = `${Math.max(el.scrollHeight, Math.round(window.innerHeight * 0.68))}px`;
-  }, [manualText, isEditingManually, isZenMode]);
 
   // Writer's Block Nudge Effect
   useEffect(() => {
@@ -298,28 +275,10 @@ export function DraftingActiveEditor({
   const hasPointSentence = liveContent.trim().length > 40;
   const hasLinkConclusion = splitProseIntoParagraphs(liveContent).length > 1;
 
-  const handleManualTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const val = e.target.value;
-    setManualText(val);
-    onUpdateContent(val);
-  };
-
-  // Enter starts a new paragraph (a blank line); Shift+Enter is a plain line break.
-  const handleManualKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing) return;
-    e.preventDefault();
-    const el = e.currentTarget;
-    const { selectionStart, selectionEnd, value } = el;
-    const before = value.slice(0, selectionStart).replace(/[ \t]+$/, "");
-    const after = value.slice(selectionEnd).replace(/^[ \t]+/, "");
-    const sep = before.endsWith("\n\n") ? "" : before.endsWith("\n") ? "\n" : "\n\n";
-    const next = `${before}${sep}${after}`;
+  // The shared rich-text editor (src/desk/editor) emits the same light-Markdown text that is stored.
+  const handleEditorChange = (next: string) => {
     setManualText(next);
     onUpdateContent(next);
-    const caret = before.length + sep.length;
-    requestAnimationFrame(() => {
-      el.selectionStart = el.selectionEnd = caret;
-    });
   };
 
   const handleSaveManualEdit = () => {
@@ -336,82 +295,15 @@ export function DraftingActiveEditor({
     const year = source.year || "n.d.";
     const citationString = ` (${author}, ${year})`;
 
-    if (textareaRef.current) {
-      const el = textareaRef.current;
-      const start = el.selectionStart ?? manualText.length;
-      const end = el.selectionEnd ?? manualText.length;
-      const updated =
-        manualText.slice(0, start) + citationString + manualText.slice(end);
-      setManualText(updated);
-      onUpdateContent(updated);
+    if (editorRef.current) {
+      editorRef.current.insertText(citationString);
       setShowCitationDropdown(false);
-      setTimeout(() => {
-        el.focus();
-        el.setSelectionRange(
-          start + citationString.length,
-          start + citationString.length
-        );
-      }, 50);
     } else {
       const updated = manualText + citationString;
       setManualText(updated);
       onUpdateContent(updated);
       setShowCitationDropdown(false);
     }
-  };
-
-  // Markdown formatting tool
-  const applyMarkdownFormat = (prefix: string, suffix: string = "") => {
-    if (!textareaRef.current) return;
-    const el = textareaRef.current;
-    const start = el.selectionStart;
-    const end = el.selectionEnd;
-    const selected = manualText.substring(start, end) || "text";
-    const replacement = `${prefix}${selected}${suffix}`;
-    const updated =
-      manualText.substring(0, start) + replacement + manualText.substring(end);
-    setManualText(updated);
-    onUpdateContent(updated);
-    setTimeout(() => {
-      el.focus();
-      el.setSelectionRange(
-        start + prefix.length,
-        start + prefix.length + selected.length
-      );
-    }, 50);
-  };
-
-  const handleElevateTone = () => {
-    if (!textareaRef.current) return;
-    const el = textareaRef.current;
-    const start = el.selectionStart;
-    const end = el.selectionEnd;
-    if (start === end) {
-      showAppToast("Please select some text to elevate.", "warning");
-      return;
-    }
-    const selectedText = manualText.substring(start, end);
-    // Simulated Academic Rewrite
-    const enhanced = selectedText
-      .replace(/\b(good|bad)\b/gi, (m) => (m.toLowerCase() === "good" ? "optimal" : "suboptimal"))
-      .replace(/\b(very|really)\b/gi, "significantly")
-      .replace(/\b(show|shows)\b/gi, "demonstrates")
-      .replace(/\b(say|says)\b/gi, "asserts")
-      .replace(/\b(use)\b/gi, "utilize")
-      .replace(/\b(think)\b/gi, "postulate") + " [Academic Tone Enhanced]";
-      
-    setToneEnhancement({ original: selectedText, enhanced, start, end });
-  };
-
-  const applyToneEnhancement = () => {
-    if (!toneEnhancement) return;
-    const newText =
-      manualText.substring(0, toneEnhancement.start) +
-      toneEnhancement.enhanced +
-      manualText.substring(toneEnhancement.end);
-    setManualText(newText);
-    onUpdateContent(newText);
-    setToneEnhancement(null);
   };
 
   // Inspect citation on click
@@ -510,15 +402,15 @@ export function DraftingActiveEditor({
             </div>
           )}
 
-          <textarea
-            ref={textareaRef}
+          <SectionTextEditor
+            ref={editorRef}
             value={manualText}
-            onChange={handleManualTextChange}
-            onKeyDown={handleManualKeyDown}
-            onBlur={handleSaveManualEdit}
+            onChange={handleEditorChange}
+            ariaLabel="Section text (focus mode)"
             placeholder="Start drafting..."
-            className="w-full h-full min-h-[60vh] bg-transparent border-none outline-none resize-none text-lg text-neutral-800 dark:text-neutral-200 leading-relaxed font-serif"
+            citationLabel={(id) => id}
             autoFocus
+            contentClassName="section-editor min-h-[60vh] p-4 sm:p-6 text-lg leading-relaxed font-serif text-[color:var(--text-primary)] focus:outline-none"
           />
         </div>
       </div>
@@ -854,60 +746,9 @@ export function DraftingActiveEditor({
       >
         {isEditingManually ? (
           <div className="space-y-3 h-full flex flex-col">
-            {/* Markdown & Citation Insertion Helper Bar */}
+            {/* Insert bar: focus mode and citations (formatting lives in the editor toolbar) */}
             <div className="flex flex-wrap items-center justify-between gap-2 p-2 rounded-xl bg-neutral-100/70 dark:bg-white/5 border border-neutral-200/60 dark:border-white/5 text-xs">
               <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => applyMarkdownFormat("**", "**")}
-                  className="p-1.5 rounded hover:bg-neutral-200 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-300 cursor-pointer"
-                  title="Bold"
-                >
-                  <Bold className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => applyMarkdownFormat("*", "*")}
-                  className="p-1.5 rounded hover:bg-neutral-200 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-300 cursor-pointer"
-                  title="Italic"
-                >
-                  <Italic className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => applyMarkdownFormat("### ", "")}
-                  className="p-1.5 rounded hover:bg-neutral-200 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-300 cursor-pointer"
-                  title="Heading 3"
-                >
-                  <Heading className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => applyMarkdownFormat("> ", "")}
-                  className="p-1.5 rounded hover:bg-neutral-200 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-300 cursor-pointer"
-                  title="Blockquote"
-                >
-                  <Quote className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => applyMarkdownFormat("- ", "")}
-                  className="p-1.5 rounded hover:bg-neutral-200 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-300 cursor-pointer"
-                  title="Bullet List"
-                >
-                  <List className="w-3.5 h-3.5" />
-                </button>
-                <div className="w-px h-4 bg-neutral-200 dark:bg-white/10 mx-1" />
-                <button
-                  type="button"
-                  onClick={handleElevateTone}
-                  className="px-2 py-1 rounded text-[11px] font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 flex items-center gap-1 transition-colors"
-                  title="Elevate Academic Tone of selected text"
-                >
-                  <Sparkles className="w-3 h-3" />
-                  Elevate Tone
-                </button>
-                <div className="w-px h-4 bg-neutral-200 dark:bg-white/10 mx-1" />
                 <button
                   type="button"
                   onClick={() => setIsZenMode(true)}
@@ -968,54 +809,23 @@ export function DraftingActiveEditor({
               </div>
             </div>
 
-            <textarea
-              ref={textareaRef}
+            <SectionTextEditor
+              ref={editorRef}
               value={manualText}
-              onChange={handleManualTextChange}
-              onKeyDown={handleManualKeyDown}
+              onChange={handleEditorChange}
+              ariaLabel="Section text"
               placeholder="Write or refine your academic section prose here..."
-              rows={18}
-              aria-label="Section text"
-              className="w-full flex-1 min-h-[68vh] p-6 sm:p-8 text-base leading-relaxed text-neutral-900 dark:text-neutral-100 bg-neutral-50/70 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 rounded-xl focus:outline-none focus:ring-1 focus:ring-neutral-400 dark:focus:ring-white/20 resize-none overflow-hidden font-sans transition-colors"
+              citationLabel={(id) => id}
+              contentClassName="section-editor min-h-[60vh] p-5 sm:p-8 text-base leading-relaxed font-serif text-[color:var(--text-primary)] focus:outline-none"
             />
 
             <div className="flex justify-between items-center text-xs text-neutral-500 dark:text-neutral-400 px-1 pt-1">
-              <span>Saved as you type. Blank lines start new paragraphs.</span>
+              <span>Saved as you type. Enter starts a new paragraph.</span>
               <span className="tabular-nums font-mono">
                 {currentWords.toLocaleString()} / {targetWords.toLocaleString()} words
               </span>
             </div>
 
-            {/* Tone Enhancer Diff Overlay */}
-            {toneEnhancement && (
-              <div className="absolute inset-x-4 bottom-4 p-4 rounded-xl bg-white dark:bg-ink-500 border border-indigo-200 dark:border-indigo-900/50 shadow-2xl z-20 animate-in slide-in-from-bottom-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-semibold text-sm">
-                    <Sparkles className="w-4 h-4" />
-                    Academic Tone Enhancement
-                  </div>
-                  <button onClick={() => setToneEnhancement(null)} className="p-1 hover:bg-neutral-100 dark:hover:bg-white/5 rounded text-neutral-400">
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div className="p-3 rounded-lg bg-neutral-50 dark:bg-ink-750 border border-neutral-200 dark:border-white/10 text-sm line-through opacity-70">
-                    {toneEnhancement.original}
-                  </div>
-                  <div className="p-3 rounded-lg bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-800/30 text-sm text-indigo-900 dark:text-indigo-100">
-                    {toneEnhancement.enhanced}
-                  </div>
-                </div>
-                <div className="flex justify-end gap-2">
-                  <button onClick={() => setToneEnhancement(null)} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-neutral-100 dark:bg-white/5 hover:bg-neutral-200 dark:hover:bg-white/10 transition-colors">
-                    Reject
-                  </button>
-                  <button onClick={applyToneEnhancement} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition-colors">
-                    Accept Enhancement
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         ) : liveContent.trim().length > 0 ? (
           <div className="prose prose-neutral dark:prose-invert max-w-none">

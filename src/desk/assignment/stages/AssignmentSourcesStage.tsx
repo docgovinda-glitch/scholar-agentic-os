@@ -5,6 +5,7 @@ import { ReferenceBarItem } from "../ReferenceBarItem";
 import { ApprovedReferencesShelf } from "../ApprovedReferencesShelf";
 import { CuratedSourceCard } from "../components/CuratedSourceCard";
 import { LectureUploadDropzone } from "../components/LectureUploadDropzone";
+import { VaultSourcePicker } from "../components/VaultSourcePicker";
 import { areSourcesRelevantToBrief } from "../../../utils/briefSourceQueries";
 import {
   discoverRealScholarlySourcesFromServer,
@@ -257,6 +258,19 @@ export default function AssignmentSourcesStage({
     [sources, setSources]
   );
 
+  // Knowledge Vault channel: chosen vault items join the project as approved sources.
+  const handleAddVaultSources = async (vaultSources: DiscoveredSource[]) => {
+    const have = new Set(sources.map((s) => s.id));
+    const fresh = vaultSources.filter((s) => !have.has(s.id));
+    if (fresh.length === 0) return;
+    await setSources([...fresh, ...sources]);
+    if (setApprovedSourceIds) {
+      await setApprovedSourceIds(Array.from(new Set([...approvedSourceIds, ...fresh.map((s) => s.id)])));
+    }
+    setDiscoverySuccessMsg(`Added ${fresh.length} source${fresh.length === 1 ? "" : "s"} from your Knowledge Vault`);
+    setTimeout(() => setDiscoverySuccessMsg(null), 3000);
+  };
+
   const handleAddCustomSource = async () => {
     if (!customForm.title.trim()) return;
 
@@ -288,8 +302,8 @@ export default function AssignmentSourcesStage({
       mainFinding: "",
       suggestedUse: "Direct evidentiary and theoretical citation in assignment body.",
       status: "kept",
-      isVerifiedAcademic: true,
-      sourceCredibility: "peer-reviewed",
+      // Entered by the student: not verified against an index, so not labelled peer-reviewed.
+      isVerifiedAcademic: false,
     };
 
     const nextSources = [newSource, ...sources];
@@ -998,6 +1012,12 @@ export default function AssignmentSourcesStage({
             projectId={projectId}
           />
 
+          <VaultSourcePicker
+            projectId={projectId}
+            existingSourceIds={sources.map((s) => s.id)}
+            onAdd={handleAddVaultSources}
+          />
+
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-neutral-200/60 dark:border-white/10">
             <p className="text-xs text-neutral-500 dark:text-neutral-400">
               Citing sources is optional. You can draft freely and add citations at any time.
@@ -1074,6 +1094,14 @@ export default function AssignmentSourcesStage({
                 assignmentQuestion={question}
                 citationStyle={citationStyle}
                 projectId={projectId}
+              />
+            </div>
+
+            <div className="mt-4">
+              <VaultSourcePicker
+                projectId={projectId}
+                existingSourceIds={sources.map((s) => s.id)}
+                onAdd={handleAddVaultSources}
               />
             </div>
           </div>

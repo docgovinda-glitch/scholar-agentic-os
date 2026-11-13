@@ -3,8 +3,9 @@ import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import { Node, mergeAttributes } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
-import { Bold, Heading4, Italic, List, ListOrdered } from "lucide-react";
+import { Bold, Heading4, Italic, List, ListOrdered, Redo2, Undo2 } from "lucide-react";
 import { docToText, normalizeSectionText, textToDoc, type PMNode } from "./sectionDoc";
+import type React from "react";
 
 /** What the Studio can do to the section being edited. */
 export interface SectionEditorHandle {
@@ -53,14 +54,18 @@ const Button = ({ on, label, icon, onClick }: { on: boolean; label: string; icon
   </button>
 );
 
-function Toolbar({ editor }: { editor: Editor }) {
+function Toolbar({ editor, extra }: { editor: Editor; extra?: React.ReactNode }) {
   return (
-    <div role="toolbar" aria-label="Text formatting" className="flex items-center gap-0.5 px-2 py-1 border-b border-[color:var(--border-subtle)]">
+    <div role="toolbar" aria-label="Text formatting" className="flex flex-wrap items-center gap-0.5 px-2 py-1 border-b border-[color:var(--border-subtle)]">
+      <Button on={false} label="Undo" icon={<Undo2 className="w-3.5 h-3.5" />} onClick={() => editor.chain().focus().undo().run()} />
+      <Button on={false} label="Redo" icon={<Redo2 className="w-3.5 h-3.5" />} onClick={() => editor.chain().focus().redo().run()} />
+      <span aria-hidden="true" className="mx-1 h-4 w-px bg-[color:var(--border-subtle)]" />
       <Button on={editor.isActive("bold")} label="Bold" icon={<Bold className="w-3.5 h-3.5" />} onClick={() => editor.chain().focus().toggleBold().run()} />
       <Button on={editor.isActive("italic")} label="Italic" icon={<Italic className="w-3.5 h-3.5" />} onClick={() => editor.chain().focus().toggleItalic().run()} />
       <Button on={editor.isActive("heading", { level: 4 })} label="Sub-heading" icon={<Heading4 className="w-3.5 h-3.5" />} onClick={() => editor.chain().focus().toggleHeading({ level: 4 }).run()} />
       <Button on={editor.isActive("bulletList")} label="Bulleted list" icon={<List className="w-3.5 h-3.5" />} onClick={() => editor.chain().focus().toggleBulletList().run()} />
       <Button on={editor.isActive("orderedList")} label="Numbered list" icon={<ListOrdered className="w-3.5 h-3.5" />} onClick={() => editor.chain().focus().toggleOrderedList().run()} />
+      {extra ? <div className="ml-auto flex items-center gap-1">{extra}</div> : null}
     </div>
   );
 }
@@ -76,7 +81,12 @@ const SectionTextEditor = forwardRef<SectionEditorHandle, {
   ariaLabel: string;
   placeholder?: string;
   citationLabel: (id: string) => string;
-}>(function SectionTextEditor({ value, onChange, ariaLabel, placeholder, citationLabel }, ref) {
+  /** Workspace-specific controls shown at the right of the toolbar (e.g. Insert citation). */
+  toolbarExtra?: React.ReactNode;
+  /** Extra classes for the editable area (size, typography). */
+  contentClassName?: string;
+  autoFocus?: boolean;
+}>(function SectionTextEditor({ value, onChange, ariaLabel, placeholder, citationLabel, toolbarExtra, contentClassName, autoFocus }, ref) {
   const lastEmitted = useRef(normalizeSectionText(value));
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
@@ -88,6 +98,7 @@ const SectionTextEditor = forwardRef<SectionEditorHandle, {
       citationNode(citationLabel),
     ],
     content: textToDoc(value) as unknown as Record<string, unknown>,
+    autofocus: autoFocus ? "end" : false,
     onUpdate: ({ editor: ed }) => {
       const text = docToText(ed.getJSON() as unknown as PMNode);
       lastEmitted.current = text;
@@ -98,7 +109,7 @@ const SectionTextEditor = forwardRef<SectionEditorHandle, {
         role: "textbox",
         "aria-multiline": "true",
         "aria-label": ariaLabel,
-        class: "section-editor min-h-[50vh] p-4 sm:p-5 text-[15px] leading-7 font-serif text-[color:var(--text-primary)] focus:outline-none",
+        class: contentClassName ?? "section-editor min-h-[50vh] p-4 sm:p-5 text-[15px] leading-7 font-serif text-[color:var(--text-primary)] focus:outline-none",
       },
     },
   });
@@ -145,7 +156,7 @@ const SectionTextEditor = forwardRef<SectionEditorHandle, {
   if (!editor) return null;
   return (
     <div className="rounded-2xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] focus-within:border-[color:var(--accent-border)]">
-      <Toolbar editor={editor} />
+      <Toolbar editor={editor} extra={toolbarExtra} />
       <EditorContent editor={editor} />
     </div>
   );

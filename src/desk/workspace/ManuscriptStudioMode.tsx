@@ -26,7 +26,7 @@ import { parseFigures } from "../../domain/journal/figures";
 import StudioOutline, { UNSORTED_ID } from "../journal/studio/StudioOutline";
 import StudioEvidencePanel from "../journal/studio/StudioEvidencePanel";
 import StudioSectionEditor from "../journal/studio/StudioSectionEditor";
-import type { SectionEditorHandle } from "../journal/studio/SectionTextEditor";
+import type { SectionEditorHandle } from "../editor/SectionTextEditor";
 
 export { IAST_DIACRITICS } from "../journal/studio/StudioSectionEditor";
 
