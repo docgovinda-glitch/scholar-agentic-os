@@ -1,5 +1,5 @@
 import express from "express";
-import { callOpenRouterText } from "../utils/llm.ts";
+import { callOpenRouterText } from "../src/services/scholarBrain.ts";
 import { sendAiFailure, UnusableAiResponseError } from "../src/ai/aiRouteErrors.ts";
 import { getProjectStore } from "../../src/services/store/projectStore.ts";
 import { requireAuth } from "../src/middleware/auth.ts";

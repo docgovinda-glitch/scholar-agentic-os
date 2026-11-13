@@ -1,113 +1,74 @@
-# Product Specification & Capabilities
+# Product Overview
 
-This document specifies the current user-facing product, supported roles, active modules, and core capabilities of **Scholar Core**.
+What Scholar Core does today, who uses it, and which parts are built. Behaviour is described step by step in [`WORKFLOWS.md`](WORKFLOWS.md).
 
----
+## 1. Audience and roles
 
-## 1. Product Overview
+| Role | How it is determined | Can do |
+| :--- | :--- | :--- |
+| Visitor | No session | Landing page, sign-in and sign-up, and `/presentation` (works signed out) |
+| Signed-in user | Supabase session verified by `requireAuth` | Own projects, Vault, AI Access, settings |
+| Premium subscriber | Active row in `user_entitlements` with a plan (`premium_plans`) | Platform-managed AI resources within plan credits and quotas |
+| Admin | Row in `admin_users` or the `MAIN_ADMIN_EMAIL` account | `/admin/*` panel and `/api/admin/ai/*`, limited by scope |
 
-**Scholar Core** is an academic research, writing, and verification operating system. It provides specialized, format-tailored workspaces for academic writing rather than generic conversational chat or unconstrained text generation.
+Admin scopes (`server/src/middleware/requireAdmin.ts`): `manage_providers`, `manage_premium`, `manage_budget`, `manage_opportunities`, `manage_users`, `manage_admins`.
 
-The platform guarantees academic integrity through:
-- **Deterministic Evidence Ledgers**: Every claim drafted can be bound directly to empirical literature or lecture materials.
-- **Dynamic Analytical Structuring**: Assignment outlines are generated analytically to fit the exact research question and prompt rather than forcing generic "Intro/Body/Conclusion" templates.
-- **Strict Citation Reconciliation**: 100% of in-text citations are audited against the compiled bibliography before export.
-- **Rubric Compliance Evaluation**: Multi-dimensional grading assessments scoring drafts against university or agency rubrics.
-- **Zero Document Storage Policy**: The platform does not store proprietary PDFs or full copyright-protected manuscripts on its servers; it stores only canonical citation metadata and authorized cloud storage pointers.
+Profiles carry username, full name, phone, affiliation, user type and education level (`public.profiles`).
 
----
+## 2. Output types and workspaces
 
-## 2. Active User Roles
+The Atlas catalog (`src/app/atlas/catalogData.ts`, `src/app/atlas/catalog.ts`) defines 24 output types in six families. A project stores one `outputTypeId`; `src/desk/DeskApp.tsx` picks the workspace from it.
 
-The platform currently models four distinct user roles, configurable during user onboarding and editable in Account Settings:
+| Family | Output types (catalog labels) |
+| :--- | :--- |
+| `short_form` | OT-01 Assignment, OT-02 Essay, OT-03 Report, OT-13 Literature Review, OT-04 Abstract, OT-05 Seminar Paper, OT-24 Generic Document |
+| `long_form` | OT-06 Undergraduate Dissertation / Capstone, OT-07 Master's Thesis, OT-08 Doctoral Dissertation, OT-09 Book / Monograph |
+| `publication` | OT-10 Journal Article, OT-11 Conference Paper, OT-12 Review Article, OT-14 Book Chapter |
+| `proposal_funding` | OT-15 Research Proposal, OT-16 Grant Proposal, OT-17 Ethics Application |
+| `applied_professional` | OT-18 Lab Report, OT-19 Case Study, OT-20 Policy Brief, OT-21 White Paper / Technical Documentation |
+| `presentation` | OT-22 Presentation, OT-23 Poster |
 
-1. **Undergraduate Student**
-   - Focus: Modular coursework assignments, essays, lab reports, case studies, lecture note synthesis, and APA/MLA/Harvard citation formatting.
-2. **Postgraduate / Masters Student**
-   - Focus: Extended essays, master's dissertations, empirical literature reviews, and research methodology framing.
-3. **Doctoral Researcher (PhD / Postdoc)**
-   - Focus: Journal manuscripts, multi-chapter doctoral dissertations, claim-evidence mapping, grant proposals, and adversarial peer review simulation.
-4. **Academic Faculty / Principal Investigator (PI)**
-   - Focus: Research grant proposals (NIH / NSF formats), peer review assessment, institutional compliance, and collaborative author management.
+Dedicated workspaces (routing in `DeskApp.tsx`):
 
----
+| `outputTypeId` | Workspace |
+| :--- | :--- |
+| `OT-01`, `OT-02` | Coursework (`src/desk/assignment/`) |
+| `OT-07` | Thesis (`src/desk/thesis/`) |
+| `OT-10` | Journal research studio (`src/desk/workspace/`) |
+| `OT-15` | Research proposal (`src/desk/proposal/`) |
+| `OT-22` | Presentation Studio (`src/desk/presentation/`) |
+| everything else | Generic shell (`src/desk/DeskShell.tsx`) |
 
-## 3. Dedicated Academic Workspaces
+Workspace ids match the catalog: Research Proposal is `OT-15` and the Thesis workspace is `OT-07`. Projects saved earlier under `OT-19` (proposal) or `OT-09` (thesis) are read as `OT-15` / `OT-07` (`src/app/atlas/legacyIds.ts`, applied by the project stores and `DeskApp`), and migration `20261109000000_align_output_type_ids.sql` rewrites the stored rows. Project creation tiles (`src/desk/dashboard/constants.ts`) are Coursework & Essays (`OT-01`), Journal Article (`OT-10`), Research Proposal (`OT-15`) and Slides & Keynotes (`OT-22`); the picker also lists the other catalog types except `OT-07`, which has its own thesis tile.
 
-Scholar Core provides purpose-built workspaces tailored to specific deliverable types:
+## 3. Capabilities by area
 
-### 3.1 Coursework & Essay Engine (`OT-01`)
-- **Status**: Production Active.
-- **Target Deliverables**: Academic Essays, Module Coursework, Analytical Papers, Policy Briefs, Case Studies, Lab Reports.
-- **Core Architecture**: 4-Phase Lifecycle:
-  1. **Phase 1 · Understand & Structure**: Dual-tab brief intake (paste prompt or upload PDF/DOCX brief document), level and citation style calibration, interactive **Rubric Matcher** (mapping user goals against university assessment criteria), AskScholar-enriched dynamic analytical outline generation, target theoretical frameworks chip manager, custom word allocations (`DynamicStructurePlanner`), and voice/style selection (`WritingStyleSelector`).
-  2. **Phase 2 · Sources & Discovery**: Question deconstruction, multi-angle scholarly discovery, lecture/slide dropzone with automatic chunking, relevance scoring, and approved evidence shelf.
-  3. **Phase 3 · Drafting**: Subheading-by-subheading drafting alignment, **Focus/Zen Mode** with intelligent 2-minute "Writer's Block" nudges, live word count progress tracking against section budgets, **Automated In-Text Citation & Bibliography Management** (one-click citation insertion with live auto-updating bibliography), **AI "Devil's Advocate"** (critique and counterargument streaming), **Paraphrasing & Academic Tone Enhancer** (side-by-side diff overlay for text refinement), and evidence passage binding.
-  4. **Phase 4 · Submission**: 10-point rubric evaluator, citation audit reconciliation, **"Flow & Transitions" Auditor** (scanning inter-paragraph logical flow for sudden jumps), and formatted `.docx` and PDF export.
-- **Copilot Integration**: 4 stage-specific copilot personas (Advisor, Librarian, Scribe, Examiner).
+**Coursework** (`OT-01`/`OT-02`): five stages (Extract, Understand, Sources, Drafting, Submission) derived only from the student's brief. Brief upload (`.pdf`, `.docx`, `.txt`, `.md`), marks-derived sub-questions and word targets, keyword-based multi-provider source discovery, outline and section drafting within budget, an offline scaffold when every AI provider is out of credit, a references card, a 10-point rubric audit, citation reconciliation, `.docx`/PDF export. Four stage copilots (Advisor, Librarian, Scribe, Examiner, defined in `src/desk/assignment/types.ts`).
 
-### 3.2 Journal Article Workspace (`OT-10`)
-- **Status**: Production Active.
-- **Target Deliverables**: Peer-reviewed empirical articles, review articles, and journal manuscripts.
-- **Core Architecture**: 25-Stage Empirical Pipeline organized into 5 logical phases:
-  - *Phase I: Foundation* (Definition, Literature, Gap Identification, Gap Selection, Title Selection, Title Lock).
-  - *Phase II: Evidence* (Vault Sources, Source Approval, Additional Data, Evidence Extraction, External Research, Analysis, Manual Review).
-  - *Phase III: Drafting* (Journal Discovery, Requirements Lock, Section Drafting, Citation Audit, Originality Check, Preview).
-  - *Phase IV: Review* (Double-Blind Peer Review Simulator, Revision Tracking, Formal Editing).
-  - *Phase V: Publication* (Publication Readiness Assessment, Final Manuscript Export).
-- **Adversarial Peer Review Simulator**: Evaluates manuscripts across 5 specialized referee perspectives: Methodologist, Domain Specialist, Biostatistician/Data Analyst, Synthesizer, and Formal Editor.
+**Journal article** (`OT-10`): 25 stages in five phases (Foundation, Evidence, Drafting, Review, Publication; `src/desk/workspace/types.ts`). Gap finding, title selection and lock, Vault and external source approval, evidence extraction and analysis, journal discovery and requirements, drafting, citation audit, originality check, peer-review simulation, revision and rebuttal matrix, final editor, publication readiness, cover letter, anonymization and export.
 
-### 3.3 Thesis & Dissertation Workspace (`OT-09` / `OT-07`)
-- **Status**: Production Active.
-- **Target Deliverables**: Master’s Theses, Doctoral Dissertations, and multi-chapter monographs.
-- **Core Architecture**: Multi-chapter milestone tracking, comprehensive literature matrix, chapter-by-chapter drafting, and a 15-question Viva Voce oral defense simulator.
+**Thesis** (`OT-07`): chapter editor, research questions, literature matrix, references, LaTeX and document export, chapter audit and gate status, Viva Voce simulator.
 
-### 3.4 Research Proposal Workspace (`OT-19`)
-- **Status**: Production Active.
-- **Target Deliverables**: Grant applications, dissertation proposals, and competitive research bids.
-- **Core Architecture**: Step-by-step grant pipeline: Funding Agency Rubric Alignment → 1-Page Specific Aims → Significance & Innovation → Research Strategy & Pitfalls → Timeline & Gantt Work Packages → Budget Justification, complete with an NIH/NSF Study Section scoring simulator.
+**Proposal** (`OT-15`): narrative section editor, budget editor, aims audit, study-section scorer, export.
 
-### 3.5 Academic Presentation Workspace (`OT-22`)
-- **Status**: Production Active.
-- **Target Deliverables**: Conference presentations, seminar slide decks, and dissertation defense slides.
-- **Core Architecture**: Constraint-driven presentation studio: Timing Profiler (10m / 20m / 45m) → Narrative Arc & Hook → Slide Deck Architecture → Word-for-Word Speaker Scripts → 16:9 Canvas Preview → Slide Export.
+**Presentation Studio** (`OT-22`): topic or document to card outline, 8 curated themes, inline editing, presenter, audience Q&A simulator, PowerPoint/PDF/Markdown/JSON export. See [`presentation-studio.md`](presentation-studio.md).
 
----
+**Knowledge Vault** (`/vault`): per-user source library with DOI lookup, file and URL import, BibTeX/RIS import, Zotero and Mendeley sync endpoints, Google Drive and OneDrive file listing, semantic search, collections and tags, retraction metadata, and a reset action.
 
-## 4. Platform Modules & Utilities
+**Citation engine** (`src/citation_compliance/`): formatters for APA 7, IEEE, MLA 9, Chicago (author-date and notes), Harvard and Vancouver registered at startup in `server.ts`; `scholarBrain` additionally accepts the `oscola` style key. BibTeX and RIS importers.
 
-### 4.1 Knowledge Vault (`/vault`)
-- **Purpose**: Global, cross-project literature and source repository.
-- **Zero Document Storage**: Retains only structured bibliographic metadata, DOIs, URLs, and client-authorized cloud storage pointers. Full proprietary manuscripts are never hosted.
-- **Ingestion Channels**:
-  - Direct DOI resolution via Crossref / OpenAlex.
-  - Cloud Drive linking: Google Drive (metadata extraction and direct link navigation) and Microsoft OneDrive / SharePoint (`1drv.ms` shared links).
-  - Reference file imports: `.bib` (BibTeX) and `.ris` files.
-- **Project Binding**: Sources in the Vault can be linked to active projects for in-text citation and automatic bibliography generation.
+**Ask Scholar** (`/projects`): research chat backed by `POST /api/ai/agent` with web search and deep research endpoints (`/api/ai/search`, `/api/ai/deep-research`).
 
-### 4.2 AI Access Control (`/ai-access`)
-- **Purpose**: Unified interface for AI configuration, BYOK API key management, local runner discovery, and model selection.
-- **5 Operational Modes**:
-  1. *Smart Gateway*: Automatic intelligent routing to the optimal available cloud model.
-  2. *Bring Your Own Key (BYOK)*: Direct connection using user-provided API keys (OpenAI, Anthropic, Gemini, Groq, Mistral, Cohere, xAI, OpenRouter, Together AI).
-  3. *Free Tier*: Access via built-in free-tier endpoints without requiring personal API keys.
-  4. *Local AI*: Local model inference via Ollama, LM Studio, vLLM, or LocalAI on `localhost`.
-  5. *Offline Mode*: Strict local-only execution without external network egress.
-- **Provider Failover**: Automatic fallback to secondary and tertiary providers if rate limits (HTTP 429) or service outages occur.
+**AI Access** (`/ai-access`): Overview, Providers, Subscription and Preferences sections. See [`AI-SYSTEM.md`](AI-SYSTEM.md).
 
-### 4.3 Account Settings (`/settings`)
-- **Purpose**: Personalization, appearance, security, and multi-account identity management.
-- **Features**:
-  - Multi-Account Registry: Add multiple scholar accounts and switch active profiles instantly.
-  - Academic Profile: Name, Institution, Discipline, Degree Level, and Default Citation Style.
-  - Appearance: Day/Night theme switcher (`dark` and `light` modes).
-  - Security & Authentication: Password changes and session management.
+**Admin panel** (`/admin/*`): providers and models, premium plans/requests/subscribers, AI resources, platform credentials, budget, usage, opportunities, admin roster, user status, audit log.
 
-### 4.4 Admin Infrastructure Panel (`/admin`)
-- **Purpose**: Operational dashboard for monitoring system AI infrastructure.
-- **Features**: Real-time provider connectivity tests, latency meters, error logs, and BYOK credential status checks.
+## 4. Principles that shape the product
 
-### 4.5 Conversational Ask Scholar & Dynamic Canvas (`/projects`)
-- **Purpose**: Rapid academic inquiry, source-grounded brainstorming, and natural language project initiation on the dashboard.
-- **Full-Screen Conversational Experience**: Interacting with Ask Scholar smoothly collapses deliverable starter cards, transitioning the dashboard into an expansive, full-screen academic dialogue canvas with streaming answers, citation grounding, and one-click project creation directly from chat context.
+- Everything a user can hand in or rely on must be real: references, DOIs, figures and reviewer comments are never invented. Generators use only material from the user's input or retrieved sources.
+- One AI brain (`scholarBrain`); no per-workspace prompt engines or subject lookup tables.
+- The user's own AI key is never stored by request handlers or written to logs; Premium keys never leave the server.
 
+## 5. Not built
+
+Items under consideration are listed in [`../PRODUCT_BACKLOG.md`](../PRODUCT_BACKLOG.md) (shared deck links, real plagiarism checking). Output types without a dedicated workspace open the generic shell.

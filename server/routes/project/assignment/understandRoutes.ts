@@ -1,4 +1,5 @@
 import express from "express";
+import { applyMarksBudget } from "../../../../src/domain/assignment/outlineBudget.ts";
 import { parseDocument } from "../../../../src/document_intelligence/index.ts";
 import {
   buildScholarlyVoiceSystemPrompt,
@@ -7,8 +8,8 @@ import {
 } from "../../../src/utils/scholarlyVoiceGuard.ts";
 import { getProjectStore } from "../../../../src/services/store/projectStore.ts";
 import { scopeBrief, structureLens } from "../../../../src/domain/assignment/briefScoping.ts";
-import { callOpenRouterJSON, callOpenRouterText } from "../../../utils/llm.ts";
-import { keyringFromRequest } from "../../../src/ai/routerBridge.ts";
+import { callOpenRouterJSON, callOpenRouterText } from "../../../src/services/scholarBrain.ts";
+import { requestKeyring } from "../../../src/ai/routerBridge.ts";
 import { scholarBrain } from "../../../src/services/scholarBrain.ts";
 import {
   auditDocumentLineByLine,
@@ -35,7 +36,6 @@ import {
 import {
   generateDynamicAssignmentStructure,
   generateAiEnhancedOutline,
-  extractTargetFrameworks,
   sanitizeOutlineHeadings,
   assignmentStructureToOutlineTree,
   outlineTreeToAssignmentStructure,
@@ -485,11 +485,13 @@ Return ONLY valid JSON matching:
 
     if (finalStructure) {
       finalStructure.headings = sanitizeOutlineHeadings(finalStructure.headings, question, assignmentType);
+      // AI-invented word counts are replaced by the marks pipeline (clean multiples, exact sum).
+      finalStructure = applyMarksBudget(finalStructure, briefText || question);
       finalStructure.targetFrameworks =
         data.target_frameworks ||
         data.targetFrameworks ||
         finalStructure.targetFrameworks ||
-        extractTargetFrameworks(question, assignmentType, briefText);
+        [];
       finalStructure.thesisStatement =
         data.thesis_statement ||
         data.thesisStatement ||

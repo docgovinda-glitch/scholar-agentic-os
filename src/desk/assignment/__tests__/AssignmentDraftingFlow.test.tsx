@@ -167,6 +167,22 @@ describe("Assignment Phase 3: Drafting Engine Components & Flow", () => {
       expect(citationAnchors[1]).toHaveTextContent("(Kearns & Roth, 2022)");
     });
 
+    it("hides refinement actions and AI directive clutter until the section has text", () => {
+      const { rerender } = render(<DraftingActiveEditor section={mockSections[1]} onUpdateContent={vi.fn()} />);
+      for (const label of [/Deepen Analysis/i, /Challenge Me/i, /Ground Citations/i, /^Expand$/i, /^Condense$/i]) {
+        expect(screen.queryByRole("button", { name: label })).not.toBeInTheDocument();
+      }
+      expect(screen.queryByPlaceholderText(/Guide AI for this section/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Suggested Directives/i)).not.toBeInTheDocument();
+
+      rerender(<DraftingActiveEditor section={{ ...mockSections[1], draftContent: "A drafted paragraph about the topic." }} onUpdateContent={vi.fn()} />);
+      for (const label of [/^Expand$/i, /^Condense$/i, /Refine Tone/i, /Insert Citation/i]) {
+        expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
+      }
+      expect(screen.queryByRole("button", { name: /Deepen Analysis/i })).not.toBeInTheDocument();
+      expect(screen.queryByPlaceholderText(/Guide AI for this section/i)).not.toBeInTheDocument();
+    });
+
     it("edits the section text and saves each change", () => {
       const onUpdate = vi.fn();
       render(
@@ -356,7 +372,7 @@ describe("Assignment Phase 3: Drafting Engine Components & Flow", () => {
   });
 
   describe("Question-Led Outline Tuning & Inline Title Editing", () => {
-    it("renders tuning banner and button when generic outline titles exist", () => {
+    it("shows no tuning banner or button, even for generic outline titles", () => {
       const onTune = vi.fn();
       const genericSections: AssignmentDraftingSection[] = [
         {
@@ -390,12 +406,10 @@ describe("Assignment Phase 3: Drafting Engine Components & Flow", () => {
         />
       );
 
-      expect(screen.getByText("Generic Outline Detected")).toBeInTheDocument();
-      const tuneBtn = screen.getByRole("button", { name: /Tune Outline to Question/i });
-      expect(tuneBtn).toBeInTheDocument();
-
-      fireEvent.click(tuneBtn);
-      expect(onTune).toHaveBeenCalledTimes(1);
+      // The outline always comes from the brief: no tuning banner or button
+      expect(screen.queryByText("Generic Outline Detected")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Tune Outline to Question/i })).not.toBeInTheDocument();
+      expect(onTune).not.toHaveBeenCalled();
     });
 
     it("allows inline section title editing in DraftingSectionIndex", () => {

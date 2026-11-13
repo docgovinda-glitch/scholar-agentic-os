@@ -187,19 +187,20 @@ describe("Assignment Phase 1 Wiring & Phase 2 Sources Workspace", () => {
 
       // Curated Literature Cards (Titles, Authors, Venue)
       expect(screen.getByText(titleRe(firstSource.title))).toBeInTheDocument();
-      expect(screen.getAllByText(titleRe(firstSource.authors.join(", "))).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(new RegExp(firstSource.authors[0].split(",")[0], "i")).length).toBeGreaterThan(0);
       expect(screen.getAllByText(titleRe((firstSource.journal || firstSource.publisher)!)).length).toBeGreaterThan(0);
       expect(screen.getByText(titleRe(secondSource.title))).toBeInTheDocument();
 
       // Exit Gate Counter (visible when sources are present) & unblocked Proceed to Drafting & Skip to Drafting buttons
-      const counter = screen.getByTestId("evidence-counter");
-      expect(counter).toHaveTextContent("0 / 4 recommended");
+      expect(screen.queryByTestId("evidence-counter")).not.toBeInTheDocument();
 
       const proceedDraftingBtn = screen.getByTestId("proceed-to-drafting-btn");
       expect(proceedDraftingBtn).not.toBeDisabled();
 
-      const skipDraftingBtn = screen.getByTestId("skip-to-drafting-btn");
-      expect(skipDraftingBtn).toBeInTheDocument();
+      // Clean bottom bar: no Skip / AI Analysis shortcuts, just Back and Proceed
+      expect(screen.queryByTestId("skip-to-drafting-btn")).not.toBeInTheDocument();
+      expect(screen.queryByText("Move to AI Analysis")).not.toBeInTheDocument();
+      expect(screen.getByText("Back to Understand")).toBeInTheDocument();
     });
 
     it("allows one-click approve and remove actions on curated cards", async () => {
@@ -272,8 +273,7 @@ describe("Assignment Phase 1 Wiring & Phase 2 Sources Workspace", () => {
       await screen.findByText(/Sources & Course Materials/i);
 
       // Check current count: 3 / 4 recommended
-      const counter = screen.getByTestId("evidence-counter");
-      expect(counter).toHaveTextContent("3 / 4 recommended");
+      expect(screen.queryByTestId("evidence-counter")).not.toBeInTheDocument();
       const proceedDraftingBtn = screen.getByTestId("proceed-to-drafting-btn");
       expect(proceedDraftingBtn).not.toBeDisabled();
 
@@ -341,9 +341,9 @@ describe("Assignment Phase 1 Wiring & Phase 2 Sources Workspace", () => {
       // Verify 0 literature cards are displayed
       expect(screen.queryByTestId("curated-sources-grid")).not.toBeInTheDocument();
 
-      // Verify Skip to Drafting button is available
-      const skipBtns = screen.getAllByTestId("skip-to-drafting-btn");
-      expect(skipBtns.length).toBeGreaterThan(0);
+      // Proceed stays available; there is no separate Skip button
+      expect(screen.queryByTestId("skip-to-drafting-btn")).not.toBeInTheDocument();
+      expect(screen.getAllByTestId("proceed-to-drafting-btn").length).toBeGreaterThan(0);
     });
   });
 });

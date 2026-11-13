@@ -5,113 +5,25 @@
  * them for that request and keeps nothing.
  */
 import { loadUserAiSettings, providersWithStoredKey, readProviderKey, type UserAiSettings } from "../../services/userAiSettings";
-import type { ProviderId } from "../../platform/router/types";
-import { keyIdsFor } from "../../config/keySlots";
-import { syncKeysWithAccount } from "../aiAccess/accountKeys";
+import { assembleKeyring, type KeyringEntry } from "../../platform/router/keyringAssemble";
 
-export interface KeyringEntry {
-  provider: ProviderId;
-  model: string;
-  apiKey?: string;
-  baseUrl?: string;
-  label?: string;
-  /** Which of the provider's keys this is (1 = main); keeps backups apart in the router. */
-  slot?: number;
-  contextWindow?: number;
-  maxOutputTokens?: number;
-}
-
-/** Catalog ids (AI Access) → router provider ids. */
-const CLOUD: Record<string, ProviderId> = {
-  openai: "openai",
-  anthropic: "anthropic",
-  claude: "anthropic",
-  gemini: "google",
-  google: "google",
-  groq: "groq",
-  deepseek: "deepseek",
-  mistral: "mistral",
-};
-const LOCAL: Record<string, ProviderId> = { ollama: "ollama", lmstudio: "lmstudio" };
-
-/** The router provider for an AI Access catalog id, if it has one. */
-export const routerProviderFor = (catalogId: string): ProviderId | undefined => CLOUD[catalogId] ?? LOCAL[catalogId];
-
-function cleanModelChoice(rawModel: string): string {
-  const stripped = rawModel
-    .split(/\s*(?:—|–|\u2014|\u2013|\u00B7)\s*/)[0]
-    .replace(/\s*\((?:Live Discovered|deprecated|preview|unverified)\)\s*$/i, "")
-    .replace(/[^\x20-\x7E]/g, "")
-    .trim();
-  return stripped || rawModel.replace(/[^\x20-\x7E]/g, "").trim();
-}
-
+export type { KeyringEntry } from "../../platform/router/keyringAssemble";
 /** Models the user picked in AI Access, plus their known limits when the catalog had them. */
 export interface ModelChoice { model: string; contextWindow?: number; maxOutputTokens?: number }
 
 /**
- * This device's AI connections, in order. On a device where nothing is set up
- * yet (a new sign-in), the account's saved keys are pulled once first, so AI
- * Access configured on another device works here without a visit to settings.
+ * Every AI connection on this device, primary first (see `assembleKeyring`, shared
+ * with the server so both build the same keyring from the same settings).
  */
 export async function buildKeyring(
   settings?: UserAiSettings,
-  storedProviders?: string[],
+  storedProviders: string[] = providersWithStoredKey(),
   readKey: (id: string) => Promise<string | null> = readProviderKey,
 ): Promise<KeyringEntry[]> {
-  const ring = await buildKeyringFromDevice(settings, storedProviders ?? providersWithStoredKey(), readKey);
-  if (ring.length > 0 || settings || storedProviders) return ring;
-  const synced = await syncKeysWithAccount(30_000).catch(() => null);
-  if (!synced || (synced.pulled.length === 0 && synced.removed.length === 0)) return ring;
-  return buildKeyringFromDevice(undefined, providersWithStoredKey(), readKey);
-}
-
-async function buildKeyringFromDevice(
-  settings: UserAiSettings | undefined,
-  storedProviders: string[],
-  readKey: (id: string) => Promise<string | null>,
-): Promise<KeyringEntry[]> {
   const s = settings ?? (await loadUserAiSettings());
-  const prefs = s.preferences ?? {};
-  const pick = (id: string): ModelChoice | null => {
-    const rawModel = prefs[`${id}Model`];
-    if (!rawModel) return null;
-    const model = cleanModelChoice(rawModel);
-    if (!model) return null;
-    const ctx = Number(prefs[`${id}ContextWindow`]);
-    const out = Number(prefs[`${id}MaxOutput`]);
-    return { model, contextWindow: Number.isFinite(ctx) && ctx > 0 ? ctx : undefined, maxOutputTokens: Number.isFinite(out) && out > 0 ? out : undefined };
-  };
-
-  // Primary provider first, then every other provider with a key on this device.
-  const order = [s.provider, ...storedProviders.filter((p) => p !== s.provider)];
-  const entries: KeyringEntry[] = [];
-  for (const id of order) {
-    const provider = CLOUD[id];
-    if (!provider) continue;
-    const choice = pick(id);
-    if (!choice) continue;
-    const endpoint = prefs[`${id}Endpoint`] || prefs[`${id}BaseUrl`];
-    const cleanBase = endpoint ? endpoint.replace(/[^\x20-\x7E]/g, "").trim() : "";
-    // The main key first, then any backup keys: a key that runs out hands over to the next.
-    for (const [index, keyId] of keyIdsFor(id).entries()) {
-      if (index > 0 && !storedProviders.includes(keyId)) continue;
-      const rawKey = await readKey(keyId);
-      const key = rawKey ? rawKey.replace(/^\s*bearer\s+/i, "").replace(/[^\x21-\x7E]/g, "").trim() : null;
-      if (!key) continue;
-      entries.push({ provider, apiKey: key, ...choice, ...(cleanBase ? { baseUrl: cleanBase } : {}), ...(index > 0 ? { slot: index + 1, label: `${choice.model} · backup key ${index + 1}` } : {}) });
-    }
-  }
-  // A local model goes last: it is the fallback that works offline.
-  for (const id of Object.keys(LOCAL)) {
-    const choice = pick(id);
-    if (!choice) continue;
-    if (id !== s.provider && !prefs[`${id}Enabled`]) continue;
-    const endpoint = prefs[`${id}Endpoint`] || prefs[`${id}BaseUrl`];
-    const cleanBase = endpoint ? endpoint.replace(/[^\x20-\x7E]/g, "").trim() : "";
-    entries.push({ provider: LOCAL[id], ...choice, ...(cleanBase ? { baseUrl: cleanBase } : {}) });
-  }
-  return entries;
+  const keys = new Map<string, string | null>();
+  for (const id of [s.provider, ...storedProviders]) if (id && !keys.has(id)) keys.set(id, await readKey(id));
+  return assembleKeyring(s, storedProviders.includes(s.provider) ? storedProviders : [s.provider, ...storedProviders], (id) => keys.get(id));
 }
 
 export const encodeKeyring = (entries: KeyringEntry[]): string => {
@@ -120,9 +32,3 @@ export const encodeKeyring = (entries: KeyringEntry[]): string => {
   bytes.forEach((b) => (bin += String.fromCharCode(b)));
   return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 };
-
-/** Providers that have a key on this device but no chosen model, so they are not used yet. */
-export async function connectionsNeedingModel(settings?: UserAiSettings): Promise<string[]> {
-  const s = settings ?? (await loadUserAiSettings());
-  return providersWithStoredKey().filter((id) => (CLOUD[id] ?? undefined) && !cleanModelChoice(s.preferences?.[`${id}Model`] ?? ""));
-}

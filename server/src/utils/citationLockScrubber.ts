@@ -63,7 +63,8 @@ export interface ScrubberOptions {
   checkEntailment?: boolean;
 }
 
-const DEFAULT_UNVERIFIED_PLACEHOLDER = "[Unverified Claim — Link Vault Source]";
+// Unmatched citations are removed silently: no placeholder tag is ever written into student prose.
+const DEFAULT_UNVERIFIED_PLACEHOLDER = "";
 
 const STOPWORDS = new Set([
   "the", "is", "at", "which", "on", "and", "a", "an", "in", "of", "to", "for", "with", "by", "as",
@@ -288,7 +289,7 @@ export function scrubCitations(
     };
   }
 
-  const placeholder = options.unverifiedPlaceholder || DEFAULT_UNVERIFIED_PLACEHOLDER;
+  const placeholder = options.unverifiedPlaceholder ?? DEFAULT_UNVERIFIED_PLACEHOLDER;
   const formatter = new APA7Formatter();
 
   // Normalize ledger into Map and Array
@@ -406,7 +407,7 @@ export function scrubCitations(
     // Unverified narrative citation
     unverifiedClaimsCount += 1;
     strippedCitations.push(`${cleanAuthor} (${cleanYear})`);
-    return `${cleanAuthor} (${cleanYear} ${placeholder})`;
+    return placeholder ? `${cleanAuthor} (${cleanYear} ${placeholder})` : cleanAuthor;
   });
 
   // Pass 4: Parenthetical citations: (Author, Year) or (Author & Author, Year)
@@ -437,12 +438,20 @@ export function scrubCitations(
     const idx = parseInt(idxStr, 10);
     return resolvedTokens[idx] || "";
   });
+  // Tidy the gaps left where an unmatched citation was removed.
+  scrubbedText = scrubbedText
+    .replace(/\(\s*[;,]?\s*\)/g, "")
+    .replace(/[ \t]+([.,;:!?])/g, "$1")
+    .replace(/[ \t]{2,}/g, " ");
 
   // Pass 5: Chronological Anachronisms & Claim Entailment Analysis
-  const sentences = scrubbedText
-    .split(/(?<=[.?!])\s+/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
+  // Sentences are checked per paragraph so the blank lines between
+  // paragraphs survive the re-join below.
+  const paragraphs = scrubbedText.split(/\n[ \t]*\n+/).map((p) => p.trim()).filter(Boolean);
+  const paragraphSentences = paragraphs.map((p) =>
+    p.split(/(?<=[.?!])\s+/).map((s) => s.trim()).filter((s) => s.length > 0)
+  );
+  const sentences = paragraphSentences.flat();
 
   const allCitedSources = Array.from(citedSourcesSet);
 
@@ -485,7 +494,14 @@ export function scrubCitations(
   });
 
   if (options.checkEntailment !== false) {
-    scrubbedText = processedSentences.join(" ");
+    let cursor = 0;
+    scrubbedText = paragraphSentences
+      .map((group) => {
+        const out = processedSentences.slice(cursor, cursor + group.length).join(" ");
+        cursor += group.length;
+        return out;
+      })
+      .join("\n\n");
   }
 
   return {

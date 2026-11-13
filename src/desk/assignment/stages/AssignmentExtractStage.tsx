@@ -119,6 +119,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
     setAnalysis,
     ensurePersisted,
     isLoading,
+    agent,
   } = useAssignmentWorkspace() as any;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -482,6 +483,19 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
     const safeUpdates = stripCircularReferences(updates);
     await saveAnswers(safeUpdates);
 
+    // Have the student's AI read the brief and plan the assignment so Phase 2
+    // opens with its full breakdown. A failure here must not block the student.
+    try {
+      if (agent?.runExtract && agent?.runUnderstand) {
+        setIsGeneratingStructure(true);
+        if (await agent.runExtract()) await agent.runUnderstand();
+      }
+    } catch (agentErr) {
+      console.warn("Brief reading by AI did not complete:", agentErr);
+    } finally {
+      setIsGeneratingStructure(false);
+    }
+
     // Smoothly advance to Part 2: Understand
     onProceed?.();
   };
@@ -526,7 +540,8 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
       });
 
       if (!res.ok) {
-        throw new Error("Brief upload endpoint failed");
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw Object.assign(new Error(body?.error || "Brief upload endpoint failed"), { userFacing: res.status === 422 && Boolean(body?.error) });
       }
 
       const data = await res.json();
@@ -557,6 +572,29 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
         setLocalCitation(nextCitation);
       }
 
+      // Persist what was read right away, so a later failure never loses the extracted brief.
+      try {
+        await saveAnswers({
+          instructions: cleanPrompt,
+          assignment_prompt: cleanPrompt,
+          assignment_question: cleanPrompt,
+          assignment_brief_text: cleanPrompt,
+          assignment_brief_file: file.name,
+          targetWordCount: newWordCount,
+          target_word_count: newWordCount,
+          word_count: newWordCount,
+          word_limit: newWordCount,
+          academic_level: nextLevel,
+          academicLevel: nextLevel,
+          citation_style: nextCitation,
+          citationStyle: nextCitation,
+        });
+      } catch (persistErr) {
+        console.warn("Could not save the extracted brief yet:", persistErr);
+      }
+
+      // Building the outline is a second step: if it fails, the extracted brief stays.
+      try {
       let dynamicStruct = generateDynamicAssignmentStructure({
         question: cleanPrompt,
         assignmentType: localType,
@@ -645,11 +683,19 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
 
       const safeUpdates = stripCircularReferences(updates);
       await saveAnswers(safeUpdates);
+      } catch (outlineErr) {
+        console.warn("Outline build after brief upload did not finish:", outlineErr);
+        setParseNotice("Your brief was read. Click Save & Build to create the outline.");
+      }
 
       // Save answers without auto-advancing so user can review extracted brief parameters
     } catch (err: any) {
       console.warn("Brief parsing error caught safely:", err);
-      setParseNotice("Could not parse this document. Please verify the file format or paste the brief text manually.");
+      setParseNotice(
+        err && (err as { userFacing?: boolean }).userFacing
+          ? (err as Error).message
+          : "Could not parse this document. Please verify the file format or paste the brief text manually."
+      );
     } finally {
       setUploadingBrief(false);
       if (fileInputRef.current) {
@@ -659,9 +705,11 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Take the File itself, then reset the input so the same file can be chosen again.
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (file) {
-      processUploadedFile(file);
+      void processUploadedFile(file);
     }
   };
 
@@ -686,26 +734,11 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
           </p>
         </div>
 
-        {/* Next step */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          {onProceed && (
-            <button
-              type="button"
-              onClick={onProceed}
-              disabled={!canGenerate}
-              title={canGenerate ? undefined : "Add the assignment question, word count and citation style first"}
-              className="disabled:opacity-40 disabled:cursor-not-allowed px-3.5 py-1.5 rounded-xl border border-neutral-200/80 dark:border-white/10 text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 transition-opacity inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
-            >
-              <span>Proceed to Phase 2: Understand</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          )}
-
-        </div>
       </div>
 
       {/* The agent: reads the brief and can work through the stages */}
       <ExtractAgentPanel
+        minimal
         brief={localQuestion}
         saveBrief={async () => {
           const clean = cleanAnswerString(localQuestion);
@@ -764,7 +797,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
           <input
             ref={fileInputRef}
             type="file"
-            accept=".pdf,.docx,.doc,.txt"
+            accept=".pdf,.docx,.doc,.txt,.md"
             onChange={handleFileUpload}
             disabled={uploadingBrief}
             className="hidden"

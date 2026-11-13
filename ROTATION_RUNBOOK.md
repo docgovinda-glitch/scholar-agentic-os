@@ -1,5 +1,7 @@
 # End-of-Project Credential Rotation & History Scrub Runbook (`ROTATION_RUNBOOK.md`)
 
+> **Dated record.** This document captures a point in time (an incident, audit, plan or status ledger) and is not kept in sync with the code. For current behaviour read [`docs/README.md`](docs/README.md). Details here, such as `render.yaml` settings, file names, line numbers and counts, may no longer match `main`.
+
 **Purpose**: Complete, step-by-step runbook to rotate all leaked credentials (`F-01`) at project end, re-wrap encrypted platform credentials, revoke/purge cloud OAuth tokens, remove `DATABASE_URL` from CI, and scrub git history.  
 **Security Rule**: This document uses `<PLACEHOLDERS>` only. Never paste real secret values into repo files or commit messages.
 

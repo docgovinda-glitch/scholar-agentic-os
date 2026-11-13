@@ -164,7 +164,7 @@ export function scopeBrief(text: string): BriefScope {
     scope.level = lv.id;
     scope.evidence.level = lv.words;
   }
-  const wc = t.match(/\b(\d{1,2}[,.\s]?\d{3}|\d{3,5})\s*(?:-|–|to)?\s*(?:\d{1,2}[,.\s]?\d{3}|\d{3,5})?\s*words?\b/i);
+  const wc = t.replace(/\b[A-Z]{2,5}-\d{3,5}\b/gi, " ").match(/\b(\d{1,2}[,.\s]?\d{3}|\d{3,5})\s*(?:-|–|to)?\s*(?:\d{1,2}[,.\s]?\d{3}|\d{3,5})?\s*words?\b/i);
   if (wc) {
     const n = parseInt(wc[1].replace(/[,.\s]/g, ""), 10);
     if (n >= 100 && n <= 50000) {

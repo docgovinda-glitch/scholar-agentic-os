@@ -184,7 +184,7 @@ export default function PresentationWorkspace({
           // Initialize cleanly from project's existing research metadata
           const projTitle = a['title'] || project.title || 'Untitled Presentation';
           setDeck((prev) => {
-            if (prev && prev.slides.length > 0) return prev;
+            if (prev && (prev.slides.length > 0 || (prev.outline && prev.outline.length > 0) || (prev.title && prev.title !== 'Untitled Presentation'))) return prev;
             return {
               id: `deck-${projectId}`,
               title: projTitle,
@@ -394,7 +394,7 @@ export default function PresentationWorkspace({
 
   return (
     <div
-      className="flex h-screen h-[100dvh] w-full overflow-hidden bg-paper-warm dark:bg-ink-850 text-neutral-900 dark:text-neutral-100 font-sans transition-colors duration-200"
+      className="flex h-dvh w-full overflow-hidden bg-paper-warm dark:bg-ink-850 text-neutral-900 dark:text-neutral-100 font-sans transition-colors duration-200"
       data-testid="presentation-workspace"
     >
       {/* Left Sidebar Shell */}
@@ -472,6 +472,7 @@ export default function PresentationWorkspace({
 
             {currentStep === 'studio' && (
                 <Step03EditSlides
+                  projectId={projectId}
                   deck={deck}
                   onUpdateDeck={handleUpdateDeck}
                   onPrevStep={() => setCurrentStep('design')}

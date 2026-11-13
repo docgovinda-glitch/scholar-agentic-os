@@ -1,5 +1,14 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+
+// A signed-in session: thread sync sends a bearer token and skips the request without one.
+const session = vi.hoisted(() => ({ token: "test-token" as string | null }));
+vi.mock("../../services/supabaseClient", () => ({
+  isSupabaseConfigured: () => true,
+  getSupabaseClient: () => ({
+    auth: { getSession: async () => ({ data: { session: session.token ? { access_token: session.token } : null } }) },
+  }),
+}));
 import {
   extractSeedClaimsFromSynthesis,
 } from "../dashboard/askScholarAnswer";
@@ -195,6 +204,24 @@ Transformer architectures rely entirely on self-attention mechanisms to compute 
           body: JSON.stringify({ threads: mockThreads }),
         })
       );
+    });
+  });
+
+  describe("2b. thread sync without a session", () => {
+    const mockThreads: AskScholarConversationThread[] = [
+      { id: "t", title: "Q", updatedAt: "10:00", updatedAtIso: "2026-11-05T10:00:00Z", messages: [{ id: "m1", sender: "user", text: "Q", timestamp: "10:00" }] },
+    ];
+    afterEach(() => {
+      session.token = "test-token";
+    });
+
+    it("makes no request (and no 401) when there is no session token", async () => {
+      session.token = null;
+      const fakeFetch = vi.fn();
+      global.fetch = fakeFetch;
+      expect(await fetchAskScholarThreadsFromServer("researcher@scholar.org", { allowInTest: true })).toEqual([]);
+      expect(await syncAskScholarThreadsToServer(mockThreads, "researcher@scholar.org", { allowInTest: true })).toBe(false);
+      expect(fakeFetch).not.toHaveBeenCalled();
     });
   });
 

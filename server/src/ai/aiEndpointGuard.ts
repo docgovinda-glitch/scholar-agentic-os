@@ -20,7 +20,17 @@ import { createRebindingSafeLookup, validateSafeUrl } from "../../utils/ssrfGuar
 import type { Candidate, ProviderAdapter, ProviderId } from "../../../src/platform/router/types.ts";
 import { defaultAdapters, ollamaAdapter, openAiCompatibleAdapter } from "../../../src/platform/router/adapters.ts";
 import { serverCanReachLocalModels } from "./serverLocalAccess.ts";
+import { CLOUD_PROVIDERS } from "../../../src/config/providerCatalog.ts";
+import { COHERE_COMPAT_BASE } from "../../../src/platform/router/providerMap.ts";
 
+const hostOf = (u: string): string | undefined => { try { return new URL(u).hostname; } catch { return undefined; } };
+
+/**
+ * The AI providers' own public API hosts: every provider in the catalog (so all
+ * of them work without a DNS check per call) plus Cohere's two. A provider that
+ * needs the user's own address (Cloudflare) contributes nothing: its address is
+ * screened like any custom endpoint.
+ */
 export const PROVIDER_API_HOSTS: ReadonlySet<string> = new Set([
   "api.openai.com",
   "api.anthropic.com",
@@ -28,7 +38,10 @@ export const PROVIDER_API_HOSTS: ReadonlySet<string> = new Set([
   "api.groq.com",
   "api.deepseek.com",
   "api.mistral.ai",
-]);
+  "api.cohere.com",
+  hostOf(COHERE_COMPAT_BASE),
+  ...(CLOUD_PROVIDERS as ReadonlyArray<{ baseUrl: string; requiresCustomBaseUrl?: boolean }>).filter((p) => !p.requiresCustomBaseUrl).map((p) => hostOf(p.baseUrl)),
+].filter((h): h is string => Boolean(h)));
 
 export const allowPrivateAiEndpoints = () => process.env.ALLOW_PRIVATE_AI_ENDPOINTS === "true";
 

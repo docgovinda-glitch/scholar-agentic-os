@@ -24,9 +24,11 @@ async function post(url: string, headers: Record<string, string>, body: unknown,
     let message = text.slice(0, 500);
     let code: string | undefined;
     try {
-      const j = JSON.parse(text) as { error?: { message?: string; code?: string; type?: string; status?: string } };
+      const j = JSON.parse(text) as { error?: { message?: string; code?: string | number; type?: string; status?: string } };
       message = j.error?.message ?? message;
-      code = j.error?.code ?? j.error?.type ?? j.error?.status;
+      // Google sends a numeric code (429) with a string status ("RESOURCE_EXHAUSTED"): keep the string.
+      const raw = typeof j.error?.code === "string" ? j.error.code : j.error?.type ?? j.error?.status ?? j.error?.code;
+      code = raw === undefined || raw === null ? undefined : String(raw);
     } catch { /* not JSON */ }
     const h: Record<string, string> = {};
     res.headers.forEach((v, k) => { h[k.toLowerCase()] = v; });
@@ -152,6 +154,9 @@ export function openAiCompatibleAdapter(fetchImpl: FetchImpl = fetch): ProviderA
 }
 
 // ── Anthropic Messages ───────────────────────────────────────────────────────
+/** About 1,000 tokens: below this the provider does not cache. */
+const CACHEABLE_SYSTEM_CHARS = 4_000;
+
 function anthropicBody(req: RouteRequest, c: Candidate, maxOutputTokens: number) {
   const system = req.messages.filter((m) => m.role === "system").map((m) => textOf(m.content)).join("\n\n");
   const messages = req.messages.filter((m) => m.role !== "system").map((m) => ({
@@ -167,7 +172,9 @@ function anthropicBody(req: RouteRequest, c: Candidate, maxOutputTokens: number)
     max_tokens: maxOutputTokens,
     stream: true,
     messages,
-    ...(system ? { system } : {}),
+    // A long system prompt (grounding sources, house rules) repeats across a workspace's calls: marking it
+    // cacheable makes repeats cost a fraction of the input price. Short prompts are below the provider's minimum.
+    ...(system ? { system: system.length >= CACHEABLE_SYSTEM_CHARS ? [{ type: "text", text: system, cache_control: { type: "ephemeral" } }] : system } : {}),
     ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
     ...(req.tools?.length ? { tools: req.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.parameters })) } : {}),
   };
@@ -233,14 +240,15 @@ export function geminiAdapter(fetchImpl: FetchImpl = fetch): ProviderAdapter {
       let n = 0;
       for await (const { data } of sseEvents(res.body!)) {
         const j = JSON.parse(data) as {
-          candidates?: Array<{ content?: { parts?: Array<{ text?: string; functionCall?: { name: string; args?: unknown } }> }; finishReason?: string }>;
+          candidates?: Array<{ content?: { parts?: Array<{ text?: string; thought?: boolean; functionCall?: { name: string; args?: unknown } }> }; finishReason?: string }>;
           usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
           promptFeedback?: { blockReason?: string };
         };
         if (j.promptFeedback?.blockReason) throw new ProviderHttpError(400, `Blocked by safety filter (${j.promptFeedback.blockReason})`, {}, "content_filter");
         const cand = j.candidates?.[0];
         for (const p of cand?.content?.parts ?? []) {
-          if (p.text) yield { type: "text", text: p.text };
+          // Thought summaries are the model thinking aloud, not the answer.
+          if (p.text && !p.thought) yield { type: "text", text: p.text };
           if (p.functionCall) yield { type: "tool_call", id: `call_${n++}`, name: p.functionCall.name, argumentsJson: JSON.stringify(p.functionCall.args ?? {}) };
         }
         if (j.usageMetadata) usage = { type: "usage", inputTokens: j.usageMetadata.promptTokenCount ?? 0, outputTokens: j.usageMetadata.candidatesTokenCount ?? 0 };

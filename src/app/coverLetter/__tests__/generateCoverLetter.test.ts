@@ -56,7 +56,7 @@ describe("app/coverLetter: generateCoverLetter", () => {
     mockModelResponse("   ");
     await expect(
       generateCoverLetter({ document: paperDocument(), journalRequirements: journalRequirements(), complete: fetchCompleter })
-    ).rejects.toThrow(/empty cover letter/i);
+    ).rejects.toThrow(/empty cover letter|without writing an answer/i);
   });
 
 });

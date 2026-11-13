@@ -73,7 +73,7 @@ describe("before a document exists", () => {
       },
     });
 
-    render(<Rail document={null} outputTypeId="OT-09" onJumpToBlock={vi.fn()} />);
+    render(<Rail document={null} outputTypeId="OT-07" onJumpToBlock={vi.fn()} />);
 
     expect(await screen.findByText("Chapter 1: Literature Review")).toBeInTheDocument();
     expect(screen.getByText("1.1 Overview")).toBeInTheDocument();

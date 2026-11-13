@@ -6,7 +6,6 @@ import {
   IR_CHINA_GEOPOLITICS_CATALOG,
   ORGANIZATIONAL_CULTURE_CATALOG,
 } from "../services/scholarlyDiscoveryService";
-import { QUANTUM_COMPUTING_CATALOG } from "../services/catalogs/quantumComputingCatalog";
 import { UN_PEACE_SECURITY_CATALOG } from "../services/catalogs/unPeaceSecurityCatalog";
 
 // Offline results come only from these catalogs, so every entry must be a
@@ -18,7 +17,6 @@ const ALL = [
   ...IR_CHINA_GEOPOLITICS_CATALOG,
   ...EXPANSION_IR_POOL,
   ...ORGANIZATIONAL_CULTURE_CATALOG,
-  ...QUANTUM_COMPUTING_CATALOG,
   ...UN_PEACE_SECURITY_CATALOG,
 ];
 

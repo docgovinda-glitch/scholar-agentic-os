@@ -201,6 +201,22 @@ describe("DeskAuthGate", () => {
     // failure. It fails closed, and says why.
     expect(screen.queryByText("Your work")).not.toBeInTheDocument();
     expect(screen.getByText(/Sign-in is not configured/i)).toBeInTheDocument();
+    // ...and never a dead end.
+    expect(screen.getByRole("link", { name: "Back to home" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+  });
+
+  it("keeps variable names out of the page on a live site", () => {
+    vi.stubEnv("DEV", false);
+    try {
+      useDeskSession.mockReturnValue({ status: "unconfigured" });
+      gate();
+      expect(screen.getByRole("heading", { name: /Sign-in is unavailable right now/i })).toBeInTheDocument();
+      expect(screen.queryByText(/VITE_SUPABASE_URL/)).not.toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Back to home" })).toBeInTheDocument();
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });
 

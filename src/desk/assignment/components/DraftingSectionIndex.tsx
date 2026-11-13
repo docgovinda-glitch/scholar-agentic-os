@@ -53,12 +53,6 @@ export function DraftingSectionIndex({
   const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
   const hasPending = completedCount < totalCount;
 
-  const hasGenericTitles = sections.some((s) =>
-    s.title.includes("Core Concept & Foundational") ||
-    s.title.includes("Empirical Evidence & Contemporary Contextual") ||
-    s.title.startsWith("Body Theme 1: Core Concept")
-  );
-
   return (
     <aside
       aria-label="Section Index"
@@ -96,39 +90,6 @@ export function DraftingSectionIndex({
 
       {/* Global Actions */}
       <div className="py-3 border-b border-neutral-100 dark:border-white/5 space-y-2">
-        {/* If generic outline detected, show tuning helper banner */}
-        {hasGenericTitles && (
-          <div className="p-2.5 rounded-xl bg-amber-500/10 dark:bg-amber-500/20 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs flex flex-col gap-1.5 mb-2">
-            <div className="flex items-center gap-1.5 font-semibold text-amber-800 dark:text-amber-300">
-              <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-              <span>Generic Outline Detected</span>
-            </div>
-            <p className="text-[11px] text-amber-800/80 dark:text-amber-300/80 leading-relaxed">
-              Section themes are currently generic. Tune them to your specific question for rigorous academic alignment.
-            </p>
-            {onTuneToQuestion && (
-              <button
-                type="button"
-                onClick={onTuneToQuestion}
-                disabled={isTuning || isGenerating}
-                className="mt-1 py-1.5 px-2.5 rounded-lg text-xs font-semibold bg-amber-600 hover:bg-amber-700 active:scale-[0.99] text-white flex items-center justify-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50 transition-all"
-              >
-                {isTuning ? (
-                  <>
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    <span>Tuning Outline...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-3 h-3" />
-                    <span>Tune Outline to Question</span>
-                  </>
-                )}
-              </button>
-            )}
-          </div>
-        )}
-
         <button
           type="button"
           onClick={onGenerateNext}
@@ -138,55 +99,21 @@ export function DraftingSectionIndex({
           {isGenerating ? (
             <>
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              <span>Streaming Subsection...</span>
+              <span>Writing section…</span>
             </>
           ) : hasPending ? (
             <>
               <Sparkles className="w-3.5 h-3.5 text-amber-300 dark:text-amber-500" />
-              <span>Draft Next Subsection</span>
+              <span>Draft Next Section</span>
             </>
           ) : (
             <>
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-              <span>All Subsections Drafted</span>
+              <span>All Sections Drafted</span>
             </>
           )}
         </button>
 
-        {hasPending && onGenerateAll && (
-          <button
-            type="button"
-            onClick={onGenerateAll}
-            disabled={isGenerating}
-            className="w-full py-1.5 px-3 rounded-xl text-[11px] font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5 disabled:opacity-40 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-          >
-            <span>Draft all remaining subsections</span>
-            <ArrowRight className="w-3 h-3" />
-          </button>
-        )}
-
-        {/* Outline Tuning action button if not already showing banner */}
-        {onTuneToQuestion && !hasGenericTitles && (
-          <button
-            type="button"
-            onClick={onTuneToQuestion}
-            disabled={isTuning || isGenerating}
-            className="w-full py-1.5 px-3 rounded-xl text-[11px] font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5 disabled:opacity-40 transition-colors flex items-center justify-center gap-1.5 cursor-pointer border border-neutral-200/60 dark:border-white/5"
-            title="Re-tune outline themes and guidance to match your assignment question"
-          >
-            {isTuning ? (
-              <>
-                <Loader2 className="w-3 h-3 animate-spin" />
-                <span>Tuning to Question...</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-3 h-3 text-amber-500" />
-                <span>Tune Outline to Question</span>
-              </>
-            )}
-          </button>
-        )}
       </div>
 
       {/* Sections List */}
@@ -208,11 +135,7 @@ export function DraftingSectionIndex({
             <>
               <div className="flex items-start justify-between gap-2 mb-1">
                 <span className="text-[11px] font-mono font-medium text-neutral-400 dark:text-neutral-500">
-                  {section.sectionType === "intro"
-                    ? "1.0 Introduction"
-                    : section.sectionType === "conclusion"
-                    ? `${sections.length}.0 Conclusion`
-                    : `Section ${idx + 1}`}
+                  Section {idx + 1}
                 </span>
 
                 {/* Status Indicator */}
@@ -321,7 +244,7 @@ export function DraftingSectionIndex({
                 <div className="flex items-center gap-1.5 tabular-nums">
                   <FileText className="w-3 h-3 text-neutral-400" />
                   <span>
-                    {section.currentWordCount || 0} / {section.targetWordCount} w
+                    {section.currentWordCount || 0} / {section.targetWordCount} words
                   </span>
                 </div>
 

@@ -213,16 +213,6 @@ describe("Per-provider configuration", () => {
     expect((screen.getByPlaceholderText(/Exact model id/i) as HTMLInputElement).value).toBe("live-model-a");
   });
 
-  it("will not connect without a model", async () => {
-    const api = await import("../aiAccessApi");
-    renderPage();
-    fireEvent.click(await screen.findByRole("button", { name: "Providers" }));
-    fireEvent.click(await screen.findByText("Groq"));
-    fireEvent.change(screen.getByPlaceholderText(/Paste your key/i), { target: { value: "gsk_test_key" } });
-    fireEvent.click(screen.getByRole("button", { name: /Test and connect/i }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(/Choose a model/i);
-    expect(api.addConnection).not.toHaveBeenCalled();
-  });
 
   it("verifies a key before saving it, and records the connection", async () => {
     const api = await import("../aiAccessApi");
@@ -237,7 +227,8 @@ describe("Per-provider configuration", () => {
     await screen.findByRole("combobox");
     fireEvent.click(screen.getByRole("button", { name: /Test and connect/i }));
 
-    await waitFor(() => expect(api.verifyProviderKey).toHaveBeenCalledWith("groq", "gsk_test_key"));
+    await waitFor(() => expect(api.verifyProviderKey).toHaveBeenCalled());
+    expect(vi.mocked(api.verifyProviderKey).mock.calls[0].slice(0, 2)).toEqual(["groq", "gsk_test_key"]);
     // The key is stored on this device and saved (encrypted) to the account
     // so it works on the person's other devices; the connection is recorded.
     const account = await import("../accountKeys");

@@ -9,6 +9,7 @@
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist server.js",
     "verify:chunks": "node scripts/verify-chunk-budget.mjs",
+    "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit && node scripts/verify-contrast.mjs && node scripts/verify-csp-hash.mjs && node scripts/verify-no-pure-black.mjs && node scripts/verify-no-raw-hex-classes.mjs",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",

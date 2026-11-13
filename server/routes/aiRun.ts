@@ -16,6 +16,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type express from "express";
 import { z } from "zod";
 import { requireAuth } from "../src/middleware/auth.ts";
+import { getCloudProvider } from "../../src/config/providerCatalog.ts";
 import { serverCanReachLocalModels } from "../src/ai/serverLocalAccess.ts";
 import { route, type RouterOptions } from "../../src/platform/router/router.ts";
 import { pipeToSse } from "../../src/platform/router/sseBridge.ts";
@@ -24,12 +25,17 @@ import { assignBadges, curateModels, type MeasuredSpeed } from "../../src/platfo
 import { listLiveModels, ModelListError } from "../../src/platform/router/modelListers.ts";
 import type { Candidate, ProviderId, RouteRequest, RouterEvent } from "../../src/platform/router/types.ts";
 import { AiEndpointBlockedError, createAiFetch, screenCandidates, serverAdapters } from "../src/ai/aiEndpointGuard.ts";
+import { entryFromCatalog, expandKeyring, liveModelsFor, quarantineModel } from "../src/ai/liveModels.ts";
+import { recommendModels } from "../../src/platform/router/modelRecommendation.ts";
 
 const PROVIDERS = ["openai", "anthropic", "google", "groq", "deepseek", "mistral", "ollama", "lmstudio", "webllm", "custom"] as const;
 const LOCAL = new Set<ProviderId>(["ollama", "lmstudio", "webllm"]);
 
 const keyringEntry = z.object({
   provider: z.enum(PROVIDERS),
+  /** The catalog provider this connection is (e.g. "openrouter"); `provider` is only its wire protocol. */
+  via: z.string().regex(/^[a-z0-9_-]{1,40}$/).optional(),
+  /** A model id, or "auto" to use the best model the provider lists live. */
   model: z.string().min(1).max(200),
   apiKey: z.string().min(1).max(4096).optional(),
   baseUrl: z.string().url().max(500).optional(),
@@ -80,15 +86,18 @@ export interface AiRunDeps {
 
 // Conservative defaults when the client did not send the model's limits.
 const DEFAULT_CONTEXT = 32_000;
-const DEFAULT_MAX_OUT = 4_096;
+/** For a model whose real limit is unknown: accepted by nearly every current model, and room for a reasoning model to think and still answer. */
+const DEFAULT_MAX_OUT = 8_192;
 
 export function keyringToCandidates(entries: KeyringEntry[]): Candidate[] {
   return entries.map((e) => ({
-    id: `${LOCAL.has(e.provider) ? "local" : "byok"}:${e.provider}:${e.model}${e.slot && e.slot > 1 ? `#${e.slot}` : ""}`,
+    id: `${LOCAL.has(e.provider) ? "local" : "byok"}:${e.via ?? e.provider}:${e.model}${e.slot && e.slot > 1 ? `#${e.slot}` : ""}`,
     lane: LOCAL.has(e.provider) ? "local" : "byok",
     provider: e.provider,
+    // A backup key is its own group: when one key runs out, the next key of the same provider still gets its turn.
+    group: `${e.via ?? e.provider}${e.slot && e.slot > 1 ? `#${e.slot}` : ""}`,
     model: e.model,
-    label: e.label ?? `${e.model}${LOCAL.has(e.provider) ? " on your device" : " · your key"}`,
+    label: e.label ?? `${e.model}${LOCAL.has(e.provider) ? " on your device" : e.via ? ` · ${getCloudProvider(e.via)?.name ?? e.via} key` : " · your key"}`,
     contextWindow: e.contextWindow ?? DEFAULT_CONTEXT,
     maxOutputTokens: e.maxOutputTokens ?? DEFAULT_MAX_OUT,
     // A local runner runs where it is reachable: on this server in development
@@ -132,12 +141,17 @@ export function registerAiRunRoutes(app: express.Express, deps: AiRunDeps = {}):
     try { keyring = parseKeyring(req.headers["x-ai-keyring"]); } catch (e) { res.status(400).json({ error: (e as Error).message }); return; }
 
     const body = parsed.data;
-    const screened = await screenCandidates(keyringToCandidates(keyring));
+    const expanded = await expandKeyring(keyring, body.task);
+    const screened = await screenCandidates(keyringToCandidates(expanded.entries));
     const own = screened.kept;
     const chain = [...own.filter((c) => c.lane === "byok"), ...own.filter((c) => c.lane === "local")];
 
     if (chain.length === 0 && screened.blocked.length) {
       res.status(400).json({ error: screened.blocked.map((b) => `${b.label}: ${b.reason}`).join("; "), code: "ai_endpoint_blocked" });
+      return;
+    }
+    if (chain.length === 0 && expanded.notices.length) {
+      res.status(400).json({ error: expanded.notices.map((n) => n.text).join(" "), code: "ai_model_required" });
       return;
     }
     if (chain.length === 0) {
@@ -163,7 +177,11 @@ export function registerAiRunRoutes(app: express.Express, deps: AiRunDeps = {}):
       for (const b of screened.blocked) {
         yield { type: "candidate_skipped", candidateId: `blocked:${b.label}`, label: b.label, reason: "endpoint_blocked", detail: b.reason };
       }
-      for await (const ev of route(request, chain, signal, { site: "server", adapters, breaker, ...deps.routerOptions })) {
+      for (const n of expanded.notices) {
+        yield { type: "candidate_skipped", candidateId: `notice:${n.text.slice(0, 40)}`, label: "AI connection", reason: "no_credential", detail: n.text };
+      }
+      const onCandidateFailure = (c: Candidate, f: { kind: string }) => { if (f.kind === "model_unavailable") quarantineModel(c); };
+      for await (const ev of route(request, chain, signal, { site: "server", adapters, breaker, onCandidateFailure, ...deps.routerOptions })) {
         if (ev.type === "metrics") {
           const c = byId.get(ev.candidateId);
           if (c && ev.outputTokens > 50) recordSpeed(`${c.provider}:${c.model}`, ev.tokensPerSecond);
@@ -178,20 +196,92 @@ export function registerAiRunRoutes(app: express.Express, deps: AiRunDeps = {}):
     try { keyring = parseKeyring(req.headers["x-ai-keyring"]); } catch (e) { res.status(400).json({ error: (e as Error).message }); return; }
     const speeds = measuredSpeeds();
     const results = await Promise.all(
-      keyring.filter((k, i) => !LOCAL.has(k.provider) && keyring.findIndex((o) => o.provider === k.provider && o.baseUrl === k.baseUrl) === i).map(async (k) => {
-        const cacheKey = createHash("sha256").update(`${k.provider}\0${k.baseUrl ?? ""}\0${k.apiKey ?? ""}`).digest("hex");
+      keyring.filter((k, i) => !LOCAL.has(k.provider) && keyring.findIndex((o) => (o.via ?? o.provider) === (k.via ?? k.provider) && o.baseUrl === k.baseUrl) === i).map(async (k) => {
+        const group = k.via ?? k.provider;
+        const cacheKey = createHash("sha256").update(`${k.provider}\0${group}\0${k.baseUrl ?? ""}\0${k.apiKey ?? ""}`).digest("hex");
         const hit = modelCache.get(cacheKey);
-        if (hit && Date.now() - hit.at < MODEL_CACHE_MS) return { provider: k.provider, models: hit.models };
-        try {
-          const live = await listModels(k.provider, { apiKey: k.apiKey, baseUrl: k.baseUrl, fetchImpl: aiFetch });
-          const models = assignBadges(curateModels(k.provider, live), speeds);
-          modelCache.set(cacheKey, { at: Date.now(), models });
-          return { provider: k.provider, models };
-        } catch (e) {
-          return { provider: k.provider, models: [], error: e instanceof ModelListError || e instanceof AiEndpointBlockedError ? e.message : "Could not reach the provider" };
-        }
+        if (hit && Date.now() - hit.at < MODEL_CACHE_MS) return { provider: group, ...(hit.models as object) };
+        const list = deps.listModels ? await deps.listModels(k.provider, { apiKey: k.apiKey, baseUrl: k.baseUrl, fetchImpl: aiFetch }).then((models) => ({ ok: true as const, models }), (e: unknown) => ({ ok: false as const, unsupported: false, error: e instanceof ModelListError || e instanceof AiEndpointBlockedError ? e.message : "Could not reach the provider" })) : await liveModelsFor(k);
+        if (!list.ok) return { provider: group, models: [], error: list.error, unsupported: list.unsupported };
+        const models = assignBadges(curateModels(group, list.models), speeds);
+        const rec = recommendModels(group, list.models);
+        const payload = { models, recommended: rec.recommended, options: rec.options, totalListed: rec.totalListed };
+        modelCache.set(cacheKey, { at: Date.now(), models: payload });
+        return { provider: group, ...payload };
       })
     );
     res.json({ providers: results, measuredAt: new Date().toISOString() });
+  });
+
+  /**
+   * POST /api/ai/verify: proves a connection works end to end, then recommends a model.
+   * Body: { providerId (catalog id), model?, baseUrl? }; the key arrives as x-ai-api-key (never in the body).
+   *   1. fetch the provider's live model list (or say it publishes none);
+   *   2. choose the model: the one asked for if still listed, else the recommendation;
+   *   3. send one tiny real request through the same adapters Ask Scholar uses, trying the
+   *      next best live model if that one fails, so the reported model is one that answered.
+   */
+  const verifyHits = new Map<string, number[]>();
+  app.post("/api/ai/verify", requireAuth, async (req, res) => {
+    const userId = (req as express.Request & { user?: { id: string } }).user?.id ?? "anon";
+    const recent = (verifyHits.get(userId) ?? []).filter((t) => Date.now() - t < 60_000);
+    if (recent.length >= 10) { res.status(429).json({ ok: false, error: "Too many checks. Wait a minute and try again." }); return; }
+    verifyHits.set(userId, [...recent, Date.now()]);
+
+    const body = (req.body ?? {}) as { providerId?: unknown; model?: unknown; baseUrl?: unknown };
+    const apiKey = typeof req.headers["x-ai-api-key"] === "string" ? req.headers["x-ai-api-key"].replace(/[^\x21-\x7E]/g, "").trim() : "";
+    if (typeof body.providerId !== "string" || !apiKey) { res.status(400).json({ ok: false, error: "A provider and an API key are required." }); return; }
+    const made = entryFromCatalog(body.providerId, { apiKey, model: typeof body.model === "string" ? body.model : undefined, baseUrl: typeof body.baseUrl === "string" ? body.baseUrl : undefined });
+    if (!made.ok) { res.status(400).json({ ok: false, error: made.reason }); return; }
+    const entry = made.entry;
+    const screened = await screenCandidates(keyringToCandidates([entry]));
+    if (!screened.kept.length) { res.status(400).json({ ok: false, error: screened.blocked.map((b) => b.reason).join("; ") || "This endpoint can't be used." }); return; }
+
+    const list = await liveModelsFor(entry, true);
+    const rec = list.ok ? recommendModels(entry.via ?? entry.provider, list.models) : null;
+    const asked = entry.model !== "auto" ? entry.model : undefined;
+    const askedListed = Boolean(asked && list.ok && list.models.some((m) => m.id === asked));
+    // Order to try: what the user asked for (if listed or if the provider cannot say), then the live options.
+    const order = [
+      ...(asked && (askedListed || !list.ok) ? [asked] : []),
+      ...(rec?.options.map((o) => o.id) ?? []),
+    ].filter((id, i, a) => a.indexOf(id) === i).slice(0, 4);
+    if (!order.length) {
+      const unsupported = !list.ok && list.unsupported;
+      // A list that failed for another reason (rejected key, provider down) is that reason, not "pick a model".
+      res.json({ ok: false, listed: list.ok, unsupported, needsModel: list.ok || unsupported, error: list.ok ? "None of the models listed can be used for text." : list.error });
+      return;
+    }
+
+    const byId = new Map(list.ok ? list.models.map((m) => [m.id, m]) : []);
+    let lastError = "";
+    for (const model of order) {
+      const m = byId.get(model);
+      const [cand] = keyringToCandidates([{ ...entry, model, contextWindow: m?.contextWindow, maxOutputTokens: m?.maxOutputTokens ? Math.min(m.maxOutputTokens, 32_768) : undefined }]);
+      const started = Date.now();
+      let text = "";
+      let failed: string | undefined;
+      let failedKind = "";
+      for await (const ev of route({ requestId: randomUUID(), task: "fast", messages: [{ role: "user", content: "Reply with the single word: ready" }], desiredOutputTokens: 1024, minOutputTokens: 16 }, [cand], new AbortController().signal, { site: "server", adapters, breaker: new CircuitBreaker(new MemoryBreakerStore()), retry: { maxAttempts: 1, baseDelayMs: 0, maxDelayMs: 0, maxWaitMs: 0 }, timeouts: { firstTokenMs: 20_000, idleMs: 15_000 }, maxTotalMs: 25_000, onCandidateFailure: (_c, f) => { failedKind = f.kind; failed = f.message; } })) {
+        if (ev.type === "token") text += ev.text;
+      }
+      if (text.trim() && !failed) {
+        res.json({
+          ok: true,
+          listed: list.ok,
+          tested: { model, latencyMs: Date.now() - started },
+          recommended: rec?.options.find((o) => o.id === model) ?? rec?.recommended ?? null,
+          options: rec?.options ?? [],
+          totalListed: rec?.totalListed ?? 0,
+          note: asked && !order.includes(asked) ? `${asked} is not listed by the provider any more.` : model !== (asked ?? model) ? `${asked} did not answer, so ${model} was tested instead.` : undefined,
+        });
+        return;
+      }
+      lastError = failed ?? "The model returned no answer.";
+      // Account-wide problems fail every model the same way: stop and say which.
+      if (failedKind === "auth") { res.json({ ok: false, listed: list.ok, error: `The provider rejected this key (${lastError}).` }); return; }
+      if (failedKind === "quota") { res.json({ ok: false, listed: list.ok, error: `The key is valid but the account has no credit or quota left (${lastError}).`, options: rec?.options ?? [] }); return; }
+    }
+    res.json({ ok: false, listed: list.ok, error: `The key was accepted but no model answered a test request. Last error: ${lastError}`, options: rec?.options ?? [] });
   });
 }

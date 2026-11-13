@@ -11,8 +11,8 @@ import {
   normalizeUnicodeNFC,
 } from "../../../src/utils/scholarlyVoiceGuard.ts";
 import { getProjectStore } from "../../../../src/services/store/projectStore.ts";
-import { callOpenRouterJSON, callOpenRouterText } from "../../../utils/llm.ts";
-import { keyringFromRequest } from "../../../src/ai/routerBridge.ts";
+import { callOpenRouterJSON, callOpenRouterText } from "../../../src/services/scholarBrain.ts";
+import { requestKeyring } from "../../../src/ai/routerBridge.ts";
 import { scholarBrain } from "../../../src/services/scholarBrain.ts";
 import {
   auditDocumentLineByLine,
@@ -38,7 +38,7 @@ import {
 } from "../../../../src/desk/assignment/types.ts";
 import {
   generateDynamicAssignmentStructure,
-  extractTargetFrameworks,
+  extractBriefInquiriesAndConcepts,
   sanitizeOutlineHeadings,
   assignmentStructureToOutlineTree,
   outlineTreeToAssignmentStructure,
@@ -51,7 +51,9 @@ import {
   isTutorialOrShortQABrief,
   extractSubstantiveBriefQuestions,
   stripSlideArtifacts,
+  stripCourseCodes,
 } from "../../../../src/utils/briefExtractor.ts";
+import { buildBriefSummary, extractPrescribedReferences } from "../../../../src/utils/briefQuestions.ts";
 import { discoverMultiPortalSources, type DiscoveredSourceDraft } from "../../../src/discovery/discovery.ts";
 import {
   replaceBracketTokensWithDeterministicCitations,
@@ -101,7 +103,25 @@ router.post(
       filename: file.originalname,
       mimeType: file.mimetype,
     });
+    if (!parsed.ok) {
+      // Binary formats must never be decoded as text: that would put garbage in the brief box.
+      const lowerName = (file.originalname || "").toLowerCase();
+      const isBinaryDoc = /\.(pdf|docx?|pptx?)$/.test(lowerName) || /pdf|word|officedocument/i.test(file.mimetype || "");
+      if (isBinaryDoc) {
+        const why = (parsed as { error?: { type?: string; message?: string } }).error;
+        console.warn("[parse-brief] could not read", file.originalname, why?.type, why?.message);
+        return res.status(422).json({
+          error:
+            why?.type === "ENCRYPTED"
+              ? "This file is password-protected. Remove the password and upload it again, or paste the brief text."
+              : "We could not read text from this file. If it is a scanned image, paste the brief text instead.",
+          code: "brief_unreadable",
+        });
+      }
+    }
     text = parsed.ok ? parsed.data.text : file.buffer.toString("utf-8");
+    // Drop page-marker lines such as "-- 1 of 3 --" that PDF extraction inserts.
+    text = text.replace(/^\s*--\s*\d+\s+of\s+\d+\s*--\s*$/gim, "");
 
     // Clean whitespace, normalize line breaks and apply NFC
     text = normalizeUnicodeNFC(text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim());
@@ -121,9 +141,11 @@ router.post(
     // Detect metadata within first 50,000 characters to eliminate regex backtracking on multi-MB documents
     const searchSlice = cleanedText.slice(0, 50000);
     let detectedWordCount: number | undefined;
+    // Strip hyphenated course/module codes (QNT-4020) so they are never read as a word count
+    const wordSlice = stripCourseCodes(searchSlice);
     const wordMatch =
-      searchSlice.match(/(?:word\s*count|target|limit|length)\s*(?:is|of|:)?\s*([1-9]\d{0,2}(?:,\d{3})+|[1-9]\d{2,4})/i) ||
-      searchSlice.match(/(?:^|[^\d,])([1-9]\d{0,2}(?:,\d{3})+|[1-9]\d{2,4})\s*words\b/i);
+      wordSlice.match(/(?:word\s*count|target|limit|length)\s*(?:is|of|:)?\s*([1-9]\d{0,2}(?:,\d{3})+|[1-9]\d{2,4})/i) ||
+      wordSlice.match(/(?:^|[^\d,])([1-9]\d{0,2}(?:,\d{3})+|[1-9]\d{2,4})\s*words\b/i);
     if (wordMatch) {
       const parsed = parseInt((wordMatch[1] || "").replace(/,/g, ""), 10);
       if (parsed >= 200 && parsed <= 50000) {
@@ -350,24 +372,10 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
     }`;
 
     // 5. Concepts, Expected Response Type, Evidence Requirements, Summary
-    const isQuantum = /quantum|qubit|superconducting|trapped-ion|shor|grover|qec|surface code|nisq|post-quantum|qkd/i.test(combinedContent);
     const isExamOrQuestionnaire = /examination|questionnaire|question\s*1|part\s*1|marks\b/i.test(combinedContent);
 
-    const keyConcepts = isQuantum
-      ? [
-          "Superconducting Transmon vs Trapped-Ion Physical Realisations",
-          "NISQ Hardware Limits & Error Mitigation (ZNE/PEC/CDR)",
-          "Quantum Algorithmic Complexity (BQP, Shor & Grover)",
-          "Planar Surface Codes & Fault-Tolerant Threshold Theorem",
-          "Quantum Key Distribution (BB84) & Post-Quantum Cryptography (FIPS 203)",
-        ]
-      : [
-          "Theoretical Framework",
-          "Empirical Evidence",
-          "Critical Synthesis",
-          "Methodological Rigor",
-          "Counterargument Evaluation",
-        ];
+    // Concepts come from the brief's own wording, never from a subject lookup.
+    const keyConcepts = extractBriefInquiriesAndConcepts(question, briefText).keyConcepts.slice(0, 6);
 
     const expectedResponseType = isExamOrQuestionnaire
       ? "Rigorous, structured technical answers solving all examination questions systematically with theoretical frameworks, mathematical rigor, and standard Harvard referencing."
@@ -381,24 +389,27 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
       ? "Scientific laboratory report following IMRaD structure with empirical hypothesis testing and error analysis."
       : "Dialectical academic essay advancing a central argumentative thesis substantiated by peer-reviewed evidence.";
 
-    const evidenceRequirements = isQuantum
-      ? "Authoritative quantum computing literature (e.g. Preskill 2018, Nielsen & Chuang 2010, Fowler et al. 2012, Shor 1994, Arute et al. 2019, Gidney & Ekerå 2021) adhering to Harvard style."
-      : academicLevel === "postgraduate"
-      ? "High-impact peer-reviewed journal articles, foundational theoretical monographs, and authoritative empirical datasets."
-      : "Authoritative academic sources, scholarly peer-reviewed journals, and verified institutional benchmark data.";
+    const prescribed = extractPrescribedReferences(combinedContent).map((r) => r.label);
+    const evidenceRequirements =
+      prescribed.length > 0
+        ? `Authoritative peer-reviewed literature. The brief names: ${prescribed.slice(0, 6).join(", ")}.`
+        : academicLevel === "postgraduate"
+        ? "High-impact peer-reviewed journal articles, foundational theoretical monographs, and authoritative empirical datasets."
+        : "Authoritative academic sources, scholarly peer-reviewed journals, and verified institutional benchmark data.";
 
-    const academicLevelNotes = isQuantum
-      ? "Calibrated for Honours / Postgraduate Quantum Information Systems examination standards. Demands mathematical precision, physical circuit mechanics, and rigorous theoretical grounding."
-      : academicLevel === "postgraduate"
+    const academicLevelNotes = academicLevel === "postgraduate"
       ? "Calibrated for Postgraduate / Masters study: demands high theoretical synthesis, methodological reflexivity, nuanced hedging, and original critical insight."
       : "Calibrated for Undergraduate study: emphasizes conceptual clarity, structured logical flow, accurate evidence deployment, and clear thesis progression.";
 
     const penaltyNote = penaltyItems.length > 0 ? ` Note: ${penaltyItems.length} specific penalty clause(s) identified.` : "";
 
-    const summary = `The examiner requires a rigorous ${assignmentType.replace(/_/g, " ")} addressing "${question.slice(
-      0,
-      140
-    )}...". The submission must reflect ${academicLevel} standards, deploy ${citationStyle.toUpperCase()} referencing, and deliver disciplined analysis within the ${targetWords}-word budget.${penaltyNote}`;
+    const summary = buildBriefSummary({
+      briefText: combinedContent,
+      assignmentType: String(assignmentType),
+      level: String(academicLevel),
+      citationStyle: String(citationStyle),
+      targetWords,
+    }) + penaltyNote;
 
     const finalAnalysis: AssignmentAnalysis = {
       commandVerbs,
@@ -470,7 +481,7 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
           criteria: criteriaLines,
         }),
       });
-      structure = structureFromAi(aiText ?? "", targetWords);
+      structure = structureFromAi(aiText ?? "", targetWords, { briefText });
       if (!structure) outlineNote = "Your AI's answer had no usable outline, so a starter outline is shown.";
     } catch (llmErr) {
       console.warn("AI outline call failed:", llmErr instanceof Error ? llmErr.message : llmErr);
@@ -564,7 +575,7 @@ export async function writeOutlineForProject(
       written: Array.isArray(previous) ? previous.filter((p) => (p.draftContent ?? "").trim()).map((p) => p.id) : [],
     }),
   });
-  const structure = structureFromAi(aiText ?? "", targetWords, { instruction: opts.instruction, previous: Array.isArray(previous) ? previous : [] });
+  const structure = structureFromAi(aiText ?? "", targetWords, { instruction: opts.instruction, previous: Array.isArray(previous) ? previous : [], briefText });
   if (!structure) throw new UnusableAiResponseError("outline");
   structure.version = (Number(current?.version) || 0) + 1;
   project.answers.assignment_structure = JSON.stringify(structure);

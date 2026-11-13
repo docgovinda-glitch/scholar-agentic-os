@@ -10,7 +10,8 @@
 import type { CuratedModel } from "../../platform/router/modelCuration";
 import { loadUserAiSettings, saveUserAiSettings } from "../../services/userAiSettings";
 import { authedFetch, json } from "../api/client";
-import { buildKeyring, encodeKeyring, routerProviderFor, type KeyringEntry } from "./keyring";
+import { resolveRouterTarget } from "../../platform/router/providerMap";
+import { buildKeyring, encodeKeyring, type KeyringEntry } from "./keyring";
 
 export type WorkspaceId = "ask-scholar" | "coursework" | "journal" | "proposal" | "presentation";
 
@@ -57,18 +58,14 @@ export function clearModelCache(): void {
   cache = null;
 }
 
-/** AI Access stores Gemini as "gemini" and Anthropic as "claude"; the router calls them "google" and "anthropic". */
-const CATALOG_ID: Record<string, string> = { google: "gemini", anthropic: "claude" };
-export const catalogIdFor = (routerProvider: string): string => CATALOG_ID[routerProvider] ?? routerProvider;
-
 /** The connection that answers first today (the keyring's first entry). */
 export async function activeConnection(): Promise<KeyringEntry | undefined> {
   return (await buildKeyring())[0];
 }
 
-/** Makes `model` on `routerProvider` the model every workspace uses first. */
-export async function selectModel(routerProvider: string, model: string): Promise<{ ok: boolean; error?: string }> {
-  const id = catalogIdFor(routerProvider);
+/** Makes `model` on the provider (its AI Access catalog id) the model every workspace uses first. */
+export async function selectModel(catalogProviderId: string, model: string): Promise<{ ok: boolean; error?: string }> {
+  const id = catalogProviderId;
   const settings = await loadUserAiSettings();
   const result = await saveUserAiSettings({ provider: id, preferences: { ...settings.preferences, [`${id}Model`]: model } });
   return result.success ? { ok: true } : { ok: false, error: result.error };
@@ -76,9 +73,9 @@ export async function selectModel(routerProvider: string, model: string): Promis
 
 /** Models a provider offers for a key the user is about to connect (nothing is saved). */
 export async function fetchModelsForKey(catalogProviderId: string, apiKey: string, baseUrl?: string): Promise<{ models: CuratedModel[]; error?: string }> {
-  const provider = routerProviderFor(catalogProviderId);
-  if (!provider) return { models: [], error: "This provider has no model list to read." };
-  const entry: KeyringEntry = { provider, model: "probe", apiKey, ...(baseUrl ? { baseUrl } : {}) };
+  const target = resolveRouterTarget(catalogProviderId, baseUrl);
+  if (!target.ok) return { models: [], error: target.reason };
+  const entry: KeyringEntry = { provider: target.target.provider, via: target.target.via, model: "auto", apiKey, ...(target.target.baseUrl ? { baseUrl: target.target.baseUrl } : {}) };
   const res = await authedFetch("/api/ai/models", { headers: { "x-ai-keyring": encodeKeyring([entry]) } });
   const body = await json<{ providers: ProviderModels[] }>(res);
   const first = body.providers[0];

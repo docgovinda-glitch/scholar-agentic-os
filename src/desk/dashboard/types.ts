@@ -33,6 +33,8 @@ export interface WebsiteAssistantMessage {
   action?: AssistantAction;
   followUps?: string[];
   mode?: "chat" | "search" | "deep-research" | "deliverable";
+  /** A built-in help/platform answer rather than a research answer: no export, citation or vault actions. */
+  kind?: "help";
   provider?: string;
   model?: string;
   plan?: string[];
@@ -118,7 +120,7 @@ export interface WebsiteAssistantMessage {
     isSufficientlyBurst: boolean;
   };
   recommendedWorkspaceHandoff?: {
-    targetFormatId: "OT-01" | "OT-10" | "OT-19" | "OT-09" | "OT-22";
+    targetFormatId: "OT-01" | "OT-10" | "OT-15" | "OT-07" | "OT-22";
     formatLabel: string;
     topic: string;
     suggestedTitle: string;

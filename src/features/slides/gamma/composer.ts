@@ -11,6 +11,8 @@
  * - From a bare topic it produces a structured scaffold whose placeholder text
  *   is clearly an instruction to the author, not a claim.
  */
+import { stripCourseCodes } from '../../../utils/briefExtractor';
+import { cleanBriefText, deriveDocumentTitle } from '../../../shared/presentationBrief';
 import type { CardContent, CardItem, CardStat, GammaLayout, NarrativeFramework, SlideCard, SlideDeck } from '../types/slides';
 import { getCardContent, inferLayout, resolveLayout, writeCardContent } from './content';
 import { DEFAULT_DECK_THEME_ID } from './theme';
@@ -352,11 +354,64 @@ function deckShell(opts: ComposeOptions, title: string, slides: SlideCard[]): Sl
   };
 }
 
-/** Build a deck from the user's own prose or Markdown. */
-export function composeDeckFromText(text: string, opts: ComposeOptions = {}): SlideDeck {
+/** Layout for each suggested card type. */
+export const VISUAL_TYPE_LAYOUT: Record<string, GammaLayout> = {
+  'Title Hero': 'title',
+  '2-Column Comparison': 'comparison',
+  '3-Card Grid': 'bento',
+  'Process / Timeline': 'timeline',
+  'Architecture Diagram': 'split',
+  'Evidence & Metrics': 'list',
+  'Key Takeaways': 'list',
+};
+
+/**
+ * Lay the presenter's reviewed outline out as cards. Content is exactly the
+ * outline's own titles and bullets (no figures are added); "Write with AI" or
+ * the server deck writer replaces the plain bullets with assertion-evidence
+ * copy.
+ */
+export function composeDeckFromOutline(
+  outline: Array<{ id?: string; title: string; visualType?: string; bullets: string[] }>,
+  opts: ComposeOptions & { title: string }
+): SlideDeck {
   const framework = opts.framework || 'Standard-Narrative';
+  const title = clean(stripCourseCodes(opts.title)) || 'Untitled presentation';
+  const slides = outline.map((card, i) => {
+    const layout = VISUAL_TYPE_LAYOUT[card.visualType || ''] ?? (i === 0 ? 'title' : 'bento');
+    const bullets = card.bullets.map((b) => clean(stripCourseCodes(b))).filter(Boolean);
+    const items: CardItem[] = bullets.map((b) => sentenceToItem(b));
+    let content: CardContent;
+    if (layout === 'title') {
+      content = { headline: clean(stripCourseCodes(card.title)) || title, lede: bullets[0], items: [], stats: [] };
+    } else if (layout === 'comparison') {
+      const half = Math.ceil(bullets.length / 2);
+      content = {
+        headline: clean(stripCourseCodes(card.title)),
+        items: [],
+        stats: [],
+        columns: [
+          { title: '', points: bullets.slice(0, half) },
+          { title: '', points: bullets.slice(half) },
+        ],
+      };
+    } else {
+      content = { headline: clean(stripCourseCodes(card.title)), items, stats: [] };
+    }
+    const notes = bullets.length ? `Cover: ${bullets.join('; ')}.` : `Introduce ${clean(card.title)}.`;
+    return makeSlide(i, content, layout, notes, framework);
+  });
+  return { ...deckShell(opts, title, slides), outline: outline.map((c, i) => ({ id: c.id || `ol-${i}`, title: c.title, visualType: c.visualType || '3-Card Grid', bullets: c.bullets })) };
+}
+
+/** Build a deck from the user's own prose or Markdown. */
+export function composeDeckFromText(rawText: string, opts: ComposeOptions = {}): SlideDeck {
+  const framework = opts.framework || 'Standard-Narrative';
+  // Course codes ("QNT-4020") and page footers never become titles or "-4020" stat cards.
+  const text = cleanBriefText(rawText);
   const { title: mdTitle, intro, sections } = parseSections(text);
-  const title = clean(opts.title || mdTitle || opts.topic || (sections[0]?.heading ?? '') || 'Untitled presentation');
+  const derived = !opts.title && !mdTitle && !opts.topic ? deriveDocumentTitle(text) : '';
+  const title = clean(stripCourseCodes(opts.title || mdTitle || opts.topic || derived || (sections[0]?.heading ?? '') || 'Untitled presentation'));
   const max = Math.max(2, Math.min(15, opts.slideCount ?? 8));
 
   const cards = sections.slice(0, max - 1).map(sectionToCard);
@@ -559,7 +614,7 @@ export interface TalkPlan {
  */
 export function composeDeckFromPlan(plan: TalkPlan): SlideDeck {
   const framework = plan.framework || 'Standard-Narrative';
-  const title = clean(plan.title) || 'Untitled presentation';
+  const title = clean(stripCourseCodes(plan.title || '')) || 'Untitled presentation';
   const key = clean(plan.keyMessage || '');
   const points = (plan.points || []).map(clean).filter(Boolean);
   const count = Math.max(3, Math.min(15, plan.slideCount ?? (plan.talkMinutes ? slidesForMinutes(plan.talkMinutes) : 6)));

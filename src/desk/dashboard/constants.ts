@@ -23,7 +23,7 @@ export const FORMAT_TILES = [
     budget: "IMRaD Architecture · Peer Review · 4,000 – 10,000 words",
   },
   {
-    id: "OT-19",
+    id: "OT-15",
     label: "Research Proposal",
     title: "Research Proposal",
     guidance: "Guides research question definition, literature gap identification, theoretical frameworks, and methodology design.",
@@ -66,7 +66,7 @@ export const STAGE_BREAKDOWNS: Record<string, { phases: string[]; highlights: st
       "Phase V (Stages 22–25): LaTeX/PDF Export & Sign-Off",
     ],
   },
-  "OT-19": {
+  "OT-15": {
     highlights: "Competitive grant and doctoral funding proposal generation pipeline.",
     phases: [
       "Phase I: Specific Aims & Novelty Justification",
@@ -137,7 +137,7 @@ export function getFormatTileTheme(id: string) {
         accentText: "text-slate-700 dark:text-slate-300",
         hoverBorder: "hover:border-slate-300 dark:hover:border-white/25",
       };
-    case "OT-19":
+    case "OT-15":
       return {
         badgeBg: "bg-indigo-50/90 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400/90 border border-indigo-100 dark:border-indigo-500/20",
         accentText: "text-indigo-600 dark:text-indigo-400/90",

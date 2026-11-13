@@ -1,6 +1,20 @@
 import { Router, Request, Response } from "express";
+import { z } from "zod";
+import { stripCourseCodes } from "../../../src/utils/briefExtractor.ts";
+import {
+  VISUAL_TYPES,
+  buildOutlineFromBrief,
+  cleanBriefText,
+  deriveDocumentTitle,
+  fitOutline,
+  isBannerLine,
+  newOutlineId,
+  suggestVisualType,
+  type OutlineCard,
+  type VisualType,
+} from "../../../src/shared/presentationBrief.ts";
 import { asyncRoute, loadOwnedProject, getSharedStore } from "../project.ts";
-import { keyringFromRequest } from "../../src/ai/routerBridge.ts";
+import { requestKeyring } from "../../src/ai/routerBridge.ts";
 import {
   sanitizeScholarlyText,
   normalizeUnicodeNFC,
@@ -283,6 +297,128 @@ function buildSlideDeckFromItems(
   };
 }
 
+const outlineSchema = z.object({
+  title: z.string().trim().max(200).nullish(),
+  slides: z
+    .array(
+      z.object({
+        title: z.string().trim().min(1).max(160),
+        visualType: z.string().trim().max(40).nullish(),
+        bullets: z.array(z.string().trim().max(200)).max(8).nullish(),
+      })
+    )
+    .min(1)
+    .max(30),
+});
+
+/**
+ * POST /api/projects/:id/presentation/outline
+ * The card-by-card outline for an uploaded brief or a topic. The AI runs
+ * through scholarBrain; with no AI the outline is built from the brief's own
+ * questions and sections (brief-grounded, never from a template).
+ */
+router.post(
+  "/outline",
+  asyncRoute(async (req: Request, res: Response) => {
+    const store = getSharedStore();
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    const body = (req.body || {}) as Record<string, unknown>;
+    const str = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : "");
+    const material = cleanBriefText(str(body.rawText, 60000));
+    const topic = stripCourseCodes(str(body.topic, 300)).trim();
+    const fileName = str(body.fileName, 200);
+    const slideCount = Math.min(15, Math.max(4, Math.round(Number(body.slideCount)) || 8));
+    const instruction = str(body.instruction, 500).trim();
+    const current = Array.isArray(body.current)
+      ? (body.current as Array<{ title?: unknown; bullets?: unknown }>).slice(0, 30).map((c) => ({
+          title: str(c.title, 160),
+          bullets: Array.isArray(c.bullets) ? (c.bullets as unknown[]).map((b) => str(b, 200)).slice(0, 8) : [],
+        }))
+      : undefined;
+    if (!material.trim() && !topic) {
+      return res.status(400).json({ error: "Add a topic or upload a document first." });
+    }
+
+    const derivedTitle = material.trim() ? deriveDocumentTitle(material, fileName) : topic;
+    const fallback = () => ({ ...buildOutlineFromBrief(material.trim() ? material : topic, slideCount, topic || derivedTitle), generatedBy: "brief-grounded" as const });
+
+    // Any connection counts, including one saved to the account and a local model only the browser can reach (426 hand-off).
+    if ((await requestKeyring(req as never)).length > 0) {
+      try {
+        const raw = await scholarBrain.presentationOutline({
+          req,
+          material,
+          topic: topic || undefined,
+          slideCount,
+          visualTypes: VISUAL_TYPES,
+          instruction: instruction || undefined,
+          current,
+        });
+        const parsed = outlineSchema.safeParse(raw);
+        if (parsed.success) {
+          let cards: OutlineCard[] = parsed.data.slides.map((c) => ({
+            id: newOutlineId(),
+            title: normalizeUnicodeNFC(sanitizeScholarlyText(stripCourseCodes(c.title))),
+            visualType: (VISUAL_TYPES as readonly string[]).includes(c.visualType ?? "") ? (c.visualType as VisualType) : suggestVisualType(c.title, c.bullets ?? []),
+            bullets: (c.bullets ?? []).map((b) => normalizeUnicodeNFC(sanitizeScholarlyText(stripCourseCodes(b)))).filter(Boolean).slice(0, 4),
+          }));
+          // Exactly the number asked for: extras are merged, a short answer is topped up from the brief.
+          if (cards.length > slideCount) cards = fitOutline(cards, slideCount);
+          if (cards.length < slideCount && material.trim()) {
+            const have = new Set(cards.map((c) => c.title.toLowerCase()));
+            const extra = buildOutlineFromBrief(material, slideCount, topic || derivedTitle).slides.filter((c) => !have.has(c.title.toLowerCase()) && c.visualType !== "Title Hero" && c.visualType !== "Key Takeaways");
+            const last = cards.length > 2 ? cards.pop() : undefined;
+            cards.push(...extra.slice(0, slideCount - cards.length - (last ? 1 : 0)));
+            if (last) cards.push(last);
+          }
+          const aiTitle = (parsed.data.title ?? "").trim();
+          const title = aiTitle && !isBannerLine(aiTitle) && !/\b[A-Z]{2,5}-\d{3,5}\b/.test(aiTitle) ? normalizeUnicodeNFC(sanitizeScholarlyText(aiTitle)) : derivedTitle;
+          if (cards[0]) cards[0] = { ...cards[0], visualType: "Title Hero", title };
+          return res.json({ success: true, title, slides: cards, generatedBy: "ai-gateway" });
+        }
+      } catch (aiErr) {
+        if (aiErr instanceof BrowserAiRequiredError || aiErr instanceof InvalidLlmChallengeError) {
+          return sendAiFailure(res, aiErr, "Presentation outline");
+        }
+        console.warn("[project/presentation.ts] AI outline fallback:", aiErr);
+      }
+    }
+    return res.json({ success: true, ...fallback() });
+  })
+);
+
+/**
+ * POST /api/projects/:id/presentation/write-block
+ * "Write with AI" for one block of a slide.
+ */
+router.post(
+  "/write-block",
+  asyncRoute(async (req: Request, res: Response) => {
+    const store = getSharedStore();
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    const body = (req.body || {}) as Record<string, unknown>;
+    const str = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : "");
+    const kind = str(body.kind, 60).trim() || "Key Insight Card";
+    const slideTitle = str(body.slideTitle, 200).trim();
+    const context = str(body.context, 4000);
+    try {
+      const raw = (await scholarBrain.writeSlideBlock({ req, kind, slideTitle, context, existing: str(body.existing, 400) || undefined })) as { title?: unknown; body?: unknown } | null;
+      const title = typeof raw?.title === "string" ? raw.title.trim() : "";
+      const text = typeof raw?.body === "string" ? raw.body.trim() : "";
+      if (!title && !text) throw new UnusableAiResponseError("slide block");
+      return res.json({
+        success: true,
+        title: normalizeUnicodeNFC(sanitizeScholarlyText(stripCourseCodes(title))),
+        body: normalizeUnicodeNFC(sanitizeScholarlyText(stripCourseCodes(text))),
+      });
+    } catch (err) {
+      return sendAiFailure(res, err, "Slide block");
+    }
+  })
+);
+
 /**
  * POST /api/projects/:id/presentation/generate-deck
  * Transforms research outline and narrative into a structured 16:9 slide deck.
@@ -301,9 +437,20 @@ router.post(
     const durationMinutes = Math.min(180, Math.max(1, Number(body.durationMinutes) || 20));
     const targetAudience = str(body.targetAudience, 120) || AUDIENCE[str(body.audienceLevel, 20)] || "Academic Conference";
     const narrativeFramework = str(body.narrativeFramework, 60) || str(body.framework, 60) || "Standard-Narrative";
-    const requestedSlides = Math.min(15, Math.max(4, Number(body.slideCount) || 6));
-    const userTopic = str(body.topic, 300);
-    const userText = str(body.rawText, 20000);
+    // The presenter's reviewed card-by-card outline, when there is one.
+    const outlineCards = Array.isArray(body.outline)
+      ? (body.outline as Array<{ title?: unknown; visualType?: unknown; bullets?: unknown }>)
+          .slice(0, 15)
+          .map((c) => ({
+            title: str(c.title, 160),
+            visualType: str(c.visualType, 40),
+            bullets: Array.isArray(c.bullets) ? (c.bullets as unknown[]).map((b) => str(b, 200)).filter(Boolean).slice(0, 6) : [],
+          }))
+          .filter((c) => c.title)
+      : [];
+    const requestedSlides = outlineCards.length >= 2 ? Math.min(15, outlineCards.length) : Math.min(15, Math.max(4, Number(body.slideCount) || 6));
+    const userTopic = stripCourseCodes(str(body.topic, 300)).trim();
+    const userText = cleanBriefText(str(body.rawText, 20000));
     // The presenter's plan: the one message to land and the points to make, in order.
     const keyMessage = str(body.keyMessage, 400);
     const talkPoints = Array.isArray(body.points)
@@ -352,7 +499,7 @@ router.post(
     }).catch(() => []);
 
     // Any connection counts, including a local model only the browser can reach (426 hand-off).
-    if (keyringFromRequest(req).length > 0) {
+    if ((await requestKeyring(req as never)).length > 0) {
       try {
         const systemPrompt = `You design presentation decks in the style of Gamma: each slide is a visual card, not a wall of bullets.
 Write a ${requestedSlides}-card deck for the given topic and material.
@@ -370,11 +517,12 @@ For every card choose the layout that fits its content and vary layouts across t
 - "split": a case or example with 2-4 items.
 - "statement": one idea, centred (headline + optional lede).
 
-Writing rules:
-- Headlines are short assertions (max 12 words) that state the point of the card.
-- Item titles max 8 words; bodies max 20 words. No filler, no clichés ("delve", "tapestry", "testament", "underscores", "pivotal").
+Writing rules (assertion-evidence design):
+- Headline: one clear academic assertion in at most 12 words that states the point of the card, or a structured title for the opening card. Never a question copied from the brief and never an institution banner or module code.
+- Body blocks: crisp, scannable cards. Item titles max 8 words; each body 15-30 words, concrete and specific. No filler, no clichés ("delve", "tapestry", "testament", "underscores", "pivotal"), no raw prompt text.
 - Cite only sources present in the material. If the material lacks evidence, write the card as a clear prompt for the author instead of inventing it.
-- Speaker notes: 40-120 words, spoken English.
+- Speaker notes: 60-120 words of natural spoken delivery in the first person plural or singular, with a brief transition to the next card. Not a re-read of the slide.
+- When an outline is given, write exactly one card per outline entry, in order, using the suggested visual type to choose the layout.
 - Preserve NFC Unicode / diacritics.
 
 Output strict JSON only:
@@ -410,6 +558,9 @@ Output strict JSON only:
           `Audience: ${targetAudience}`,
           `Duration: ${durationMinutes} minutes (about ${Math.round((durationMinutes * 60) / requestedSlides)} seconds per card)`,
           keyMessage ? `Key message (open with it on the title card's lede and close with it as the final takeaway): ${keyMessage}` : "",
+          outlineCards.length
+            ? `Outline to follow (one card per entry, in order):\n${outlineCards.map((c, i) => `${i + 1}. ${c.title}${c.visualType ? ` [${c.visualType}]` : ""}${c.bullets.length ? `: ${c.bullets.join("; ")}` : ""}`).join("\n")}`
+            : "",
           talkPoints.length ? `Points the presenter wants to make, in this order, one card each:\n${talkPoints.map((p, i) => `${i + 1}. ${p}`).join("\n")}` : "",
           `Narrative framework: ${narrativeFramework}`,
           researchQuestions.length ? `Research questions: ${JSON.stringify(researchQuestions)}` : "",

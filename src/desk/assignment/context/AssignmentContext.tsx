@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode, useMemo, useRef } from "react";
+import { purgeLegacyTemplateText } from "../../../domain/assignment/legacyPurge";
 import type { CanonicalDocument, OutputTypeSpec, ProjectView, RubricReport } from "../../types";
 import {
   getDocument,
@@ -239,6 +240,7 @@ export function AssignmentProvider({
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const justPersistedIdRef = useRef<string | null>(null);
   useEffect(() => {
     setActiveProjectId(projectId);
   }, [projectId]);
@@ -248,6 +250,7 @@ export function AssignmentProvider({
     const onPersisted = (e: Event) => {
       const custom = e as CustomEvent<{ draftId: string; realId: string; project: ProjectView }>;
       if (custom.detail && custom.detail.draftId === activeProjectId) {
+        justPersistedIdRef.current = custom.detail.realId;
         setActiveProjectId(custom.detail.realId);
         setProject(custom.detail.project);
       }
@@ -261,6 +264,9 @@ export function AssignmentProvider({
       return activeProjectId;
     }
     const realProject = await commitProjectToDatabase(activeProjectId);
+    // The new id already has its project in state: do not reload it (a reload
+    // shows the loading skeleton and unmounts a stage mid-upload).
+    justPersistedIdRef.current = realProject.projectId;
     setActiveProjectId(realProject.projectId);
     setProject(realProject);
     return realProject.projectId;
@@ -297,9 +303,17 @@ export function AssignmentProvider({
 
   // Load project data with phase auto-migration
   const load = useCallback(async () => {
+    if (justPersistedIdRef.current && justPersistedIdRef.current === activeProjectId && projectRef.current?.projectId === activeProjectId) {
+      // Just committed from a draft: the project is already loaded and the stage keeps its state.
+      justPersistedIdRef.current = null;
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
-      const proj = await getProject(activeProjectId);
+      const loaded = await getProject(activeProjectId);
+      // Legacy template text from older saves is removed on every load.
+      const proj = { ...loaded, answers: purgeLegacyTemplateText(loaded.answers) } as typeof loaded;
       const [rub, doc] = proj.hasDocument
         ? await Promise.all([getRubric(activeProjectId), getDocument(activeProjectId)])
         : [null, null];
@@ -787,8 +801,10 @@ export function AssignmentProvider({
         // fallback
       }
     }
+    // Until the student approves sources, only the brief's own prescribed
+    // references count as approved; discovered papers wait for a decision.
     const fromSources = (sources ?? [])
-      .filter((s) => s.status !== "removed" && !s.isExcluded)
+      .filter((s) => s.status !== "removed" && !s.isExcluded && s.prescribedInBrief)
       .map((s) => s.id);
     const fromUploaded = userUploadedSources.map((u) => u.id);
     return Array.from(new Set([...fromSources, ...fromUploaded]));
@@ -1250,7 +1266,8 @@ export function AssignmentProvider({
       await saveChainRef.current;
     },
     reload: async () => {
-      const fresh = await getProject(activeProjectId);
+      const loadedFresh = await getProject(activeProjectId);
+      const fresh = { ...loadedFresh, answers: purgeLegacyTemplateText(loadedFresh.answers) } as typeof loadedFresh;
       projectRef.current = fresh;
       setProject(fresh);
       return (fresh.answers ?? {}) as Record<string, unknown>;

@@ -1,4 +1,5 @@
 import OutlineByAiPanel from "../components/OutlineByAiPanel";
+import { useToast } from "../../../components/ui/FeedbackSystem";
 import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
 import { DraftingSectionIndex } from "../components/DraftingSectionIndex";
@@ -26,6 +27,8 @@ import {
   PanelLeftOpen,
 } from "lucide-react";
 import { SlideCanvas, extractSlidesFromAcademicText, type SlideDeck } from "../../../features/slides";
+import { ReferencesCard } from "../components/ReferencesCard";
+import { selectCitedSources } from "../services/exportText";
 import { buildFormattedBibliography } from "../services/assignmentExportService";
 import { formatReferenceHtml } from "../services/referenceListGenerator";
 import { validateSectionUniqueness } from "../../../features/drafting/services/sectionDraftingEngine";
@@ -47,6 +50,8 @@ export function AssignmentDraftingStage({
   const {
     projectId,
     project,
+    saveAnswers,
+    writingStyle,
     setPhase,
     targetWordCount,
     currentWordCount,
@@ -74,6 +79,11 @@ export function AssignmentDraftingStage({
 
   const [streamingChunk, setStreamingChunk] = useState<string>("");
   const [draftError, setDraftError] = useState<string | null>(null);
+  const [offlineNotice, setOfflineNotice] = useState<string | null>(null);
+  // The offline scaffold is a guide shown beside the section, never saved as its text:
+  // it must not count as drafted words or mark the section ready.
+  const [offlineScaffold, setOfflineScaffold] = useState<{ sectionId: string; title: string; text: string } | null>(null);
+  const { showError } = useToast();
   const [activeStreamingSectionId, setActiveStreamingSectionId] = useState<string | null>(null);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [isTuning, setIsTuning] = useState(false);
@@ -88,10 +98,12 @@ export function AssignmentDraftingStage({
   );
 
   const draftMarkdown = useMemo(() => {
-    return internalSections
-      .map((sec) => `## ${sec.title}\n\n${sec.draftContent || ""}`)
-      .join("\n\n");
-  }, [internalSections]);
+    const body = internalSections.map((sec) => `## ${sec.title}\n\n${sec.draftContent || ""}`).join("\n\n");
+    const approved = sources.filter((s) => s.status === "kept" || (approvedSourceIds && approvedSourceIds.includes(s.id)));
+    // The compiled draft lists only what the text cites, plus the brief's prescribed references.
+    const refs = buildFormattedBibliography(selectCitedSources(approved, body), citationStyle || "harvard");
+    return refs.length ? `${body}\n\n## References\n\n${refs.join("\n\n")}` : body;
+  }, [internalSections, sources, approvedSourceIds, citationStyle]);
 
   // Context continuity state — tracks claims, cited sources, and themes across sections
   const contextContinuityRef = useRef<ContextContinuityState | null>(null);
@@ -189,6 +201,8 @@ export function AssignmentDraftingStage({
       setActiveStreamingSectionId(sec.id);
       setGeneratingSection(sec.id, true);
       setDraftError(null);
+      setOfflineNotice(null);
+      setOfflineScaffold(null);
       setStreamingChunk(sec.draftContent || "");
 
       // ── Evidence Pack Construction (Production Spec §4.1–4.3) ──
@@ -241,7 +255,14 @@ export function AssignmentDraftingStage({
           onChunk: (_chunk, aggregated) => {
             setStreamingChunk(aggregated);
           },
-          onComplete: async (fullText) => {
+          onComplete: async (fullText, meta) => {
+            if (meta?.scaffold) {
+              setOfflineScaffold({ sectionId: sec.id, title: sec.title, text: fullText });
+              setStreamingChunk("");
+              setActiveStreamingSectionId(null);
+              setGeneratingSection(sec.id, false);
+              return;
+            }
             await updateSectionContent(sec.id, fullText);
             // Update context continuity state after section completion
             contextContinuityRef.current = updateContextContinuityAfterSection(
@@ -252,19 +273,34 @@ export function AssignmentDraftingStage({
             setActiveStreamingSectionId(null);
             setGeneratingSection(sec.id, false);
           },
-          onError: (err) => {
-            console.error("Section streaming failed:", err);
+          report: {
+            sectionIndex,
+            sectionCount: internalSections.length,
+            outlineTitles: internalSections.map((x) => x.title),
+            previousTail: sectionIndex > 0 ? (internalSections[sectionIndex - 1].draftContent || "").slice(-400) : undefined,
+            remainingEssayWords: Math.max(
+              0,
+              (targetWordCount || 0) -
+                internalSections.filter((x) => x.id !== sec.id).reduce((n, x) => n + (x.draftContent ? x.draftContent.trim().split(/\s+/).filter(Boolean).length : 0), 0)
+            ),
+          },
+          writingStyle: writingStyle && typeof writingStyle === "object" ? (writingStyle as { preset?: string; customSampleText?: string }) : undefined,
+          onFallback: ({ reason }) => {
+            setOfflineNotice(`${reason} Nothing was written into the section. Below is a scaffold built from your outline: try again, or insert it and write the analysis yourself.`);
           },
         });
       } catch (err) {
         // Keep whatever the section had before; never fill it with stand-in text.
-        setDraftError(`"${sec.title}" was not drafted: ${err instanceof Error ? err.message : String(err)}`);
+        // One clean toast; no uncaught console stack traces.
+        showError(`"${sec.title}" was not drafted: ${err instanceof Error ? err.message : String(err)}`);
         setStreamingChunk("");
         setActiveStreamingSectionId(null);
         setGeneratingSection(sec.id, false);
       }
     },
     [
+      writingStyle,
+      targetWordCount,
       activeSection,
       projectId,
       project,
@@ -441,6 +477,41 @@ export function AssignmentDraftingStage({
         </div>
       </header>
 
+      {offlineNotice && (
+        <div role="status" className="text-xs text-neutral-600 dark:text-neutral-400 px-1 space-y-2" data-testid="offline-draft-notice">
+          <p>{offlineNotice}</p>
+          {offlineScaffold && (
+            <details className="rounded-xl border border-neutral-200/80 dark:border-white/10 bg-neutral-50/70 dark:bg-white/[0.03] px-3 py-2">
+              <summary className="cursor-pointer font-medium text-neutral-800 dark:text-neutral-200">Scaffold for "{offlineScaffold.title}"</summary>
+              <pre className="mt-2 whitespace-pre-wrap font-sans text-[12px] leading-relaxed text-neutral-700 dark:text-neutral-300">{offlineScaffold.text}</pre>
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const target = internalSections.find((x) => x.id === offlineScaffold.sectionId);
+                    if (target) handleStreamSection(target);
+                  }}
+                  className="px-3 py-1 rounded-full bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-medium cursor-pointer"
+                >
+                  Try AI again
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await updateSectionContent(offlineScaffold.sectionId, offlineScaffold.text);
+                    setOfflineScaffold(null);
+                    setOfflineNotice(null);
+                  }}
+                  className="px-3 py-1 rounded-full border border-neutral-300 dark:border-white/15 font-medium cursor-pointer"
+                >
+                  Insert scaffold into section
+                </button>
+              </div>
+            </details>
+          )}
+        </div>
+      )}
+
       {draftError && (
         <div role="alert" className="flex items-start gap-2 text-xs text-[var(--text-primary)] bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl px-3 py-2">
           <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
@@ -450,129 +521,6 @@ export function AssignmentDraftingStage({
           </button>
         </div>
       )}
-
-      {/* Progressive-Disclosure Telemetry Bar: Overlap Validation (< 20%), Active-Voice & Anti-Fluff Metrics, Citation Tokens */}
-      <details
-        aria-label="Detailed Drafting Telemetry & Validation"
-        className="group rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs font-sans transition-colors"
-      >
-        <summary className="px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 cursor-pointer list-none select-none">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-900 dark:text-zinc-100 truncate">
-              Detailed Mode · Academic Integrity & Citation Grounding Inspector
-            </h2>
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap text-[10px] font-mono">
-            <span
-              className={`font-semibold px-2 py-0.5 rounded-full ${
-                uniquenessValidation.isUnique
-                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                  : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
-              }`}
-            >
-              {uniquenessValidation.isUnique ? "< 20% Overlap (Pass)" : "Overlap Violation"}
-            </span>
-            <span
-              className={`font-semibold px-2 py-0.5 rounded-full ${
-                !activeProseAudit || activeProseAudit.activeVoiceRatio >= 0.8
-                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                  : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
-              }`}
-            >
-              {activeProseAudit ? `${Math.round(activeProseAudit.activeVoiceRatio * 100)}% Active Voice` : "Pending Draft"}
-            </span>
-            <span className="font-semibold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-              {detectedCitationTokens.length} Token{detectedCitationTokens.length !== 1 ? "s" : ""} Bound
-            </span>
-            <span className="text-[11px] text-zinc-500 dark:text-zinc-400 pl-1 group-open:rotate-180 transition-transform">
-              ▾
-            </span>
-          </div>
-        </summary>
-
-        <div className="px-4 pb-4 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 space-y-3">
-          <div className="flex items-center justify-between text-[11px] font-mono text-zinc-500 dark:text-zinc-400">
-            <span>Live Collegiate Directives Active</span>
-            <span>{citationStyle.toUpperCase()} Interceptor</span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-            {/* 1. Inter-Section Uniqueness (< 20% Overlap) */}
-            <div className="p-3.5 rounded-xl bg-white dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/60 space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Section Uniqueness</span>
-                <span
-                  className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full ${
-                    uniquenessValidation.isUnique
-                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                      : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
-                  }`}
-                >
-                  {uniquenessValidation.isUnique ? "< 20% Overlap (Pass)" : "Overlap Violation"}
-                </span>
-              </div>
-              <div className="text-base font-bold text-zinc-900 dark:text-zinc-100 tabular-nums">
-                {Math.round(uniquenessValidation.maxSimilarity * 100)}% Max Similarity
-              </div>
-              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-snug">
-                {uniquenessValidation.isUnique
-                  ? "Zero cross-section argument replication across all sections."
-                  : `Redundancy between: "${uniquenessValidation.conflictingPair?.[0]}" & "${uniquenessValidation.conflictingPair?.[1]}".`}
-              </p>
-            </div>
-
-            {/* 2. Active-Voice & Anti-Fluff Metrics */}
-            <div className="p-3.5 rounded-xl bg-white dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/60 space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Active-Voice Ratio</span>
-                <span
-                  className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full ${
-                    !activeProseAudit || activeProseAudit.activeVoiceRatio >= 0.8
-                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                      : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
-                  }`}
-                >
-                  {activeProseAudit ? `${Math.round(activeProseAudit.activeVoiceRatio * 100)}% (Target ≥80%)` : "Pending Draft"}
-                </span>
-              </div>
-              <div className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                {activeProseAudit?.isCompliant ? "Collegiate Prose Verified" : "Active Re-writing Needed"}
-              </div>
-              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-snug">
-                {activeProseAudit && activeProseAudit.violations.length > 0
-                  ? `${activeProseAudit.violations.length} advisory detected: ${activeProseAudit.violations[0]}`
-                  : "Zero throat-clearing openings or banned nominalizations detected."}
-              </p>
-            </div>
-
-            {/* 3. Citation Token Mappings ([ev-uuid], [1]) */}
-            <div className="p-3.5 rounded-xl bg-white dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/60 space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Citation Tokens</span>
-                <span className="text-[10px] font-mono uppercase font-semibold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-                  {citationStyle.toUpperCase()} Interceptor
-                </span>
-              </div>
-              <div className="text-base font-bold text-zinc-900 dark:text-zinc-100 tabular-nums">
-                {detectedCitationTokens.length} Token{detectedCitationTokens.length !== 1 ? "s" : ""} Bound
-              </div>
-              <div className="flex flex-wrap gap-1 text-[10px] font-mono text-zinc-500 dark:text-zinc-400 truncate">
-                {detectedCitationTokens.length > 0 ? (
-                  detectedCitationTokens.slice(0, 4).map((tok, i) => (
-                    <span key={i} className="px-1.5 py-0.2 rounded bg-zinc-100 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300">
-                      [{tok}]
-                    </span>
-                  ))
-                ) : (
-                  <span>[1], [ev-uuid] tokens intercept into authoritative citations</span>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </details>
 
       {/* Outline (can be hidden) beside a wide writing area */}
       <div className={`grid grid-cols-1 gap-5 items-start ${showOutline ? "lg:grid-cols-[minmax(240px,300px)_minmax(0,1fr)]" : ""}`}>
@@ -628,38 +576,16 @@ export function AssignmentDraftingStage({
             }}
           />
 
-          {/* Live Bibliography Section */}
-          {approvedSources.length > 0 && (
-            <details className="mt-5 rounded-2xl bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs overflow-hidden">
-              <summary className="px-5 py-3 flex items-center gap-2 bg-neutral-50/50 dark:bg-white/[0.02] cursor-pointer">
-                <Book className="w-4 h-4 text-emerald-500" />
-                <span className="text-sm font-semibold text-neutral-900 dark:text-white">Bibliography ({approvedSources.length})</span>
-              </summary>
-              <div className="p-5 text-[13px] text-neutral-700 dark:text-neutral-300 leading-relaxed space-y-4">
-                {buildFormattedBibliography(approvedSources, citationStyle || "harvard").map((bib, i) => {
-                  const safeHtml = formatReferenceHtml(bib);
-                  return (
-                    <p
-                      key={i}
-                      className="pl-6 -indent-6"
-                      ref={(el) => {
-                        if (!el) return;
-                        const anyEl = el as unknown as {
-                          setHTML?: (html: string, opts?: { sanitizer?: { elements?: string[]; attributes?: string[] } }) => void;
-                        };
-                        if (typeof anyEl.setHTML === "function") {
-                          anyEl.setHTML(safeHtml, {
-                            sanitizer: { elements: ["i", "em", "b", "strong"], attributes: [] },
-                          });
-                        } else {
-                          el.innerHTML = safeHtml;
-                        }
-                      }}
-                    />
-                  );
-                })}
-              </div>
-            </details>
+          {/* Live compiled References */}
+          {selectCitedSources(approvedSources, internalSections.map((x) => x.draftContent || "").join("\n\n")).length > 0 && (
+            <ReferencesCard
+              sources={selectCitedSources(approvedSources, internalSections.map((x) => x.draftContent || "").join("\n\n"))}
+              style={citationStyle || "harvard"}
+              savedEdit={typeof project?.answers?.["assignment_reference_list_edit"] === "string" ? (project?.answers?.["assignment_reference_list_edit"] as string) : ""}
+              onSaveEdit={(text) => {
+                void saveAnswers?.({ assignment_reference_list_edit: text });
+              }}
+            />
           )}
         </div>
       </div>

@@ -377,7 +377,7 @@ export default function ThesisWorkspace({
     <div className="min-h-screen bg-background text-primary font-sans flex flex-col selection:bg-accent/15">
       {/* Unified Apple-Grade Top Workspace Bar */}
       <AppleStudioHeader
-        deliverableCode="OT-09"
+        deliverableCode="OT-07"
         deliverableLabel={thesisData.degreeLevel}
         projectTitle={thesisData.title}
         onProjectTitleChange={(nextTitle) => updateThesisField("title", nextTitle)}

@@ -204,15 +204,16 @@ describe("Journal Step A: Citation Lock Scrubber & Chronological Checker", () =>
     expect(result.scrubbedText).not.toContain("[CITE:src_1]");
   });
 
-  it("scrubCitations strips hallucinated (FakeAuthor, 2022) citations and replaces with unverified claim placeholder", () => {
+  it("scrubCitations strips hallucinated (FakeAuthor, 2022) citations without leaving a placeholder tag", () => {
     const textWithHallucination =
       "Conventional architectures exhibit asymptotic degradation (FakeAuthor, 2022), leading to key failure.";
     const result = scrubCitations(textWithHallucination, verifiedSources);
 
     expect(result.unverifiedClaimsCount).toBe(1);
     expect(result.strippedCitations).toContain("FakeAuthor, 2022");
-    expect(result.scrubbedText).toContain("[Unverified Claim — Link Vault Source]");
+    expect(result.scrubbedText).not.toContain("Unverified Claim");
     expect(result.scrubbedText).not.toContain("(FakeAuthor, 2022)");
+    expect(result.scrubbedText).toBe("Conventional architectures exhibit asymptotic degradation, leading to key failure.");
   });
 
   it("checkChronologicalAnachronism flags warning when sentence eventYear > source pubYear", () => {

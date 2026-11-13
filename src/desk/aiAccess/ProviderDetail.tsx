@@ -7,6 +7,8 @@ import type { CuratedModel } from "../../platform/router/modelCuration";
 import { fetchModelsForKey } from "../ai/modelChoices";
 import { readProviderKey } from "../../services/userAiSettings";
 import { verifyProviderKey } from "./aiAccessApi";
+import type { ConnectCloudResult } from "./useAiAccess";
+import { normalizeBaseUrl } from "../../platform/router/baseUrl";
 
 /**
  * The configuration surface for ONE cloud provider.
@@ -38,7 +40,7 @@ export default function ProviderDetail({
   view: ProviderView;
   spec: CloudProviderSpec;
   tier?: ConnectionTier;
-  onConnect: (input: { apiKey: string; model: string; baseUrl?: string; makeDefault: boolean; tier?: ConnectionTier }) => Promise<{ ok: boolean; error?: string; modelsDetected?: number }>;
+  onConnect: (input: { apiKey: string; model: string; baseUrl?: string; makeDefault: boolean; tier?: ConnectionTier }) => Promise<ConnectCloudResult>;
   onDisconnect: () => Promise<void>;
   onSetModel: (model: string) => Promise<void>;
   onMakeDefault: () => Promise<void>;
@@ -54,6 +56,7 @@ export default function ProviderDetail({
   const [result, setResult] = useState<string | null>(null);
   const [makeDefault, setMakeDefault] = useState(!view.connected);
 
+  const [found, setFound] = useState<ConnectCloudResult | null>(null);
   const [liveModels, setLiveModels] = useState<CuratedModel[]>([]);
   const [discovering, setDiscovering] = useState(false);
   const [discoveryMsg, setDiscoveryMsg] = useState<string | null>(null);
@@ -131,18 +134,30 @@ export default function ProviderDetail({
         setError("This provider needs a custom address — see the note under the field.");
         return;
       }
-      if (!model.trim()) {
-        setError("Choose a model first. Press \"Refresh models\" to list what your key can use, or type a model id under Advanced.");
-        return;
+      // A typed address is cleaned (a pasted full endpoint is cut back to its base) and checked before anything is sent.
+      let address: string | undefined;
+      if (baseUrl.trim()) {
+        const checked = normalizeBaseUrl(baseUrl);
+        if (!checked.ok) {
+          setError(checked.reason);
+          return;
+        }
+        address = checked.url;
+        setBaseUrl(checked.url);
       }
-      const outcome = await onConnect({ apiKey: apiKey.trim(), model: model.trim(), baseUrl: baseUrl.trim() || undefined, makeDefault, tier });
+      // No model is required: an empty one means "best available", chosen live and tested by the server.
+      const outcome = await onConnect({ apiKey: apiKey.trim(), model: model.trim(), baseUrl: address, makeDefault, tier });
+      setFound(outcome);
+      if (outcome.model) setModel(outcome.model);
       if (!outcome.ok) {
         setError(outcome.error ?? "Could not connect.");
         return;
       }
       setApiKey("");
       setResult(
-        outcome.modelsDetected != null
+        outcome.tested
+          ? `Connected. ${outcome.tested.model} answered a test request in ${(outcome.tested.latencyMs / 1000).toFixed(1)}s.`
+          : outcome.modelsDetected != null
           ? `Connected. ${outcome.modelsDetected} model${outcome.modelsDetected === 1 ? "" : "s"} available.`
           : "Connected."
       );
@@ -246,6 +261,10 @@ export default function ProviderDetail({
                 className="mt-1 w-full rounded-[var(--radius-sm)] border border-[color:var(--border-control)] bg-[color:var(--surface-inset)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               />
               <p className="mt-1 text-xs text-[color:var(--text-muted)]">{spec.customBaseUrlHint}</p>
+              {(() => {
+                const c = baseUrl.trim() ? normalizeBaseUrl(baseUrl) : null;
+                return c && c.ok ? <p className="mt-1 text-xs text-[color:var(--text-secondary)]">Your key will be sent only to <span className="font-mono">{c.host}</span>.</p> : null;
+              })()}
             </div>
           )}
         </Step>
@@ -269,6 +288,17 @@ export default function ProviderDetail({
               {discoveryMsg}
             </p>
           )}
+          {found && (found.options?.length || found.needsModel) ? (
+            <RecommendationPanel
+              found={found}
+              selected={model}
+              onPick={(id) => {
+                setModel(id);
+                if (view.connected) void onSetModel(id);
+              }}
+              providerName={spec.name}
+            />
+          ) : null}
           <ModelSelectField id={`model-${spec.id}`} models={liveModels} value={model} onChange={setModel} />
           {view.connected && (
             <button
@@ -407,4 +437,47 @@ export function Chip({ tone, children }: { tone: "good" | "warn" | "neutral"; ch
         ? "border-[color:var(--state-warning)] bg-[color:var(--state-warning-subtle)] text-[color:var(--state-warning)]"
         : "border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]";
   return <span className={`inline-block rounded-full border px-2 py-0.5 text-[11px] font-medium ${cls}`}>{children}</span>;
+}
+
+const ROLE_LABEL: Record<string, string> = { recommended: "Recommended", most_capable: "Most capable", fastest: "Fastest", option: "Also good" };
+
+/** After connecting: the model that answered, and the best live alternatives, each with why. */
+function RecommendationPanel({ found, selected, onPick, providerName }: { found: ConnectCloudResult; selected: string; onPick: (id: string) => void; providerName: string }) {
+  const options = found.options ?? [];
+  return (
+    <div className="mb-3 rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-3" aria-live="polite">
+      {options.length > 0 ? (
+        <>
+          <p className="text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">Best models on your {providerName} account (fetched live)</p>
+          <ul className="mt-2 space-y-1.5">
+            {options.map((o) => (
+              <li key={o.id} className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm text-[color:var(--text-primary)]">
+                    <span className="font-medium">{o.displayName || o.id}</span>{" "}
+                    <span className="rounded bg-[color:var(--surface-sunken)] px-1.5 py-0.5 text-[11px] font-semibold text-[color:var(--text-secondary)]">{ROLE_LABEL[o.role]}</span>
+                    {found.tested?.model === o.id && <span className="ml-1.5 text-[11px] text-[color:var(--state-success)]">answered a test request</span>}
+                  </p>
+                  <p className="text-xs text-[color:var(--text-muted)]">{o.why}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onPick(o.id)}
+                  disabled={selected === o.id}
+                  className="shrink-0 rounded-[var(--radius-sm)] border border-[color:var(--border-control)] px-2.5 py-1 text-xs font-medium text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] disabled:opacity-60"
+                >
+                  {selected === o.id ? "In use" : "Use this"}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <p className="text-sm text-[color:var(--text-secondary)]">
+          {providerName} does not publish a list of its models, so none can be recommended. Type the model name from its documentation below (Advanced), then press Save model.
+        </p>
+      )}
+      {found.note && <p className="mt-2 text-xs text-[color:var(--text-muted)]">{found.note}</p>}
+    </div>
+  );
 }

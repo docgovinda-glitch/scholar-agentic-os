@@ -1,131 +1,93 @@
-# Scholar Core — The Agentic Scientific Operating System
+# Scholar Core (`scholar-agentic-os`)
 
-**Scholar Core** is an enterprise-grade academic research, thinking, structured writing, and verification operating system. Built for researchers, postgraduates, and undergraduate scholars, it replaces generic AI text generation with deterministic evidence ledgers, adversarial multi-agent peer review, and human-centered academic workspaces.
+Scholar Core is a full-stack academic research and writing platform. It provides purpose-built workspaces for coursework, journal manuscripts, theses, research proposals and presentations, backed by AI agents, a citation engine and a cross-project source library (the "Universal Vault"). One Node process serves both the API and the React single-page app.
 
----
+- Production: https://scholar.gkshah.com.np (Render, Docker, free plan)
+- Stack: React 19 + Vite 6 + Tailwind CSS v4 (client), Express 4 + TypeScript (server), Supabase (Auth, Postgres, Storage, Edge Functions)
+- Every statement in this documentation is meant to match the code on `main`. If you find a mismatch, the code wins; please fix the doc.
 
-## 🏛️ Dedicated Academic Workspaces
+## Workspaces
 
-Rather than generic forms, each academic format in Scholar Core operates through its own purpose-built workspace tailored to the exact cognitive process of researchers:
+A project's `outputTypeId` decides which workspace opens (`src/desk/DeskApp.tsx`). The catalog (`src/app/atlas/catalogData.ts`) defines 24 output types (`OT-01` to `OT-24`); five dedicated workspaces exist today.
 
-1. **📝 Coursework & Essay Engine (`OT-01`)**:
-   - **Dual Execution Modes (`Minimal | Detailed`)**:
-     - **Minimal Mode**: Streamlined setup (Topic, Assignment Type, Word Count Target, Citation Style) with a clean distraction-free writing canvas; defers intermediate telemetry and drawers.
-     - **Detailed Mode**: Full architectural controls (Academic Tone selector with auto-binding, custom rubric, database filters) + live 4-phase atomic lifecycle stepper, OpenAlex/Crossref citation badges, `<20%` inter-section overlap indicator, and expanded ML Style Compliance Audit panel.
-   - **4-Phase Atomic Lifecycle**:
-     - **Phase 1 · Extract & Understand** (`current_phase = 'understand'` in Supabase DB):
-       - **Part 1 (Extract)**: Assignment brief intake (paste prompt or upload `.pdf`, `.docx`), target word count stepper, level, citation style, and grading criteria extraction.
-       - **Part 2 (Understand)**: Core working thesis calibration, target theoretical frameworks, tailored dynamic outline generator (`outlineService.ts`), dynamic word count editor (`DynamicStructurePlanner.tsx`), and collegiate writing style selection across 6 tones.
-     - **Phase 2 · Sources & Discovery**: Literature discovery engine (`scholarlyDiscoveryService.ts`), connecting directly to Phase 1 subheadings with research status indicators, explicit assignment roles (*Empirical evidence*, *Theoretical framework*, *Core theory*), and lecture/slide upload dropzone (`LectureUploadDropzone.tsx`).
-     - **Phase 3 · Drafting & Learned Prompt Injection**: Section drafting prompt generator (`drafting.ts`) injecting explicit quantitative writing constraints (mean sentence length 18–32 words, burstiness standard deviation 6.5–9.5 words, active voice `>= 80%`, citation density `>= 2.2%`, and archetype transition n-grams).
-     - **Phase 4 · Submission**: 10-point rubric compliance evaluator, citation reconciliation auditor (100% in-text citations verified against references), and one-click `.docx` and PDF export.
-   - **Stage-Scoped Copilot Personas** (`ContextPanel.tsx`): Advisor (Understand), Librarian (Sources), Scribe (Drafting), Examiner (Submission).
+| Output type | Workspace | Entry component |
+| :--- | :--- | :--- |
+| `OT-01` Assignment, `OT-02` Essay | Coursework (5 stages) | `src/desk/assignment/AssignmentWorkspace.tsx` |
+| `OT-07` Master's Thesis | Thesis | `src/desk/thesis/ThesisWorkspace.tsx` |
+| `OT-10` Journal Article | Journal research studio (25 stages in 5 phases) | `src/desk/workspace/ResearchWorkspace.tsx` |
+| `OT-15` Research Proposal | Research proposal | `src/desk/proposal/ProposalWorkspace.tsx` |
+| `OT-22` | Presentation Studio | `src/desk/presentation/PresentationWorkspace.tsx` |
+| any other type | Generic project shell | `src/desk/DeskShell.tsx` |
 
-2. **📄 Journal Article Workspace (`OT-10`)**:
-   - **5-Mode Studio & 25-Stage Empirical Pipeline**:
-     - *Mode 1: Protocol Blueprint & Word Budgeter* → *Mode 2: Evidence Matrix & Primary Data Ingestion* → *Mode 3: Grounded Manuscript Studio* → *Mode 4: Unified Referee Rebuttal Workbench* → *Mode 5: Pre-Flight Compliance & Export Studio*.
-   - **Q1 Journal Style Compliance Engine & NLI Citation Lock Scrubber**: Live manuscript style compliance scorecard based on the 110-paper corpus, paired with Natural Language Inference (NLI) claim-evidence entailment verification (`citationLockScrubber.ts`) and hybrid Semantic RAG (`semanticRagEngine.ts`).
+Highlights per workspace (details in [`docs/WORKFLOWS.md`](docs/WORKFLOWS.md)):
 
-3. **💡 Research Proposal Workspace (`OT-19`)**:
-   - **Competitive Grant Pipeline**: *Funding Agency Alignment → 1-Page Specific Aims → Significance & Innovation → Research Strategy & Pitfalls → Timeline & Gantt Work Packages → Budget Justification*.
-   - Includes a **Study Section Review Simulator (NIH / NSF Scoring Criteria)** powered by `scholarBrain.ts`.
+- **Coursework**: Extract, Understand, Sources, Drafting, Submission, all derived from the student's own brief. One section per brief question with marks-weighted word budgets that sum exactly to the target, a prescribed-bibliography parser, on-topic source discovery, cited-only reference lists, a 10-point rubric audit, citation reconciliation and `.docx` / PDF export. The suite has 459 test files and 4,267 tests.
+- **Journal**: 25 stages grouped as Foundation, Evidence, Drafting, Review and Publication, with claim-evidence tracking, a peer-review simulation, rebuttal matrix, cover letter, anonymization and export.
+- **Thesis**: chapter editor, research questions, literature matrix, references and a Viva Voce simulator.
+- **Proposal**: narrative section editor, budget editor and a study-section scorer.
+- **Presentation Studio**: four steps (Understand, Design, Edit Slides, Present), Gamma-style card engine, native `.pptx` export. See [`docs/presentation-studio.md`](docs/presentation-studio.md).
 
-4. **📊 Academic Presentation Studio (`OT-22`)**:
-   - **4-Step Guided Workflow**: *01 Understand (topic or document → card outline) → 02 Design (8 curated themes previewed with your slides, library, screenshot cloner) → 03 Edit Slides (Gamma-style cards, inline editing, one-click layout and theme switching) → 04 Present (stage / leave-behind views, full-screen presenter)*.
-   - **Gamma-style cards**: bento grids, big-number callouts, timelines, comparisons, quotes and image + text layouts in a scientific monochrome look (`#F8F7F4` / `#171717`).
-   - **Native PowerPoint export (`.pptx`)** that matches the on-screen slides, plus PDF, Markdown and JSON. Generated decks only use figures found in your own material. See [`docs/presentation-studio.md`](docs/presentation-studio.md).
+Other surfaces: Ask Scholar chat on `/projects`, Knowledge Vault (`/vault`), AI Access (`/ai-access`), account settings (`/settings`) and the lazy-loaded admin panel (`/admin/*`).
 
-5. **🎓 Thesis & Dissertation Workspace (`OT-09` / `OT-07`)**:
-   - Multi-chapter milestone tracker with sequential chapter readiness gating, literature synthesis matrix, and 15-question Viva Voce oral defense simulator.
+## Single-brain architecture
 
-6. **💬 Full-Screen Conversational Ask Scholar (`/projects`)**:
-   - Immersive dashboard research chat that collapses template starter cards upon interaction, creating an expansive full-screen canvas with citation grounding and direct project initiation.
+`server/src/services/scholarBrain.ts` is the only AI brain for every workspace. It is the only module allowed to import `server/utils/llm.ts`; routes and services call its logged wrappers (`callOpenRouterJSON`, `callOpenRouterText`, `streamOpenRouterJSON`). No workspace may add its own prompt engine, regex outline generator or subject-to-theory table, and the Quantum literature catalog, the Zappos/Schein canned outline and keyword-to-framework tables are permanently banned. `src/__tests__/singleBrainGuardian.test.ts` enforces this in `npm test`. See [`CLAUDE.md`](CLAUDE.md) and `.claude/agents/single-brain-guardian.md`.
 
-7. **♿ 100/100 Lighthouse Accessibility & Non-Blocking UX (`FeedbackSystem.tsx`, `AriaLiveAnnouncer.tsx`)**:
-   - Accessible toast/modal feedback system (zero native browser popups), WCAG screen-reader live regions, persistent autosave badges (`WorkspaceAutosaveBadge.tsx`), unsaved-changes guards (`useUnsavedChangesGuard.ts`), and Laptop Focus Mode.
+## AI access
 
----
+Users choose where AI runs in `/ai-access` (sections: Overview, Providers, Subscription, Preferences). A request is served from four tiers: the user's local runner, free-tier keys, bring-your-own keys, or platform-managed Premium resources.
 
-## 🧠 Supervised ML Style Engine (110-Paper Open-Access Corpus)
+- 37 cloud providers are catalogued in `src/config/providerCatalog.ts`; 9 local runners (Ollama, LM Studio, Jan, LocalAI, llama.cpp, KoboldCpp, vLLM, text-generation-webui, OmniRoute) in `src/config/localRunnerCatalog.ts`.
+- A user's key travels with a request only as transient `x-ai-*` headers (or the `x-ai-keyring` header for `/api/ai/run`); request handlers hold it in memory and never log or store it, and request bodies may not carry credentials. Users can optionally save keys to their account to sync devices (`public.user_provider_keys`, envelope-encrypted under `MASTER_KEY`). Premium (platform) credentials live in a separate server-side vault and never leave the server.
+- A local model on the user's machine can only be reached from the browser; a deployed server cannot reach it.
+- See [`docs/AI-SYSTEM.md`](docs/AI-SYSTEM.md).
 
-Scholar Core includes a dedicated Supervised Machine Learning Style Engine (`ml-style-engine/`):
-- **110-Paper Verified Corpus**: 10 full-text peer-reviewed open-access papers per archetype across 11 scholarly classes (`essay`, `literature_review`, `research_paper`, `case_study`, `report`, `critical_essay`, `argumentative_essay`, `policy_analysis`, `business_assignment`, `journal_article`, `presentation_slides`), totaling **752,811 verified words** with 0 duplicate PMCIDs and 0 duplicate hashes.
-- **High-Precision ML Classifier**: Calibrated LinearSVC achieves **93.97% 5-Fold Stratified Cross-Validation Accuracy & Macro F1** (exceeding the 85% qualification gate).
-- **Zero-Latency In-Memory Inference**: Model weights exported to JSON (`archetype_model_weights.json`) for deterministic client-side TF-IDF dot-product scoring and quantitative style auditing in TypeScript without network overhead.
+## Source library and storage policy
 
+The Knowledge Vault stores structured bibliographic metadata, DOIs, URLs and citation data per user (`public.user_vault_items`, with cloud-drive pointers for Google Drive and OneDrive). Uploaded files are parsed in memory (hard ceiling 10 MB, `MAX_UPLOAD_MB`) and the parsed text is stored only where a feature needs it (for example vault item `content_text`, or project files in the private `project-files` bucket). Reference import supports DOI lookup, BibTeX and RIS.
 
----
+## Style engine
 
-## 🔐 Source Library & Zero Document Storage Architecture
+`ml-style-engine/` holds an offline-trained archetype classifier (Python scripts, 110 open-access papers, 10 per archetype across 11 archetypes, 752,811 words). Its exported weights (`src/features/coursework/data/archetype_model_weights.json`) are scored in TypeScript by `src/features/coursework/services/styleEngineService.ts` (TF-IDF dot products plus style metrics). Reported calibrated LinearSVC cross-validation accuracy: 93.97% (`ml-style-engine/models/archetype_classifier_meta.json`).
 
-Scholar Core operates under a strict **Zero Document Storage Policy**:
-- **Zero Full-Text Retention**: Scholar Core does NOT store full proprietary PDFs, copyrighted manuscripts, or full paper texts on its servers.
-- **Verifiable Citation & Metadata Pointers**: Retains only structured bibliographic metadata, canonical references, DOIs, URLs, and client-authorized cloud storage pointers.
-- **Cloud Drives (Google Drive & Microsoft OneDrive)**:
-  - **Google Drive**: Automatic metadata extraction and direct `↗ Open in Google Drive` navigation.
-  - **Microsoft OneDrive & SharePoint**: Instant share link ingestion (`https://1drv.ms/...`), institutional email workspace connect, and Azure OAuth handling.
-- **Reference Management**: Direct DOI lookup via Crossref/OpenAlex, plus BibTeX (`.bib`) and RIS (`.ris`) import.
+## Quick start
 
----
+Requirements: Node 22 (Dockerfile and CI use 22), npm 10+.
 
-## ⚡ Multi-Tier AI Gateway & BYOK Infrastructure
-
-Scholar Core features a flexible, multi-tiered AI architecture configurable in `/ai-access`:
-- **5 Operating Modes**: Smart Gateway, Bring Your Own Key (BYOK), Free Tier, Local AI (Ollama, LM Studio on `localhost`), and Offline Mode.
-- **Provider Support**: OpenAI, Anthropic, Google Gemini, Groq, Mistral, Cohere, xAI, OpenRouter, and Together AI.
-- **Automatic Failover**: Transparent fallback on HTTP 429 rate limits or provider outages with exponential quarantine recovery.
-
----
-
-## 🚀 Quick Start
-
-### Installation
 ```bash
-# Clone repository
 git clone https://github.com/docgovinda-glitch/scholar-agentic-os.git
 cd scholar-agentic-os
-
-# Install dependencies
-npm install
-
-# Setup environment variables
-cp .env.example .env
+npm ci
+cp .env.example .env      # fill in Supabase keys; see SETUP.md
+npm run dev               # Express + Vite middleware on http://localhost:3000
 ```
 
-### Run Locally
-```bash
-npm run dev
-```
-Access the application at `http://localhost:3000`.
+| Command | What it does |
+| :--- | :--- |
+| `npm run dev` | `tsx server.ts`: API plus Vite HMR on port 3000 |
+| `npm run lint` | `tsc --noEmit` + contrast, CSP-hash, no-pure-black and no-raw-hex-class checks (pre-commit hook and CI gate) |
+| `npm run typecheck` | `tsc --noEmit` only |
+| `npm test` | `vitest run` (whole suite) |
+| `npm run build` | `vite build`, chunk-budget check (< 500 kB per chunk), then esbuild bundles `server.ts` to `dist/server.cjs` |
+| `npm start` | `node dist/server.cjs` |
+| `npm run test:e2e` | Playwright end-to-end suite (see [`e2e/README.md`](e2e/README.md)) |
 
-### Run Verification & Tests
-```bash
-# Type checking
-npx tsc --noEmit
+## Documentation map
 
-# Run tests
-npm test
+| Document | Contents |
+| :--- | :--- |
+| [`docs/README.md`](docs/README.md) | Index and conventions |
+| [`docs/PRODUCT.md`](docs/PRODUCT.md) | Capabilities, roles, output types |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Topology, layers, security model |
+| [`docs/WORKFLOWS.md`](docs/WORKFLOWS.md) | Step-by-step workflows per workspace |
+| [`docs/AI-SYSTEM.md`](docs/AI-SYSTEM.md) | AI routing, providers, credentials, scholarBrain |
+| [`docs/AI-CALL-MAP.md`](docs/AI-CALL-MAP.md) | Every AI entry layer and its credential source |
+| [`docs/DATA-MODEL.md`](docs/DATA-MODEL.md) | Tables, storage, domain state |
+| [`docs/API.md`](docs/API.md) | HTTP endpoints |
+| [`docs/UI-UX.md`](docs/UI-UX.md) | Design tokens, themes, layout, accessibility |
+| [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | Local development and testing |
+| [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | Docker, Render, CI/CD, Supabase |
+| [`docs/presentation-studio.md`](docs/presentation-studio.md) | Slides engine |
+| [`SETUP.md`](SETUP.md), [`RUNBOOK.md`](RUNBOOK.md), [`SYSTEM_MAP.md`](SYSTEM_MAP.md) | Setup, operations, file map |
 
-# Linting & design checks
-npm run lint
-
-# Production build
-npm run build
-```
-
----
-
-## 📚 Documentation Directory
-
-Complete authoritative documentation is available in the [`/docs`](docs/README.md) directory:
-
-- [**`docs/README.md`**](docs/README.md): Master documentation index.
-- [**`docs/PRODUCT.md`**](docs/PRODUCT.md): Current product capabilities and user roles.
-- [**`docs/UI-UX.md`**](docs/UI-UX.md): UI layout, component design, Day/Night theme, and interaction states.
-- [**`docs/ARCHITECTURE.md`**](docs/ARCHITECTURE.md): Fullstack architecture, topology, and security model.
-- [**`docs/WORKFLOWS.md`**](docs/WORKFLOWS.md): Step-by-step user journeys across all major features.
-- [**`docs/AI-SYSTEM.md`**](docs/AI-SYSTEM.md): AI routing, failover, local runners, and prompt design.
-- [**`docs/DATA-MODEL.md`**](docs/DATA-MODEL.md): Domain models, TypeScript interfaces, and PostgreSQL schemas.
-- [**`docs/API.md`**](docs/API.md): Server endpoints, authentication, and request/response specifications.
-- [**`docs/DEVELOPMENT.md`**](docs/DEVELOPMENT.md): Local development environment, commands, and standards.
-- [**`docs/DEPLOYMENT.md`**](docs/DEPLOYMENT.md): Docker, Render, environment configuration, and Supabase setup.
+Incident, audit and hotfix records (`AUDIT.md`, `HOTFIX*_DEPLOY.md`, `COMPROMISE_CHECKS.md`, `MERGE_PLAN.md`, `POST_DEPLOY_80.md`, `PROD_CHECKS.md`, `PRODUCT_AUDIT.md`, `ROTATION_RUNBOOK.md`, `USER_NOTICE.md`, `STATUS.md`, `docs/COMPLETION_ROADMAP.md`) are dated records and are not kept in sync with the code. `CHANGELOG.md` lists user-visible changes.

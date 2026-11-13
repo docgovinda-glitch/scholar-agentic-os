@@ -31,6 +31,16 @@ import { ag26WorkflowCoordinator } from "../../../src/app/mesh/agents/ag26Workfl
 import { issue, revoke } from "../../../src/services/capabilities/capabilities.ts";
 import { initialProjectGateState } from "../../../src/app/conductor/conductor.ts";
 import {
+  callOpenRouterJSON as rawCallOpenRouterJSON,
+  callOpenRouterText as rawCallOpenRouterText,
+  handOffBeforeStream as rawHandOffBeforeStream,
+  streamOpenRouterJSON as rawStreamOpenRouterJSON,
+  signLlmChallenge,
+  computePromptHash,
+  generateGeminiEmbedding,
+} from "../../utils/llm.ts";
+import { loadArchetypeModelWeights, type ArchetypeModelWeights } from "../../../src/shared/archetypeModelWeights.ts";
+import {
   buildScholarlyVoiceSystemPrompt,
   sanitizeScholarlyText,
   normalizeUnicodeNFC,
@@ -267,9 +277,75 @@ function cachedLiveDiscovery(query: string, maxResults: number): Promise<LiveDra
 }
 
 /**
+ * SINGLE LLM GATEWAY. scholarBrain.ts is the only module allowed to import
+ * server/utils/llm.ts. The three execution functions below are real wrappers,
+ * not pass-throughs: every call is timed and logged (task type + outcome only,
+ * never prompt text or credentials), failures are logged once with context and
+ * rethrown unchanged so route-level handling (NoAiConnectedError,
+ * BrowserAiRequiredError, ...) keeps working, and text output is NFC-normalised.
+ * Orthography/cliché rewriting stays opt-in via scholarBrain.complete()/stream(),
+ * because generic text calls (JSON, code, citations) must not be rewritten.
+ */
+export {
+  signLlmChallenge,
+  computePromptHash,
+  generateGeminiEmbedding,
+  readVerifiedBrowserResult,
+};
+
+async function runGatewayCall<T>(kind: string, taskType: string | undefined, fn: () => Promise<T>): Promise<T> {
+  const started = Date.now();
+  try {
+    const result = await fn();
+    console.info(`[scholarBrain] ${kind} ok task=${taskType ?? "reasoning"} ms=${Date.now() - started}`);
+    return result;
+  } catch (err) {
+    const name = err instanceof Error ? err.constructor.name : typeof err;
+    console.warn(`[scholarBrain] ${kind} failed task=${taskType ?? "reasoning"} ms=${Date.now() - started} error=${name}`);
+    throw err;
+  }
+}
+
+export function callOpenRouterJSON<T = any>(...args: Parameters<typeof rawCallOpenRouterJSON>): Promise<T> {
+  return runGatewayCall("json", args[5], () => rawCallOpenRouterJSON<T>(...args));
+}
+
+export function callOpenRouterText(...args: Parameters<typeof rawCallOpenRouterText>): ReturnType<typeof rawCallOpenRouterText> {
+  return runGatewayCall("text", args[5], async () => {
+    const text = await rawCallOpenRouterText(...args);
+    return typeof text === "string" ? normalizeUnicodeNFC(text) : text;
+  });
+}
+
+/**
+ * Before an SSE route flushes its headers: hand the request to the browser
+ * (426) when no server-side model can answer. True = handed off, stop here.
+ */
+export function handOffBeforeStream(...args: Parameters<typeof rawHandOffBeforeStream>): ReturnType<typeof rawHandOffBeforeStream> {
+  return rawHandOffBeforeStream(...args);
+}
+
+export function streamOpenRouterJSON(...args: Parameters<typeof rawStreamOpenRouterJSON>): ReturnType<typeof rawStreamOpenRouterJSON> {
+  return runGatewayCall("stream", args[5], () => rawStreamOpenRouterJSON(...args));
+}
+
+/** Centrally managed quantitative style weights (trained archetype model). */
+export function getArchetypeModelWeights(): ArchetypeModelWeights {
+  return loadArchetypeModelWeights();
+}
+
+/**
  * Canonical scholarBrain Orchestrator Object
  */
 export const scholarBrain = {
+  callJSON: (...args: Parameters<typeof callOpenRouterJSON>) => callOpenRouterJSON(...args),
+  callText: (...args: Parameters<typeof callOpenRouterText>) => callOpenRouterText(...args),
+  streamJSON: (...args: Parameters<typeof streamOpenRouterJSON>) => streamOpenRouterJSON(...args),
+  signLlmChallenge: (...args: Parameters<typeof signLlmChallenge>) => signLlmChallenge(...args),
+  computePromptHash: (...args: Parameters<typeof computePromptHash>) => computePromptHash(...args),
+  generateGeminiEmbedding: (...args: Parameters<typeof generateGeminiEmbedding>) => generateGeminiEmbedding(...args),
+  readVerifiedBrowserResult: (...args: Parameters<typeof readVerifiedBrowserResult>) => readVerifiedBrowserResult(...args),
+  getArchetypeModelWeights,
   /**
    * 1. Unified Client-Owned AI Execution
    * Strictly enforces client-owned BYOK/Local routing, zero hardcoded models,
@@ -787,6 +863,57 @@ export const scholarBrain = {
    * 5. Deterministic Mark-Weighted Word Allocator
    * Partitions total word count across questions based on marks, percentages, or subpart complexity.
    */
+  /**
+   * Presentation Studio (OT-22): the card-by-card outline for an uploaded
+   * brief or a topic. Returns the model's JSON (validated by the route).
+   */
+  async presentationOutline(options: {
+    req: ScholarBrainAiRequestLike;
+    material: string;
+    topic?: string;
+    slideCount: number;
+    visualTypes: readonly string[];
+    instruction?: string;
+    current?: Array<{ title: string; bullets: string[] }>;
+  }): Promise<unknown> {
+    const systemPrompt = `You plan presentation outlines in the style of Gamma: one idea per card, each card a visual.
+Write EXACTLY ${options.slideCount} cards for the material, in presentation order: a title card first, a key-takeaways card last.
+
+Rules:
+- "title" of the deck: the real topic of the material (for example "Branches of Quantum Computing: Assessment & Architectural Framework"). Never an institution banner such as "DEPARTMENT OF ...", never a module or course code, never "-4020"-style numbers.
+- Every card: a short assertion or topic title (max 10 words), a "visualType" from this list: ${options.visualTypes.map((v) => `"${v}"`).join(", ")}, and 3-4 "bullets" (max 14 words each) that say what the card covers.
+- Cover every question or section in the material; never drop one. Use only content that is in the material; never invent figures, quotations or citations.
+- Vary visualType across the deck; use "2-Column Comparison" for comparisons and "Process / Timeline" for sequences.
+Output strict JSON only: {"title":"...","slides":[{"title":"...","visualType":"...","bullets":["..."]}]}`;
+    const userPrompt = [
+      options.topic ? `Topic: ${options.topic}` : "",
+      options.instruction ? `Change requested by the presenter: ${options.instruction}` : "",
+      options.current?.length ? `Current outline:\n${options.current.map((c, i) => `${i + 1}. ${c.title}: ${c.bullets.join("; ")}`).join("\n")}` : "",
+      options.material ? `Material:\n${options.material.slice(0, 20000)}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+    const res = await scholarBrain.complete({ req: options.req, browserFallback: true, taskClass: "verification", systemPrompt, userPrompt, responseFormat: "json" });
+    return res.parsedJson ?? (res.text ? parseAndRepairLLMJson(res.text) : null);
+  },
+
+  /** Write one block of a slide (Presentation Studio "Write with AI"). */
+  async writeSlideBlock(options: {
+    req: ScholarBrainAiRequestLike;
+    kind: string;
+    slideTitle: string;
+    context: string;
+    existing?: string;
+  }): Promise<unknown> {
+    const systemPrompt = `You write one block of a presentation slide using assertion-evidence design.
+Block kind: ${options.kind}. Write a "title" (max 8 words, an assertion not a topic) and a "body" (15-30 words, concrete, scannable, no filler or clichés).
+Use only what the slide context supports; never invent figures, quotations or citations. If the context has no figure, do not write one.
+Output strict JSON only: {"title":"...","body":"..."}`;
+    const userPrompt = `Slide: ${options.slideTitle}\nContext:\n${options.context.slice(0, 4000)}${options.existing ? `\nCurrent text: ${options.existing}` : ""}`;
+    const res = await scholarBrain.complete({ req: options.req, browserFallback: true, taskClass: "verification", systemPrompt, userPrompt, responseFormat: "json" });
+    return res.parsedJson ?? (res.text ? parseAndRepairLLMJson(res.text) : null);
+  },
+
   allocateWordsByMarks(
     questions: Array<BriefQuestionInput | string>,
     totalWordBudget: number

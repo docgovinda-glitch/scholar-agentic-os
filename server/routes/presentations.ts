@@ -5,6 +5,7 @@
  * supporting debounced autosave, copilot mutations, and CRUD operations.
  */
 
+import { cleanBriefText, deriveDocumentTitle } from "../../src/shared/presentationBrief.ts";
 import express, { Router, Request, Response } from "express";
 import { randomUUID } from "node:crypto";
 import JSZip from "jszip";
@@ -303,37 +304,21 @@ router.post("/parse-document", upload.single("file"), async (req: Request, res: 
         filename: file.originalname,
         mimeType: file.mimetype,
       });
+      if (!parsed.ok && /\.(pdf|docx?)$/i.test(lowerName)) {
+        // A binary file that failed to parse must never be decoded as text.
+        return res.status(422).json({ error: "We could not read text from this file. If it is a scanned image, paste the text instead.", code: "document_unreadable" });
+      }
       text = parsed.ok ? parsed.data.text : file.buffer.toString("utf-8");
     }
 
-    text = normalizeUnicodeNFC(text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim());
+    // Course codes and page footers never reach titles, outlines or stat cards.
+    text = cleanBriefText(normalizeUnicodeNFC(text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim())).trim();
     if (!text) {
       return res.status(422).json({ error: "Could not extract readable text from document. Please verify file content." });
     }
 
-    // Heuristically extract title/topic from first few non-trivial lines
-    const lines = text.split("\n").map(l => l.trim().replace(/^#+\s*/, "")).filter(Boolean);
-    if (!detectedTitle) {
-      for (let i = 0; i < Math.min(lines.length, 6); i++) {
-        const candidate = lines[i].replace(/^["'“”‘’]+|["'“”‘’]+$/g, "").trim();
-        if (
-          candidate.length >= 8 &&
-          candidate.length <= 120 &&
-          !/^(assignment brief|essay prompt|module handbook|table of contents|contents|abstract|overview|introduction)$/i.test(candidate)
-        ) {
-          detectedTitle = candidate;
-          break;
-        }
-      }
-
-      if (!detectedTitle) {
-        detectedTitle = file.originalname
-          .replace(/\.[^/.]+$/, "")
-          .replace(/[-_]/g, " ")
-          .replace(/\b\w/g, (c: string) => c.toUpperCase())
-          .trim();
-      }
-    }
+    // The real topic: never an institution banner or a module code.
+    if (!detectedTitle) detectedTitle = deriveDocumentTitle(text, file.originalname);
 
     const words = text.split(/\s+/).filter(Boolean);
     const wordCount = words.length;

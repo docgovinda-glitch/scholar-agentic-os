@@ -11,6 +11,8 @@
  * - Human-readable slide headlines and clear category labels
  */
 
+import { stripCourseCodes } from '../../../utils/briefExtractor';
+import { cleanBriefText } from '../../../shared/presentationBrief';
 import type {
   SlideDeck,
   SlideCard,
@@ -634,7 +636,8 @@ function generateSlidesForTopic(
  * Main Slide Generator
  * Ingests freeform topic or markdown draft, generates structured presentation deck.
  */
-export function generateSlideDeck(input: DecomposeInput): SlideDeck {
+export function generateSlideDeck(rawInput: DecomposeInput): SlideDeck {
+  const input: DecomposeInput = { ...rawInput, topic: stripCourseCodes(rawInput.topic || ''), text: rawInput.text ? cleanBriefText(rawInput.text) : rawInput.text };
   const { text = '', topic = '', framework = 'Standard-Narrative', presentationStyle } = input;
   const trimmedText = text.trim();
   const trimmedTopic = topic.trim();
@@ -857,6 +860,7 @@ export const decomposeToUniversal5Beat = generateSlideDeck;
 /**
  * Extracts clean structured slides from raw academic text.
  */
-export function extractSlidesFromAcademicText(text: string): SlideDeck {
+export function extractSlidesFromAcademicText(rawText: string): SlideDeck {
+  const text = cleanBriefText(rawText);
   return generateSlideDeck({ text });
 }

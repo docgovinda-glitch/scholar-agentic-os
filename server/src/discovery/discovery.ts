@@ -211,6 +211,41 @@ export async function discoverCrossrefSources(query: string, maxResults = 25): P
   });
 }
 
+export async function discoverSemanticScholarSources(query: string, maxResults = 20): Promise<DiscoveredSourceDraft[]> {
+  const params = new URLSearchParams({
+    query,
+    limit: String(Math.min(maxResults, 50)),
+    fields: "title,authors,year,venue,externalIds,url",
+  });
+  let res: Response;
+  try {
+    res = await fetch(`https://api.semanticscholar.org/graph/v1/paper/search?${params.toString()}`, {
+      signal: AbortSignal.timeout(15_000),
+      headers: { Accept: "application/json" },
+    });
+  } catch (err) {
+    throw new Error(`Semantic Scholar request failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  if (!res.ok) throw new Error(`Semantic Scholar ${res.status}`);
+  const parsed = (await res.json()) as { data?: any[] };
+  return (parsed.data ?? [])
+    .filter((p) => p?.title)
+    .map((p) => {
+      const doi: string | undefined = p.externalIds?.DOI;
+      return {
+        title: String(p.title),
+        authors: Array.isArray(p.authors) ? p.authors.map((a: any) => a?.name).filter(Boolean) : [],
+        url: p.url || (doi ? `https://doi.org/${doi}` : undefined),
+        ...(doi ? { doi } : {}),
+        ...(p.venue ? { venue: String(p.venue) } : {}),
+        ...(p.year ? { year: Number(p.year) } : {}),
+        discoveredVia: "semantic_scholar" as const,
+        sourceType: "scholarly" as const,
+        authorityTier: "A" as const,
+      };
+    });
+}
+
 export async function discoverDoajSources(query: string, maxResults = 25): Promise<DiscoveredSourceDraft[]> {
   let res: Response;
   try {
@@ -289,6 +324,7 @@ export async function discoverMultiPortalSources(query: string, maxResults = 50)
     discoverDoajSources(query, Math.min(20, perPortalLimit)).catch(() => [] as DiscoveredSourceDraft[]),
     discoverDataCiteSources(query, Math.min(20, perPortalLimit)).catch(() => [] as DiscoveredSourceDraft[]),
     discoverArxivSources(query, Math.min(20, perPortalLimit)).catch(() => [] as DiscoveredSourceDraft[]),
+    discoverSemanticScholarSources(query, Math.min(20, perPortalLimit)).catch(() => [] as DiscoveredSourceDraft[]),
   ];
 
   const results = await Promise.allSettled(portalPromises);

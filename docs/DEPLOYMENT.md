@@ -1,161 +1,69 @@
-# Production Deployment & Infrastructure
+# Deployment
 
-This document specifies the deployment architecture, Docker containerization, platform configuration, environment variables, and database setup for **Scholar Core**.
+How the application is built, shipped and verified. Day-to-day operations (rollback, health checks, auth rate limits) are in [`../RUNBOOK.md`](../RUNBOOK.md).
 
----
+## 1. Shape
 
-## 1. Deployment Architecture Overview
-
-Scholar Core is designed for deployment as a unified, production-ready containerized service on platforms such as **Render**, **Fly.io**, **AWS ECS**, or any standard Docker-compatible host.
+Production is https://scholar.gkshah.com.np: Cloudflare (DNS, Turnstile) in front of one Render Docker web service on the free plan, backed by a Supabase project. The container runs `node dist/server.cjs`, which serves the API, the Supabase proxy and the static SPA.
 
 ```text
-Incoming Web Traffic (HTTPS: 443)
-             ↓
-Cloudflare / CDN Edge (SSL termination, Turnstile CAPTCHA validation)
-             ↓
-Render / Cloud Container Service (Running Dockerfile, gated deploys)
-             ↓
-Node.js Express Server (dist/server.cjs on $PORT, Node 22)
-  ├── Serves pre-built Vite client static assets (dist/*)
-  ├── Handles API endpoints (/api/*)
-  └── Proxies Supabase REST & WebSocket connections (strict allowlist)
-             ↓
-Remote Supabase Cloud (PostgreSQL 17 + Network Restrictions + RLS + S3 Storage)
+Browser -> Cloudflare -> Render web service (Docker, Node 22)
+                           |-- /api/*          Express routes
+                           |-- /api/supabase/* streaming proxy -> Supabase
+                           `-- everything else  static dist/ (SPA)
+Supabase: Auth, Postgres (RLS), Storage, Edge Functions
 ```
 
----
+## 2. Dockerfile
 
-## 2. Docker Containerization (`Dockerfile`)
+Two stages on `node:22-alpine`, sized for the free plan's cold starts and 512 MB RAM:
 
-The application includes an optimized multi-stage `Dockerfile`:
+1. **builder**: `npm ci --ignore-scripts`, `npm run build` (`dist/` assets plus `dist/server.cjs`). `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` and `VITE_CAPTCHA_SITE_KEY` are build `ARG`s turned into `ENV`, because Vite inlines `VITE_*` values at build time.
+2. **runtime**: production `node_modules` only (`npm ci --omit=dev`; `server.cjs` is bundled with `--packages=external`), the `dist/` folder, `NODE_ENV=production`, `PORT=3000`, runs as the non-root `node` user, `CMD ["node", "dist/server.cjs"]`. `HUSKY=0` in both stages.
 
-### 2.1 Multi-Stage Build Structure
-- **Stage 1: Build Stage (`node:22-alpine`)**:
-  - Installs npm dependencies.
-  - Compiles client application via `vite build`.
-  - Compiles server bundle via `esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --define:import.meta.env=process.env --define:import.meta={} --outfile=dist/server.cjs`. Ensures `import.meta.env` mappings safely resolve to `process.env` in Node.js CJS runtime.
-- **Stage 2: Production Runner (`node:22-alpine`)**:
-  - Sets `NODE_ENV=production`.
-  - Copies minimal production `node_modules` and compiled `dist/` directory.
-  - Adheres to least-privilege security by creating and switching to a non-root system user (`nodejs`).
-  - Exposes port specified by `$PORT`.
-  - Launches container using `node dist/server.cjs`.
+Local image: `docker build --build-arg VITE_SUPABASE_URL=... --build-arg VITE_SUPABASE_ANON_KEY=... --build-arg VITE_CAPTCHA_SITE_KEY= -t scholar-agentic-os:local .` then `docker run --rm -p 3000:3000 --env-file .env scholar-agentic-os:local`.
 
-### 2.2 Local Docker Build & Test
+## 3. Render (`render.yaml`)
+
+- One `web` service `scholar-agentic-os`, `env: docker`, `plan: free`, `autoDeploy: false`, `healthCheckPath: /api/health`.
+- Fixed values: `PORT=3000`, `NODE_ENV=production`, `MAX_UPLOAD_MB=10`.
+- Secrets set in the Render dashboard (`sync: false`): `MAIN_ADMIN_EMAIL`, `ADMIN_EMAIL`, `ENCRYPTION_KEY`, `MASTER_KEY`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_CAPTCHA_SITE_KEY`, `CAPTCHA_SECRET_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`.
+- Variables the code reads that are not in the blueprint can be added in the dashboard when needed, notably `LLM_CHALLENGE_SECRET` (required in production for browser-run AI challenges), `SUPABASE_JWT_SECRET`, `ALLOW_SERVER_LOCAL_AI`, `ENABLE_SERVER_AI`, `OPENALEX_MAILTO`, `OPENALEX_API_KEY` and search keys. Full list: [`../SETUP.md`](../SETUP.md) §4.
+- `VITE_*` variables are baked in at build time; a change needs a rebuild. Never put a secret in a `VITE_` variable.
+- The free plan sleeps after about 15 minutes idle; the client wakes it early with `src/services/serverWarmup.ts`.
+- In production the server refuses to start unless durable storage is configured (`VITE_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`, or `DATABASE_URL`).
+
+## 4. GitHub workflows (`.github/workflows/`)
+
+| Workflow | Trigger | What it does |
+| :--- | :--- | :--- |
+| `ci.yml` "CI" | Pull requests to `main`, manual | `npm ci`, `npm run lint`, `npm audit --omit=dev --audit-level=high`, `npm test`, `npm run build` (Node 22, placeholder Supabase values) |
+| `e2e.yml` "E2E" | Pull requests, manual | Local Supabase from the CLI, `scripts/db/replay-migrations.sh`, `scripts/db/test-credits.sql`, `scripts/e2e-setup.mjs`, stub AI server, `npx playwright test`, production smoke suite against the local app |
+| `ai-routing.yml` "AI routing" | Pull requests and pushes to `main` that touch AI code, manual | Typecheck and the fast AI suites: router, live models, failover, keyring and account keys, URL screening, the single-brain guardian, and the Journal Writer routes |
+| `db-migrate.yml` "Database migrations" | Changes under `supabase/migrations`, manual | Validates file names (timestamp, unique) and that applied migrations are never edited (pull requests); on `main`, if `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD` and `SUPABASE_PROJECT_REF` secrets exist, shows `supabase db push --dry-run` and then applies the pending migrations; without the secrets it validates and skips with a notice |
+| `slide-parity.yml` | Pull requests (path-filtered), manual | `node scripts/slide-parity/run.mjs` compares web and `.pptx` rendering |
+| `deploy.yml` "Production Deployment & Verification" | Push to `main`, manual | Job `verify`: lint, audit, tests, build. Job `deploy` (environment `Production`): POSTs the Render deploy hook when the `RENDER_DEPLOY_KEY` secret exists; waits up to 20 minutes until `/api/health` reports the pushed commit (or a newer one containing it); `GET /api/health?deep=1`; runs `scripts/smoke-prod.mjs` only if the smoke secrets exist (`SMOKE_SUPABASE_SERVICE_ROLE_KEY`, `SMOKE_A_EMAIL`, …), otherwise skips with a warning |
+| `uptime.yml` | Every 15 minutes (cron), manual | Up to three attempts at `GET /api/health?deep=1`; a failing run notifies the repository owner |
+
+`main` is production; never push to it directly. Render builds the newest `main`, so when several merges land together an earlier run may report a newer commit; that is normal.
+
+## 5. Supabase
+
+- **Server access**: the server reaches Supabase over HTTPS (Data API, Auth, Storage) with `VITE_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`; `DATABASE_URL` (direct Postgres) is an optional fallback. The browser talks to Supabase through `/api/supabase/*` or directly with the anon key, as configured by `VITE_SUPABASE_URL`.
+- **Schema**: `supabase/schema.sql`, `schema_ai_engine.sql`, `schema_store.sql`, `schema_user_settings.sql`, then `supabase/migrations/*.sql` in timestamp order. Prove changes on a throwaway local database with `scripts/db/replay-migrations.sh "<local url>"` (it refuses hosted URLs). Apply to production with the Supabase CLI (`supabase db push`) or the Management API, then record them; migrations are not deployed by Render. The `db-migrate.yml` workflow applies pending migrations on `main` when its secrets are set (see §4). See [`../RUNBOOK.md`](../RUNBOOK.md) §4.
+- **Storage**: private buckets `project-files`, `vault-files` and `id-documents` ([`DATA-MODEL.md`](DATA-MODEL.md) §3); `scripts/create_bucket.ts` creates `project-files` if missing.
+- **Edge Functions** (`supabase/functions/`, deployed with `supabase functions deploy <name>`): `search-proxy`, `arxiv-proxy`, `who-proxy`, `imf-proxy` (stateless search proxies) and `request-profile-update` (currently disabled: returns 410). Shared helpers in `_shared/` (`adminClient.ts`, `cors.ts`, `resend.ts`). They are excluded from `tsconfig.json`.
+- **Auth settings** (dashboard): enable the email provider; set the Site URL to the production domain and add redirect URLs for `/verify-email` and `/reset-password/confirm`; Google sign-in needs the Google provider configured. Current rate-limit values are in [`../RUNBOOK.md`](../RUNBOOK.md) §6.
+
+## 6. Verifying a deploy
+
 ```bash
-# Build the Docker image
-docker build -t scholar-agentic-os:latest .
-
-# Run the container locally
-docker run -p 3000:3000 --env-file .env scholar-agentic-os:latest
+curl -s https://scholar.gkshah.com.np/api/health
+curl -s "https://scholar.gkshah.com.np/api/health?deep=1"
 ```
 
----
+Expect `status: "healthy"`, `persistenceMode: "supabase-rest"`, `commit` equal to the short SHA of `main`, and (deep) `checks.database: "ok"`. A database that cannot be reached returns 503 with `status: "degraded"`. For a full functional pass run `scripts/smoke-prod.sh` as described in the runbook.
 
-## 3. Render Deployment Configuration (`render.yaml`)
+## 7. Other hosts
 
-The repository includes a blueprint specification in `render.yaml`:
-
-```yaml
-services:
-  - type: web
-    name: scholar-agentic-os
-    env: docker
-    plan: starter
-    region: frankfurt
-    dockerfilePath: Dockerfile
-    healthCheckPath: /health
-    autoDeploy: true
-    envVars:
-      - key: PORT
-        value: 3000
-      - key: NODE_ENV
-        value: production
-      - key: VITE_SUPABASE_URL
-        sync: false
-      - key: VITE_SUPABASE_ANON_KEY
-        sync: false
-      - key: SUPABASE_SERVICE_ROLE_KEY
-        sync: false
-      - key: GEMINI_API_KEY
-        sync: false
-      - key: CLOUDFLARE_TURNSTILE_SECRET_KEY
-        sync: false
-      - key: VITE_CLOUDFLARE_TURNSTILE_SITE_KEY
-        sync: false
-```
-
----
-
-## 4. Production Environment Variables Checklist
-
-Ensure the following variables are configured in your hosting platform dashboard:
-
-| Variable | Description | Required | Sensitive |
-| :--- | :--- | :--- | :--- |
-| `PORT` | Port for Express server to bind to (Render sets this dynamically). | Yes | No |
-| `NODE_ENV` | Must be set to `production`. | Yes | No |
-| `VITE_SUPABASE_URL` | Full URL to Supabase project (`https://<project-ref>.supabase.co`). | Yes | No |
-| `VITE_SUPABASE_ANON_KEY` | Public anonymous key for client Supabase requests. | Yes | No |
-| `SUPABASE_SERVICE_ROLE_KEY` | Administrative service-role key for backend operations. | Yes | **Yes** |
-| `SUPABASE_JWT_SECRET` | Secret for local HS256 JWT access token validation in Express. | Recommended | **Yes** |
-| `MASTER_KEY` | 32-byte hexadecimal key for wrapping platform provider credentials and cloud OAuth tokens. | Yes | **Yes** |
-| `LLM_CHALLENGE_SECRET` | 32-byte secret for domain-separated HMAC challenge token signing on `/api/ai/agent`. | Yes | **Yes** |
-| `MAX_UPLOAD_MB` | Maximum upload ceiling for multipart parsing (hard-clamped to `10` in code). | Recommended (`10`) | No |
-| `MAIN_ADMIN_EMAIL` | Administrator email address authorized to access `/api/admin/*`. | Yes | No |
-| `GEMINI_API_KEY` | Google Gemini API key powering Smart Gateway and default prompts. | Optional (if BYOK used) | **Yes** |
-| `CLOUDFLARE_TURNSTILE_SECRET_KEY` | Secret key for server-side CAPTCHA token verification. | Recommended | **Yes** |
-| `VITE_CLOUDFLARE_TURNSTILE_SITE_KEY` | Public site key for client Turnstile widget rendering. | Recommended | No |
-
----
-
-## 5. Supabase Database Setup & Migrations
-
-### 5.1 Network Restrictions & HTTPS Rest API Architecture
-- **Supabase Network Restrictions**: In production, direct Postgres TCP connections (`5432`/`6543`) are restricted to the owner's workstation `/32` IP.
-- **Durable Persistence via REST**: The Express server communicates with Supabase exclusively over HTTPS (`PostgREST`, `GoTrue`, and `Storage` via `VITE_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`). `projectStore.ts` automatically selects `createRestProjectStore` whenever Supabase credentials are configured, avoiding any direct TCP dependencies.
-
-### 5.2 Remote Database Synchronization & Safety Pre-Checks
-All database schema definitions and security policies are version-controlled in `supabase/migrations/`.
-
-> [!CAUTION]
-> **Production Safety Rule (Count-Only Pre-Check & Backup)**:
-> Before running `npx supabase db push` against production, verify the migration on a local Docker Supabase instance (`./scripts/verify-local-supabase.sh`), run the count-only query in [`HOTFIX2_DEPLOY.md`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/HOTFIX2_DEPLOY.md), and generate an encrypted database backup dump.
-
-To inspect pending migrations without applying:
-```bash
-# Dry-run check for unapplied migrations
-SUPABASE_ACCESS_TOKEN=<your-supabase-access-token> npx supabase db push --dry-run --project-ref <your-project-ref>
-```
-
-To apply pending migrations after verification and backup:
-```bash
-# Apply pending SQL migrations
-SUPABASE_ACCESS_TOKEN=<your-supabase-access-token> npx supabase db push --project-ref <your-project-ref>
-```
-
-### 5.2 Storage Bucket Configuration
-The platform requires an S3 storage bucket for project attachments and lecture slides:
-- Bucket Name: `project-files`
-- Privacy: Private (access controlled via signed URLs and RLS policies).
-- Creation Script: `npx tsx scripts/create_bucket.ts`.
-
-### 5.3 Authentication Settings in Supabase Dashboard
-1. **Email Auth**:
-   - Enable Email Provider.
-   - Configure Site URL to production domain (e.g., `https://scholar-core.onrender.com`).
-   - Add redirect URLs:
-     - `https://your-domain.com/verify-email`
-     - `https://your-domain.com/reset-password/confirm`
-2. **Google OAuth (Optional)**:
-   - Configure Google Client ID and Secret in Supabase Auth > Providers > Google.
-   - Add authorized redirect URI from Supabase into Google Cloud Console.
-
----
-
-## 6. Health Checks & Verification
-
-After deployment, confirm operational status:
-- **Liveness & Readiness**: Query `GET https://your-domain.com/health` (must return HTTP 200 with `{ "status": "ok" }`).
-- **CSP Headers**: Confirm Content Security Policy headers allow Supabase and Gemini endpoints without browser console violations.
-- **Signup Flow**: Test user registration with CAPTCHA verification to confirm end-to-end connectivity.
+Nothing is Render-specific except `render.yaml` and the `RENDER_GIT_COMMIT` variable used for the reported `commit` (`GIT_COMMIT` is also read). Any Docker host that passes the three `VITE_*` build args, sets the runtime variables in section 3 and exposes `/api/health` can run the image.

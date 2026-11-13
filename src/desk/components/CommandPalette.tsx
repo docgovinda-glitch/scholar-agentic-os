@@ -133,7 +133,7 @@ export function CommandPalette({
     const formatLabels: Record<string, string> = {
       "OT-01": "Coursework & Essays",
       "OT-10": "Journal Article",
-      "OT-19": "Research Proposal",
+      "OT-15": "Research Proposal",
       "OT-22": "Presentation",
       "OT-06": "Thesis / Dissertation",
     };
@@ -164,7 +164,7 @@ export function CommandPalette({
     const workspaces = [
       { id: "OT-01", label: "Coursework & Essays", desc: "Thesis formulation, rubric alignment, & argument synthesis" },
       { id: "OT-10", label: "Journal Article", desc: "Formal IMRaD manuscripts & peer-review readiness" },
-      { id: "OT-19", label: "Research Proposal", desc: "Gap identification & theoretical methodology design" },
+      { id: "OT-15", label: "Research Proposal", desc: "Gap identification & theoretical methodology design" },
       { id: "OT-22", label: "Slides & Keynotes", desc: "Academic presentation decks & speaker notes" },
     ];
 

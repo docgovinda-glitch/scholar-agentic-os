@@ -139,25 +139,33 @@ export function isDeepEqual(a: unknown, b: unknown, seenA = new WeakSet<object>(
 }
 
 /**
+ * Remove hyphenated course/module codes (e.g. "QNT-4020") so their digits are
+ * never mistaken for a word count.
+ */
+export function stripCourseCodes(text: string): string {
+  return text.replace(/\b[A-Z]{2,5}-\d{3,5}\b/gi, " ");
+}
+
+/**
  * Bounded word count extractor.
  * Scans only the first 50,000 characters using non-backtracking regular expressions.
  */
 export function extractWordCountFromText(rawText: string): number | undefined {
   if (!rawText) return undefined;
   // Bound to the first 50,000 characters to prevent regex catastrophic backtracking
-  const slice = rawText.slice(0, 50000);
+  const slice = stripCourseCodes(rawText.slice(0, 50000));
 
   // Pattern 1: "Word count: 2500" or "Length: 3000 words"
-  const match1 = slice.match(/(?:word\s*count|target|limit|length)\s*(?:is|of|:)?\s*([1-9]\d{2,4})/i);
+  const match1 = slice.match(/(?:word\s*count|target|limit|length)\s*(?:is|of|:)?\s*([1-9]\d{0,2}(?:,\d{3})+|[1-9]\d{2,4})/i);
   if (match1) {
-    const val = parseInt(match1[1], 10);
+    const val = parseInt(match1[1].replace(/,/g, ""), 10);
     if (val >= 200 && val <= 50000) return val;
   }
 
   // Pattern 2: "2500 words"
-  const match2 = slice.match(/\b([1-9]\d{2,4})\s*words\b/i);
+  const match2 = slice.match(/(?:^|[^\d,])([1-9]\d{0,2}(?:,\d{3})+|[1-9]\d{2,4})\s*words\b/i);
   if (match2) {
-    const val = parseInt(match2[1], 10);
+    const val = parseInt(match2[1].replace(/,/g, ""), 10);
     if (val >= 200 && val <= 50000) return val;
   }
 

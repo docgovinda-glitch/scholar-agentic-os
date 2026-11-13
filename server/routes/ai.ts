@@ -1,7 +1,7 @@
 import express, { Request, Response } from "express";
 import { requireAuth } from "../src/middleware/auth.ts";
-import { readVerifiedBrowserResult, signLlmChallenge, computePromptHash } from "../utils/llm.ts";
-import { keyringFromRequest } from "../src/ai/routerBridge.ts";
+import { readVerifiedBrowserResult, signLlmChallenge, computePromptHash } from "../src/services/scholarBrain.ts";
+import { requestKeyring } from "../src/ai/routerBridge.ts";
 import { InvalidLlmChallengeError, LocalModelUnreachableError, NoClientAiProviderError, sendAiFailure } from "../src/ai/aiRouteErrors.ts";
 import { aiAvailability, answeredByLabel, routedCompletion } from "../src/ai/routerBridge.ts";
 import type { ResearchLlm } from "../src/research/deepResearchEngine.ts";
@@ -306,7 +306,7 @@ export function registerAIRoutes(
    */
   router.get("/status", async (req: Request, res: Response) => {
     try {
-      const ring = keyringFromRequest(req);
+      const ring = await requestKeyring(req as never);
       const operational = ring.length > 0;
       const isLocal = (provider: string) => provider === "ollama" || provider === "lmstudio";
 
@@ -988,6 +988,10 @@ Formatting & Verification Rules:
           if (execErr instanceof NoClientAiProviderError || execErr instanceof LocalModelUnreachableError) return chatHandOff();
           return sendAiFailure(res, execErr, "The answer");
         }
+      }
+
+      if (!result.text || !result.text.trim()) {
+        return sendAiFailure(res, new Error("The AI returned an empty answer."), "The answer");
       }
 
       // 7. Post-Generation Anti-Hallucination Lock & Quality-Control via scholarBrain (only for strict Vault/Canonical ledger mode)

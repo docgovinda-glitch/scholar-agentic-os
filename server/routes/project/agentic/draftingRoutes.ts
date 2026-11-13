@@ -5,7 +5,7 @@ import { safeParseAnswerField } from "../../../../src/shared/projectStateSchema.
 import {
   callOpenRouterText,
   streamOpenRouterJSON,
-} from "../../../utils/llm.ts";
+} from "../../../src/services/scholarBrain.ts";
 import {
   buildScholarlyVoiceSystemPrompt,
   sanitizeScholarlyText,

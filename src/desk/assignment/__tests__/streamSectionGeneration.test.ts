@@ -34,7 +34,7 @@ describe("streamSectionGeneration", () => {
     const { promise, onComplete } = run();
     await expect(promise).resolves.toBe("Teams decide.");
     expect(authedJsonFetch).toHaveBeenCalledWith("/api/projects/p1/assignment/stream-section", "POST", expect.objectContaining({ sectionTitle: "Introduction" }));
-    expect(onComplete).toHaveBeenCalledWith("Teams decide.");
+    expect(onComplete).toHaveBeenCalledWith("Teams decide.", { scaffold: false });
   });
 
   it("a failed draft is an error with the server's message, and nothing is written", async () => {

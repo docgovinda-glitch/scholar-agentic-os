@@ -1,5 +1,7 @@
 # Live Post-Deploy Verification Runbook for PR #80 (`POST_DEPLOY_80.md`)
 
+> **Dated record.** This document captures a point in time (an incident, audit, plan or status ledger) and is not kept in sync with the code. For current behaviour read [`docs/README.md`](docs/README.md). Details here, such as `render.yaml` settings, file names, line numbers and counts, may no longer match `main`.
+
 **Target Commit on `origin/main`**: `cbf38da8934a6aa0d8e6654063bb253729b64e78` (`Merge pull request #80`, head `0d5b0df`)  
 **Target Live Origin**: `https://scholar.gkshah.com.np` (Render Service `srv-d9lgbn710e5c73dl8sk0` behind Cloudflare)  
 **Scope Rule**: Live HTTP and browser UI checks only — **zero production database queries**. Never paste or log secret values, access tokens, or refresh tokens into chat.

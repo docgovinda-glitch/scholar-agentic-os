@@ -5,12 +5,12 @@ import { ReferenceBarItem } from "../ReferenceBarItem";
 import { ApprovedReferencesShelf } from "../ApprovedReferencesShelf";
 import { CuratedSourceCard } from "../components/CuratedSourceCard";
 import { LectureUploadDropzone } from "../components/LectureUploadDropzone";
-import { ScholarlyResearchPipeline } from "../components/ScholarlyResearchPipeline";
 import {
   areSourcesRelevantToQuestion,
 } from "../services/scholarlyDiscoveryService";
 import {
   discoverRealScholarlySourcesFromServer,
+  discoverSourcesForAssignment,
   fetchMoreRealSources,
 } from "../services/realScholarlyDiscoveryService";
 import { SectionAnalysisWorkspace } from "../components/SectionAnalysisWorkspace";
@@ -77,6 +77,12 @@ export interface AssignmentSourcesStageProps {
   onBack?: () => void;
 }
 
+/** Relevance as a 0-100 integer whatever the source scale (0-1 fractions included). */
+function normalizeRelevance(score: number | undefined): number {
+  if (typeof score !== "number" || !Number.isFinite(score) || score <= 0) return 0;
+  return Math.min(100, Math.round(score <= 1 ? score * 100 : score));
+}
+
 export default function AssignmentSourcesStage({
   onProceed,
   onBack,
@@ -86,6 +92,7 @@ export default function AssignmentSourcesStage({
     project,
     saveAnswers,
     question,
+    assignmentBriefText,
     citationStyle,
     structure,
     sources,
@@ -368,7 +375,7 @@ export default function AssignmentSourcesStage({
     // Falls back to mock catalog if server is unavailable
     let cancelled = false;
     setIsDiscoveringInitial(true);
-    discoverRealScholarlySourcesFromServer(question, citationStyle)
+    discoverSourcesForAssignment({ question, briefText: assignmentBriefText, citationStyle })
       .then((discovered) => {
         if (!cancelled) {
           setSources(discovered);
@@ -407,7 +414,7 @@ export default function AssignmentSourcesStage({
   const handleReCurateForPrompt = async () => {
     setIsFindingMore(true);
     try {
-      const discovered = await discoverRealScholarlySourcesFromServer(question, citationStyle);
+      const discovered = await discoverSourcesForAssignment({ question, briefText: assignmentBriefText, citationStyle });
       await setSources(discovered);
       if (setApprovedSourceIds && approvedSourceIds.length > 0) {
         await setApprovedSourceIds(discovered.map((s) => s.id));
@@ -646,7 +653,17 @@ export default function AssignmentSourcesStage({
 
     return raw.map((s, idx) => ({
       ...s,
-      sourceOrigin: s.sourceOrigin || (idx < 15 ? "ask_scholar" : "ai_research"),
+      // Brief-driven discovery (incl. prescribed references) counts under Ask Scholar;
+      // AI-search results under AI Research. Unknown origins never fall out of every tab.
+      sourceOrigin:
+        s.sourceOrigin === "ai_research" || s.sourceOrigin === "user"
+          ? s.sourceOrigin
+          : s.sourceOrigin === "ask_scholar"
+          ? "ask_scholar"
+          : s.originTag === "ai-research"
+          ? "ai_research"
+          : "ask_scholar",
+      relevanceScore: normalizeRelevance(s.relevanceScore),
       status: s.status || "kept",
     }));
   }, [sources, question, citationStyle, hasTopic, hasUploadedDocs]);
@@ -789,7 +806,7 @@ export default function AssignmentSourcesStage({
 
     // 7. Minimum Relevance filter
     if (minRelevance > 0) {
-      list = list.filter((s) => (s.relevanceScore || 0) >= minRelevance);
+      list = list.filter((s) => normalizeRelevance(s.relevanceScore) >= minRelevance);
     }
 
     // 8. Open Access Only filter
@@ -802,6 +819,8 @@ export default function AssignmentSourcesStage({
       // Keep uploaded sources near the top if on "all"
       if (a.isUserUploaded && !b.isUserUploaded) return -1;
       if (!a.isUserUploaded && b.isUserUploaded) return 1;
+      if (a.prescribedInBrief && !b.prescribedInBrief) return -1;
+      if (!a.prescribedInBrief && b.prescribedInBrief) return 1;
 
       if (sortBy === "citations") {
         return (b.citationCount || 0) - (a.citationCount || 0);
@@ -886,12 +905,11 @@ export default function AssignmentSourcesStage({
         <div className="space-y-1">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wider uppercase bg-neutral-900 text-white dark:bg-white dark:text-neutral-900">
-              Phase 02
+              Phase 03
             </span>
             <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">
               Evidence Discovery & Course Grounding
             </span>
-            <ScholarlyResearchPipeline question={question} />
           </div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">
             Sources & Course Materials
@@ -899,12 +917,6 @@ export default function AssignmentSourcesStage({
           <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 max-w-2xl leading-relaxed">
             Upload course slides, syllabus, or readings to ground your citations.
           </p>
-          {question && (
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 font-medium truncate max-w-2xl pt-1">
-              <span className="text-neutral-400 dark:text-neutral-500 font-normal">Topic: </span>
-              <span className="text-neutral-700 dark:text-neutral-300">{question}</span>
-            </p>
-          )}
         </div>
 
         {/* View Switcher & Evidence Base Counter (Top Header View) */}
@@ -940,35 +952,12 @@ export default function AssignmentSourcesStage({
               </button>
             </div>
 
-            <div className="flex items-center gap-2">
-              <span
-                data-testid="evidence-counter"
-                className="px-3 py-1 rounded-full text-xs font-bold font-mono bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30"
-              >
-                {approvedSourceIds.length} / 4 recommended · {allMasterSources.length} in Vault
-              </span>
-            </div>
           </div>
         )}
       </div>
 
       {/* The agent: real search, AI reading of abstracts, links to the outline */}
-      <div className="mb-5"><SourcesAgentPanel /></div>
-
-      {/* Minimal Step Guidance Banner */}
-      <div className="p-3.5 sm:p-4 rounded-xl bg-neutral-100/60 dark:bg-white/[0.02] border border-neutral-200/60 dark:border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-2.5">
-          <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center font-mono font-bold text-[10px] shrink-0">
-            2
-          </div>
-          <p className="text-neutral-600 dark:text-neutral-400 text-xs leading-relaxed">
-            Curate peer-reviewed literature and course materials. Kept and approved sources are automatically linked to your outline sections for grounded drafting with verified in-text citations.
-          </p>
-        </div>
-        <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20 shrink-0 self-start sm:self-auto">
-          Sources ground your citations
-        </span>
-      </div>
+      <SourcesAgentPanel minimal />
 
       {isDiscoveringInitial && allMasterSources.length === 0 ? (
         <div
@@ -1011,20 +1000,11 @@ export default function AssignmentSourcesStage({
             projectId={projectId}
           />
 
-          {/* Quick Skip to Drafting option */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-neutral-200/60 dark:border-white/10">
             <p className="text-xs text-neutral-500 dark:text-neutral-400">
               Citing sources is optional. You can draft freely and add citations at any time.
             </p>
             <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={handleContinue}
-                data-testid="skip-to-drafting-btn"
-                className="px-5 py-2.5 rounded-full text-xs font-semibold border border-neutral-200 dark:border-white/10 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
-              >
-                Skip to Drafting
-              </button>
               <button
                 type="button"
                 onClick={handleContinue}
@@ -1102,25 +1082,6 @@ export default function AssignmentSourcesStage({
 
           {/* Section 2: Curated Academic Literature & Source Collection */}
           <section className="space-y-4 pt-4 border-t border-neutral-200/60 dark:border-white/5">
-            {/* Detailed Mode Evidence Grounding Matrix Banner */}
-            <>
-              <div className="rounded-2xl p-4 bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800/80 text-xs space-y-2 font-sans animate-in fade-in duration-200">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider text-[11px]">
-                      Detailed Mode · OpenAlex & CrossRef Evidence Grounding Matrix
-                    </span>
-                  </div>
-                  <span className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400">
-                    {allMasterSources.length} Sources Active · Citation Token Interceptor Ready
-                  </span>
-                </div>
-                <p className="text-zinc-600 dark:text-zinc-400 text-[11px] leading-relaxed">
-                  Every approved source excerpt is assigned a deterministic token (e.g. <code>[1]</code> or <code>[ev-uuid]</code>) to ground factual statements before section drafting.
-                </p>
-              </div>
-            </>
             {/* Workspace Toolbar Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
@@ -1171,23 +1132,18 @@ export default function AssignmentSourcesStage({
 
             {/* Topic Mismatch Notice Banner if user changed prompt but has previously approved sources */}
             {isMismatched && approvedSourceIds.length > 0 && (
-              <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-900 dark:text-amber-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-2">
-                <div className="flex items-center gap-2.5">
-                  <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                  <span>
-                    Your assignment question has changed. Would you like to curate fresh literature tailored to your research question?
-                  </span>
-                </div>
+              <p className="flex items-center justify-between gap-3 text-xs text-neutral-600 dark:text-neutral-400" data-testid="question-changed-notice">
+                <span>Your assignment question has changed.</span>
                 <button
                   type="button"
                   onClick={handleReCurateForPrompt}
                   disabled={isFindingMore}
-                  className="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs shrink-0 cursor-pointer transition-colors flex items-center gap-1.5 shadow-xs dark:shadow-none"
+                  className="px-2.5 py-1 rounded-lg border border-neutral-200 dark:border-white/15 text-xs font-medium text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-white/5 cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50"
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isFindingMore ? "animate-spin" : ""}`} />
-                  <span>Curate for Question</span>
+                  <RefreshCw className={`w-3 h-3 ${isFindingMore ? "animate-spin" : ""}`} />
+                  Refresh Sources
                 </button>
-              </div>
+              </p>
             )}
 
             {/* AI Literature Discovery & Query Bar */}
@@ -1896,7 +1852,7 @@ export default function AssignmentSourcesStage({
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">
-              Phase 2: Evidence Grounding
+              Evidence Grounding
             </h3>
             {approvedCount > 0 ? (
               <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 flex items-center gap-1 border border-emerald-500/20">
@@ -1926,25 +1882,7 @@ export default function AssignmentSourcesStage({
             className="px-4 py-2.5 rounded-full text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer flex items-center gap-1.5"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Phase 1: Understand</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleContinue}
-            data-testid="skip-to-drafting-btn"
-            className="px-5 py-2.5 rounded-full text-xs font-semibold border border-neutral-200 dark:border-white/10 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
-          >
-            Skip to Drafting
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveMainView("analysis")}
-            className="px-5 py-2.5 rounded-full text-xs font-semibold border border-neutral-200 dark:border-white/10 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer flex items-center gap-1.5"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-            <span>Move to AI Analysis</span>
+            <span>Back to Understand</span>
           </button>
 
           <button

@@ -1,4 +1,9 @@
 import express from "express";
+import { buildSectionScaffold, type ScaffoldSource } from "../../../src/utils/sectionScaffold.ts";
+import { BrowserAiRequiredError, InvalidLlmChallengeError, LocalModelUnreachableError, NoClientAiProviderError } from "../../../src/ai/aiRouteErrors.ts";
+import { buildSectionContract } from "../../../src/utils/sectionContract.ts";
+import { sectionWordRange, trimToSentenceWithinWords } from "../../../src/utils/sectionBudget.ts";
+import { countExactWords } from "../../../src/utils/wordBudgetAllocator.ts";
 import { parseDocument } from "../../../../src/document_intelligence/index.ts";
 import {
   buildScholarlyVoiceSystemPrompt,
@@ -6,8 +11,10 @@ import {
   normalizeUnicodeNFC,
 } from "../../../src/utils/scholarlyVoiceGuard.ts";
 import { getProjectStore } from "../../../../src/services/store/projectStore.ts";
-import { callOpenRouterJSON, callOpenRouterText } from "../../../utils/llm.ts";
-import { keyringFromRequest } from "../../../src/ai/routerBridge.ts";
+import { callOpenRouterJSON, callOpenRouterText, handOffBeforeStream } from "../../../src/services/scholarBrain.ts";
+import { requestKeyring } from "../../../src/ai/routerBridge.ts";
+import { ensureParagraphBreaks } from "../../../../src/shared/proseParagraphs.ts";
+import { chunkPreservingWhitespace, openSseStream, paragraphRange, SSE_HEARTBEAT_MS, streamErrorMessage } from "../../../src/utils/sectionStream.ts";
 import { scholarBrain } from "../../../src/services/scholarBrain.ts";
 import { sendAiFailure, UnusableAiResponseError } from "../../../src/ai/aiRouteErrors.ts";
 import {
@@ -35,7 +42,6 @@ import {
 import {
   generateDynamicAssignmentStructure,
   generateAiEnhancedOutline,
-  extractTargetFrameworks,
   sanitizeOutlineHeadings,
   assignmentStructureToOutlineTree,
   outlineTreeToAssignmentStructure,
@@ -212,7 +218,7 @@ ${tutorialOrPeelRules}`;
     });
 
     let effectiveDraft = "";
-    if (keyringFromRequest(req).length > 0) {
+    if ((await requestKeyring(req as never)).length > 0) {
       try {
         const brainResult = await scholarBrain.complete({
           req,
@@ -259,15 +265,6 @@ ${tutorialOrPeelRules}`;
     effectiveDraft = sanitizeScholarlyText(effectiveDraft, { dialect: "en-GB", stripCliches: true });
     effectiveDraft = normalizeUnicodeNFC(effectiveDraft);
 
-    if (mappedCitationItems.length === 0 && !effectiveDraft.includes("[Unverified Claim — Vault Citation Required]")) {
-      if (/\b(studies show|research indicates|data demonstrates|proven that|empirically established)\b/i.test(effectiveDraft)) {
-        effectiveDraft = effectiveDraft.replace(
-          /\b(studies show|research indicates|data demonstrates|proven that|empirically established)\b/gi,
-          (m) => `${m} [Unverified Claim — Vault Citation Required]`
-        );
-      }
-    }
-
     res.json({ draft: effectiveDraft });
   } catch (err: any) {
     if (err?.message === "RequireFrontendLLMException") return;
@@ -284,7 +281,8 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
     sectionId,
     sectionTitle,
     academicFunction,
-    targetWordCount = 500,
+    targetWordCount: requestedTarget = 500,
+    allocatedWords,
     academicLevel = project.answers["academic_level"] || "undergraduate",
     citationStyle = project.answers["citation_style"] || "apa7",
     assignmentTopic = project.answers["assignment_question"] || "",
@@ -293,10 +291,26 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
     revisionPrompt,
     existingContent = "",
     evidencePackPrompt,
+    guidance: sectionGuidance = "",
+    keyPoints: sectionKeyPoints = [],
+    remainingEssayWords,
+    sectionIndex,
+    sectionCount,
+    outlineTitles,
+    previousTail,
+    writingStyle,
   } = req.body || {};
+  // The section's exact budget from the outline (±5%), never more than what the
+  // whole essay still has left, so a 1,000-word paper cannot reach 1,450.
+  const allocated = Math.round(Number(allocatedWords ?? requestedTarget) || 500);
+  const remaining = Number(remainingEssayWords);
+  const capped = Number.isFinite(remaining) && remaining > 0 ? Math.min(allocated, remaining) : allocated;
+  const targetWordCount = Math.min(3000, Math.max(50, capped));
+  const budgetRange = sectionWordRange(targetWordCount);
 
-  // The event stream starts only once the AI has answered, so a missing AI
-  // can still be reported as a 426 hand-off or an error status (P0-20).
+  // A missing AI is still a 426 hand-off (checked before the stream opens);
+  // once the stream is open, failures are SSE events (P0-20).
+  let heartbeat: ReturnType<typeof setInterval> | undefined;
   try {
     const mappedSources: WebsiteCitationItem[] = (
       Array.isArray(boundSources) ? boundSources : []
@@ -348,6 +362,8 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
       ? "REVISION FOCUS: Condense prose. Tighten argumentation and eliminate redundancies to fit the exact target word count."
       : revisionPrompt === "citations"
       ? "REVISION FOCUS: Reinforce citation grounding. Seamlessly integrate in-text citations from the bound sources to substantiate claims and strengthen academic credibility."
+      : revisionPrompt === "tone"
+      ? "REVISION FOCUS: Refine the academic tone and register. Keep every claim, citation and the word count; improve precision, formality and flow."
       : revisionPrompt === "smooth"
       ? "REVISION FOCUS: Enhance academic transitions and cohesion. Craft seamless transitional linkages between paragraphs and ensure strong analytical flow."
       : revisionPrompt
@@ -402,7 +418,7 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
     const prompt = `You are the Scholar Core Grounded Academic Drafting Agent.
 Write the section prose for: "${sectionTitle}".
 Academic Function: ${academicFunction}
-Target Word Count: ~${targetWordCount} words
+WORD BUDGET: ${targetWordCount} words (acceptable range ${budgetRange.min}-${budgetRange.max}). Write a complete, cohesive, well-cited section that lands inside that range and ends on a finished sentence; never stop mid-sentence and never pad.
 Academic Level: ${academicLevel}
 Citation Style: ${citationStyle}
 Central Thesis: "${thesis || String(project.answers["assignment_thesis"] || project.answers["thesis_statement"] || "")}"
@@ -413,29 +429,65 @@ ${existingBlock}
 ${evidencePackPrompt ? evidenceBlock : `BOUND EVIDENCE (Use these sources for in-text citations; do NOT fabricate external sources):\n${evidenceBlock || "Use standard scholarly reasoning."}`}
 ${agentBlock}
 
+${buildSectionContract({
+  prompt: String(sectionGuidance || ""),
+  sectionIndex: Number.isFinite(Number(sectionIndex)) ? Number(sectionIndex) : undefined,
+  sectionCount: Number.isFinite(Number(sectionCount)) ? Number(sectionCount) : undefined,
+  outlineTitles: Array.isArray(outlineTitles) ? outlineTitles.map(String).slice(0, 12) : undefined,
+  previousTail: typeof previousTail === "string" ? previousTail : undefined,
+  sources: mappedSources,
+  writingStyle: writingStyle && typeof writingStyle === "object" ? (writingStyle as { preset?: string; customSampleText?: string }) : undefined,
+})}
+
 ${frameworkGuidelines}
 
-Output ONLY the section text in clean academic Markdown prose.`;
+PARAGRAPH STRUCTURE (mandatory): ${isShortQA ? "write 1-2 paragraphs" : `write ${paragraphRange(targetWordCount)} distinct academic paragraphs`} separated by ONE BLANK LINE (two newline characters). Each paragraph opens with a topic sentence, then explains the technical point, then brings cited evidence, then ends on a transition into the next idea. Never return one long unbroken block and never a single fragment.
+
+Output ONLY the section text in clean academic Markdown prose. Do not print a heading for the section.`;
 
     const scholarlyDirectives = buildScholarlyVoiceSystemPrompt({
       discipline: "Academic Coursework",
       dialect: "en-GB",
       requireVaultEvidence: true,
     });
+    const systemPrompt = `You are the Scholar Core Grounded Academic Drafting Agent.\n\n${scholarlyDirectives}`;
 
-    const draft = await callOpenRouterText(
-      req,
-      res,
-      `You are the Scholar Core Grounded Academic Drafting Agent.\n\n${scholarlyDirectives}`,
-      prompt,
-      undefined,
-      "drafting"
-    );
+    // No server-side model (or the user's local model goes first): hand off with
+    // a 426 now, while a status can still be sent.
+    if (await handOffBeforeStream(req, res, systemPrompt, prompt, "drafting")) return;
+
+    // Open the event stream BEFORE the model call, and keep it alive while the
+    // model thinks, so proxies (Render, Vite) never drop a silent socket.
+    openSseStream(res);
+    heartbeat = setInterval(() => {
+      if (!res.writableEnded) res.write(": keep-alive\n\n");
+    }, SSE_HEARTBEAT_MS);
+    res.on("close", () => {
+      if (heartbeat) clearInterval(heartbeat);
+    });
+
+    const draft = await callOpenRouterText(req, res, systemPrompt, prompt, undefined, "drafting");
 
     let effectiveDraft = draft?.trim() ?? "";
-    if (!effectiveDraft) {
-      return sendAiFailure(res, new UnusableAiResponseError("section draft"), "Section draft");
+    if (!effectiveDraft) throw new UnusableAiResponseError("section draft");
+
+    // Enforce the budget: ask once for a rewrite when far under, trim to a whole sentence when over.
+    if (!revisionPrompt && countExactWords(effectiveDraft) < budgetRange.min) {
+      try {
+        const longer = await callOpenRouterText(
+          req,
+          res,
+          systemPrompt,
+          `${prompt}\n\nYOUR PREVIOUS ATTEMPT WAS ${countExactWords(effectiveDraft)} WORDS, BELOW THE BUDGET. Rewrite it fully at ${targetWordCount} words (${budgetRange.min}-${budgetRange.max}) in ${paragraphRange(targetWordCount)} paragraphs separated by blank lines, keeping every citation token.\nPREVIOUS ATTEMPT:\n${effectiveDraft}`,
+          undefined,
+          "drafting"
+        );
+        if (longer && countExactWords(longer) > countExactWords(effectiveDraft)) effectiveDraft = longer.trim();
+      } catch {
+        // Keep the first draft rather than fail the whole section.
+      }
     }
+    effectiveDraft = trimToSentenceWithinWords(effectiveDraft, budgetRange.max);
 
     // Pipe streamed draft through deterministic citation interceptor
     effectiveDraft = replaceBracketTokensWithDeterministicCitations(
@@ -447,36 +499,54 @@ Output ONLY the section text in clean academic Markdown prose.`;
     // Apply Discourse-Level Scholarly Voice Guardrails (cliché suppression, British English, NFC Unicode preservation)
     effectiveDraft = sanitizeScholarlyText(effectiveDraft, { dialect: "en-GB", stripCliches: true });
     effectiveDraft = normalizeUnicodeNFC(effectiveDraft);
+    // Paragraphs survive every step: blank lines kept, a single wall regrouped.
+    effectiveDraft = ensureParagraphBreaks(effectiveDraft);
 
-    if (mappedSources.length === 0 && !effectiveDraft.includes("[Unverified Claim — Vault Citation Required]")) {
-      if (/\b(studies show|research indicates|data demonstrates|proven that|empirically established)\b/i.test(effectiveDraft)) {
-        effectiveDraft = effectiveDraft.replace(
-          /\b(studies show|research indicates|data demonstrates|proven that|empirically established)\b/gi,
-          (m) => `${m} [Unverified Claim — Vault Citation Required]`
-        );
-      }
-    }
-
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Connection", "keep-alive");
-    res.flushHeaders?.();
-
-    const words = effectiveDraft.split(" ");
-    for (let i = 0; i < words.length; i += 5) {
-      const chunk = (i === 0 ? "" : " ") + words.slice(i, i + 5).join(" ");
+    for (const chunk of chunkPreservingWhitespace(effectiveDraft, 5)) {
       res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
     }
     res.write(`data: ${JSON.stringify({ fullText: effectiveDraft })}\n\n`);
     res.write("data: [DONE]\n\n");
     res.end();
   } catch (err: any) {
-    if (err?.message === "RequireFrontendLLMException") return;
+    const handedOff = err?.message === "RequireFrontendLLMException";
+    if (handedOff && !res.headersSent) return;
     if (!res.headersSent) return sendAiFailure(res, err, "Section draft");
-    console.error("Stream section error:", err);
-    res.write(`data: ${JSON.stringify({ error: "The section draft stopped before it finished. Try again." })}\n\n`);
-    res.write("data: [DONE]\n\n");
-    res.end();
+    // The stream is open: every failure becomes an event, never a dropped socket.
+    // Configuration errors keep their own message; any other AI failure
+    // (credit/quota exhausted on every provider, 5xx, timeout) on a first draft
+    // gets a clearly labelled offline scaffold.
+    const keepsOwnStatus =
+      handedOff ||
+      err instanceof BrowserAiRequiredError ||
+      err instanceof InvalidLlmChallengeError ||
+      err instanceof LocalModelUnreachableError ||
+      err instanceof NoClientAiProviderError ||
+      err instanceof UnusableAiResponseError;
+    if (!res.writableEnded && !keepsOwnStatus && !revisionPrompt && !String(existingContent || "").trim()) {
+      const scaffold = buildSectionScaffold({
+        title: String(sectionTitle || ""),
+        prompt: String(sectionGuidance || ""),
+        assignmentQuestion: String(assignmentTopic || ""),
+        keyPoints: Array.isArray(sectionKeyPoints) ? sectionKeyPoints.map(String) : [],
+        sources: Array.isArray(boundSources) ? (boundSources as ScaffoldSource[]) : [],
+        targetWords: targetWordCount,
+      });
+      console.warn("[stream-section] AI unavailable, sending offline scaffold:", err instanceof Error ? err.message : err);
+      res.write(`data: ${JSON.stringify({ fallback: { mode: "offline_scaffold", reason: "No AI provider could answer right now." } })}\n\n`);
+      res.write(`data: ${JSON.stringify({ fullText: scaffold })}\n\n`);
+      res.write("data: [DONE]\n\n");
+      res.end();
+      return;
+    }
+    console.error("Stream section error:", err instanceof Error ? err.message : err);
+    if (!res.writableEnded) {
+      res.write(`data: ${JSON.stringify({ error: streamErrorMessage(err, handedOff), recoverable: true })}\n\n`);
+      res.write("data: [DONE]\n\n");
+      res.end();
+    }
+  } finally {
+    if (heartbeat) clearInterval(heartbeat);
   }
 });
 

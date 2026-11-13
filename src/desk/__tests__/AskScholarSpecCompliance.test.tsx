@@ -210,12 +210,12 @@ describe("AskScholar Authoritative Specification Compliance (Sections 2–16)", 
     const picker = await screen.findByTestId("continue-workspace-picker");
     expect(within(picker).getByTestId("continue-workspace-OT-01")).toHaveTextContent("Assignment");
     expect(within(picker).getByTestId("continue-workspace-OT-10")).toHaveTextContent("Journal Article");
-    expect(within(picker).getByTestId("continue-workspace-OT-19")).toHaveTextContent("Research Proposal");
+    expect(within(picker).getByTestId("continue-workspace-OT-15")).toHaveTextContent("Research Proposal");
     expect(within(picker).getByTestId("continue-workspace-OT-22")).toHaveTextContent("Presentation");
 
-    fireEvent.click(within(picker).getByTestId("continue-workspace-OT-19"));
+    fireEvent.click(within(picker).getByTestId("continue-workspace-OT-15"));
     await waitFor(() => {
-      expect(createProject).toHaveBeenCalledWith("OT-19");
+      expect(createProject).toHaveBeenCalledWith("OT-15");
       expect(onOpen).toHaveBeenCalledWith("proj-seeded-99");
     });
   });

@@ -58,7 +58,7 @@ function renderScreen(ui: React.ReactElement) {
 const TYPES = [
   { id: "OT-02", label: "Essay", aliases: [], family: "short_form", academicLevels: [], typicalDisciplines: [], available: false },
   { id: "OT-06", label: "Journal Article", aliases: [], family: "publication", academicLevels: [], typicalDisciplines: [], available: true },
-  { id: "OT-09", label: "Doctoral Dissertation", aliases: [], family: "long_form", academicLevels: [], typicalDisciplines: [], available: false },
+  { id: "OT-07", label: "Doctoral Dissertation", aliases: [], family: "long_form", academicLevels: [], typicalDisciplines: [], available: false },
   { id: "OT-10", label: "Review Article", aliases: [], family: "publication", academicLevels: [], typicalDisciplines: [], available: false },
 ];
 
@@ -1145,15 +1145,15 @@ describe("distinct academic format USPs & specs", () => {
     expect(screen.getByText("10 – 35 slides")).toBeInTheDocument();
   });
 
-  it("renders centered middle-dot separator with subtle opacity styling", async () => {
+  it("lists each deliverable spec on its own line, with no stranded separator dots", async () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
     const essayHeading = screen.getByRole("heading", { name: "Coursework & Essays" });
     const card = essayHeading.closest("button")!;
-    const dot = card.querySelector(".opacity-60");
-    expect(dot).toBeInTheDocument();
-    expect(dot?.textContent).toBe("·");
+    const specs = Array.from(card.querySelectorAll("ul li")).map((li) => li.textContent);
+    expect(specs).toEqual(["Structured Outline", "Rubric Matched", "800 – 4,000 words"]);
+    expect(card.textContent).not.toContain("·");
   });
 
   it("does not render pen, pencil, or edit icons on dashboard cards", async () => {
@@ -1373,5 +1373,17 @@ describe("project list load failure (B7)", () => {
 
     await waitFor(() => expect(screen.queryByText(/Couldn't load your projects/)).not.toBeInTheDocument());
     expect(listProjects).toHaveBeenCalledTimes(2);
+  });
+
+  it("says the session ended on a 401, with a button that cannot be confused with the sign-in form's", async () => {
+    const unauthenticated = Object.assign(new Error("Unauthenticated"), { name: "UnauthenticatedError" });
+    listProjects.mockRejectedValue(unauthenticated);
+    listOutputTypes.mockResolvedValue({ items: TYPES });
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    expect(await screen.findByText(/Your session has ended/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sign in again" })).toBeInTheDocument();
+    // The E2E sign-in step clicks getByRole("button", { name: /^Sign in$/ }); it must stay unique.
+    expect(screen.queryByRole("button", { name: /^Sign in$/ })).toBeNull();
   });
 });

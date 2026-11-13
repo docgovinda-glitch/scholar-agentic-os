@@ -1169,7 +1169,7 @@ Once connected, the Multi-Agent Editorial Board automatically routes tasks to yo
 2. Choose one of the 4 verified academic formats:
    • Assignment (OT-01): Course essays, structured thinking, and literature synthesis.
    • Journal Article (OT-10): 25-stage empirical research pipeline with peer review.
-   • Research Proposal (OT-19): Competitive funding and grant applications.
+   • Research Proposal (OT-15): Competitive funding and grant applications.
    • Presentation (OT-22): Conference slides, defense scripts, and keynote summaries.
 3. Your workspace launches immediately with interactive gates and milestones.`;
   }

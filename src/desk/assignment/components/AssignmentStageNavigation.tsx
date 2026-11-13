@@ -47,7 +47,10 @@ export default function AssignmentStageNavigation({
   const phasePercentages = useMemo(() => {
     const hasBrief = Boolean(question && question.trim().length > 10);
     const p1 = hasBrief ? 100 : question?.trim() ? 50 : 0;
-    const p2 = structure?.isConfirmed ? 100 : structure ? 75 : hasBrief ? 50 : 0;
+    // A placeholder structure on a new project is not progress: only an outline
+    // built from a real brief counts.
+    const hasOutline = hasBrief && (structure?.headings?.length ?? 0) > 0;
+    const p2 = !hasBrief ? 0 : structure?.isConfirmed ? 100 : hasOutline ? 75 : 50;
     const p3 = Math.min(100, Math.round((approvedSourceIds.length / 4) * 100));
     const p4 = Math.min(100, wordCountPercentage || 0);
     const p5 = submissionReport ? 100 : 0;

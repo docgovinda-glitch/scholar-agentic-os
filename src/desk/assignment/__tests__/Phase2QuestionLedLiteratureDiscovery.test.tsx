@@ -16,7 +16,6 @@ import {
   IR_CHINA_GEOPOLITICS_CATALOG,
   ORGANIZATIONAL_CULTURE_CATALOG,
 } from "../services/scholarlyDiscoveryService";
-import { QUANTUM_COMPUTING_CATALOG } from "../services/catalogs/quantumComputingCatalog";
 import { UN_PEACE_SECURITY_CATALOG } from "../services/catalogs/unPeaceSecurityCatalog";
 
 // Every offline result must be a curated catalog entry, unchanged: the
@@ -26,7 +25,6 @@ const CATALOG = new Map(
     ...CORE_SCHOLARLY_CATALOG,
     ...IR_CHINA_GEOPOLITICS_CATALOG,
     ...ORGANIZATIONAL_CULTURE_CATALOG,
-    ...QUANTUM_COMPUTING_CATALOG,
     ...UN_PEACE_SECURITY_CATALOG,
   ].map((c) => [c.title, c])
 );

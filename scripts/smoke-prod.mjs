@@ -178,7 +178,16 @@ await check('TEST_A uploads a 1-page PDF → parsed', async () => {
   expect(/smoke test document/i.test(r.text), 'parsed text missing');
 });
 
+// The AI routes share a per-minute abuse limit (20/min). The browser suite that
+// runs before this script uses that budget, so wait out one window first.
+// Otherwise these checks would test the limiter (429), not the auth behaviour.
+const waitForRateWindow = async () => {
+  console.log('waiting 65s for the AI rate-limit window to reset');
+  await new Promise((resolve) => setTimeout(resolve, 65_000));
+};
+
 // ── Negative checks ─────────────────────────────────────────────────────────
+await waitForRateWindow();
 for (const path of ['/api/vault/parse-url', '/api/vault/search-semantic', '/api/search/live', '/api/ai/search', '/api/ai/agent']) {
   await check(`anonymous POST ${path} → 401`, async () => {
     const r = await req('POST', path, { body: {} });
@@ -211,6 +220,8 @@ await check('11 MB upload → 413', async () => {
   expect(r.status === 413, `HTTP ${r.status}`);
 });
 // AI router: checks that never reach a provider (nothing is spent).
+// The anonymous checks above used part of the window, so wait again.
+await waitForRateWindow();
 const keyringHeader = (entries) => Buffer.from(JSON.stringify(entries)).toString('base64url');
 await check('/api/ai/run rejects a malformed request and an unreadable keyring', async () => {
   const bad = await req('POST', '/api/ai/run', { token: tokA, body: { task: 'fast', messages: [] } });

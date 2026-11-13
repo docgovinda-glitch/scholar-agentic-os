@@ -25,9 +25,9 @@
 -- that entered them, and a database compromise exposes no provider
 -- credentials because none are there.
 --
--- The honest cost, stated in the UI rather than hidden: keys do not follow the
--- user to a new device and must be entered again there. Which provider and
--- model they chose DOES follow them, because that is what this table is for.
+-- Update: keys now DO follow the user, encrypted, via public.user_provider_keys
+-- (migration 20261103150000). This table still holds only which provider and
+-- model they chose, which the server reads so any device uses those choices.
 --
 -- If cross-device key sync is wanted later, the upgrade path is a user-held
 -- passphrase gating `api_credentials` — deliberately not done here, because it

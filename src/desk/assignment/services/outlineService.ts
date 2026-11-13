@@ -27,7 +27,6 @@ import type {
 
 import { structureToInternalSections } from "../types";
 import { conductAskScholarResearchForOutline } from "./scholarlyDiscoveryService";
-import { isZapposScheinAssignment } from "../../../features/drafting/services/outlineGenerator";
 import {
   isClassroomLogisticsLine,
   stripSlideArtifacts,
@@ -35,6 +34,9 @@ import {
   extractSubstantiveBriefQuestions,
 } from "../../../utils/briefExtractor";
 
+import { applyMarksBudget, allocateCleanWords } from "../../../domain/assignment/outlineBudget";
+import { isNonQuestionBriefLine, parseBriefQuestions, groupBriefQuestions } from "../../../utils/briefQuestions";
+import { briefGroundedThesis } from "../../../domain/assignment/briefThesis";
 export function generateAdaptiveDefaultOutline(
   type: AssignmentType,
   question: string,
@@ -589,11 +591,46 @@ export function formatAcademicTopicTitle(raw: string): string {
     ) {
       return w.toLowerCase();
     }
-    return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+    // Never rewrite what is already deliberately cased: acronyms (QKD, RSA-2048,
+    // NP-complete, ML-KEM), units (mK), names in citations (Preskill), mixed case.
+    if (keepsOwnCasing(w)) return w;
+    return w.charAt(0).toUpperCase() + w.slice(1);
   });
 
   return formatted.join(" ");
 }
+
+/** True for tokens whose casing carries meaning and must be kept as written. */
+export function keepsOwnCasing(token: string): boolean {
+  const core = token.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
+  if (!core) return true;
+  if (/\p{Lu}.*\p{Lu}/u.test(core)) return true; // QKD, NP-complete, ML-KEM, RSA-2048, McKinsey
+  if (/\d/.test(core)) return true; // RSA-2048, 15, 2018
+  if (/^\p{Ll}+\p{Lu}/u.test(core)) return true; // mK, eV, iOS
+  if (/^\(/.test(token)) return true; // parenthetical citations "(Preskill, 2018)"
+  return false;
+}
+
+/** A short (about 8 word) heading from a question: drops the leading command verb. */
+export function shortHeading(text: string, maxWords = 8): string {
+  const stripped = text
+    .replace(/^(?:critically\s+)?(?:compare|contrast|evaluate|analy[sz]e|assess|discuss|explain|describe|examine|derive|justify|propose|recommend|explore|investigate|identify|outline|define|apply|develop|design|calculate|show)\s+(?:and\s+\w+\s+)?/i, "")
+    .replace(/[?.:]+$/, "")
+    .trim();
+  const words = stripped.split(/\s+/);
+  const cut = words.length > maxWords ? `${words.slice(0, maxWords).join(" ")}…` : stripped;
+  return cut.charAt(0).toUpperCase() + cut.slice(1);
+}
+
+/** Keep a title as written (no case changes) but at most `maxWords` words. */
+function clipWords(text: string, maxWords: number): string {
+  const t = text.replace(/[:.\s]+$/, "").trim();
+  const w = t.split(/\s+/);
+  return w.length > maxWords ? `${w.slice(0, maxWords).join(" ")}…` : t;
+}
+
+/** Max top-level sections an outline may be expanded to (human-scale outlines). */
+const MAX_OUTLINE_SECTIONS = 8;
 
 export interface ExtractedBriefInquiries {
   subQuestions: string[];
@@ -621,7 +658,7 @@ export function extractBriefInquiriesAndConcepts(
   // Extract substantive questions directly if available
   const substantiveQuestions = extractSubstantiveBriefQuestions(cleanCombined);
   for (const sq of substantiveQuestions) {
-    if (!seenItems.has(sq.toLowerCase())) {
+    if (!isNonQuestionBriefLine(sq) && !seenItems.has(sq.toLowerCase())) {
       seenItems.add(sq.toLowerCase());
       subQuestions.push(sq);
     }
@@ -634,7 +671,7 @@ export function extractBriefInquiriesAndConcepts(
   let inTaskBlock = false;
   for (const line of lines) {
     const cleanLine = line.trim();
-    if (!cleanLine || isClassroomLogisticsLine(cleanLine)) continue;
+    if (!cleanLine || isClassroomLogisticsLine(cleanLine) || isNonQuestionBriefLine(cleanLine)) continue;
 
     // Detect directive trigger headers
     if (/(?:in your answer|address the following|ensure you address|tasks?|questions?|sub-questions?|key requirements?|topics? to cover)[:]/i.test(cleanLine)) {
@@ -714,137 +751,9 @@ export function extractBriefInquiriesAndConcepts(
   };
 }
 
-/** Helper to add a framework if not already in array */
-function addIfNotPresent(arr: string[], item: string): void {
-  if (!arr.includes(item)) {
-    arr.push(item);
-  }
-}
-
-/**
- * Extract target academic, theoretical, and analytical frameworks from the assignment question and brief.
- * Adheres to AskScholar academic domain patterns.
- */
-export function extractTargetFrameworks(
-  question: string = "",
-  assignmentType?: string,
-  briefText?: string
-): string[] {
-  const combined = `${question} ${briefText || ""}`.toLowerCase();
-  const frameworks: string[] = [];
-
-  const knownExplicit: [RegExp, string][] = [
-    [/\bporter(?:'s)?\s*(?:five\s*forces|value\s*chain)?\b/i, "Porter's Five Forces & Value Chain Analysis"],
-    [/\bvrio\b/i, "VRIO Framework"],
-    [/\brbv\b|\bresource[- ]based\s*view\b/i, "Resource-Based View (RBV)"],
-    [/\bpestle?\b/i, "PESTLE Environmental Scanning"],
-    [/\bswot\b/i, "SWOT Strategic Framework"],
-    [/\brawls(?:ian)?\b|\bveil\s*of\s*ignorance\b/i, "Rawlsian Distributive Justice & Fairness Parity"],
-    [/\bkant(?:ian)?\b|\bdeontolog/i, "Kantian Deontological Ethics"],
-    [/\butilitarian(?:ism)?\b/i, "Utilitarian Consequentialism"],
-    [/\bfoucault\b|\bbiopolitics\b|\bpanopticon\b/i, "Foucauldian Power-Knowledge & Biopolitics"],
-    [/\bbourdieu\b|\bhabitus\b|\bcultural\s*capital\b/i, "Bourdieu's Cultural Capital & Habitus"],
-    [/\bhabermas\b|\bcommunicative\s*action\b/i, "Habermasian Communicative Action"],
-    [/\b(structural\s*realism|neorealism|mearsheimer|waltz)\b/i, "Structural Realism (Waltz & Mearsheimer)"],
-    [/\b(liberal\s*institutionalism|keohane|neoliberalism)\b/i, "Liberal Institutionalism (Keohane)"],
-    [/\b(constructivism|wendt)\b/i, "Social Constructivism (Wendt)"],
-    [/\bweaponized\s*interdependence\b/i, "Weaponized Interdependence (Farrell & Newman)"],
-    [/\bcommercial\s*peace\b/i, "Bilateral Economic Interdependence Model"],
-    [/\bsecurity\s*dilemma\b/i, "Security Dilemma (Jervis)"],
-    [/\binterdependence\b/i, "Complex Interdependence (Keohane & Nye)"],
-    [/\bcar[- ]t\b|\bcellular\s*therapy\b|\badoptive\s*cell\b/i, "Adoptive Cellular Transfer (ACT) Mechanics"],
-    [/\btumor\s*microenvironment\b|\btme\b/i, "Tumor Microenvironment (TME) Immunosuppression"],
-    [/\bempirical\s*risk\s*minimization\b|\berm\b/i, "Empirical Risk Minimization (ERM)"],
-    [/\brepresentation\s*learning\b|\bmanifold\b/i, "Latent Manifold Representation Theory"],
-    [/\bscaling\s*law/i, "Compute-Optimal Neural Scaling Laws (Chinchilla)"],
-    [/\bmechanistic\s*interpretability\b/i, "Mechanistic Interpretability Circuit Analysis"],
-    [/\beu\s*ai\s*act\b|\brisk[- ]tiered\b/i, "EU AI Act Risk-Tiered Governance Architecture"],
-    [/\bdisparate\s*impact\b|\bequalized\s*odds\b/i, "Statistical Fairness & Equalized Odds Parity"],
-    [/\bipcc\b|\bshared\s*socioeconomic\b|\bssp\b/i, "IPCC Shared Socioeconomic Pathways (SSPs)"],
-    [/\bplanetary\s*boundaries\b/i, "Planetary Boundaries Framework (Rockström)"],
-    [/\bostrom\b|\bcommons\b|\bcollective\s*action\b/i, "Polycentric Governance & Commons Theory (Ostrom)"],
-  ];
-
-  for (const [pattern, label] of knownExplicit) {
-    if (pattern.test(combined)) {
-      addIfNotPresent(frameworks, label);
-    }
-  }
-
-  // Domain heuristics if fewer than 3 frameworks found
-  if (frameworks.length < 3) {
-    if (
-      (combined.includes("china") || combined.includes("geopolitic")) &&
-      (combined.includes("ai") || combined.includes("tech") || combined.includes("artificial intelligence") || combined.includes("semiconductor") || combined.includes("chips"))
-    ) {
-      addIfNotPresent(frameworks, "Techno-Nationalism & Sovereign Innovation Systems");
-      addIfNotPresent(frameworks, "Weaponized Interdependence (Farrell & Newman)");
-      addIfNotPresent(frameworks, "Developmental State Industrial Policy");
-      addIfNotPresent(frameworks, "Compute Governance & Semiconductor Value Chains");
-    } else if (
-      combined.includes("economic interdependence") ||
-      combined.includes("commercial peace") ||
-      (combined.includes("trade") && (combined.includes("conflict") || combined.includes("peace") || combined.includes("friction") || combined.includes("war") || combined.includes("interstate"))) ||
-      (combined.includes("interdependence") && (combined.includes("conflict") || combined.includes("trade") || combined.includes("peace")))
-    ) {
-      addIfNotPresent(frameworks, "Bilateral Economic Interdependence Model");
-      addIfNotPresent(frameworks, "Realist Strategic Vulnerability");
-      addIfNotPresent(frameworks, "Weaponized Interdependence (Farrell & Newman)");
-    } else if (combined.includes("nepal") || (combined.includes("foreign policy") && combined.includes("india"))) {
-      addIfNotPresent(frameworks, "Small-State Asymmetric Buffer Theory");
-      addIfNotPresent(frameworks, "Equi-Proximity & Strategic Hedging");
-      addIfNotPresent(frameworks, "Regional Security Complex Theory (Buzan & Wæver)");
-    } else if (
-      combined.includes("cancer") ||
-      combined.includes("cell therapy") ||
-      combined.includes("cellular therapy") ||
-      combined.includes("immunotherapy") ||
-      combined.includes("oncology") ||
-      combined.includes("lymphoma") ||
-      combined.includes("tumor") ||
-      combined.includes("car-t")
-    ) {
-      addIfNotPresent(frameworks, "Adoptive Cellular Transfer (ACT) Mechanics");
-      addIfNotPresent(frameworks, "Tumor Microenvironment (TME) Immunosuppression");
-      addIfNotPresent(frameworks, "On-Target Off-Tumor Cytotoxicity Profiling");
-    } else if (combined.includes("machine learning") || (combined.includes("ai") && combined.includes("model"))) {
-      addIfNotPresent(frameworks, "Empirical Risk Minimization (ERM)");
-      addIfNotPresent(frameworks, "Latent Manifold Representation Theory");
-      addIfNotPresent(frameworks, "Compute-Optimal Scaling Laws");
-    } else if (
-      combined.includes("ethic") ||
-      combined.includes("bias") ||
-      combined.includes("fairness") ||
-      combined.includes("regulat") ||
-      combined.includes("discriminat") ||
-      (combined.includes("algorithm") && (combined.includes("governance") || combined.includes("accountab") || combined.includes("justice")))
-    ) {
-      addIfNotPresent(frameworks, "Rawlsian Distributive Justice & Fairness Parity");
-      addIfNotPresent(frameworks, "EU AI Act Risk-Tiered Governance Architecture");
-      addIfNotPresent(frameworks, "Algorithmic Accountability & Disparate Impact");
-    } else if (combined.includes("climate") || combined.includes("food security") || combined.includes("environment")) {
-      addIfNotPresent(frameworks, "IPCC Shared Socioeconomic Pathways (SSPs)");
-      addIfNotPresent(frameworks, "Planetary Boundaries Framework (Rockström)");
-      addIfNotPresent(frameworks, "Socio-Ecological Systems Resilience (Ostrom)");
-    } else if (
-      assignmentType === "coursework" ||
-      combined.includes("coursework") ||
-      assignmentType === "case_study" ||
-      assignmentType === "business_assignment" ||
-      assignmentType === "report"
-    ) {
-      addIfNotPresent(frameworks, "Porter's Five Forces & Value Chain Analysis");
-      addIfNotPresent(frameworks, "Resource-Based View (RBV) & VRIO");
-      addIfNotPresent(frameworks, "Strategic Alignment & Stakeholder Salience Theory");
-    } else {
-      addIfNotPresent(frameworks, "Comparative Analysis & Evidence Synthesis");
-      addIfNotPresent(frameworks, "Critical Epistemic & Methodological Deconstruction");
-      addIfNotPresent(frameworks, "Empirical Causal Inference & Evidence Synthesis");
-    }
-  }
-
-  return frameworks.slice(0, 4);
-}
+// NOTE (Single-Brain Architecture): target theoretical frameworks are never
+// derived here from keyword tables. They come only from scholarBrain-driven AI
+// output (`target_frameworks`) or from the user's own edits.
 
 /** Check if a heading title is a generic banned placeholder */
 export function isGenericPlaceholderTitle(title: string): boolean {
@@ -1232,7 +1141,7 @@ export function generateThesisStatement(
   const toneLower = String(rawTone || "formal_academic").toLowerCase();
 
   const hasOBOrLeadership =
-    /\b(leadership|culture|schein|zappos|human resource|organizational behaviour|organizational behavior|management|employee|workplace|onboarding)\b/i.test(
+    /\b(leadership|culture|schein|human resource|organizational behaviour|organizational behavior|management|employee|workplace|onboarding)\b/i.test(
       qLower
     );
 
@@ -1380,7 +1289,9 @@ export function buildBriefSpecificSpecs(
   targetWordCount?: number
 ): HeadingSpec[] {
   const inquiries = extractBriefInquiriesAndConcepts(question, briefText);
-  const directTasks = [...inquiries.extractedTasks, ...inquiries.subQuestions];
+  const directTasks = [...inquiries.extractedTasks, ...inquiries.subQuestions]
+    .filter((t) => !isNonQuestionBriefLine(t))
+    .slice(0, MAX_OUTLINE_SECTIONS);
   const semantics = deconstructQuestionSemantics(question);
   const primaryTopic = semantics.topicA || inquiries.coreThemes[0] || "Primary Analytical Focus";
   const secondaryTopic = semantics.topicB || inquiries.coreThemes[1] || "";
@@ -1393,180 +1304,51 @@ export function buildBriefSpecificSpecs(
 
   const primaryFramework = targetFrameworks[0] || (isCoursework ? "Applied Analytical Model" : "Theoretical Explanatory Framework");
 
+  // The brief states its own questions and marks: one section per main question,
+  // budgets proportional to the marks, Focus lines quoting the brief itself.
+  const markedRows = parseBriefQuestions(briefText || question || "");
+  if (markedRows.length >= 2 && markedRows.some((r) => r.marks)) {
+    // One section per main question: the stem and its sub-parts stay together and
+    // no question is ever dropped, however many there are.
+    const groups = groupBriefQuestions(markedRows);
+    const known = groups.filter((g) => g.marks);
+    const avgMarks = known.reduce((t, g) => t + (g.marks ?? 0), 0) / Math.max(1, known.length);
+    const weights = groups.map((g) => g.marks ?? avgMarks);
+    const totalWeight = weights.reduce((t, w) => t + w, 0) || 1;
+    return groups.map((g, i) => {
+      const n = i + 1;
+      const heading = g.stem ? clipWords(g.stem.text, 12) : shortHeading(g.title, 10);
+      const focus = [g.stem?.text, ...g.parts.map((p) => `(${p.label.slice(-1)}) ${p.text}`)].filter(Boolean).join(" ");
+      const partWeights = g.parts.map((p) => p.marks ?? 1);
+      const partTotal = partWeights.reduce((t, w) => t + w, 0) || 1;
+      return {
+        title: `${n}.0 ${heading}`,
+        // The full question stem stays with its section (shown as a quiet subtitle, never in the heading).
+        notes: g.stem?.text ?? `Answers ${g.key} from the brief.`,
+        // Sub-parts get their own short titles; a single prompt gets one neutral
+        // sub-section, never a copy of the parent title.
+        subheadings: g.parts.length > 0
+          ? g.parts.map((p, k) => ({
+              title: `${n}.${k + 1} ${shortHeading(p.text)}`,
+              ratio: (weights[i] / totalWeight) * (partWeights[k] / partTotal),
+              guidance: `Focus: (${p.label.slice(-1)}) ${p.text}`,
+              keyPoints: [] as string[],
+            }))
+          : [
+              {
+                title: `${n}.1 Key points and evidence`,
+                ratio: weights[i] / totalWeight,
+                guidance: `Focus: ${focus}`,
+                keyPoints: [] as string[],
+              },
+            ],
+      };
+    });
+  }
+
   const isTutorialOrShort =
     (targetWordCount !== undefined && targetWordCount <= 600) ||
     isTutorialOrShortQABrief(briefText || question, targetWordCount);
-
-  // If the brief is the Breakthrough Leadership (Zappos & Schein) tutorial, return exact canonical sequence
-  if (isZapposScheinAssignment(question, briefText, directTasks)) {
-    if (isTutorialOrShort) {
-      return [
-        {
-          title: "1.0 Evaluating Culture Change: Why Changing Artifacts Alone Is Insufficient",
-          notes: "Directly address: Can organizational culture be changed by changing artifacts alone?",
-          subheadings: [
-            {
-              title: "1.1 Evaluating Culture Change: Why Changing Artifacts Alone Is Insufficient",
-              ratio: 0.35,
-              guidance: "Focus: Provide a direct, grounded answer evaluating whether organizational culture can be altered simply by changing surface artifacts alone.",
-              keyPoints: [
-                "Surface compliance versus internalized behavioral alignment",
-                "Why modifying artifacts (dress codes, office layouts) without shifting core assumptions fails",
-                "Aligning core principles and foundational beliefs",
-              ],
-            },
-          ],
-        },
-        {
-          title: "2.0 Leadership Interventions: Selecting the Most Effective Cultural Level to Target",
-          notes: "Directly address: As a leader, which level of Schein's model would you start with to change culture?",
-          subheadings: [
-            {
-              title: "2.1 Leadership Interventions: Selecting the Most Effective Cultural Level to Target",
-              ratio: 0.35,
-              guidance: "Focus: Explain which level of Schein's model leaders should start with (espoused values, norms, philosophies) and why.",
-              keyPoints: [
-                "Beginning at espoused values, norms, and philosophies",
-                "Defining expected behaviors and creating a shared direction",
-                "Reinforcing practices until they sink into underlying assumptions",
-              ],
-            },
-          ],
-        },
-        {
-          title: "3.0 Assessing Organizational Culture During the Job Interview Process",
-          notes: "Directly address: How would you assess a company's culture during a job interview using Schein's model?",
-          subheadings: [
-            {
-              title: "3.1 Assessing Organizational Culture During the Job Interview Process",
-              ratio: 0.30,
-              guidance: "Focus: Explain practical inquiries candidates can make during an interview to evaluate true corporate culture.",
-              keyPoints: [
-                "Inquiring about daily practices, ethics, and leadership styles",
-                "Probing artifacts, operational limits, and non-negotiables",
-                "Evaluating alignment between candidate boundaries and company culture",
-              ],
-            },
-          ],
-        },
-      ];
-    }
-
-    return [
-      {
-        title: "1.0 Introduction: Organizational Culture and the Zappos Case Study",
-        notes: "Directly address: Organizational Culture and the Zappos Case Study",
-        subheadings: [
-          {
-            title: "1.1 Introduction: Organizational Culture and the Zappos Case Study",
-            ratio: 0.12,
-            guidance: "Focus: Introduce organizational culture as a strategic asset, setting up the Zappos onboarding model and Schein's theoretical framework.",
-            keyPoints: [
-              "Significance of organizational culture in modern enterprise strategy",
-              "Introduction to Zappos' customer-centric and culture-first business architecture",
-              "Schein's 3-level model as the analytical scaffold for evaluating cultural coherence",
-            ],
-          },
-        ],
-      },
-      {
-        title: "2.0 Strategic Purpose of Zappos' $2,000 Resignation Offer",
-        notes: "Directly address: Why Zappos offers new employees $2,000 to quit after their first week",
-        subheadings: [
-          {
-            title: "2.1 Strategic Purpose of Zappos' $2,000 Resignation Offer",
-            ratio: 0.16,
-            guidance: "Focus: Evaluate the rationale behind Zappos' $2,000 resignation offer and its impact on employee alignment.",
-            keyPoints: [
-              "Self-selection screening mechanism during onboarding",
-              "Filtering for intrinsic cultural commitment over transactional compensation",
-              "Long-term economic advantages: lowering turnover and bad-hire costs",
-            ],
-          },
-        ],
-      },
-      {
-        title: "3.0 Schein’s Culture Model: Artifacts, Espoused Values, and Underlying Assumptions",
-        notes: "Directly address: Deconstruct Schein's 3 levels of organizational culture",
-        subheadings: [
-          {
-            title: "3.1 Schein’s Culture Model: Artifacts, Espoused Values, and Underlying Assumptions",
-            ratio: 0.16,
-            guidance: "Focus: Deconstruct Schein's three levels of culture (artifacts, espoused values, underlying assumptions) and their operational interplay.",
-            keyPoints: [
-              "Artifacts: visible organizational structures, physical layouts, and rituals",
-              "Espoused Values: stated norms, philosophies, and official codes of conduct",
-              "Basic Underlying Assumptions: unconscious, taken-for-granted beliefs shaping worldview",
-            ],
-          },
-        ],
-      },
-      {
-        title: "4.0 Evaluating Culture Change: Why Changing Artifacts Alone Is Insufficient",
-        notes: "Directly address: Can organizational culture be changed by changing artifacts alone?",
-        subheadings: [
-          {
-            title: "4.1 Evaluating Culture Change: Why Changing Artifacts Alone Is Insufficient",
-            ratio: 0.16,
-            guidance: "Focus: Analyze why modifying physical artifacts alone fails to create durable cultural transformation without shifting underlying assumptions.",
-            keyPoints: [
-              "Surface compliance versus internalized behavioral alignment",
-              "Limits of cosmetic alterations (open-plan offices, casual dress codes, game rooms)",
-              "Why underlying assumptions resist superficial visual redesigns",
-            ],
-          },
-        ],
-      },
-      {
-        title: "5.0 Leadership Interventions: Selecting the Most Effective Cultural Level to Target",
-        notes: "Directly address: As a leader, which level of Schein's model would you start with to change culture?",
-        subheadings: [
-          {
-            title: "5.1 Leadership Interventions: Selecting the Most Effective Cultural Level to Target",
-            ratio: 0.16,
-            guidance: "Focus: Evaluate which level of Schein's model leaders should target first to successfully lead and sustain culture change.",
-            keyPoints: [
-              "Weighing intervention points: direct targeting of values versus behavioral habits",
-              "Role of executive role-modeling and resource allocation in unfreezing assumptions",
-              "Aligning reward systems to bridge espoused values and everyday practices",
-            ],
-          },
-        ],
-      },
-      {
-        title: "6.0 Assessing Organizational Culture During the Job Interview Process",
-        notes: "Directly address: How would you assess a company's culture during a job interview using Schein's model?",
-        subheadings: [
-          {
-            title: "6.1 Assessing Organizational Culture During the Job Interview Process",
-            ratio: 0.14,
-            guidance: "Focus: Formulate practical methods for candidates and evaluators to assess genuine organizational culture during job interviews using Schein's levels.",
-            keyPoints: [
-              "Observing physical artifacts and interaction patterns during on-site visits",
-              "Asking probing behavioral questions that test stated values against real dilemmas",
-              "Identifying discrepancies between public marketing and internal unspoken assumptions",
-            ],
-          },
-        ],
-      },
-      {
-        title: "7.0 Conclusion & Strategic Takeaways",
-        notes: "Directly address: Synthesis of leadership insights and cultural alignment",
-        subheadings: [
-          {
-            title: "7.1 Conclusion & Strategic Takeaways",
-            ratio: 0.10,
-            guidance: "Focus: Synthesize findings on leadership, cultural alignment, and strategic hiring practices into actionable takeaways.",
-            keyPoints: [
-              "Synthesis of cultural coherence as a sustained competitive advantage",
-              "Summary of Schein's framework applied to modern organizational leadership",
-              "Key recommendations for leaders driving cultural evolution",
-            ],
-          },
-        ],
-      },
-    ];
-  }
 
   // If the brief provided 2 or more explicit tasks or questions, mirror them directly!
   if (directTasks.length >= 2) {
@@ -1584,7 +1366,7 @@ export function buildBriefSpecificSpecs(
           notes: `Directly address: "${task}".`,
           subheadings: [
             {
-              title: `${tIdx + 1}.1 ${cleanTaskTitle}`,
+              title: `${tIdx + 1}.1 Key points and evidence`,
               ratio: perTaskRatio,
               guidance: `Focus: Provide a direct, evidence-based, conversational answer addressing: "${task}".`,
               keyPoints: [
@@ -1609,31 +1391,18 @@ export function buildBriefSpecificSpecs(
       const taskConcept = concepts[tIdx] || primaryTopic;
       const relatedConcept = concepts[(tIdx + 1) % (concepts.length || 1)] || secondaryTopic || "Operational Dynamics";
 
-      const sub1Title = `${tIdx + 1}.1 Conceptual Framing and Analysis of ${cleanTaskTitle}`;
-      const sub2Title = `${tIdx + 1}.2 Empirical Evidence and Strategic Evaluation of ${cleanTaskTitle}`;
-
       return {
         title: `${tIdx + 1}.0 ${cleanTaskTitle}`,
         notes: `Directly address and substantiate: "${task}".`,
         subheadings: [
           {
-            title: sub1Title,
-            ratio: tIdx === 0 ? 0.16 : 0.18,
-            guidance: `Focus: Analyze core conceptual mechanisms, theoretical grounding (${primaryFramework}), and analytical dimensions for: "${task}".`,
+            title: `${tIdx + 1}.1 Key points and evidence`,
+            ratio: 1 / directTasks.length,
+            guidance: `Focus: Analyze the conceptual mechanisms, theoretical grounding (${primaryFramework}) and empirical evidence needed to answer: "${task}".`,
             keyPoints: [
               `Direct answer to directive: ${task.slice(0, 80)}`,
               `Analytical parameters and theoretical grounding (${primaryFramework})`,
-              `Core conceptual mechanisms concerning ${taskConcept}`,
-            ],
-          },
-          {
-            title: sub2Title,
-            ratio: tIdx === 0 ? 0.18 : 0.16,
-            guidance: `Focus: Examine empirical case evidence, diagnostic indicators, and critical evaluation regarding: "${task}".`,
-            keyPoints: [
-              `Empirical data and case evidence addressing ${relatedConcept}`,
-              `Critical friction points, vulnerabilities, and counterarguments`,
-              `Substantiated conclusions and analytical synthesis`,
+              `Empirical evidence addressing ${relatedConcept} and core mechanisms concerning ${taskConcept}`,
             ],
           },
         ],
@@ -2077,7 +1846,7 @@ export function generateDynamicAssignmentStructure(
   const targetFrameworks =
     inputFrameworks && inputFrameworks.length > 0
       ? inputFrameworks
-      : extractTargetFrameworks(question, assignmentType, briefText);
+      : [];
 
   const total = Math.max(300, Number(targetWordCount) || 2000);
   const qLower = question.toLowerCase();
@@ -2164,17 +1933,14 @@ export function generateDynamicAssignmentStructure(
       qLower.includes("drug discovery"));
 
   const hasOBOrLeadership =
-    /\b(leadership|culture|schein|zappos|human resource|organizational behaviour|organizational behavior|management|employee|workplace|onboarding)\b/i.test(
+    /\b(leadership|culture|schein|human resource|organizational behaviour|organizational behavior|management|employee|workplace|onboarding)\b/i.test(
       qLower
     );
-
-  const isZapposSchein = isZapposScheinAssignment(question, briefText);
 
   const isAIMachineLearning =
     !isAIEthicsOrLaw &&
     !isAIInHealthcare &&
     !hasOBOrLeadership &&
-    !isZapposSchein &&
     (qLower.includes("machine learning") ||
       qLower.includes("deep learning") ||
       qLower.includes("neural network") ||
@@ -2215,7 +1981,7 @@ export function generateDynamicAssignmentStructure(
     assignmentType === "annotated_bibliography" ||
     qLower.includes("literature review");
 
-  if (hasExplicitBriefDirectives || isZapposSchein || hasOBOrLeadership) {
+  if (hasExplicitBriefDirectives || hasOBOrLeadership) {
     specs = buildBriefSpecificSpecs(question, briefText, assignmentType, targetFrameworks, targetWordCount);
   } else if (isEconomicInterdependence) {
     specs = [
@@ -2991,9 +2757,14 @@ export function generateDynamicAssignmentStructure(
 
   const headings = sanitizeOutlineHeadings(rawHeadings, question, assignmentType);
   const totalAllocated = headings.reduce((sum, h) => sum + h.targetWordCount, 0);
-  const thesisStatement = generateThesisStatement(question, options.writingTone, academicLevel);
+  // A multi-question brief gets a thesis built from its own title and questions,
+  // never from a regex reading of its first "compare/contrast" sub-part.
+  const thesisStatement =
+    briefGroundedThesis([options.briefText, question].filter(Boolean).join("\n")) ||
+    generateThesisStatement(question, options.writingTone, academicLevel);
 
-  return {
+  // Marks-weighted, clean multiples, exact sum to the target (never 40w + 960w).
+  return applyMarksBudget({
     version: currentStructure ? (currentStructure.version || 1) + 1 : 1,
     isConfirmed: false,
     targetWordCount: total,
@@ -3012,7 +2783,7 @@ export function generateDynamicAssignmentStructure(
       qualityControlChecklist: askScholarResearch.qualityControlChecklist,
     },
     questionMappingMatrix: askScholarResearch.questionMappingMatrix,
-  };
+  }, briefText || question);
 }
 
 /**
@@ -3205,19 +2976,23 @@ Generate the tailored academic outline JSON now:`;
       parsed.targetFrameworks ||
       parsed.target_frameworks ||
       fallbackStructure.targetFrameworks ||
-      extractTargetFrameworks(question, options.assignmentType, options.briefText);
+      [];
 
-    return {
-      version: options.currentStructure ? (options.currentStructure.version || 1) + 1 : 1,
-      isConfirmed: false,
-      targetWordCount: total,
-      totalAllocated,
-      headings,
-      thesisStatement: parsed.thesisStatement || parsed.thesis_statement || fallbackStructure.thesisStatement,
-      targetFrameworks,
-      writingTone: typeof writingTone === "string" ? writingTone : (writingTone as any)?.preset || "formal_academic",
-      rationale: `AI-synthesized bespoke outline tailored specifically for: "${question}" (${academicLevel} level).`,
-    };
+    // AI-invented word counts are replaced by the marks pipeline (clean multiples, exact sum).
+    return applyMarksBudget(
+      {
+        version: options.currentStructure ? (options.currentStructure.version || 1) + 1 : 1,
+        isConfirmed: false,
+        targetWordCount: total,
+        totalAllocated,
+        headings,
+        thesisStatement: parsed.thesisStatement || parsed.thesis_statement || fallbackStructure.thesisStatement,
+        targetFrameworks,
+        writingTone: typeof writingTone === "string" ? writingTone : (writingTone as any)?.preset || "formal_academic",
+        rationale: `AI-synthesized bespoke outline tailored specifically for: "${question}" (${academicLevel} level).`,
+      },
+      options.briefText || question
+    );
   } catch (err) {
     console.warn("generateAiEnhancedOutline: LLM failed or timed out, returning high-precision local outline", err);
     return fallbackStructure;
@@ -3340,23 +3115,11 @@ export function autoBalanceStructure(
   const allSubs = structure.headings.flatMap((h) => h.subheadings);
   if (allSubs.length === 0) return structure;
 
-  const currentSum = allSubs.reduce((sum, s) => sum + (Number(s.targetWordCount) || 0), 0) || 1;
-  let distributed = 0;
-
-  const updatedHeadings = structure.headings.map((h, hIdx) => {
-    const updatedSubs = h.subheadings.map((s, sIdx) => {
-      const isLastGlobal =
-        hIdx === structure.headings.length - 1 && sIdx === h.subheadings.length - 1;
-      let words: number;
-      if (isLastGlobal) {
-        words = Math.max(50, total - distributed);
-      } else {
-        words = Math.max(50, Math.round((s.targetWordCount / currentSum) * total));
-        distributed += words;
-      }
-      return { ...s, targetWordCount: words };
-    });
-
+  // Same proportions as before, in clean multiples that sum to the target exactly.
+  const words = allocateCleanWords(allSubs.map((s) => Number(s.targetWordCount) || 1), total);
+  let k = 0;
+  const updatedHeadings = structure.headings.map((h) => {
+    const updatedSubs = h.subheadings.map((s) => ({ ...s, targetWordCount: words[k++] }));
     const hTotal = updatedSubs.reduce((sum, s) => sum + s.targetWordCount, 0);
     return { ...h, targetWordCount: hTotal, subheadings: updatedSubs };
   });

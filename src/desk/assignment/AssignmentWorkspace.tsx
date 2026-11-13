@@ -325,21 +325,11 @@ function AssignmentWorkspaceInner({
   } = useAssignmentWorkspace();
 
   const currentPhaseDef = ASSIGNMENT_PHASES.find((p) => p.id === currentPhase);
-  // Docked beside the stage on wide screens; on phones it would cover the
-  // whole form, so it starts closed there and opens from the header.
-  const [tutorPanelOpen, setTutorPanelOpen] = useState(() =>
-    typeof window === "undefined" || typeof window.matchMedia !== "function"
-      ? true
-      : window.matchMedia("(min-width: 640px)").matches
-  );
+  // The right-hand Architect / tutor drawer is closed in every phase so it never
+  // takes screen space; there is no header toggle for it.
+  const [tutorPanelOpen, setTutorPanelOpen] = useState(false);
   const [isZenMode, setIsZenMode] = useState(false);
   useUnsavedChangesGuard(Boolean(isLoading));
-  // Drafting needs the width: the side panel closes on arrival there and the
-  // header's Inspector button reopens it.
-  useEffect(() => {
-    if (currentPhase === "drafting") setTutorPanelOpen(false);
-  }, [currentPhase]);
-
   useEffect(() => {
     if (!isZenMode) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -534,20 +524,12 @@ function AssignmentWorkspaceInner({
           if (onClose) onClose();
           else if (typeof window !== "undefined") window.location.href = "/";
         }}
-        metricLabel="5 stages"
-        aiModelLabel="Socratic Tutor AI"
+        metricLabel={`${(currentWordCount || 0).toLocaleString()} / ${(targetWordCount || 0).toLocaleString()} words`}
         onOpenAiAccess={onOpenAiAccess}
         aiWorkspace="coursework"
         autosaveStatus={saveStatus}
         hidePhaseTabs
         projectVersion={project?.version}
-        zenMode={isZenMode}
-        onToggleZenMode={() => setIsZenMode((z) => !z)}
-        inspectorOpen={!isZenMode && tutorPanelOpen}
-        onToggleInspector={() => {
-          setIsZenMode(false);
-          setTutorPanelOpen((o) => !o);
-        }}
       />
 
       {/* Assignment bar: the title (editable on phones where the studio header hides it) */}

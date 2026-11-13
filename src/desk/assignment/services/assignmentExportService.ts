@@ -8,6 +8,7 @@
  * - Formatted Bibliography: Auto-generated reference list formatted to citationStyle (Harvard, APA 7, IEEE, MHRA) with hanging indent
  */
 
+import { selectCitedSources, inlineMarkdownRuns, inlineMarkdownToHtml } from "./exportText";
 import {
   Document,
   Packer,
@@ -37,6 +38,7 @@ import {
   getReferenceListHeading,
 } from "./referenceListGenerator";
 import { isTutorialOrShortQABrief } from "../../../utils/briefExtractor";
+import { splitProseIntoParagraphs } from "../../../shared/proseParagraphs";
 
 const ACADEMIC_LEVEL_NAMES: Record<string, string> = {
   high_school: "High school",
@@ -192,23 +194,14 @@ export async function generateAssignmentDocx(params: AssignmentExportParams): Pr
         })
       );
 
-      const paragraphs = (sec.draftContent || "")
-        .split(/\n\s*\n/)
-        .map((p) => p.trim())
-        .filter((p) => p.length > 0);
+      const paragraphs = splitProseIntoParagraphs(sec.draftContent || "")
 
       paragraphs.forEach((pText) => {
         const cleanP = pText.replace(/^#+\s*/, "");
         qnaChildren.push(
           new Paragraph({
             spacing: { line: 320, after: 140 },
-            children: [
-              new TextRun({
-                text: cleanP,
-                font: "Times New Roman",
-                size: 24, // 12pt
-              }),
-            ],
+            children: inlineMarkdownRuns(cleanP).map((r) => new TextRun({ ...r, font: "Times New Roman", size: 24 })),
           })
         );
       });
@@ -272,22 +265,7 @@ export async function generateAssignmentDocx(params: AssignmentExportParams): Pr
         }),
       ],
     }),
-    // Prompt Excerpt Box if available
-    ...(brief.rawPrompt || brief.instructions ? [
-      new Paragraph({
-        alignment: AlignmentType.CENTER,
-        spacing: { after: 800, before: 200 },
-        children: [
-          new TextRun({
-            text: `Assignment Prompt: "${brief.rawPrompt || brief.instructions}"`,
-            font: "Times New Roman",
-            size: 20, // 10pt
-            italics: true,
-            color: "555555",
-          }),
-        ],
-      }),
-    ] : []),
+    // The raw assignment prompt is never printed in the submission.
     // Spacing before metadata table
     new Paragraph({
       text: "",
@@ -399,10 +377,7 @@ export async function generateAssignmentDocx(params: AssignmentExportParams): Pr
     );
 
     // Split content into clean paragraphs
-    const paragraphs = (sec.draftContent || "")
-      .split(/\n\s*\n/)
-      .map((p) => p.trim())
-      .filter((p) => p.length > 0);
+    const paragraphs = splitProseIntoParagraphs(sec.draftContent || "")
 
     if (paragraphs.length === 0) {
       bodyChildren.push(
@@ -426,13 +401,7 @@ export async function generateAssignmentDocx(params: AssignmentExportParams): Pr
         bodyChildren.push(
           new Paragraph({
             spacing: { line: 360, after: 160 }, // 1.5 line spacing (360 dxa)
-            children: [
-              new TextRun({
-                text: cleanP,
-                font: "Times New Roman",
-                size: 24, // 12pt standard
-              }),
-            ],
+            children: inlineMarkdownRuns(cleanP).map((r) => new TextRun({ ...r, font: "Times New Roman", size: 24 })),
           })
         );
       });
@@ -440,7 +409,9 @@ export async function generateAssignmentDocx(params: AssignmentExportParams): Pr
   });
 
   // Bibliography / Reference List
-  const bibliographyEntries = buildFormattedBibliography(sources, brief.citationStyle || "harvard");
+  // Only sources cited in the body plus the brief's prescribed references, once each.
+  const bodyText = sections.map((sec) => sec.draftContent || "").join("\n\n");
+  const bibliographyEntries = buildFormattedBibliography(selectCitedSources(sources, bodyText), brief.citationStyle || "harvard");
 
   bodyChildren.push(
     new Paragraph({
@@ -484,13 +455,7 @@ export async function generateAssignmentDocx(params: AssignmentExportParams): Pr
           // Hanging indent standard for academic bibliographies (720 dxa = 0.5 in)
           indent: { left: 720, hanging: 720 },
           spacing: { line: 360, after: 140 },
-          children: [
-            new TextRun({
-              text: refText,
-              font: "Times New Roman",
-              size: 24, // 12pt
-            }),
-          ],
+          children: inlineMarkdownRuns(refText).map((r) => new TextRun({ ...r, font: "Times New Roman", size: 24 })),
         })
       );
     });
@@ -614,7 +579,10 @@ export function exportAssignmentToPdf(params: AssignmentExportParams): void {
   });
 
   const citationStyleLabel = (brief.citationStyle || "harvard").toUpperCase();
-  const bibliographyEntries = buildFormattedBibliography(sources, brief.citationStyle || "harvard");
+  const bibliographyEntries = buildFormattedBibliography(
+    selectCitedSources(sources, sections.map((sec) => sec.draftContent || "").join("\n\n")),
+    brief.citationStyle || "harvard"
+  );
 
   const printWindow = window.open("", "_blank");
   if (!printWindow) {
@@ -630,11 +598,8 @@ export function exportAssignmentToPdf(params: AssignmentExportParams): void {
 
   const sectionsHtml = sections
     .map((s) => {
-      const paras = (s.draftContent || "")
-        .split(/\n\s*\n/)
-        .map((p) => p.trim())
-        .filter(Boolean)
-        .map((p) => `<p>${p.replace(/^#+\s*/, "")}</p>`)
+      const paras = splitProseIntoParagraphs(s.draftContent || "")
+        .map((p) => `<p>${inlineMarkdownToHtml(p.replace(/^#+\s*/, ""))}</p>`)
         .join("");
       return `<section class="academic-section"><h2>${s.title}</h2>${paras || "<p><em>[Not drafted yet]</em></p>"}</section>`;
     })
@@ -691,7 +656,7 @@ export function exportAssignmentToPdf(params: AssignmentExportParams): void {
   }
 
   const bibliographyHtml = bibliographyEntries.length > 0
-    ? bibliographyEntries.map((ref) => `<p class="bib-entry">${ref}</p>`).join("\n")
+    ? bibliographyEntries.map((ref) => `<p class="bib-entry">${inlineMarkdownToHtml(ref)}</p>`).join("\n")
     : "<p><em>No references cited.</em></p>";
 
   const htmlContent = `
@@ -756,7 +721,6 @@ export function exportAssignmentToPdf(params: AssignmentExportParams): void {
     <div class="inst-name">${institution}</div>
     <div class="course-name">${courseName}</div>
     <div class="paper-title">${title}</div>
-    ${brief.rawPrompt || brief.instructions ? `<div class="prompt-box"><strong>Prompt:</strong> ${brief.rawPrompt || brief.instructions}</div>` : ""}
 
     <table class="meta-table">
       <tr><td class="label">Candidate:</td><td>${studentName}</td></tr>
@@ -803,7 +767,10 @@ export async function copyAssignmentMarkdown(
   brief: AssignmentBriefState,
   title: string
 ): Promise<boolean> {
-  const referenceBlock = generateReferenceListBlock(sources, brief.citationStyle || "harvard");
+  const referenceBlock = generateReferenceListBlock(
+    selectCitedSources(sources, sections.map((sec) => sec.draftContent || "").join("\n\n")),
+    brief.citationStyle || "harvard"
+  );
 
   const fullMarkdown = [
     `# ${title}`,

@@ -11,6 +11,7 @@ vi.mock("../../src/middleware/auth.ts", () => ({
 vi.mock("../../utils/llm.ts", () => ({
   callOpenRouterJSON: vi.fn(),
   callOpenRouterText: vi.fn(),
+  handOffBeforeStream: vi.fn(async () => false),
   getCandidates: () => [],
   buildAuthorizedPolicy: () => ({}),
   resolveRequestAiConfig: () => ({ candidates: [], isClientConfigured: false }),

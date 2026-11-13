@@ -75,3 +75,17 @@ describe("streaming adapters", () => {
     expect(classify(err, signal)).toMatchObject({ kind: "rate_limit", httpStatus: 429, retryAfterMs: 3000, message: "Slow down" });
   });
 });
+
+describe("Anthropic prompt caching", () => {
+  it("marks a long system prompt cacheable and leaves a short one as plain text", async () => {
+    const bodies: Array<{ system: unknown }> = [];
+    const f = (async (_u: string, init: RequestInit) => { bodies.push(JSON.parse(init.body as string)); return new Response("event: message_stop\ndata: {}\n\n", { status: 200 }); }) as unknown as typeof fetch;
+    const { anthropicAdapter } = await import("../adapters");
+    const c = { id: "x", lane: "byok", provider: "anthropic", model: "m", label: "m", contextWindow: 100_000, maxOutputTokens: 4000, runsIn: "server", credential: { apiKey: "k" } } as never;
+    const mk = (system: string) => ({ requestId: "r", task: "drafting", messages: [{ role: "system", content: system }, { role: "user", content: "hi" }], desiredOutputTokens: 100, minOutputTokens: 10 }) as never;
+    for await (const _ of anthropicAdapter(f).stream(c, mk("x".repeat(5000)), 100, new AbortController().signal)) void _;
+    for await (const _ of anthropicAdapter(f).stream(c, mk("short"), 100, new AbortController().signal)) void _;
+    expect(bodies[0].system).toEqual([{ type: "text", text: "x".repeat(5000), cache_control: { type: "ephemeral" } }]);
+    expect(bodies[1].system).toBe("short");
+  });
+});

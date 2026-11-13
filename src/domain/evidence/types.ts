@@ -37,6 +37,7 @@ export type DiscoveryMethod =
   | "crossref"
   | "doaj"
   | "datacite"
+  | "semantic_scholar"
   | "europepmc"
   | "multi_portal"
   | "user_upload"

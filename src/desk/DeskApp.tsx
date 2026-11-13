@@ -20,6 +20,7 @@ import { getProject, UnauthenticatedError, getMigratedDraftRealId, createEphemer
 import { useAiSetupStatus } from "./setup/useAiSetupStatus";
 import { useVaultSetupStatus } from "./setup/useVaultSetupStatus";
 import { useDeskSession } from "./useDeskSession";
+import { normalizeOutputTypeId } from "../app/atlas/legacyIds";
 import { useDeviceClass } from "../hooks/useDeviceClass";
 import type { SectionId } from "./aiAccess/AiAccessPage";
 import GlobalLoader from "./components/GlobalLoader";
@@ -218,7 +219,7 @@ function ProjectRoute() {
     if (targetId) {
       getProject(targetId)
         .then((p) => {
-          if (active) setOutputTypeId(p.outputTypeId);
+          if (active) setOutputTypeId(normalizeOutputTypeId(p.outputTypeId));
         })
         .catch((e) => {
           if (active) {
@@ -336,7 +337,7 @@ function ProjectRoute() {
     );
   }
 
-  if (outputTypeId === "OT-09" || outputTypeId === "OT-07") {
+  if (outputTypeId === "OT-07") {
     return (
       <ThesisWorkspace
         projectId={targetProjectId}
@@ -348,7 +349,7 @@ function ProjectRoute() {
     );
   }
 
-  if (outputTypeId === "OT-19") {
+  if (outputTypeId === "OT-15") {
     return (
       <ProposalWorkspace
         projectId={targetProjectId}

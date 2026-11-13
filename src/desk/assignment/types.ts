@@ -348,6 +348,8 @@ export interface DiscoveredSource {
   canonicalReference?: CanonicalReference;
   status: "unreviewed" | "kept" | "removed";
   fromVault?: boolean;
+  /** Named in the assignment brief itself (listed first, with a badge). */
+  prescribedInBrief?: boolean;
 
   // Canonical Source Registry Fields (Production Spec §3.3)
   verificationStatus?: SourceVerificationStatus;
@@ -1034,15 +1036,27 @@ export function structureToSectionBudgets(structure?: AssignmentStructure | null
   }));
 }
 
+/** Upper bound on drafting sections so no outline fragments into tiny pieces. */
+export const MAX_DRAFTING_SECTIONS = 8;
+/** Below this a sub-part is not drafted on its own. */
+export const MIN_DRAFTING_SECTION_WORDS = 250;
+
 export function structureToInternalSections(structure?: AssignmentStructure | null): AssignmentDraftingSection[] {
   if (!structure?.headings || structure.headings.length === 0) return [];
   const sections: AssignmentDraftingSection[] = [];
+  // Human-scale outlines: when per-subheading expansion would exceed
+  // MAX_DRAFTING_SECTIONS, draft one section per heading instead.
+  const flatCount = structure.headings.reduce((n, h) => n + Math.max(1, h.subheadings?.length ?? 0), 0);
+  const mergeSubheadings = flatCount > MAX_DRAFTING_SECTIONS;
   structure.headings.forEach((h, hIdx) => {
-    if (h.subheadings && h.subheadings.length > 0) {
+    // A heading whose sub-parts would each get a very small budget is drafted as one section.
+    const tooSmall = (h.subheadings ?? []).length > 1 && (h.subheadings ?? []).some((x) => x.targetWordCount > 0 && x.targetWordCount < MIN_DRAFTING_SECTION_WORDS);
+    if (!mergeSubheadings && !tooSmall && h.subheadings && h.subheadings.length > 0) {
       h.subheadings.forEach((s) => {
         sections.push({
           id: s.id,
-          title: `${s.numberStr} ${s.title}`,
+          // One sub-section means the heading IS the section: never "1.0 X" then "1.1 X".
+          title: h.subheadings.length === 1 ? numberedHeading(h) : `${s.numberStr} ${stripSectionNumber(s.title)}`,
           targetWordCount: s.targetWordCount,
           currentWordCount: s.currentWordCount || 0,
           guidance: s.guidance || `Analytical depth for ${s.title}. Notes: ${s.notes || ""}`,
@@ -1065,15 +1079,24 @@ export function structureToInternalSections(structure?: AssignmentStructure | nu
         });
       });
     } else {
+      // Keep any text already drafted under merged subheadings.
+      const mergedDraft = (h.subheadings ?? []).map((sub) => sub.draftContent || "").filter((t) => t.trim()).join("\n\n");
       sections.push({
         id: h.id,
-        title: `${h.number}.0 ${h.title}`,
+        title: numberedHeading(h),
         targetWordCount: h.targetWordCount,
-        currentWordCount: 0,
-        guidance: h.notes || `Analysis for ${h.title}`,
-        draftContent: "",
-        status: "not_started",
-        keyPoints: [],
+        currentWordCount: (h.subheadings ?? []).reduce((n, sub) => n + (sub.currentWordCount || 0), 0),
+        // The whole question: its stem, then every lettered sub-part, in order.
+        guidance: ((joined) => (joined ? `Focus: ${joined}` : h.notes || `Analysis for ${h.title}`))(
+          [h.notes, ...(h.subheadings ?? []).map((sub) => (sub.guidance || "").replace(/^Focus:\s*/i, ""))]
+            .filter((t): t is string => Boolean(t && t.trim()) && !/^Answers Q\d+/.test(String(t)))
+            .join(" ")
+        ),
+        draftContent: mergedDraft,
+        status: mergedDraft ? "completed" : "not_started",
+        keyPoints: (h.subheadings ?? [])
+          .flatMap((sub) => (sub.keyPoints && sub.keyPoints.length ? sub.keyPoints : [sub.title.replace(/^\s*\d+(\.\d+)*\.?\s*/, "")]))
+          .slice(0, 6),
         linkedEvidenceIds: [],
         academicFunction: h.title,
         purpose: h.purpose,
@@ -1088,7 +1111,17 @@ export function structureToInternalSections(structure?: AssignmentStructure | nu
       });
     }
   });
+  // Never merge or drop whole questions: every heading keeps its own section.
   return sections;
+}
+
+/** "3.0 3.0 Title" -> "Title": strips any leading section number(s). */
+export function stripSectionNumber(title: string): string {
+  return (title || "").replace(/^\s*(?:\d+(?:\.\d+)*\.?\s+)+/, "").trim();
+}
+
+function numberedHeading(h: { number: number; title: string }): string {
+  return `${h.number}.0 ${stripSectionNumber(h.title)}`;
 }
 
 export type WritingTonePreset =

@@ -646,7 +646,7 @@ function ProvidersSection({
                   : "text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
               }`}
             >
-              {f === "free" ? "Free to start" : `Connected (${allItems.filter((p) => p.connected).length})`}
+              {f === "free" ? "Free to start" : (access.loading ? "Connected" : `Connected (${allItems.filter((p) => p.connected).length})`)}
             </button>
           ))}
         </div>

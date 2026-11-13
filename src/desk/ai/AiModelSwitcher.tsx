@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, RefreshCw } from "lucide-react";
-import { connectionsNeedingModel } from "./keyring";
 import { lastAiAnswer, type LastAnswer } from "./liveAiStatus";
 import { activeConnection, clearModelCache, fetchLiveModels, recommendFor, selectModel, type ProviderModels, type WorkspaceId } from "./modelChoices";
 import type { KeyringEntry } from "./keyring";
@@ -16,7 +15,6 @@ export function AiModelSwitcher({ workspace, className = "" }: { workspace: Work
   const [providers, setProviders] = useState<ProviderModels[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [needsModel, setNeedsModel] = useState<string[]>([]);
   const [answer, setAnswer] = useState<LastAnswer | null>(lastAiAnswer.get());
   const ref = useRef<HTMLDivElement>(null);
 
@@ -24,7 +22,6 @@ export function AiModelSwitcher({ workspace, className = "" }: { workspace: Work
 
   useEffect(() => {
     activeConnection().then(setActive).catch(() => setActive(undefined));
-    connectionsNeedingModel().then(setNeedsModel).catch(() => setNeedsModel([]));
   }, []);
 
   useEffect(() => {
@@ -51,11 +48,11 @@ export function AiModelSwitcher({ workspace, className = "" }: { workspace: Work
     const r = await selectModel(provider, model);
     if (!r.ok) { setError(r.error ?? "Could not save your choice."); return; }
     setActive(await activeConnection());
-    setNeedsModel(await connectionsNeedingModel().catch(() => []));
     setOpen(false);
   }
 
-  const label = active ? `${active.model}` : needsModel.length ? "Choose a model" : "No AI connected";
+  const modelName = (e: { model: string; via?: string; provider: string }) => (e.model === "auto" ? "Best available" : e.model);
+  const label = active ? modelName(active) : "No AI connected";
 
   return (
     <div className={`relative ${className}`} ref={ref}>
@@ -64,7 +61,7 @@ export function AiModelSwitcher({ workspace, className = "" }: { workspace: Work
         onClick={() => { setOpen((o) => !o); if (!providers) void load(false); }}
         aria-expanded={open}
         aria-label="AI model"
-        title={active ? `Active model: ${active.model} (${active.provider})` : "Connect an AI in AI Access"}
+        title={active ? `Active model: ${modelName(active)} (${active.via ?? active.provider})` : "Connect an AI in AI Access"}
         className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium border border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] cursor-pointer"
       >
         <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${active ? "bg-emerald-500" : "bg-amber-500"}`} aria-hidden="true" />
@@ -84,11 +81,6 @@ export function AiModelSwitcher({ workspace, className = "" }: { workspace: Work
               <RefreshCw className={`w-3 h-3 ${loading ? "animate-spin" : ""}`} aria-hidden="true" />
             </button>
           </div>
-          {needsModel.length > 0 && (
-            <p role="status" className="text-xs text-[color:var(--state-warning)]">
-              {needsModel.join(", ")} {needsModel.length === 1 ? "is" : "are"} connected but not used yet: pick a model below.
-            </p>
-          )}
           {error && <p role="alert" className="text-xs text-[color:var(--state-danger)]">{error}</p>}
           {loading && !providers && <p className="text-xs text-[color:var(--text-muted)]" role="status">Loading the models your providers offer…</p>}
           {providers && providers.length === 0 && <p className="text-xs text-[color:var(--text-muted)]">No cloud provider is connected. Local models are chosen in AI Access.</p>}
@@ -100,7 +92,7 @@ export function AiModelSwitcher({ workspace, className = "" }: { workspace: Work
                 {p.error && <p className="text-[11px] text-[color:var(--state-danger)]">{p.error}</p>}
                 <ul className="mt-1 space-y-0.5">
                   {ranked.map((m) => {
-                    const isActive = active?.provider === p.provider && active.model === m.id;
+                    const isActive = (active?.via ?? active?.provider) === p.provider && active?.model === m.id;
                     return (
                       <li key={m.id}>
                         <button

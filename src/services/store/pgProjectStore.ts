@@ -9,6 +9,7 @@
  */
 
 import { Pool } from "pg";
+import { normalizeOutputTypeId } from "../../app/atlas/legacyIds.ts";
 import { initialProjectGateState } from "../../domain/project/gates";
 import { emptyGraph } from "../../domain/claim/graph";
 import { emptyLedger } from "../../domain/evidence/types";
@@ -73,7 +74,7 @@ function rowToRecord(row: Record<string, unknown>): ProjectRecord {
     projectId: row.project_id as string,
     version: (row.version as number) ?? 1,
     ownerId: row.owner_id as string,
-    outputTypeId: row.output_type_id as string,
+    outputTypeId: normalizeOutputTypeId(row.output_type_id as string) as string,
     answers: ((row.answers as Record<string, any> | null) ?? {}) as ProjectRecord["answers"],
     authors: (row.authors as ProjectRecord["authors"] | null) ?? [],
     gates: row.gates as ProjectRecord["gates"],
@@ -119,7 +120,7 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
         projectId,
         version: 1,
         ownerId,
-        outputTypeId,
+        outputTypeId: normalizeOutputTypeId(outputTypeId) as string,
         answers: {},
         authors: [],
         gates: initialProjectGateState(projectId),

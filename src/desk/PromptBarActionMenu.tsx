@@ -124,9 +124,11 @@ export function PromptBarActionMenu({
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
-          className="p-1.5 rounded-full text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/10 transition-colors cursor-pointer flex items-center justify-center"
+          className="p-1.5 min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 rounded-full text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/10 transition-colors cursor-pointer flex items-center justify-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
           aria-label="Add files and more"
-          title="Add files and more"
+          aria-haspopup="menu"
+          aria-expanded={isOpen}
+          title="Attach a brief (PDF, DOCX, TXT), add photos, or choose a mode"
         >
           <Plus className="w-4 h-4" />
         </button>

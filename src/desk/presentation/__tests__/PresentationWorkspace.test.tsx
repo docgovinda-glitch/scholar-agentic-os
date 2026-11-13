@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, fireEvent, within, act } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import React from "react";
 import PresentationWorkspace from "../PresentationWorkspace";
@@ -52,7 +52,7 @@ describe("PresentationWorkspace", () => {
     const step1Btn = screen.getByRole("button", { name: /01 Understand/i });
     fireEvent.click(step1Btn);
     expect(screen.getByTestId("step-01-understand")).toBeInTheDocument();
-    expect(screen.getByText(/Understand Your Presentation/i)).toBeInTheDocument();
+    expect(screen.getByText(/Outline your presentation/i)).toBeInTheDocument();
 
     // Switch to Step 02 Design
     const step2Btn = screen.getByRole("button", { name: /02 Design/i });
@@ -71,25 +71,23 @@ describe("PresentationWorkspace", () => {
     expect(screen.getByTestId("step-03-studio-canvas")).toBeInTheDocument();
   });
 
-  it("Step 01: starts clean with zero mock slides and generates outline on demand", () => {
+  it("Step 01: starts clean (no pre-filled cards or dropdowns) and builds an outline on demand", async () => {
     render(<PresentationWorkspace projectId="proj-pres-1" />);
 
-    // Starts on 01 Understand
     expect(screen.getByTestId("step-01-understand")).toBeInTheDocument();
     expect(screen.queryByTestId("generated-outline-section")).not.toBeInTheDocument();
+    // Only the slide-count selector remains; the old dropdowns and fake cards are gone.
+    expect(screen.getByLabelText("Slide Count")).toBeInTheDocument();
+    for (const gone of [/Talk length/i, /Presentation Style/i, /Audience Level/i, /What This Presentation Covers/i, /What to Avoid/i]) {
+      expect(screen.queryByText(gone)).not.toBeInTheDocument();
+    }
 
-    const input = screen.getByLabelText(/^Title/i);
-    fireEvent.change(input, {
-      target: { value: "Why Zappos Pays New Hires to Quit" },
-    });
+    fireEvent.change(screen.getByLabelText(/Presentation topic/i), { target: { value: "Why Zappos Pays New Hires to Quit" } });
+    fireEvent.click(screen.getByRole("button", { name: /Generate outline/i }));
 
-    const genBtn = screen.getByRole("button", { name: "Starter outline without AI" });
-    fireEvent.click(genBtn);
-
-    expect(screen.getByText(/Generated Presentation Outline/i)).toBeInTheDocument();
-    // The title field keeps what was typed, and the outline shows the built deck.
-    expect((screen.getByLabelText(/^Title/i) as HTMLInputElement).value).toBe("Why Zappos Pays New Hires to Quit");
-    expect(screen.getAllByText(/Why Zappos Pays New Hires \$2,000 to Quit/i).length).toBeGreaterThan(0);
+    expect(await screen.findByTestId("outline-builder")).toBeInTheDocument();
+    expect((screen.getByLabelText("Presentation title") as HTMLInputElement).value).toBe("Why Zappos Pays New Hires to Quit");
+    expect(screen.getByTestId("outline-card-1")).toBeInTheDocument();
   });
 
   it("Step 02: displays the curated theme gallery (including the 4 classic presets) and accent picker without legacy bloat", () => {
@@ -122,13 +120,13 @@ describe("PresentationWorkspace", () => {
     expect(card()).toHaveAttribute("data-layout", "title");
 
     // Layout switching keeps the content and changes the composition.
-    fireEvent.click(screen.getByRole("radio", { name: "Big numbers" }));
-    expect(card()).toHaveAttribute("data-layout", "stats");
+    fireEvent.click(screen.getByRole("radio", { name: /3-Card Feature Grid/ }));
+    expect(card()).toHaveAttribute("data-layout", "bento");
 
-    fireEvent.click(screen.getByRole("radio", { name: "Image + text" }));
+    fireEvent.click(screen.getByRole("radio", { name: /Split Visual \+ Key Insights/ }));
     expect(card()).toHaveAttribute("data-layout", "split");
 
-    fireEvent.click(screen.getByRole("radio", { name: "Comparison" }));
+    fireEvent.click(screen.getByRole("radio", { name: /2-Column Comparison/ }));
     expect(card()).toHaveAttribute("data-layout", "comparison");
     expect(card()).toHaveTextContent("vs");
 
@@ -363,23 +361,24 @@ Multi-agent verification delivers 100% citation accuracy across 5,000 tested ref
     expect(screen.queryByText("✕")).not.toBeInTheDocument();
 
     // Left-anchored Apple/Airbnb back button
-    const backBtn = screen.getByRole("button", { name: /Back to Workspace/i });
+    const backBtn = screen.getByRole("button", { name: /Back to Projects/i });
     expect(backBtn).toBeInTheDocument();
-    expect(backBtn).toHaveTextContent("Workspace");
+    expect(backBtn).not.toHaveTextContent("Workspace");
 
     fireEvent.click(backBtn);
     expect(handleClose).toHaveBeenCalledTimes(1);
   });
 
-  it("displays the OT-22 learned ML Style Compliance badge and exports quantitative constraints", () => {
+  it("header keeps All changes saved, Q&A and Ask Scholar, and drops the style labels", () => {
     render(<PresentationWorkspace projectId="proj-pres-style" />);
 
-    // Renders the learned style badge
-    const badge = screen.getByTestId("presentation-style-badge");
-    expect(badge).toBeInTheDocument();
-    expect(badge).toHaveTextContent("OT-22 Style:");
-    expect(badge).toHaveTextContent("Conversational Academic");
-    expect(badge).toHaveTextContent("6x6 Density");
+    const header = screen.getByTestId("presentation-header");
+    expect(within(header).getByText(/All changes saved|Saved/i)).toBeInTheDocument();
+    expect(within(header).getByRole("button", { name: /Simulate Audience Q&A/i })).toHaveTextContent("Q&A");
+    expect(within(header).getByRole("button", { name: /Toggle Ask Scholar/i })).toHaveTextContent("Ask Scholar");
+    expect(screen.queryByTestId("presentation-style-badge")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Conversational Academic/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/6x6 Density/i)).not.toBeInTheDocument();
   });
 
   it("hydrates presentation deck and version tracking from getProject and displays version badge", async () => {

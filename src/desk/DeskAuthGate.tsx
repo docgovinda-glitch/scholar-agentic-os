@@ -26,19 +26,47 @@ export function SessionBoundaryFallback({ status }: { status: "loading" | "uncon
       </Centered>
     );
   }
+  // Developers need the variable names; visitors to a live site do not, and
+  // cannot act on them. Either way the page offers a way out instead of ending.
+  const showSetupDetails = import.meta.env.DEV;
   return (
     <Centered>
       <div className="max-w-md text-center">
-        <h1 className="text-lg font-semibold text-[color:var(--text-primary)]">Sign-in is not configured</h1>
-        <p className="mt-2 text-sm text-[color:var(--text-secondary)]">
-          This deployment is missing <code className="px-1.5 py-0.5 rounded-md bg-neutral-100 text-neutral-800 text-xs font-medium">VITE_SUPABASE_URL</code> and{" "}
-          <code className="px-1.5 py-0.5 rounded-md bg-neutral-100 text-neutral-800 text-xs font-medium">VITE_SUPABASE_ANON_KEY</code>. Until they are set, no one can sign in
-          and your work cannot be saved.
-        </p>
-        {/* UX7: say what happened, what it means, and what to do. */}
-        <p className="mt-3 text-xs text-[color:var(--text-muted)]">
-          See <code className="px-1.5 py-0.5 rounded-md bg-neutral-100 text-neutral-800 font-medium">.env.example</code> for both values.
-        </p>
+        <h1 className="text-lg font-semibold text-[color:var(--text-primary)]">
+          {showSetupDetails ? "Sign-in is not configured" : "Sign-in is unavailable right now"}
+        </h1>
+        {showSetupDetails ? (
+          <>
+            <p className="mt-2 text-sm text-[color:var(--text-secondary)]">
+              This deployment is missing <code className="px-1.5 py-0.5 rounded-md bg-neutral-100 text-neutral-800 text-xs font-medium">VITE_SUPABASE_URL</code> and{" "}
+              <code className="px-1.5 py-0.5 rounded-md bg-neutral-100 text-neutral-800 text-xs font-medium">VITE_SUPABASE_ANON_KEY</code>. Until they are set, no one can sign in
+              and your work cannot be saved.
+            </p>
+            {/* UX7: say what happened, what it means, and what to do. */}
+            <p className="mt-3 text-xs text-[color:var(--text-muted)]">
+              See <code className="px-1.5 py-0.5 rounded-md bg-neutral-100 text-neutral-800 font-medium">.env.example</code> for both values.
+            </p>
+          </>
+        ) : (
+          <p className="mt-2 text-sm text-[color:var(--text-secondary)]">
+            We can't sign you in or save your work at the moment. Please try again in a few minutes.
+          </p>
+        )}
+        <div className="mt-5 flex items-center justify-center gap-3">
+          <a
+            href="/"
+            className="inline-flex items-center justify-center min-h-11 px-5 rounded-full bg-neutral-900 text-white text-sm font-semibold hover:bg-neutral-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
+          >
+            Back to home
+          </a>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="inline-flex items-center justify-center min-h-11 px-5 rounded-full border border-neutral-300 text-sm font-medium text-[color:var(--text-primary)] hover:bg-neutral-100 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
+          >
+            Try again
+          </button>
+        </div>
       </div>
     </Centered>
   );

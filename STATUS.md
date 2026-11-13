@@ -1,5 +1,7 @@
 # Scholar Core (`scholar-agentic-os`) — Production Deployment Status Ledger (`STATUS.md`)
 
+> **Dated record.** This document captures a point in time (an incident, audit, plan or status ledger) and is not kept in sync with the code. For current behaviour read [`docs/README.md`](docs/README.md). Details here, such as `render.yaml` settings, file names, line numbers and counts, may no longer match `main`.
+
 **Single Source of Truth Rule (Standing Rule 0)**:
 1. Re-read `STATUS.md` and the relevant source/doc files at the start of every task and before writing any report.
 2. Every factual claim in any report must cite `file:line` or paste raw command output. Anything not verified directly from code or command output must be labeled **`unverified`**.

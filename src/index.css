@@ -795,6 +795,11 @@ button:disabled {
     min-width: 44px;
   }
 
+  /* Native selects get the same minimum height as buttons. */
+  select:not([data-compact="true"]) {
+    min-height: 44px;
+  }
+
   /* iOS zooms the viewport when a focused input's text is under 16px. */
   input, textarea, select {
     font-size: 16px;
@@ -855,6 +860,11 @@ button:disabled {
 }
 .tiptap-editor p {
   @apply text-[color:var(--text-secondary)] leading-relaxed my-2;
+}
+/* Every paragraph in a rich-text editor reads as its own block. */
+.ProseMirror p {
+  margin-bottom: 1rem;
+  line-height: 1.75;
 }
 .tiptap-editor p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);

@@ -120,7 +120,7 @@ async function createTestProposalProject(projectId = "proj-proposal-ot19"): Prom
     projectId,
     ownerId: TEST_USER_ID,
     schemaVersion: 1,
-    outputTypeId: "OT-19",
+    outputTypeId: "OT-15",
     answers: {
       working_title: "Precision Epigenetic Reprogramming in Neurodegenerative Tauopathies",
       title: "Precision Epigenetic Reprogramming in Neurodegenerative Tauopathies",
@@ -163,7 +163,7 @@ async function createTestThesisProject(projectId = "proj-thesis-ot09"): Promise<
     projectId,
     ownerId: TEST_USER_ID,
     schemaVersion: 1,
-    outputTypeId: "OT-09",
+    outputTypeId: "OT-07",
     answers: {
       working_title: "Epistemic Uncertainty Calibration in Transformer Foundation Models",
       title: "Epistemic Uncertainty Calibration in Transformer Foundation Models",
@@ -336,7 +336,7 @@ describe("Architectural Unification Step 2: System-Wide scholarBrain Integration
       expect([200, 426]).toContain(res.status);
       const handoff = res.body.recommendedWorkspaceHandoff || res.body.deliverableIntent;
       if (handoff) {
-        expect(["OT-01", "OT-10", "OT-19", "OT-09", "OT-22"]).toContain(handoff.targetFormatId);
+        expect(["OT-01", "OT-10", "OT-15", "OT-07", "OT-22"]).toContain(handoff.targetFormatId);
         expect(handoff.suggestedTitle).toBeDefined();
       }
     });
@@ -425,7 +425,7 @@ describe("Architectural Unification Step 2: System-Wide scholarBrain Integration
     });
   });
 
-  // Arm 3: Research Proposal OT-19
+  // Arm 3: Research Proposal OT-15
   // These routes used to fall back to keyword-heuristic scores and template prose
   // whenever the AI call failed ("mock-provider" always fails), and the old tests
   // asserted that invented output. They now return the AI's own answer or an
@@ -442,7 +442,7 @@ describe("Architectural Unification Step 2: System-Wide scholarBrain Integration
   }
   const aiHeaders = keyringHeader("openai", "mock-model", "test-key");
 
-  describe("Arm 3: Research Proposal OT-19 (/study-section-simulate, /aims-audit & /draft-section)", () => {
+  describe("Arm 3: Research Proposal OT-15 (/study-section-simulate, /aims-audit & /draft-section)", () => {
     it("POST /study-section-simulate returns the AI panel's scores for the stored proposal", async () => {
       const projectId = await createTestProposalProject("proj-proposal-sim-test");
       const brain = mockBrain({
@@ -514,8 +514,8 @@ describe("Architectural Unification Step 2: System-Wide scholarBrain Integration
     });
   });
 
-  // Arm 4: Thesis & Dissertation OT-09/OT-07
-  describe("Arm 4: Thesis & Dissertation OT-09/OT-07 (/viva-simulate, /chapter-audit & /draft-chapter)", () => {
+  // Arm 4: Thesis & Dissertation OT-07/OT-07
+  describe("Arm 4: Thesis & Dissertation OT-07/OT-07 (/viva-simulate, /chapter-audit & /draft-chapter)", () => {
     it("POST /viva-simulate returns the AI examiner questions for the stored thesis", async () => {
       const projectId = await createTestThesisProject("proj-thesis-viva-test");
       const brain = mockBrain({

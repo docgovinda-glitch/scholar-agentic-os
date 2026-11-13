@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { setLiveModelsFetch, clearLiveModelState } from "../liveModels";
 import express from "express";
 import request from "supertest";
 import { aiRouteDecorator, configureRouterBridge, keyringFromRequest } from "../routerBridge";
@@ -8,6 +9,8 @@ import { ProviderHttpError } from "../../../../src/platform/router/errors";
 import type { AdapterChunk, Candidate, ProviderAdapter } from "../../../../src/platform/router/types";
 
 process.env.LLM_CHALLENGE_SECRET = "test-challenge-secret";
+// No test reaches a real provider: model lists fail, so named models are trusted as given.
+beforeEach(() => { clearLiveModelState(); setLiveModelsFetch((async () => { throw new Error("offline"); }) as unknown as typeof fetch); });
 const SECRET = "sk-test-SECRET-1234567890";
 const calls: string[] = [];
 const fake: ProviderAdapter = {

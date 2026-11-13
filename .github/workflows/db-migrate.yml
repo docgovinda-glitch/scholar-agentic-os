@@ -1,0 +1,81 @@
+name: Database migrations
+
+# Supabase migrations are deployed separately from Render (see docs/DEPLOYMENT.md).
+# Every change under supabase/migrations is checked on pull requests; on main the
+# pending migrations are applied with the Supabase CLI when the project's
+# credentials exist as repository secrets. Without them the apply step is skipped
+# (and says so), so a fork or a fresh clone never fails here.
+#
+# Secrets: SUPABASE_ACCESS_TOKEN, SUPABASE_DB_PASSWORD, SUPABASE_PROJECT_REF.
+on:
+  pull_request:
+    branches: [main]
+    paths: ['supabase/migrations/**']
+  push:
+    branches: [main]
+    paths: ['supabase/migrations/**']
+  workflow_dispatch:
+
+concurrency:
+  group: db-migrate-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate migration files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Names are timestamped, unique and in order
+        run: |
+          set -euo pipefail
+          cd supabase/migrations
+          # Two early migrations predate the 14-digit convention and are already applied: they are
+          # grandfathered by name and must never be renamed. Every other file must be <14-digit timestamp>_<name>.sql.
+          legacy='^(20260824_drop_user_vault_items|20260825_universal_vault_v2)\.sql$'
+          bad=$(ls | grep -vE '^[0-9]{14}_[a-z0-9_]+\.sql$' | grep -vE "$legacy" || true)
+          if [ -n "$bad" ]; then echo "::error::Migration files must be named <14-digit timestamp>_<name>.sql:"; echo "$bad"; exit 1; fi
+          dupes=$(ls | cut -d_ -f1 | sort | uniq -d || true)
+          if [ -n "$dupes" ]; then echo "::error::Duplicate migration timestamps: $dupes"; exit 1; fi
+          echo "$(ls | wc -l) migration files OK"
+      - name: Applied migrations are never edited
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          changed=$(git diff --name-status "origin/${{ github.base_ref }}"...HEAD -- supabase/migrations | grep -E '^(M|D|R)' || true)
+          if [ -n "$changed" ]; then echo "::error::Existing migrations must not be modified or removed; add a new timestamped file instead:"; echo "$changed"; exit 1; fi
+
+  apply:
+    name: Apply to Supabase
+    needs: validate
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check credentials
+        id: creds
+        env:
+          TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          if [ -n "$TOKEN" ] && [ -n "$PASSWORD" ] && [ -n "$REF" ]; then echo "ready=true" >> "$GITHUB_OUTPUT"; else echo "ready=false" >> "$GITHUB_OUTPUT"; echo "::notice::Supabase secrets are not set; migrations were validated but not applied."; fi
+      - uses: supabase/setup-cli@v1
+        if: steps.creds.outputs.ready == 'true'
+        with:
+          version: latest
+      - name: Preview pending migrations
+        if: steps.creds.outputs.ready == 'true'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
+          supabase db push --dry-run
+      - name: Apply pending migrations
+        if: steps.creds.outputs.ready == 'true'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: supabase db push

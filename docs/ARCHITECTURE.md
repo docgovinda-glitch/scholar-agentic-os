@@ -1,206 +1,164 @@
 # Technical Architecture
 
-This document specifies the current fullstack architecture, system topology, data flow, security model, and application layers of **Scholar Core**.
+Runtime topology, server and client layers, and the security model. Paths are relative to the repository root.
 
----
+## 1. Topology
 
-## 1. System Topology Overview
-
-Scholar Core is architected as a hybrid single-container application in production and a unified fullstack development environment locally.
+One Node process (`server.ts`) serves the API, proxies Supabase, and serves the SPA (Vite middleware in development, `dist/` in production).
 
 ```mermaid
 graph TD
-    Client["Browser Client (React 19 + Vite 6 + TailwindCSS v4)"]
-    
-    subgraph ExpressApp ["Node.js / Express Server (server.ts)"]
-        Security["Helmet & CSP Middleware"]
-        AuthRoute["Auth & Turnstile (/api/auth/*)"]
-        ProjectsRoute["Projects & Workspaces (/api/projects/*)"]
-        AssignmentRoute["Assignment 4-Phase API (/api/projects/:id/assignment/*)"]
-        AIRoute["AI Gateway & Fallback (/api/ai/*)"]
-        VaultRoute["Universal Vault API (/api/vault/*)"]
-        SearchRoute["Scholarly Search Proxies (/api/search/*)"]
-        SupabaseProxy["Supabase HTTP & WS Proxy (/api/supabase/*)"]
+    Client["Browser: React 19 SPA (src/main.tsx)"]
+    subgraph Server ["Express 4 process (server.ts)"]
+        Sec["helmet + CSP, rate limits, body limits"]
+        Proxy["/api/supabase/* streaming proxy (allowlisted prefixes)"]
+        Api["/api/* route modules (server/routes)"]
+        Static["Vite middleware (dev) / static dist/ (prod)"]
     end
-    
-    subgraph ExternalServices ["External Infrastructure"]
-        Supabase["Supabase Cloud (PostgreSQL + RLS + GoTrue Auth + S3 Storage)"]
-        Turnstile["Cloudflare Turnstile (CAPTCHA)"]
-        CloudAI["Cloud AI Providers (OpenAI, Anthropic, Gemini, Groq, Mistral, Cohere, xAI)"]
-        LocalAI["Local AI Runners (Ollama, LM Studio, vLLM on localhost)"]
-        ScholarlyAPIs["Scholarly APIs (OpenAlex, Crossref, Semantic Scholar)"]
-        CloudDrives["Cloud Storage Pointers (Google Drive, Microsoft OneDrive)"]
+    subgraph Ext ["External services"]
+        SB["Supabase: Auth (GoTrue), Postgres + RLS, Storage, Edge Functions"]
+        Cap["Cloudflare Turnstile"]
+        LLM["AI providers (user keys, platform keys)"]
+        Sch["Scholarly APIs: OpenAlex, Crossref, Semantic Scholar, DOAJ, DataCite, arXiv, EuropePMC"]
     end
-
-    Client -->|HTTP / WebSocket| Security
-    Security --> ProjectsRoute
-    Security --> AssignmentRoute
-    Security --> AIRoute
-    Security --> VaultRoute
-    Security --> SearchRoute
-    Security --> AuthRoute
-    Security --> SupabaseProxy
-    
-    AuthRoute --> Turnstile
-    SupabaseProxy --> Supabase
-    ProjectsRoute --> Supabase
-    AssignmentRoute --> Supabase
-    VaultRoute --> Supabase
-    AIRoute --> CloudAI
-    Client -.->|Direct Local Call| LocalAI
-    SearchRoute --> ScholarlyAPIs
-    Client -.->|OAuth & Metadata Links| CloudDrives
+    Client --> Sec
+    Sec --> Proxy --> SB
+    Sec --> Api
+    Sec --> Static
+    Api -->|service-role HTTPS Data API| SB
+    Api --> Cap
+    Api --> LLM
+    Api --> Sch
+    Client -. direct from browser: local models, some providers .-> LLM
 ```
 
----
+Process start order in `server.ts`: helmet and CSP, request-header redaction, Supabase proxy (before body parsers so streams stay unbuffered), JSON and URL-encoded body parsers (limit derived from `MAX_UPLOAD_MB`), parser and agent registration (`registerDefaultParsers`, `registerBuiltinAgents`), citation formatter registration, then route registration, `errorHandler`, and finally Vite middleware or static files. Process-level `unhandledRejection` and `uncaughtException` handlers log and keep the server up; `SIGTERM`/`SIGINT` close the HTTP server (forced exit after 10 s).
 
-## 2. Technology Stack
+## 2. Technology
 
-### 2.1 Frontend Client
-- **Runtime & UI**: React 19 (`react`, `react-dom`).
-- **Language**: TypeScript 5.8 (configured with strict type checking in `tsconfig.json`).
-- **Build Tooling & Bundler**: Vite 6 (`vite`, `@vitejs/plugin-react`).
-- **Styling**: TailwindCSS v4 (`@tailwindcss/vite`, `tailwindcss`) augmented with semantic CSS custom properties in `src/index.css`.
-- **Client Routing**: React Router DOM 7 (`react-router-dom`) with a unified `BrowserRouter` mounted at root.
-- **Rich Text Editor**: TipTap 3 (`@tiptap/core`, `@tiptap/react`, `@tiptap/starter-kit`, `@tiptap/extension-placeholder`).
-- **Animations & Transitions**: Motion 12 (`motion`).
-- **Icons**: Lucide React (`lucide-react`).
+| Area | Choice (from `package.json`) |
+| :--- | :--- |
+| Client | React 19, react-router-dom 7, Vite 6, Tailwind CSS v4 (`@tailwindcss/vite`), TipTap 3, motion, lucide-react, @dnd-kit |
+| Server | Express 4 (`express-async-errors`), helmet 8, multer 2, run with `tsx` in development and bundled by esbuild to `dist/server.cjs` (`--packages=external`) |
+| Language | TypeScript ~5.8, strict; path alias `@/*` resolves to the repository root |
+| Validation | zod 4 |
+| AI libraries | `@google/genai`, LangChain core / OpenAI and LangGraph (`server/services/briefScannerGraph.ts`) |
+| Documents | `pdf-parse`, `mammoth`, `docx`, `pdfmake`, `pptxgenjs`, `jszip` |
+| Data | `@supabase/supabase-js` (client), Supabase Data API over HTTPS from the server, optional `pg` direct connection |
+| Tests | Vitest 4 + Testing Library (unit and route tests), Playwright + axe (end to end) |
 
-### 2.2 Backend Server
-- **Runtime**: Node.js 20+ / Express 4 (`express`, `express-async-errors`).
-- **Language**: TypeScript executed via `tsx` during development and bundled via `esbuild` to CommonJS (`dist/server.cjs`) for production.
-- **Security & Headers**: Helmet 8 (`helmet`) with tailored Content Security Policy (CSP).
-- **Rate Limiting**: Custom token-bucket rate limiter middleware (`server/src/middleware/rateLimit.ts`).
-- **Document Parsers**: Built-in AST extractors for PDF (`pdf-parse`), Word documents (`mammoth`, `docx`), plain text, and Markdown (`src/document_intelligence/parser/`).
-- **File Ingestion**: Multer (`multer`) for handling multipart form uploads.
+## 3. Server layer
 
-### 2.3 Database & Cloud Backend (Supabase)
-- **Database Engine**: PostgreSQL 15+ managed via Supabase.
-- **Access Model**: Dual-mode access:
-  1. Direct PostgREST / Supabase Client (`@supabase/supabase-js`) with Row Level Security (RLS) for user-scoped queries.
-  2. Express Backend Supabase Proxy (`server/routes/supabaseProxy.ts`) for unified reverse proxying and server-side operations.
-- **Authentication**: Supabase GoTrue Auth supporting Email/Password, Magic Link, and Google OAuth.
-- **Object Storage**: Supabase Storage (`project-files` bucket) for brief documents and lecture slides.
+### 3.1 Route modules (`server/routes/`)
 
----
+Registered in `server.ts` in this order: health, admin, auth, `/api/ai/run` and `/api/ai/models`, AI routes, studio, projects, drafting, AI access, search, vault, presentations. Full endpoint list: [`API.md`](API.md).
 
-## 3. Major Application Layers
+| Module | Mount |
+| :--- | :--- |
+| `health.ts` | `GET /api/health` |
+| `admin.ts` | `/api/admin/ai/*` (`requireAuth` then `requireAdmin`, scope checks) |
+| `auth.ts` | `/api/auth/verify-signup`, `/login`, `/check-availability` |
+| `aiRun.ts` | `POST /api/ai/run`, `GET /api/ai/models` |
+| `ai.ts` | `/api/ai/*`: status, search, deep research, agent, threads |
+| `studio.ts` | `/api/studio/*` (voice profile, refine, consent, restrict, egress audit) |
+| `project.ts` | `/api/projects/*` and `/api/atlas/output-types`, `/api/user/saved-authors`; mounts the sub-routers in `server/routes/project/` |
+| `drafting.ts` | `POST /api/drafting/section` |
+| `aiAccess.ts` | `/api/ai-access/*` |
+| `search.ts` | `/api/search/*` and the alias `/api/discovery/*` |
+| `vault.ts` | `/api/vault/*` and `POST /api/lookup-doi` |
+| `presentations.ts` | `/api/presentations/*` |
+| `supabaseProxy.ts` | `/api/supabase/*` (HTTP) and WebSocket upgrade |
 
-### 3.1 Client Routing Layer (`src/main.tsx` & `src/desk/DeskApp.tsx`)
-The application operates on a single `BrowserRouter` hierarchy:
-- `/admin/*`: Lazy-loaded Admin AI Infrastructure panel chunk (`AdminApp.tsx`).
-- `/*`: Main Desk application (`DeskApp.tsx`):
-  - **Public Routes**: `/`, `/signin`, `/signup`, `/reset-password`, `/verify-email`.
-  - **Authenticated Routes** (enforced by `<RequireAuth>`):
-    - `/onboarding`: Mandatory initial user profile configuration.
-    - Gated by `<OnboardingGate>`:
-      - `/projects`: Main projects list and dashboard.
-      - `/projects/:projectId`: Project workspace router (dynamically mounts `AssignmentWorkspace`, `ThesisWorkspace`, `ProposalWorkspace`, `PresentationWorkspace`, or `ResearchWorkspace` based on `outputTypeId`).
-      - `/projects/:projectId/:view`: Deep stage link within the workspace.
-      - `/vault`: Universal Knowledge Vault screen.
-      - `/ai-access` and `/ai-access/:section`: AI provider, local runner, and preference management.
-      - `/settings`: Multi-account registry, active profile, and theme settings.
+Project sub-routers (`server/routes/project/`): `agentic/` (journal pipeline, split into blueprint, citation support, drafting, evidence, journal profile, references, review routers), `assignment/` (extract, understand, sources, drafting, submission, agent routes), `thesis.ts`, `proposal.ts`, `presentation.ts` (+ `presentationCards.ts`), `claims.ts`, `evidence.ts`, `files.ts`, `activity.ts`, `parse.ts`, `mesh.ts`, `journal_compliance.ts`, `submissions.ts`, and `core/` (manuscript, gate, export handlers).
 
-### 3.2 Workspace Routing & State Management
-- Workspace state is managed through React Context (`AssignmentContext.tsx`, `ResearchContext.tsx`) coupled with atomic synchronization refs (`projectRef`) to prevent state loss during rapid edits.
-- State is continuously debounced and synchronized with backend endpoints (`PUT /api/projects/:id/assignment`) which persist the canonical state into `public.assignment_projects` in Supabase.
+### 3.2 Middleware (`server/src/middleware/`)
 
-### 3.3 Coursework & Essay Engine: 5-Phase Pipeline & Database Mapping
-The Coursework & Essay workspace (`OT-01`) is organized into five canonical sequential phases, backed by PostgreSQL tables and Supabase RLS:
-1. **Phase 1: Extract** (`AssignmentExtractStage.tsx`, phase ID `extract`): Ingestion of assignment brief document (`.pdf`, `.docx`, `.txt`) or pasted prompts, extracting core question, academic level, assignment genre, citation style, and dynamic target word counts (100–50,000w stepper).
-2. **Phase 2: Understand** (`AssignmentUnderstandStage.tsx`, phase ID `understand`): Calibration of core working thesis, identification of required theoretical frameworks, bespoke hierarchical outline tree decomposition (`DynamicStructurePlanner.tsx`), section-by-section word allocation, and rule-indexed rubric criteria extraction (`project_answers.assignment_analysis`).
-3. **Phase 3: Sources** (`AssignmentSourcesStage.tsx`, phase ID `sources`): Scholarly literature discovery via OpenAlex, lecture slide concept indexing, and evidence ledger grounding (`public.project_sources`, `public.project_evidence`).
-4. **Phase 4: Drafting** (`AssignmentDraftingStage.tsx`, phase ID `drafting`): Sequential PEEL paragraph synthesis, real-time word budgeting, and supervised ML style adherence.
-5. **Phase 5: Submission** (`AssignmentSubmissionStage.tsx`, phase ID `submission`): 10-point academic rubric audit, citation reconciliation, and camera-ready PDF/DOCX export.
+| File | Role |
+| :--- | :--- |
+| `auth.ts` | `requireAuth`: verifies the Supabase access token with a direct GoTrue call (no supabase-js client), bounded in-memory token cache; 401 for bad tokens, 503 when verification cannot be performed |
+| `requireAdmin.ts` | Admin roster check, `MAIN_ADMIN_EMAIL` super-admin, scope enforcement (`requireScope`, `requireScopeInline`) |
+| `rateLimit.ts` | Fixed-window in-memory limiter, keyed by client IP (Cloudflare-aware; only trusts `CF-Connecting-IP` when the peer is a Cloudflare address) |
+| `captchaVerify.ts` | Turnstile token verification for sign-up |
+| `rejectClientCredentials.ts` | Rejects provider credentials in request bodies on AI routes |
+| `uploadGuard.ts` | Multer memory storage, `MAX_UPLOAD_MB` (default and hard ceiling 10), heavy-parser detection |
+| `errorHandler.ts`, `asyncHandler.ts` | Uniform error responses |
 
-### 3.4 Server Routes Layer (`server/routes/index.ts`)
-The Express server modularizes routes across domain boundaries:
-- `registerHealthRoutes`: `/health`, `/healthz`, `/api/health` probes.
-- `registerAuthRoutes`: `/api/auth/verify-signup` with Turnstile token validation.
-- `registerProjectRoutes`: CRUD for projects, stages, claims, evidence, the dedicated 5-phase assignment endpoints (`server/routes/project/assignment.ts`), and the modularized 25-stage / 5-mode agentic research sub-routers (`server/routes/project/agentic/{draftingRoutes,evidenceRoutes,reviewRoutes,helpers,types,index}.ts`).
-- `registerAIRoutes`: Unified AI endpoints (`/api/ai/generate`, `/api/ai/chat`, `/api/ai/stream`, `/api/ai/models`) orchestrated via `scholarBrain.ts` and `semanticRagEngine.ts`.
-- `registerAiAccessRoutes`: Provider credentials, BYOK encryption, and local runner detection.
-- `registerVaultRoutes`: Universal Vault operations, DOI fetching, and cloud links.
-- `registerSearchRoutes`: Proxied scholarly search queries to OpenAlex, Crossref, and Semantic Scholar.
-- `registerSupabaseProxy`: Reverse proxy for Supabase PostgREST and Realtime WebSockets.
+Rate limits actually applied (fixed window, per client IP): AI abuse limit 20/min on `/api/ai/run`, `/api/ai/models` and the `/api/ai/*` router; studio routes 200/min; project routes 600/min; Supabase proxy 300/min; saved AI keys 120 per 15 min (`/api/ai-access/keys`); auth routes use their own limiters (login 5 per 5 min, availability 30 per 15 min, signup verification 20 per 15 min).
 
-### 3.5 Modular Client API, Type-Safe State Accessor & Code Splitting
-- **Modular Client API (`src/desk/api/*`)**:
-  - `client.ts`: Authenticated fetch transport (`authedFetch`), transient BYOK header injection (`x-ai-*`), and offline queue synchronization.
-  - `projectsApi.ts`: Project CRUD, file attachments, and activity logs.
-  - `agenticApi.ts`: 25-stage and 5-mode Journal Studio pipeline operations.
-  - `claimEvidenceApi.ts`: Claim-evidence graph and matrix operations.
-  - `studioGenerationApi.ts`: Thesis (`OT-09`), Proposal (`OT-19`), and Presentation (`OT-22`) generation endpoints.
-- **Type-Safe Project State Accessor (`src/shared/projectStateSchema.ts`)**:
-  - Replaces raw `JSON.parse(project.answers)` calls across workspace stages with a deterministic, schema-validated parser (`parseProjectAnswers`, `readStageAnswer`) that safely handles both serialized strings and hydrated JSONB objects.
-- **Dynamic Document Compiler Chunking (`vite.config.ts`)**:
-  - Heavy document processing libraries (`pdfmake`, `docx`, `mammoth`, `xlsx`, `pdf-parse`) are isolated into lazy-loaded chunks and dynamically imported only when a user triggers document ingestion or manuscript export.
+### 3.3 Persistence (`src/services/store/projectStore.ts`)
 
----
+Projects are persisted through `resolveStore()`: (1) Supabase Data API over HTTPS when `VITE_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are set (`restProjectStore.ts`, `server/src/supabaseRest.ts`); (2) direct Postgres when `DATABASE_URL` is set (`pgProjectStore.ts`); (3) an on-disk store (`data/.scholar_local_store.json`) in non-production; in production the server throws at start rather than run without durable storage. Tests use an in-memory store. `GET /api/health` reports `persistenceMode` as `supabase-rest`, `postgres`, `in-memory-test` or `in-memory-EPHEMERAL` (the last also appears in an unconfigured development run).
 
-## 4. Security Architecture
+Ownership is enforced in application code: the server holds the service-role key, and `projects` has RLS enabled with no policies (see [`DATA-MODEL.md`](DATA-MODEL.md)).
 
-### 4.1 Content Security Policy (CSP)
-In production, Helmet enforces a strict CSP policy in `server.ts` configured with exact origins:
-- `default-src`: `'self'`
-- `connect-src`:
-  - `'self'`
-  - Exact Supabase Project URL (`https://<project-ref>.supabase.co` and `wss://<project-ref>.supabase.co`)
-  - Direct Browser Cloud Origins (Google Gemini API: `https://generativelanguage.googleapis.com`)
-  - Local AI Runners (`http://localhost:*`, `http://127.0.0.1:*`)
-  - Scholarly Discovery APIs (`https://api.openalex.org`, `https://api.crossref.org`, `https://api.semanticscholar.org`, `https://api.datacite.org`)
-  - Cloud Drive APIs (`https://www.googleapis.com`, `https://graph.microsoft.com`)
-- `script-src`: `'self'`, Cloudflare Turnstile (`https://challenges.cloudflare.com`)
-- `frame-src`: `'self'`, Cloudflare Turnstile (`https://challenges.cloudflare.com`)
+### 3.4 AI layer
 
-### 4.2 Bot Abuse Protection
-- User registration requires a Cloudflare Turnstile CAPTCHA token.
-- Verification is performed on the server via `server/src/middleware/captchaVerify.ts` against Cloudflare's siteverify API before account creation proceeds.
+`server/src/services/scholarBrain.ts` is the only AI brain. Routing, credentials and providers are documented in [`AI-SYSTEM.md`](AI-SYSTEM.md); entry layers in [`AI-CALL-MAP.md`](AI-CALL-MAP.md). Supporting modules: `server/src/aiEngine/` (routers, credits, quotas, entitlements, credential vault, provider health), `server/src/ai/` (client AI config, endpoint guard, router bridge), `server/src/research/` (web search, deep research, citation validator, scholarly retrieval), `server/src/discovery/` (live search, blueprint scout), `server/src/services/semanticRagEngine.ts`.
 
-### 4.3 Tenant Isolation & Database Security
-- Every relational table in Supabase enforces Row Level Security (RLS).
-- Read, write, and delete operations check `auth.uid() = user_id`, guaranteeing that users can only access their own projects, vault items, and credentials.
-- Multi-Account switching manages active sessions via Supabase auth tokens, maintaining strict isolation across profiles.
+### 3.5 Shared code
 
-### 4.4 Envelope Encryption for Credentials
-- User-provided BYOK keys (OpenAI, Anthropic, etc.) stored in the database are encrypted using envelope encryption primitives (`src/services/crypto/crypto.ts`) with user-scoped keys.
+The server imports from `src/` (citation formatters, `document_intelligence`, mesh agents, `platform/` router, completion and warden, `config/` catalogs). Those modules must stay free of browser-only APIs. SSRF-sensitive fetches of user-supplied URLs go through `server/utils/ssrfGuard.ts` (HTTP/HTTPS only, DNS pre-resolution with private-range blocking, connection pinning, per-hop redirect validation, 2 MB and 8 s caps).
 
----
+## 4. Client layer
 
-## 5. Supervised ML Style Engine Architecture (`ml-style-engine/`)
+### 4.1 Routing
 
-Scholar Core embeds a high-precision, client-side capable Supervised Machine Learning Style Engine to guarantee that AI-drafted sections adhere to verified collegiate and peer-reviewed journal benchmarks:
+`src/main.tsx` mounts `/admin/*` (lazy `src/admin/AdminApp.tsx`) and `/*` (`src/desk/DeskApp.tsx`).
 
-### 5.1 Corpus Architecture (110 Papers, 752,811 Words)
-- **Open-Access Verified Corpus**: 110 complete peer-reviewed papers fetched directly from EuropePMC XML across 11 scholarly archetypes:
-  - `essay` (10 files)
-  - `literature_review` (10 files)
-  - `research_paper` (10 files)
-  - `case_study` (10 files)
-  - `report` (10 files)
-  - `critical_essay` (10 files)
-  - `argumentative_essay` (10 files)
-  - `policy_analysis` (10 files)
-  - `business_assignment` (10 files)
-  - `journal_article` (10 files)
-  - `presentation_slides` (10 files)
-- **Integrity Gates**: 100% verified with 0 duplicate PMCIDs, 0 duplicate SHA-256 hashes, and every paper exceeding the 1,200-word substantive threshold.
+| Route | Access |
+| :--- | :--- |
+| `/`, `/signin`, `/signup` | Public (landing or projects list) |
+| `/signup/check-email`, `/signup/resend`, `/reset-password` | Public only |
+| `/reset-password/confirm`, `/verify-email` | Public |
+| `/presentation` | Public (works signed out) |
+| `/onboarding` | Signed in |
+| `/projects`, `/projects/:projectId`, `/projects/:projectId/:view` | Signed in and onboarded |
+| `/vault`, `/ai-access`, `/ai-access/:section`, `/settings` | Signed in and onboarded |
+| `/presentation` (inside the gate) | Signed in and onboarded |
+| `/agents`, anything else | Redirect to `/projects` |
 
-### 5.2 Supervised Classifier Pipeline (`03_train_model.py`)
-- **Sample Generation**: 8,154 chunked training samples with paragraph-level windowing.
-- **Model Evaluation**:
-  - Calibrated LinearSVC (Selected Production Model): **93.97% 5-Fold Stratified Cross-Validation Accuracy & Macro F1** (In-sample: 99.46%).
-  - Multinomial Naive Bayes: 93.18% CV Accuracy.
-  - L2 Logistic Regression: 93.08% CV Accuracy.
-- **Exported Runtime Weights**: Pre-computed vocabulary IDFs, class intercept offsets, and weight vectors exported to `src/features/coursework/data/archetype_model_weights.json`.
+`ProjectRoute` loads the project and chooses the workspace from `outputTypeId` ([`PRODUCT.md`](PRODUCT.md) §2). The signed-in routes sit behind `RequireAuth`, `RequireOnboarding` and `OnboardingGate`.
 
-### 5.3 Deterministic Client-Side Inference (`styleEngineService.ts`)
-- Evaluates text in-memory via TF-IDF dot products and softmax probability distribution.
-- Computes 5 quantitative collegiate style metrics:
-  - **Mean Sentence Length** (target: 18–32 words depending on archetype)
-  - **Sentence Length Burstiness** (std dev target: 6.5–9.5 words)
-  - **Active Voice Ratio** (enforces `>= 80%` active voice, max passive voice `<= 20%`)
-  - **Bracket Citation Density** (target: `>= 0.8%` to `>= 2.2%` per 100 words)
-  - **Lexical Diversity (Type-Token Ratio)** (target: `>= 0.40` to `>= 0.48`)
-- Injects archetype-specific learned rhetorical transition n-grams into the drafting prompt builder (`drafting.ts`, `generate.ts`, `slideGenerator.ts`).
+### 4.2 Source layout
 
+| Path | Contents |
+| :--- | :--- |
+| `src/desk/` | UI by feature: assignment, thesis, journal, workspace (journal studio), proposal, presentation, vault, aiAccess, ai, auth, account, admin, dashboard, intake, setup, claims, evidence, gates, discovery, export, manuscript, editor |
+| `src/desk/api/` | Typed client: `client.ts` (authenticated fetch, transient `x-ai-*` headers on AI routes via `routeUsesClientAi`, offline queue), `projectsApi.ts`, `agenticApi.ts`, `claimEvidenceApi.ts`, `studioGenerationApi.ts` |
+| `src/app/` | Client engines: `atlas` (output-type catalog), `conductor` (gates), `mesh` (agent registry and executor), `citation`, `manuscript`, `review`, `coherence`, `rubric`, `studio`, `journal`, `anonymization`, `coverLetter`, `export` |
+| `src/domain/` | Pure models and zod schemas; no React and no I/O |
+| `src/features/` | `slides` (Presentation Studio and Gamma card engine), `coursework` (style engine, legacy coursework components), `drafting`, `sources`, `understand` |
+| `src/platform/` | `router/` (the one AI engine: adapters, failover, key rotation, circuit breaker, model listing and curation, SSE bridge), `completion.ts` (the `Completer` app modules use), `warden/` (egress policy, used by the mesh agents) |
+| `src/services/` | Auth, Supabase client, vault, store, offline queue, crypto, capabilities, AI settings and diagnostics |
+| `src/citation_compliance/` | Formatters, validation, CSL engine, BibTeX/RIS importers |
+| `src/config/` | `providerCatalog.ts`, `modelCatalog.ts`, `localRunnerCatalog.ts` |
+| `src/shared/` | Cross-cutting helpers (project state schema, LLM JSON parser, guardrails, style weights) |
+
+### 4.3 State
+
+Coursework state lives in `AssignmentContext` and is saved as keyed answers through `PATCH /api/projects/:id/intake` into `projects.answers`; journal state lives in `ResearchContext`. Typed access to saved answers goes through `src/shared/projectStateSchema.ts`.
+
+### 4.4 Code splitting
+
+`vite.config.ts` splits `react`, `tiptap`, `supabase`, `ui`, `docx`, `pdfmake` and parser dependencies into their own chunks, and workspaces are lazy-loaded in `DeskApp.tsx`. `scripts/verify-chunk-budget.mjs` (run by `npm run build`) fails the build if any JavaScript chunk exceeds 500 kB (`CHUNK_BUDGET_KB` overrides).
+
+## 5. Security model
+
+- **Authentication**: Supabase Auth. Sign-up requires a Turnstile token verified server-side; `/api/auth/login` accepts email, username or phone and answers failures with one uniform message.
+- **Authorization**: `requireAuth` on every project, vault, AI-access, search, presentation, drafting and studio route; project ownership checked per request; admin routes require an admin roster entry and the relevant scope.
+- **CSP** (production, `server.ts`): `connect-src` allows self, the Supabase origin (https and wss), direct-call provider origins from the provider catalog, `localhost`/`127.0.0.1` for local runners, the scholarly APIs (OpenAlex, Crossref, DataCite, EuropePMC, DOAJ, Semantic Scholar, arXiv), World Bank and OECD, Cloudflare challenges, Google Fonts and Google accounts. `script-src` is self, Turnstile, Google accounts and one hashed inline theme script (`INLINE_THEME_SCRIPT_CSP_HASH`, checked by `npm run verify:csp-hash`). `frame-src` is self, Turnstile and Google accounts.
+- **Supabase proxy**: only `/auth/v1`, `/rest/v1`, `/storage/v1`, `/functions/v1` and `/realtime/v1` are forwarded; fails closed when no upstream is configured.
+- **Credentials**: a user's key is sent per request in `x-ai-*` / `x-ai-keyring` headers and held in memory for that request only; handlers never log it (`x-ai-api-key` is redacted in `server.ts`) and request bodies may not carry credentials (`rejectClientCredentials`). Keys a user chooses to save for device sync (`user_provider_keys`, via `/api/ai-access/keys`) and the platform's own provider keys (`platform_provider_credentials`) are envelope-encrypted: a per-credential key wrapped under `MASTER_KEY` (`server/src/aiEngine/credentialVault.ts`, `userKeyVault.ts`). Only the owner's own request can read back saved user keys.
+- **Outbound requests**: user-named AI base URLs must be https and public (`server/src/ai/aiEndpointGuard.ts`); the generic provider proxy applies an equivalent check; page fetches use `ssrfGuard`.
+- **Uploads**: in-memory, ceiling 10 MB, heavy parsers (PDF, Office) tracked by `uploadGuard`.
+- **Database**: all tables have RLS enabled; server-owned tables carry no policies and are reachable only with the service-role key.
+- Deeper security history: `AUDIT.md`, `ROTATION_RUNBOOK.md`, `HOTFIX*_DEPLOY.md` (dated records).
+
+## 6. ML style engine (`ml-style-engine/`)
+
+An offline pipeline that trains an archetype classifier; only its exported weights ship in the app.
+
+- **Corpus**: `ml-style-engine/corpus/<archetype>/` holds 10 open-access papers (EuropePMC) for each of 11 archetypes: `essay`, `literature_review`, `research_paper`, `case_study`, `report`, `critical_essay`, `argumentative_essay`, `policy_analysis`, `business_assignment`, `journal_article`, `presentation_slides`. 110 documents, 752,811 words in total (`corpus_manifest.json`).
+- **Scripts**: `01_download_exact_90_files.py`, `02_verify_corpus.py`, `03_train_model.py`, `04_expand_corpus_110_files.py` (Python, scikit-learn; not part of `npm` scripts).
+- **Model**: `models/archetype_classifier_meta.json` records the selected calibrated LinearSVC (cross-validation accuracy 0.9397, macro F1 0.9397) against multinomial naive Bayes (0.9318) and L2 logistic regression (0.9308), 5,000-term vocabulary, 8,154 training samples. `03_train_model.py` writes `models/model_weights.json` and copies the runtime weights to `src/features/coursework/data/archetype_model_weights.json`.
+- **Runtime**: `src/features/coursework/services/styleEngineService.ts` classifies text (`classifyArchetype`), computes style metrics (`extractStyleMetrics`) and builds a compliance report (`auditStyleCompliance`) in TypeScript. It is used by `src/features/coursework/` and `src/desk/manuscript/ManuscriptGenerationPanel.tsx`; `scholarBrain.getArchetypeModelWeights()` exposes the weights to server code.

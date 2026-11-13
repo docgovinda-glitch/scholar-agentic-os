@@ -86,10 +86,9 @@ export default function PresentationHeader({
             <PanelLeftOpen className="w-4 h-4" />
           </button>
         )}
-        <button type="button" onClick={handleBack} className={`${ghostBtn} pl-2 shrink-0`} aria-label="Back to Workspace" title="Back to Workspace">
+        <button type="button" onClick={handleBack} className={`${ghostBtn} pl-2 shrink-0`} aria-label="Back to Projects" title="Back to Projects">
           <ArrowLeft className="w-3.5 h-3.5" />
-          <span className="hidden lg:inline">Workspace</span>
-          <span className="sr-only lg:hidden">Workspace</span>
+          <span className="hidden xl:inline">Projects</span>
         </button>
         <span className="h-4 w-px bg-neutral-900/10 dark:bg-white/10 shrink-0 mx-1" aria-hidden />
         <span className="sr-only">Presentation Studio</span>
@@ -99,7 +98,7 @@ export default function PresentationHeader({
           onChange={(e) => onTitleChange(e.target.value)}
           aria-label="Presentation Title"
           placeholder="Untitled presentation"
-          className="min-w-0 flex-1 max-w-[360px] h-8 px-2 rounded-lg bg-transparent text-sm font-semibold text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 truncate hover:bg-neutral-900/[0.04] dark:hover:bg-white/[0.05] focus:bg-white dark:focus:bg-[#212121] focus:outline-none focus:ring-1 focus:ring-neutral-900/15 dark:focus:ring-white/15 transition-colors"
+          className="min-w-0 flex-1 max-w-[300px] h-8 px-2 rounded-lg bg-transparent text-sm font-semibold text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 truncate hover:bg-neutral-900/[0.04] dark:hover:bg-white/[0.05] focus:bg-white dark:focus:bg-[#212121] focus:outline-none focus:ring-1 focus:ring-neutral-900/15 dark:focus:ring-white/15 transition-colors"
         />
       </div>
 
@@ -132,15 +131,6 @@ export default function PresentationHeader({
 
       {/* Right: status + assistants */}
       <div className="flex items-center justify-end gap-1.5 min-w-0">
-        <div
-          data-testid="presentation-style-badge"
-          className="hidden 2xl:inline-flex items-center gap-1.5 px-2.5 h-7 rounded-full text-[11px] text-neutral-500 dark:text-neutral-400"
-          title="Writing style: conversational academic, at most 6 points of 6 words"
-        >
-          <span className="sr-only">OT-22 Style:</span>
-          <span>Conversational Academic</span>
-          <span className="text-neutral-400">· 6x6 Density</span>
-        </div>
         {!hideAutosaveBadge && (
           // The badge sets its own display (inline-flex), which overrode `hidden`
           // and overlapped the step switcher on phones; hide via a wrapper.
@@ -164,7 +154,7 @@ export default function PresentationHeader({
             aria-label="Simulate Audience Q&A"
           >
             <MessagesSquare className="w-3.5 h-3.5" />
-            <span className="hidden 2xl:inline">Q&amp;A</span>
+            <span className="hidden xl:inline">Q&amp;A</span>
           </button>
         )}
         <button
@@ -177,7 +167,7 @@ export default function PresentationHeader({
           aria-label="Toggle Ask Scholar"
         >
           <Lightbulb className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
-          <span className="hidden 2xl:inline whitespace-nowrap">Ask Scholar</span>
+          <span className="hidden xl:inline whitespace-nowrap">Ask Scholar</span>
         </button>
         {currentStep === 'delivery' && onStartPresentation && (
           <button

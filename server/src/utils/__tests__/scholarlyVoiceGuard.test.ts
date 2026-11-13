@@ -121,7 +121,8 @@ describe("Scholarly Voice & Orthographic Guardrails", () => {
       expect(prompt).toContain("QubitDecoherenceRate");
       expect(prompt).toContain("SchrödingerOperator");
       expect(prompt).toContain("LEXICAL FINGERPRINT SUPPRESSION");
-      expect(prompt).toContain("[Unverified Claim — Vault Citation Required]");
+      // Unsourced claims are never tagged in prose.
+      expect(prompt).toContain("never write placeholder tags");
     });
   });
 });

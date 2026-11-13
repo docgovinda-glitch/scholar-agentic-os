@@ -4,6 +4,7 @@ import type { SlideDeck } from '../types/slides';
 import { SLIDE_THEMES, type CustomTheme, type SlideThemeId, calculateContrastRatio, isWcagAA } from '../types/themes';
 import ThemeScreenshotCloner from './ThemeScreenshotCloner';
 import ThemeLibraryGrid from './ThemeLibraryGrid';
+import VisualPlanner from './VisualPlanner';
 import CustomThemeStudio from './CustomThemeStudio';
 import type { BestSlideDesign } from '../data/bestSlideDesigns100';
 import { applyDeckTheme } from '../services/deckProgressionService';
@@ -445,6 +446,8 @@ export default function Step02Design({ deck, onUpdateDeck, onPrevStep, onNextSte
       )}
 
       {activeTab === 'cloner' && <ThemeScreenshotCloner deck={deck} onApplyClonedTheme={handleApplyClonedTheme} />}
+
+      <VisualPlanner deck={deck} onUpdateDeck={onUpdateDeck} />
 
       <div className="flex items-center justify-between pt-5 border-t border-neutral-900/[0.06] dark:border-white/[0.06]">
         <button

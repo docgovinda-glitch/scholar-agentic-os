@@ -80,11 +80,35 @@ export function liveSourcesAsCitations(sources?: LiveSearchResult[]): Citation[]
 }
 
 const NO_AI = /no ai providers|not configured|no provider|connect a provider|api key|unauthori[sz]ed|\b401\b|\b426\b/i;
+/** The server rejected the request for lack of a signed-in session (not a bad provider key). */
+const SIGNED_OUT = /authori[sz]ation header|missing or invalid (?:token|session|credentials)|not signed in|sign in required|jwt|session (?:has )?expired/i;
+/** The request never reached the server (offline, DNS, blocked): browsers word this differently. */
+const NETWORK = /failed to fetch|networkerror|network request failed|load failed|err_internet|err_network/i;
+
+export type AskFailureKind = "no-ai" | "signed-out" | "offline" | "failed";
 
 /** What to tell the person when no answer could be written. */
-export function askFailureMessage(err: unknown, foundSources: number): { kind: "no-ai" | "failed"; text: string } {
+export function askFailureMessage(
+  err: unknown,
+  foundSources: number,
+  online: boolean = typeof navigator === "undefined" || navigator.onLine !== false
+): { kind: AskFailureKind; text: string } {
   const raw = err instanceof Error ? err.message : typeof err === "string" ? err : "";
   const found = foundSources > 0 ? `I found ${foundSources} source${foundSources === 1 ? "" : "s"} for this question (below), but ` : "";
+  if (!online || NETWORK.test(raw)) {
+    return {
+      kind: "offline",
+      text: online
+        ? `${found ? `${found}I` : "I"} couldn't reach Scholar just now. Check your connection and try again.`
+        : `${found ? `${found}you're` : "You're"} offline, so I can't write an answer. Reconnect and try again.`,
+    };
+  }
+  if (SIGNED_OUT.test(raw)) {
+    return {
+      kind: "signed-out",
+      text: `${found ? `${found}you're` : "You're"} not signed in, so I can't write an answer. Sign in and ask again.`,
+    };
+  }
   if (NO_AI.test(raw)) {
     return {
       kind: "no-ai",

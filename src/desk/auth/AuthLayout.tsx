@@ -162,7 +162,6 @@ export function Field({
         {showPasswordToggle && (
           <button
             type="button"
-            data-compact="true"
             onClick={() => setVisible((v) => !v)}
             className="absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-1 text-xs font-medium text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/10 rounded-sm transition-colors cursor-pointer flex items-center gap-1"
             aria-label={visible ? "Hide password" : "Show password"}
@@ -499,9 +498,8 @@ export function AuthLink({ onClick, children }: { onClick: () => void; children:
   return (
     <button
       type="button"
-      data-compact="true"
       onClick={onClick}
-      className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white underline-offset-4 hover:underline transition-colors cursor-pointer"
+      className="inline-flex items-center text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white underline-offset-4 hover:underline transition-colors cursor-pointer"
     >
       {children}
     </button>

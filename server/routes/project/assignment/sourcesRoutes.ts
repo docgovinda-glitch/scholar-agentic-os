@@ -1,4 +1,7 @@
 import express from "express";
+import { buildSourceSearchQueries, briefDomainTerms, anchorQueries, scoreSourceRelevance } from "../../../../src/utils/briefSourceQueries.ts";
+import { parseBriefQuestions } from "../../../../src/utils/briefQuestions.ts";
+import { explainSourceFit } from "../../../../src/utils/sourceFit.ts";
 import { parseDocument } from "../../../../src/document_intelligence/index.ts";
 import {
   buildScholarlyVoiceSystemPrompt,
@@ -6,8 +9,8 @@ import {
   normalizeUnicodeNFC,
 } from "../../../src/utils/scholarlyVoiceGuard.ts";
 import { getProjectStore } from "../../../../src/services/store/projectStore.ts";
-import { callOpenRouterJSON, callOpenRouterText } from "../../../utils/llm.ts";
-import { keyringFromRequest } from "../../../src/ai/routerBridge.ts";
+import { callOpenRouterJSON, callOpenRouterText } from "../../../src/services/scholarBrain.ts";
+import { requestKeyring } from "../../../src/ai/routerBridge.ts";
 import { scholarBrain } from "../../../src/services/scholarBrain.ts";
 import {
   auditDocumentLineByLine,
@@ -34,7 +37,6 @@ import {
 import {
   generateDynamicAssignmentStructure,
   generateAiEnhancedOutline,
-  extractTargetFrameworks,
   sanitizeOutlineHeadings,
   assignmentStructureToOutlineTree,
   outlineTreeToAssignmentStructure,
@@ -97,11 +99,29 @@ router.post("/research", async (req: express.Request<{ id: string }>, res) => {
     let discoveredDrafts: DiscoveredSourceDraft[] = [];
 
     // Query multi-portal discovery (OpenAlex, Crossref, DOAJ, DataCite, arXiv)
-    try {
-      discoveredDrafts = await discoverMultiPortalSources(effectiveQuery, 25);
-    } catch (discErr) {
-      console.warn("Multi-portal discovery network call failed, attempting fallback:", discErr);
+    // Never send the raw brief to an index: build clean keyword phrases from it.
+    const briefQuestionRows = parseBriefQuestions(effectiveQuery);
+    const phrases = anchorQueries(buildSourceSearchQueries(effectiveQuery, 4), briefDomainTerms(effectiveQuery));
+    const toRun = phrases.length > 0 ? phrases : [effectiveQuery.slice(0, 200)];
+    const settled = await Promise.allSettled(toRun.map((q) => discoverMultiPortalSources(q, 15)));
+    const seenKeys = new Set<string>();
+    for (const r of settled) {
+      if (r.status !== "fulfilled") {
+        console.warn("Multi-portal discovery phrase failed:", r.reason);
+        continue;
+      }
+      for (const d of r.value) {
+        const key = (d.doi || d.title).toLowerCase();
+        if (seenKeys.has(key)) continue;
+        seenKeys.add(key);
+        discoveredDrafts.push(d);
+      }
     }
+    // Drop papers from other fields that only share a generic word with a query.
+    const domainTerms = briefDomainTerms(effectiveQuery);
+    discoveredDrafts = discoveredDrafts
+      .filter((d) => scoreSourceRelevance({ title: d.title, venue: d.venue }, domainTerms, toRun) > 0)
+      .slice(0, 25);
 
     let sources: DiscoveredSource[] = [];
 
@@ -130,10 +150,8 @@ router.post("/research", async (req: express.Request<{ id: string }>, res) => {
           url: draft.url,
           // Only what the index returned; no summary of findings is invented.
           mainFinding: draft.venue ? `Published in ${draft.venue}.` : "",
-          suggestedUse:
-            draft.authorityTier === "A"
-              ? "Primary theoretical framework & empirical evidence grounding"
-              : "Supporting literature and contextual evidence",
+          suggestedUse: explainSourceFit({ title: draft.title, venue: draft.venue }, briefQuestionRows, toRun[0]) ?? "",
+          whyThisSource: explainSourceFit({ title: draft.title, venue: draft.venue }, briefQuestionRows, toRun[0]) ?? undefined,
           citation: citationStr,
           status: "unreviewed",
           retrievalSource: draft.discoveredVia,

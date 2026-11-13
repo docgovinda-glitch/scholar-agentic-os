@@ -10,6 +10,9 @@
 
 import type { DiscoveredSource, SourceVerificationStatus } from "../types";
 import { authedJsonFetch } from "../../api";
+import { buildSourceSearchQueries, briefDomainTerms, anchorQueries, scoreSourceRelevance } from "../../../utils/briefSourceQueries";
+import { extractPrescribedReferences, parseBriefQuestions, parsePrescribedBibliography } from "../../../utils/briefQuestions";
+import { explainSourceFit } from "../../../utils/sourceFit";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types for server response
@@ -183,21 +186,90 @@ function deduplicateSources(sources: DiscoveredSource[]): DiscoveredSource[] {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function buildDiscoveryQueries(question: string): string[] {
-  const queries: string[] = [];
-  const clean = question.trim();
-  if (!clean) return queries;
+  // Clean keyword phrases from the brief's questions; never the raw prompt text.
+  return buildSourceSearchQueries(question, 5);
+}
 
-  // Primary: the full question (most complete semantic signal)
-  queries.push(clean);
+/** Reject after `ms` so one slow provider never holds the spinner. */
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`timed out after ${ms}ms`)), ms);
+    p.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      }
+    );
+  });
+}
 
-  // Extract key noun phrases for targeted queries
-  const words = clean.split(/\s+/).filter((w) => w.length > 3);
-  if (words.length > 6) {
-    // Take first 6 meaningful words as a focused query
-    queries.push(words.slice(0, 6).join(" "));
-  }
+async function serverMultiPortal(query: string, maxResults: number): Promise<ServerDiscoveredDraft[]> {
+  const response = await authedJsonFetch("/api/search/multi-portal", "POST", { query, maxResults });
+  if (!response || !response.ok) return [];
+  const data: MultiPortalResponse = await response.json();
+  return data.success && Array.isArray(data.sources) ? data.sources : [];
+}
 
-  return queries;
+async function directOpenAlex(query: string, maxResults: number): Promise<ServerDiscoveredDraft[]> {
+  const res = await fetch(`https://api.openalex.org/works?search=${encodeURIComponent(query)}&per-page=${maxResults}`, { signal: AbortSignal.timeout(12_000) });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return (data.results || []).map((w: any) => ({
+    title: w.title || w.display_name || "Untitled",
+    authors: (w.authorships || []).map((a: any) => a.author?.display_name).filter(Boolean),
+    url: w.doi || w.primary_location?.landing_page_url,
+    doi: typeof w.doi === "string" ? w.doi.replace(/^https?:\/\/doi\.org\//, "") : undefined,
+    year: w.publication_year,
+    venue: w.primary_location?.source?.display_name,
+    sourceType: "scholarly",
+    authorityTier: w.type === "article" && w.primary_location?.source?.type === "journal" ? "A" : "B",
+    discoveredVia: "openalex",
+  }));
+}
+
+async function directCrossref(query: string, maxResults: number): Promise<ServerDiscoveredDraft[]> {
+  const res = await fetch(`https://api.crossref.org/works?query.bibliographic=${encodeURIComponent(query)}&rows=${maxResults}`, { signal: AbortSignal.timeout(12_000) });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return (data.message?.items || []).map((w: any) => ({
+    title: (w.title && w.title[0]) || "Untitled",
+    authors: (w.author || []).map((a: any) => [a.given, a.family].filter(Boolean).join(" ")).filter(Boolean),
+    url: w.URL,
+    doi: w.DOI,
+    year: w.issued?.["date-parts"]?.[0]?.[0],
+    venue: w["container-title"]?.[0],
+    sourceType: "scholarly",
+    authorityTier: w.type === "journal-article" ? "A" : "B",
+    discoveredVia: "crossref",
+  }));
+}
+
+async function directSemanticScholar(query: string, maxResults: number): Promise<ServerDiscoveredDraft[]> {
+  const res = await fetch(
+    `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(query)}&limit=${maxResults}&fields=title,authors,year,url,venue,externalIds`,
+    { signal: AbortSignal.timeout(12_000) }
+  );
+  if (!res.ok) return [];
+  const data = await res.json();
+  return (data.data || []).map((w: any) => ({
+    title: w.title || "Untitled",
+    authors: (w.authors || []).map((a: any) => a.name).filter(Boolean),
+    url: w.url,
+    doi: w.externalIds?.DOI,
+    year: w.year,
+    venue: w.venue,
+    sourceType: "scholarly",
+    authorityTier: "A",
+    discoveredVia: "semantic_scholar",
+  }));
+}
+
+function settledValues<T>(results: PromiseSettledResult<T[]>[]): T[] {
+  return results.flatMap((r) => (r.status === "fulfilled" && Array.isArray(r.value) ? r.value : []));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -222,97 +294,153 @@ export async function discoverRealScholarlySourcesFromServer(
     return [];
   }
 
-  const queries = buildDiscoveryQueries(question);
+  const domainTerms = briefDomainTerms(question);
+  // Every search carries the subject word, so "noisy" never finds Bangla sentiment analysis.
+  const queries = anchorQueries(buildDiscoveryQueries(question).slice(0, 4), domainTerms);
   if (queries.length === 0) return [];
+  const perQuery = Math.max(10, Math.ceil(maxResults / queries.length));
 
-  try {
-    // Call server multi-portal discovery endpoint
-    const response = await authedJsonFetch(
-      "/api/search/multi-portal",
-      "POST",
-      {
-        query: queries[0],
-        maxResults,
-      }
+  // 1. Server multi-portal search, one request per phrase; a slow or failing phrase never blocks the rest.
+  const viaServer = settledValues(
+    await Promise.allSettled(queries.map((q) => withTimeout(serverMultiPortal(q, perQuery), 25_000)))
+  );
+
+  let drafts = viaServer;
+  // 2. If the server gave nothing, ask the public indexes directly, all at once.
+  if (drafts.length === 0) {
+    const direct = await Promise.allSettled(
+      queries.slice(0, 2).flatMap((q) => [
+        withTimeout(directOpenAlex(q, perQuery), 15_000),
+        withTimeout(directCrossref(q, perQuery), 15_000),
+        withTimeout(directSemanticScholar(q, perQuery), 15_000),
+      ])
     );
-
-    if (response && response.ok) {
-      const data: MultiPortalResponse = await response.json();
-      if (data.success && Array.isArray(data.sources) && data.sources.length > 0) {
-        const mapped = data.sources.map((draft, idx) =>
-          mapDraftToDiscoveredSource(draft, idx, question)
-        );
-        const deduplicated = deduplicateSources(mapped);
-        console.log(`[RealDiscovery] Discovered ${deduplicated.length} real scholarly sources via server API.`);
-        return deduplicated;
-      }
-    }
-  } catch (err) {
-    console.warn("[RealDiscovery] Server discovery failed:", err);
+    drafts = settledValues(direct);
   }
 
-  // Fallback 1: Live OpenAlex API (Frontend direct)
-  try {
-    console.log("[RealDiscovery] Falling back to direct OpenAlex API...");
-    const openAlexUrl = `https://api.openalex.org/works?search=${encodeURIComponent(queries[0])}&per-page=${maxResults}`;
-    const oaRes = await fetch(openAlexUrl);
-    
-    if (oaRes.ok) {
-      const oaData = await oaRes.json();
-      if (oaData.results && oaData.results.length > 0) {
-        const drafts: DiscoveredSourceDraft[] = oaData.results.map((w: any) => ({
-          title: w.title || w.display_name || "Untitled",
-          authors: (w.authorships || []).map((a: any) => a.author?.display_name).filter(Boolean),
-          url: w.doi || w.primary_location?.landing_page_url,
-          year: w.publication_year,
-          venue: w.primary_location?.source?.display_name,
-          sourceType: "scholarly",
-          authorityTier: (w.type === "article" && w.primary_location?.source?.type === "journal") ? "A" : "B",
-          discoveredVia: "openalex"
-        }));
-        
-        const mapped = drafts.map((draft, idx) => mapDraftToDiscoveredSource(draft, idx, question));
-        const deduplicated = deduplicateSources(mapped);
-        return deduplicated;
-      }
-    }
-  } catch (err) {
-    console.warn("[RealDiscovery] OpenAlex fallback failed:", err);
+  if (drafts.length === 0) {
+    // Never substitute catalog or synthesized entries for live results.
+    console.warn("[RealDiscovery] All live APIs returned nothing.");
+    return [];
   }
+  const questionRows = parseBriefQuestions(question);
+  const scored = drafts
+    .map((draft, idx) => {
+      const src = mapDraftToDiscoveredSource(draft, idx, queries.join(" "));
+      const raw = scoreSourceRelevance({ title: draft.title, venue: draft.venue }, domainTerms, queries);
+      const why = explainSourceFit({ title: draft.title, venue: draft.venue }, questionRows, queries[0]);
+      return { src: why ? { ...src, whyThisSource: why } : src, raw };
+    })
+    // Off-topic papers (no subject word at all) are dropped, not just ranked low.
+    .filter((x) => x.raw > 0);
+  // Scale so the best match reads 95 and the 85%+/90%+ filters show the strongest papers.
+  const top = Math.max(1, ...scored.map((x) => x.raw));
+  const ranked = scored
+    .map((x) => ({ ...x.src, relevanceScore: Math.max(1, Math.round((x.raw / top) * 95)) }))
+    .sort((a, b) => (b.relevanceScore ?? 0) - (a.relevanceScore ?? 0));
+  return deduplicateSources(ranked).slice(0, maxResults);
+}
 
-  // Fallback 2: Live Semantic Scholar API (Frontend direct)
-  try {
-    console.log("[RealDiscovery] Falling back to direct Semantic Scholar API...");
-    const s2Url = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(queries[0])}&limit=${maxResults}&fields=title,authors,year,url,venue`;
-    const s2Res = await fetch(s2Url);
-    
-    if (s2Res.ok) {
-      const s2Data = await s2Res.json();
-      if (s2Data.data && s2Data.data.length > 0) {
-        const drafts: DiscoveredSourceDraft[] = s2Data.data.map((w: any) => ({
-          title: w.title || "Untitled",
-          authors: (w.authors || []).map((a: any) => a.name).filter(Boolean),
-          url: w.url,
-          year: w.year,
-          venue: w.venue,
-          sourceType: "scholarly",
-          authorityTier: "A", // Semantic Scholar mostly indexes peer-reviewed
-          discoveredVia: "semantic_scholar"
-        }));
-        
-        const mapped = drafts.map((draft, idx) => mapDraftToDiscoveredSource(draft, idx, question));
-        const deduplicated = deduplicateSources(mapped);
-        return deduplicated;
-      }
+/**
+ * References the brief itself names ("Preskill (2018)"), resolved to real
+ * records where an index confirms author and year, otherwise kept as named
+ * (unverified). They are listed first, marked as prescribed in the brief.
+ */
+export async function resolvePrescribedReferences(briefText: string, topicQueries: string[] = []): Promise<DiscoveredSource[]> {
+  // 1. Full entries printed in the brief's own reference list: used exactly as given.
+  const bibliography = parsePrescribedBibliography(briefText);
+  const fromBibliography: DiscoveredSource[] = bibliography.map((b, i) => ({
+    id: `prescribed-bib-${i}-${b.year}`,
+    title: b.title,
+    authors: b.etAl ? [...b.authors, "et al."] : b.authors,
+    year: String(b.year),
+    type: b.isBook ? "book" : "journal",
+    journal: b.isBook ? undefined : b.venue,
+    publisher: b.publisher,
+    volume: b.volume,
+    issue: b.issue,
+    pages: b.pages,
+    doi: b.doi,
+    url: b.doi ? `https://doi.org/${b.doi}` : undefined,
+    mainFinding: "",
+    suggestedUse: "Named in your assignment brief.",
+    whyThisSource: "Named in your assignment brief.",
+    citation: b.raw,
+    status: "kept" as const,
+    verificationStatus: b.doi ? ("verified" as const) : ("unverified" as const),
+    isActive: true,
+    relevanceScore: 100,
+    sourceOrigin: "system_found",
+    prescribedInBrief: true,
+  }));
+  const familyYear = (fam: string, year: number | string) => `${fam.toLowerCase()}|${year}`;
+  const covered = new Set(bibliography.map((b) => familyYear((b.authors[0] ?? "").split(",")[0], b.year)));
+
+  // 2. Citations named in the questions but not in a printed list: look them up.
+  const refs = extractPrescribedReferences(briefText).filter((r) => !covered.has(familyYear(r.authors.split(/\s|&|,/)[0], r.year)));
+  if (refs.length === 0) return fromBibliography;
+  const topic = (topicQueries[0] || "").split(" ").slice(0, 3).join(" ");
+
+  const resolved = await Promise.allSettled(
+    refs.map(async (ref) => {
+      const surname = ref.authors.split(/\s|&|,/)[0];
+      const q = `${surname} ${topic}`.trim();
+      const found = settledValues(
+        await Promise.allSettled([withTimeout(directCrossref(q, 8), 12_000), withTimeout(directOpenAlex(q, 8), 12_000)])
+      );
+      return found.find(
+        (d) => d.year === ref.year && d.authors.some((a) => a.toLowerCase().includes(surname.toLowerCase()))
+      );
+    })
+  );
+
+  const looked = refs.map((ref, i) => {
+    const r = resolved[i];
+    const hit = r.status === "fulfilled" ? r.value : undefined;
+    if (hit) {
+      return { ...mapDraftToDiscoveredSource(hit, i, ref.label), id: `prescribed-${i}-${ref.year}`, prescribedInBrief: true, status: "kept" as const, relevanceScore: 100, whyThisSource: "Named in your assignment brief." };
     }
-  } catch (err) {
-    console.warn("[RealDiscovery] Semantic Scholar fallback failed:", err);
-  }
+    // Unresolved: keep the name as the brief gives it, with "et al." as a flag, never as a surname.
+    const etAl = /\bet\.?\s*al/i.test(ref.authors);
+    const names = ref.authors.replace(/\s*et\.?\s*al\.?/i, "").split(/\s+(?:and|&)\s+/).map((n) => n.trim()).filter(Boolean);
+    return {
+      id: `prescribed-${i}-${ref.year}`,
+      title: `Reference named in your brief: ${ref.label}`,
+      authors: etAl ? [...names, "et al."] : names,
+      year: String(ref.year),
+      type: "journal",
+      mainFinding: "",
+      suggestedUse: "Named in your assignment brief.",
+      whyThisSource: "Named in your assignment brief. Add its full details to cite it.",
+      citation: ref.label,
+      status: "kept" as const,
+      verificationStatus: "unverified" as const,
+      isActive: true,
+      relevanceScore: 100,
+      sourceOrigin: "system_found",
+      prescribedInBrief: true,
+    } as DiscoveredSource;
+  });
+  return [...fromBibliography, ...looked];
+}
 
-  // Never substitute catalog or synthesized entries for live results: an
-  // empty list lets the UI say plainly that no sources were found.
-  console.warn("[RealDiscovery] All live APIs failed; returning no sources.");
-  return [];
+/** Prescribed references first, then live discovery from clean phrases built from the brief. */
+export async function discoverSourcesForAssignment(opts: {
+  question: string;
+  briefText?: string;
+  citationStyle: string;
+  maxResults?: number;
+}): Promise<DiscoveredSource[]> {
+  const text = opts.briefText && opts.briefText.trim().length > 20 ? opts.briefText : opts.question;
+  const [prescribed, discovered] = await Promise.allSettled([
+    resolvePrescribedReferences(text, buildDiscoveryQueries(text)),
+    discoverRealScholarlySourcesFromServer(text, opts.citationStyle, opts.maxResults ?? 50),
+  ]);
+  const first = prescribed.status === "fulfilled" ? prescribed.value : [];
+  const rest = discovered.status === "fulfilled" ? discovered.value : [];
+  const seenDoi = new Set(first.map((s) => s.doi?.toLowerCase()).filter(Boolean));
+  const seenTitle = new Set(first.map((s) => s.title.toLowerCase()));
+  return [...first, ...rest.filter((s) => !(s.doi && seenDoi.has(s.doi.toLowerCase())) && !seenTitle.has(s.title.toLowerCase()))];
 }
 
 /**

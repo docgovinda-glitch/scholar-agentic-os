@@ -1,3 +1,4 @@
+import { clearAccountKeyring } from "../src/ai/accountAi.ts";
 import express from "express";
 import { z } from "zod";
 import { requireAuth, type AuthenticatedUser } from "../src/middleware/auth";
@@ -127,7 +128,9 @@ export function registerAiAccessRoutes(app: express.Express): void {
     if (!vaultAvailable()) return vaultOff(res);
     try {
       const body = (req.body ?? {}) as { key?: unknown };
-      res.json(await saveUserKey(userId(req), req.params.providerId, body.key as string));
+      const saved = await saveUserKey(userId(req), req.params.providerId, body.key as string);
+      clearAccountKeyring(userId(req));
+      res.json(saved);
     } catch (err) {
       keyFail(res, err);
     }
@@ -137,6 +140,7 @@ export function registerAiAccessRoutes(app: express.Express): void {
     if (!vaultAvailable()) return vaultOff(res);
     try {
       await deleteUserKey(userId(req), req.params.providerId);
+      clearAccountKeyring(userId(req));
       res.json({ success: true });
     } catch (err) {
       keyFail(res, err);

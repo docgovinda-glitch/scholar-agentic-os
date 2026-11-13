@@ -1,257 +1,93 @@
-# Application Workflows
+# Workflows
 
-This document specifies the step-by-step user journeys and system processing flows currently active in **Scholar Core**.
+Step-by-step behaviour of the application as implemented. Endpoint details are in [`API.md`](API.md); state shapes in [`DATA-MODEL.md`](DATA-MODEL.md).
 
----
+## 1. Sign-up, sign-in and onboarding
 
-## 1. Authentication & Onboarding Workflow
+Components: `src/desk/auth/AuthFlow.tsx`, `src/desk/DeskAuthGate.tsx`, `src/desk/DeskApp.tsx` (`OnboardingGate`).
 
-### Workflow Structure
-```text
-Landing / Auth Page
-       ↓
-User Submission (with Turnstile CAPTCHA)
-       ↓
-Backend Verification & Supabase Auth
-       ↓
-Onboarding Profile Form
-       ↓
-AI Setup Interstitial (if unconfigured)
-       ↓
-Knowledge Vault Setup Offer (if unconfigured)
-       ↓
-Project Dashboard (/projects)
-```
+1. **Sign-up** (`/signup`): full name, username, email, user type, level of education, institution (optional), password, and a Cloudflare Turnstile token when `VITE_CAPTCHA_SITE_KEY` is set. The client checks identifier availability (`POST /api/auth/check-availability`) and the server verifies the CAPTCHA (`POST /api/auth/verify-signup`). Supabase Auth creates the account and sends a confirmation link to `/verify-email` (`/signup/check-email`, `/signup/resend`).
+2. **Sign-in** (`/signin`): one field accepting user ID, email or mobile number, plus password. `POST /api/auth/login` resolves the identifier and returns one uniform error for any failure; a Google Identity button (`GoogleIdentityButton.tsx`) is also present. Password reset: `/reset-password`, then `/reset-password/confirm`.
+3. **Onboarding** (`/onboarding`): role, highest education level, institution or company, mobile number.
+4. **AI setup interstitial**: until AI setup is complete or skipped (`useAiSetupStatus`), `OnboardingGate` shows `AiAccessPage` in onboarding mode.
+5. **Vault setup offer**: then `VaultSetupScreen` steps `offer`, `storage_choice` (`local` or `synced`), `passphrase`, `recovery` (a recovery code), `done`; it can be skipped.
+6. The user lands on `/projects`. Signed-out visitors on `/` see the landing page; `/presentation` works without an account.
 
-### Steps
-1. **Entry**:
-   - User visits `/` (or clicks "Get Started" / "Sign In").
-2. **User Action**:
-   - Enters email, password, and completes Cloudflare Turnstile CAPTCHA verification widget.
-3. **System Processing**:
-   - Frontend validates client form fields.
-   - Server verifies Turnstile token with Cloudflare (`/api/auth/verify-signup`).
-   - Supabase Auth creates user record and returns JWT session.
-4. **Result**:
-   - User session is established in browser local state.
-5. **Next Available Action**:
-   - If user profile is incomplete, user is redirected to `/onboarding`.
-   - Onboarding collects: Full Name, Role (Undergraduate, Postgraduate, PhD, Faculty), Institution, Primary Discipline, and Preferred Citation Style.
-   - If AI provider is unconfigured, `<OnboardingGate>` renders AI Access onboarding.
-   - Once completed, user arrives at the Project Dashboard (`/projects`).
+## 2. Creating a project
 
----
+1. On `/projects` (or the landing page) the user picks a format tile: Coursework & Essays (`OT-01`), Journal Article (`OT-10`), Research Proposal (`OT-15`) or Slides & Keynotes (`OT-22`); the picker also lists other catalog types. A signed-out visitor is asked to sign in first. An existing empty project of the same type is reused instead of creating another.
+2. `createProject` (`src/desk/api/projectsApi.ts`) makes a **local draft** (`draft-…` id kept in browser storage by `src/desk/ephemeralProjectStore.ts`) for every type except `OT-06`, which is created on the server immediately (`POST /api/projects` with `{ outputTypeId }`).
+3. The first authenticated project request for a draft (`authedFetch` in `src/desk/api/client.ts`) commits it to the database and rewrites the id; later requests use the real id.
+4. `/projects/:projectId` opens the workspace chosen by `outputTypeId` ([`PRODUCT.md`](PRODUCT.md) §2). Deep links use `/projects/:projectId/:view` (a journal stage id, or a shell view).
+5. Titles that are still untitled are filled from the brief (`autoUpdateProjectTitleIfUntitled` in `server/routes/project/assignment/helpers.ts`).
 
-## 2. Project Creation Workflow
+## 3. Coursework (`OT-01`, `OT-02`)
 
-### Workflow Structure
-```text
-Project Dashboard (/projects)
-       ↓
-Click "+ New Project"
-       ↓
-Select Deliverable Format & Set Parameters
-       ↓
-System Initialises Project Record
-       ↓
-Redirect to Dedicated Workspace (/projects/:projectId)
-```
+Five stages shown in `AssignmentStageNavigation`: `extract`, `understand`, `sources`, `drafting`, `submission`. The stage flow is always the full five-stage flow (`executionMode` in `AssignmentContext.tsx` is fixed to `detailed`). Everything is derived from the student's brief, never from a subject template.
 
-### Steps
-1. **Entry**:
-   - User clicks `+ New Project` on the dashboard or visits deep-link `/projects?newFormat=OT-01`.
-2. **User Action**:
-   - Selects deliverable format (e.g. `Coursework & Essay (OT-01)`, `Journal Article (OT-10)`, `Research Proposal (OT-19)`, `Academic Presentation (OT-22)`).
-   - Inputs Title, Target Word Count, Academic Level, and Citation Style.
-   - Clicks `Create Project`.
-3. **System Processing**:
-   - Frontend executes `POST /api/projects`.
-   - Backend creates record in `public.projects`.
-   - For `OT-01`, backend also initializes the 4-phase state structure in `public.assignment_projects`.
-4. **Result**:
-   - Project is created with unique UUID.
-5. **Next Available Action**:
-   - Browser navigates directly to `/projects/:projectId`, mounting the format-tailored workspace.
+| Stage | Component | What happens |
+| :--- | :--- | :--- |
+| 01 Extract | `AssignmentExtractStage.tsx`, `server/routes/project/assignment/extractRoutes.ts` | Paste or upload the brief (`.pdf`, `.docx`, `.txt`, `.md`; the `File` goes straight to the handler and the input resets). Set level, type, citation style, tone and word count; course codes are stripped before counting (`QNT-4020` is never `4020`). **Save & Build** saves, then runs the AI extract and understand steps so Stage 02 opens populated |
+| 02 Understand | `AssignmentUnderstandStage.tsx`, `understandRoutes.ts` | Brief summary (`buildBriefSummary`), sub-question rows with the brief's own marks and proportional word targets (`parseBriefQuestions`, `allocateWordsByMarks` in `src/utils/briefQuestions.ts`), grading criteria (`parseMarkingCriteria`), thesis selector  PDF layouts are normalised first (`normalizeBriefLayout`); sub-parts are budgeted inside their question (never double-counted); the rubric is read from its own heading; the working thesis is the AI's line of argument or `briefGroundedStances` (brief title + question titles, no subject tables) |
+| 03 Sources | `AssignmentSourcesStage.tsx`, `realScholarlyDiscoveryService.ts`, `sourcesRoutes.ts` | 3-5 keyword phrases built from the brief (`buildSourceSearchQueries`, never the raw prompt), each carrying the brief's subject word (`briefDomainTerms`); papers without it are dropped (`scoreSourceRelevance`, 0-100). OpenAlex, Crossref, Semantic Scholar, DOAJ, DataCite and arXiv queried with `Promise.allSettled` and timeouts. A reference list printed in the brief is parsed into full entries (`parsePrescribedBibliography`) and pinned first with a `Prescribed in Brief` badge. Rows show the title first; author names go through `parsePersonName` (never "al., A. e.", never inverted). The student approves sources and can upload lecture material |
+| 04 Drafting | `AssignmentDraftingStage.tsx`, `draftingRoutes.ts` | One section per main question (stem and sub-parts together, `groupBriefQuestions`); a question is never dropped (`ensureEveryQuestionHasSection`, also for AI outlines). Budgets from `applyMarksBudget` (`src/domain/assignment/outlineBudget.ts`): marks-weighted, clean multiples of 5 (10 from 1,000 words), remainder on the largest body section, exact sum to the target. Per-question word counts the student types are kept (`applyQuestionWordTargets`). `/stream-section` takes `allocatedWords` (capped by `remainingEssayWords`), asks for ±5%, requests one rewrite if short and trims long drafts at a sentence boundary (`server/src/utils/sectionBudget.ts`). Each section prompt carries a contract (`server/src/utils/sectionContract.ts`): every lettered sub-part, the citations the question names, its place in the report and the chosen writing style (including "My Own Writing Style" from a pasted sample). No `[Unverified Claim]` tag is written into prose; unmatched citations are removed and adjacent author-date citations merge. With every AI provider out of credit it sends a labelled offline scaffold (`server/src/utils/sectionScaffold.ts`); failed revisions never overwrite text. The stream opens before the model call: a 426 hand-off is decided first (`handOffBeforeStream`), then SSE headers (`no-cache, no-transform`, `X-Accel-Buffering: no`) are flushed with a `: keep-alive` comment every 5 s (`server/src/utils/sectionStream.ts`); after that every failure is a `{ error, recoverable: true }` event, never a dropped socket, and the client retries a dropped connection once. The prompt asks for 2-4 paragraphs separated by blank lines; chunks keep whitespace exactly and `ensureParagraphBreaks` / `formatProseToParagraphHtml` (`src/shared/proseParagraphs.ts`) keep or rebuild paragraphs (a single block over 120 words is regrouped every 3-4 sentences) in the editor and exports. In the manual editor, Enter starts a new paragraph. Approved sources compile into a `ReferencesCard`, appended to the compiled draft |
+| 05 Submission | `AssignmentSubmissionStage.tsx`, `submissionRoutes.ts` | 10-point rubric audit (`RubricComplianceCard`), citation reconciliation (`CitationReconciliationCard`), `.docx` and PDF export (`exportAssignmentToPdf`, helpers in `exportText.ts`): no raw prompt on the cover, only cited and prescribed sources (deduplicated), real italics |
 
----
+Stage copilots (`src/desk/assignment/types.ts`): Advisor (Understand), Librarian (Sources), Scribe (Drafting), Examiner (Submission), served by `assignmentCopilotService.ts` and `POST .../assignment/copilot-chat`, `.../tutor-chat`, `.../agent/{extract,understand,sources,review}`.
 
-## 3. Coursework & Essay Workflow (`OT-01`)
+Saved projects are cleaned of legacy template text on load (`src/domain/assignment/legacyPurge.ts`). State is held in `AssignmentContext` and saved as keyed answers (`saveAnswers`, which calls `PATCH /api/projects/:id/intake`) into the project's `answers` object in `public.projects`. The `assignment_projects` table exists in the schema but no application code reads or writes it.
 
-The Coursework & Essay module guides students through 4 interconnected phases:
+## 4. Journal article (`OT-10`)
 
-```text
-Phase 1: Extract & Understand (Database: understand)
-             ↓
-Phase 2: Sources & Literature Discovery
-             ↓
-Phase 3: Drafting & Section Planner
-             ↓
-Phase 4: Submission & Verification Audit
-```
+25 stages in five phases (`RESEARCH_PHASES` in `src/desk/workspace/types.ts`), implemented by `ResearchWorkspace` and the stage components, with server routes under `/api/projects/:id/agentic/*` (`server/routes/project/agentic/`).
 
----
+| Phase | Stages |
+| :--- | :--- |
+| I. Foundation | 1 Research Definition, 2 Literature Discovery, 3 Gap Identification, 4 Gap Selection, 5 Title Generation, 6 Title Lock |
+| II. Evidence | 7 Knowledge Vault, 8 Vault Approval, 9 Primary Data, 10 AI Extraction, 11 External Research, 12 External Approval, 13 Evidence Matrix, 14 Researcher Review |
+| III. Drafting | 15 Journal Discovery, 16 Journal Rules, 17 AI Draft Generation, 18 Citation Audit, 19 Originality Check, 20 Draft Preview |
+| IV. Peer Review | 21 AI Peer Review, 22 AI Revision |
+| V. Publication | 23 Final Editor, 24 Readiness Check, 25 Format & Export |
 
-### 3.1 Phase 1: Extract & Understand (`current_phase = 'extract'` / `'understand'`)
-Phase 1 supports dual execution modes configured via the persistent `Minimal Mode | Detailed Mode` toggle:
-- **Minimal Mode (Quick Flow)**: 4-stage pipeline (01 Extract → 02 Sources → 03 Drafting → 04 Submission). The engine automatically structures your outline and word budget so students can proceed straight to sources.
-- **Detailed Mode (Guided Architect)**: 5-stage pipeline (01 Extract → 02 Understand → 03 Sources → 04 Drafting → 05 Submission). Calibrate custom thesis stances, research questions, and fine-tune section roadmaps in Phase 2 before finding sources.
+The same workspace also exposes a five-mode studio (Protocol Blueprint, Evidence Matrix, Manuscript Studio, Referee Rebuttal, Audit & Export: `ProtocolBlueprintMode.tsx`, `EvidenceMatrixMode.tsx`, `ManuscriptStudioMode.tsx`, `RefereeRebuttalMode.tsx`, `AuditExportMode.tsx`). Notes:
 
-1. **Unified Setup & Question Input (01 Extract)**:
-   - **User Action**: Pastes the assignment question/prompt (or uploads brief document `.pdf`, `.docx`), sets target word count via interactive stepper (`−`/`+`) or clean single-line numeric pill (`2,000 words`), and selects Academic Level, Assignment Type, Citation Style, and Writing Tone.
-   - **Dynamic Tone Calibration**: Selecting an Assignment Type automatically synchronizes the optimal academic tone (e.g., Essay/Research Paper → *Formal Academic*, Literature Review/Critical Essay → *Critical*, Case Study/Policy Analysis → *Analytical*, Report → *Objective*, Argumentative Essay → *Persuasive*).
-   - **Result**: Context parameters and prompt are staged cleanly in a single workspace component without rigid word limit barriers, dynamically driving downstream section budgets and drafting compliance gates.
-2. **Brief-Specific Structure Generation**:
-   - **User Action**: Clicks `Save & Build` or `Proceed to Phase 2`.
-   - **System Processing**: Client and server outline services display an animated loading state (*"Analyzing Brief & Generating Tailored Assignment Structure..."*). The engine extracts inquiry directives, sentence questions ending in `?`, domain acronyms, and technical terms directly from the brief text (`extractBriefInquiriesAndConcepts`, `buildBriefSpecificSpecs`). Bespoke H1/H2/H3 structures are generated that substantively mirror the assignment brief's requirements without generic Introduction/Body/Conclusion placeholders.
-   - **Result**: The tailored structure displays immediately in the unified workspace via `DynamicStructurePlanner`.
-3. **Structure Customization & Word Count Allocation (CRUD)**:
-   - **User Action**: User edits heading/subheading titles inline with visual edit affordances, adds/deletes headings and nested subheadings without restrictive length barriers, reorders sections with Up/Down buttons, and calibrates word allocations using section-level (`-50`/`+50`), subheading-level (`-50`/`+50`), or direct numeric inputs.
-   - **Dynamic Word Status & Auto-Balancing**: Live status bar tracks `Target: X words · Allocated: Y words · Remaining: Z words (or Over: W words / Balanced)`. 1-click `Auto-Balance` proportionally synchronizes all section allocations to match the user's target word count.
-4. **Voice & Tone Selection**:
-   - **User Action**: Selects an academic style (e.g. *Formal Academic*, *Analytical*, *Argumentative*, *Critical*, *Objective*, or *Persuasive*).
-5. **Phase Progression & Canonical Persistence**:
-   - **User Action**: In Detailed Mode, clicks `Proceed to Phase 2: Understand`; in Minimal Mode, clicks `Proceed to Phase 2: Sources`.
-   - **System Processing**: The confirmed structure with stable internal IDs is saved into canonical project keys (`assignment_structure`, `structure`, `sectionBudgets`, `assignment_internal_sections`, `targetWordCount`, `word_count`, `word_limit`, `execution_mode`).
-   - **Result**: Phase 1 is completed; subsequent phase unlocks using the exact confirmed parameters.
+- **Peer review** runs one bounded model call per lens over seven lenses (`REVIEW_LENSES`: contribution, literature, methodology, evidence, argument, citation, journal_fit; `src/app/review/peerReview.ts`). A failed lens is recorded, not fatal. Critiques are stored in `peer_review_critiques` and can be waived. The rebuttal matrix and rebuttal-letter export hang off `/agentic/rebuttal-matrix` and `/agentic/export/rebuttal-letter`.
+- **Claims and evidence**: `/api/projects/:id/claims` and `/evidence` hold the claim-evidence graph (claims, evidence items, bindings; unsupported claims can be listed and marked).
+- **Gates** (`src/domain/project/gates.ts`): G0 Intake, G1 Requirements, G2 Sources, G3 Structure, G4 Draft, G5 Review, G6 Compliance, G7 Export, signed off via `/api/projects/:id/gates/:gate/signoff`. G2 allows a smaller corpus through `/gates/G2/accept-smaller-corpus`.
+- **Manuscript generation** is a resumable job (`/manuscript/start`, `next-section`, `pause`, `resume`) followed by `coherence-check`, `peer-review` and `resolve-citations`.
+- **Extras**: cover letter, anonymization (propose then apply), journal compliance report (`/compliance`), submission tracking (`/submissions`).
+- **Export** (`POST/GET /api/projects/:id/export[/:format]`): `docx`, `odt`, `pdf`, `latex`, `typst`, `camera_ready_pdf`, `markdown`/`md`, `rebuttal_letter`. A project with no document returns 400.
 
----
+## 5. Thesis (`OT-07`)
 
-### 3.2 Phase 2: Sources & Literature Discovery
+`ThesisWorkspace` has six steps: 1 Proposal & Framing, 2 Literature Matrix, 3 Methodology & Ethics, 4 Write Chapters, 5 Discussion & Audit, 6 Viva Voce Simulator. Server routes (`server/routes/project/thesis.ts`): `POST /viva-simulate` (examiner questions from the thesis title and research questions), `/chapter-audit`, `GET /gate-status`, `/draft-chapter`. Export: `thesisExport.ts`, `thesisLatex.ts`; references: `thesisReferences.ts`. Thesis and proposal routes answer with a browser hand-off when the user's only AI is a local model.
 
-1. **Question Deconstruction & Search**:
-   - **User Action**: Clicks `Run Scholarly Discovery` or adds lecture materials.
-   - **System Processing**: Server invokes `scholarlyDiscoveryService.ts`. The prompt is deconstructed into core conceptual entities, explanatory variables, and disciplinary bounds. The system searches OpenAlex/Crossref, prioritizing recent empirical literature (2024-2026) alongside seminal classics.
-   - **Result**: Discovered literature cards appear in a 2-column grid (`CuratedSourceCard`), tagged with roles (`Empirical evidence`, `Theoretical framework`, `Core theory`) and "Why this source?" justifications.
-2. **Lecture Material Ingestion**:
-   - **User Action**: User drops lecture slides (`.pptx`, `.pdf`) or syllabus files into `LectureUploadDropzone`.
-   - **System Processing**: Files are parsed, chunked, and stored with source badge `USER UPLOADED`.
-3. **Evidence Approval**:
-   - **User Action**: User reviews cards, clicks `+ Add Source` to assign them to specific Phase 1 subheadings.
-   - **Result**: Approved sources populate the `ApprovedReferencesShelf`. Subheading indicators change from `⚪ Not researched` to `🟢 Sufficient evidence`.
-4. **Phase Progression**:
-   - **User Action**: Clicks `Proceed to Phase 3 Drafting`.
+## 6. Proposal (`OT-15`)
 
----
+`ProposalWorkspace` has eight steps: 1 Agency & Rubric, 2 Specific Aims (1-Page), 3 Preliminary Studies, 4 Significance & Innovation, 5 Research Strategy & Risk, 6 Budget & Resources, 7 Broader Impacts & Data Plan, 8 Study Section Scorer. Server routes (`server/routes/project/proposal.ts`): `POST /study-section-simulate`, `/aims-audit`, `/draft-section`. Export in `proposalExport.ts`.
 
-### 3.3 Phase 3: Drafting
+## 7. Presentation Studio (`OT-22`)
 
-1. **Section Selection**:
-   - **User Action**: Selects a subheading from the `DraftingSectionIndex` navigation rail.
-2. **Evidence-Guided Drafting**:
-   - **User Action**: Clicks `Generate Section Draft` or drafts manually in the TipTap canvas.
-   - **System Processing**: If AI drafting is requested, the system prompts the language engine with:
-     - The active subheading title and author notes.
-     - Section word budget constraints.
-     - Selected writing tone and stylistic voice profile.
-     - Approved evidence quotes and references assigned to this section.
-   - **Result**: Generated text streams into the editor with formatted citations (e.g. `(Smith, 2024)`).
-3. **Manual Citation Insertion**:
-   - **User Action**: User opens the Evidence Drawer, selects a source, and clicks `Insert Citation` or `Insert Quote`.
-   - **Result**: Pre-formatted citation is placed at the cursor.
-4. **Progress Monitoring**:
-   - **User Action**: User watches live word count dials comparing section actuals against target allocations.
-5. **Phase Progression**:
-   - **User Action**: Clicks `Proceed to Phase 4 Submission`.
+Four steps (Understand, Design, Edit Slides, Present) and the card engine are documented in [`presentation-studio.md`](presentation-studio.md). Step 01 is a card-by-card outline: an uploaded brief (`POST /api/presentations/parse-document`, which strips course codes and page footers and returns the real topic, never a department banner) or a topic goes to `POST /api/projects/:id/presentation/outline` (`scholarBrain.presentationOutline`; with no AI, an outline built from the brief's own questions). Step 02 adds per-slide Visual & Graphic Requirements the presenter confirms; Step 03 has a 7-layout switcher, typed blocks and `POST .../presentation/write-block`. Decks are saved with `PUT /api/projects/:id/presentation/deck` (project decks) and `/api/presentations/:id` (library decks, `public.presentation_decks`).
 
----
+## 8. Knowledge Vault (`/vault`)
 
-### 3.4 Phase 4: Submission & Verification
+`VaultScreen` has tabs `projects`, `sources` and `settings`; `SourceLibraryScreen` and `KnowledgeVault` show sources, `AddSourceModal` adds them.
 
-1. **Rubric Compliance Evaluation**:
-   - **User Action**: Clicks `Run Rubric Evaluation`.
-   - **System Processing**: Server evaluates full draft against a 10-point academic rubric (Thesis clarity, argument progression, evidence density, critical depth, voice consistency).
-   - **Result**: Detailed score report with strengths and actionable revision suggestions.
-2. **Citation Reconciliation Audit**:
-   - **User Action**: Views Citation Audit panel.
-   - **System Processing**: System extracts all in-text citation patterns and cross-checks them against approved bibliography entries.
-   - **Result**: Shows 100% match indicator or flags orphan citations.
-3. **Document Export**:
-   - **User Action**: Configures export options (Title Page, Table of Contents, Headers) and clicks `Download Word Document (.docx)` or `Download PDF`.
-   - **System Processing**: Server or client builds structured `.docx` or PDF file using `docx` / `pdfmake`.
-   - **Result**: File downloads to user's device.
+1. **Set-up**: passphrase and recovery code, storage mode `local` or `synced` (`src/services/userVault.ts`, table `user_vaults`). The vault can be locked and unlocked per session.
+2. **Add a source**: DOI (`POST /api/vault/lookup-doi`, or `POST /api/lookup-doi`), file upload (`POST /api/vault/parse-file`, ≤ 10 MB), URL (`POST /api/vault/parse-url`, SSRF-guarded), BibTeX or RIS (`src/citation_compliance/importers/`, `referenceImport.ts`), Zotero and Mendeley sync (`POST /api/vault/zotero/sync`, `/mendeley/sync`), Google Drive and OneDrive file listing (`GET /api/vault/drive/files`, `/onedrive/files`) with stored connections (`/api/vault/cloud/connections`).
+3. **Search**: semantic search over the user's sources (`POST /api/vault/search-semantic`).
+4. **Persist**: rows go to `public.user_vault_items` with `canonical_reference`, `citation_status`, authors, year, journal and metadata. `POST /api/vault/reset` clears the vault.
+5. **Use**: journal stages 7-8 pull from the Vault; coursework approves sources into the project.
 
----
+## 9. AI Access (`/ai-access`)
 
-## 4. Journal Article 25-Stage Pipeline Workflow (`OT-10`)
+1. Overview shows what is connected and the active routing. Providers lists the catalogued cloud providers and local runners.
+2. For a cloud provider the user adds a key and verifies it (`POST /api/ai-access/models` discovers models from the provider with that key); the key can be saved to the account for other devices (`PUT /api/ai-access/keys/:providerId`).
+3. For a local runner the browser probes `localhost` (`src/services/localRunnerProbe.ts`) and hardware can be profiled (`hardwareProfiler.ts`).
+4. Subscription lets the user see Premium plans and send, view or cancel a request (`/api/ai-access/premium-*`).
+5. Preferences set default routing. During onboarding the same page appears with continue and skip actions.
 
-### 5-Phase Progression
-```text
-Phase I: Foundation (Stages 1-6)
-   ↓
-Phase II: Evidence (Stages 7-14)
-   ↓
-Phase III: Drafting (Stages 15-20)
-   ↓
-Phase IV: Review & Simulation (Stages 21-23)
-   ↓
-Phase V: Publication (Stages 24-25)
-```
+## 10. Ask Scholar (`/projects`)
 
-1. **Foundation**: User defines empirical domain, runs gap identification, and locks research question and working title.
-2. **Evidence**: User connects Knowledge Vault sources, approves external empirical datasets, extracts quantitative/qualitative claims, and executes evidence analysis.
-3. **Drafting**: User selects target journal to lock editorial guidelines, drafts empirical sections, audits citations, and previews the combined manuscript.
-4. **Adversarial Peer Review Simulator**:
-   - User clicks `Simulate Peer Review`.
-   - 5 AI referee agents evaluate the paper:
-     - Methodologist (evaluates rigor, sampling, and threats to validity)
-     - Domain Specialist (checks literature coverage and theoretical contribution)
-     - Biostatistician / Data Analyst (verifies quantitative interpretations)
-     - Synthesizer (evaluates narrative flow and structural coherence)
-     - Formal Editor (checks academic register and citation standards)
-   - Generates simulated editorial decision: `Accept`, `Minor Revisions`, `Major Revisions`, or `Reject`.
-5. **Publication**: User implements revision points, performs publication readiness audit, and exports submission-ready manuscript.
-
----
-
-## 5. Knowledge Vault Ingestion Workflow
-
-```text
-Knowledge Vault Screen (/vault)
-       ↓
-Ingest Source (DOI, Cloud Drive, or BibTeX)
-       ↓
-System Fetches & Standardizes Metadata
-       ↓
-Canonical Reference Created in Vault
-       ↓
-Source Available for Linking across Projects
-```
-
-1. **Entry**: User navigates to `/vault`.
-2. **User Action**:
-   - **Option A (DOI)**: Enters DOI string (e.g., `10.1038/s41586-024-00000-0`).
-   - **Option B (Cloud Drive)**: Connects Google Drive or pastes OneDrive share link.
-   - **Option C (Reference File)**: Drops `.bib` (BibTeX) or `.ris` file.
-3. **System Processing**:
-   - For DOI: Calls Crossref / OpenAlex API via `/api/vault/doi`.
-   - For Cloud Drive: Extracts file title and creates cloud pointer with authorized view link.
-   - For BibTeX: Parses citation records into structured `CanonicalReference` objects.
-   - Persists entry into `public.universal_vault_items` (storing metadata only, 0% proprietary full-text storage).
-4. **Result**: Source appears in Vault list with citation pill, author list, year, and DOI link.
-5. **Next Available Action**: Link source to active projects using the project selector.
-
----
-
-## 6. AI Access & BYOK Management Workflow
-
-```text
-AI Access Screen (/ai-access)
-       ↓
-Select Provider (e.g. Anthropic, OpenAI, Gemini)
-       ↓
-Input API Key & Click "Test Key"
-       ↓
-System Executes Verification Probe
-       ↓
-Key Encrypted & Saved in User Settings
-```
-
-1. **Entry**: User navigates to `/ai-access/providers`.
-2. **User Action**: Enters personal API key on provider card and clicks `Test Key`.
-3. **System Processing**:
-   - System calls `/api/ai/verify-key` with the key and provider name.
-   - Executes a lightweight ping to the provider endpoint.
-4. **Result**:
-   - If valid: Green checkmark appears with response latency; key is envelope-encrypted and saved to user profile.
-   - If invalid: Error banner displays exact provider error (e.g. `Invalid API Key`, `Quota Exceeded`).
-5. **Next Available Action**: Select provider in Preferences tab as default for drafting or search.
+The prompt bar and chat on the projects screen (`src/desk/ProjectListScreen.tsx`) ask `POST /api/ai/agent` for grounded answers with web and scholarly retrieval and citation validation, can run `POST /api/ai/search` or `/api/ai/deep-research`, and can start a project from an answer (formats `OT-01`, `OT-10`, `OT-19`, `OT-09`, `OT-22`).

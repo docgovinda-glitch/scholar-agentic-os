@@ -1,0 +1,69 @@
+name: AI routing
+
+# Guards the AI chain that every workspace shares (Ask Scholar, Coursework,
+# Journal Writer, Proposal, Presentation): provider mapping for all catalog
+# providers, live model resolution, failover, key handling and URL screening.
+# Fast (about a minute), so it runs on every change that can affect AI, in
+# addition to the full CI gate.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/platform/**'
+      - 'src/config/providerCatalog.ts'
+      - 'src/config/modelCatalog.ts'
+      - 'src/desk/ai/**'
+      - 'src/desk/aiAccess/**'
+      - 'src/desk/api/**'
+      - 'src/services/useAiConfig.ts'
+      - 'server/src/ai/**'
+      - 'server/src/aiEngine/**'
+      - 'server/routes/ai*.ts'
+      - 'server/routes/project/**'
+      - 'server/routes/studio.ts'
+      - '.github/workflows/ai-routing.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/platform/**'
+      - 'server/src/ai/**'
+      - '.github/workflows/ai-routing.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ai-routing-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ai-routing:
+    name: AI routing tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Router, live models, failover, keyring, account keys, URL screening
+        run: >
+          npx vitest run
+          src/platform
+          src/desk/ai
+          src/desk/aiAccess
+          server/src/ai
+          server/routes/__tests__/aiRun.test.ts
+          server/routes/__tests__/aiAccess.models.test.ts
+          src/__tests__/singleBrainGuardian.test.ts
+      - name: Journal Writer routes use the shared AI chain
+        run: >
+          npx vitest run
+          server/routes/__tests__/manuscriptGeneration.test.ts
+          server/routes/__tests__/coherenceCheck.test.ts
+          server/routes/__tests__/peerReview.test.ts
+          server/routes/__tests__/coverLetter.test.ts
+          server/routes/__tests__/anonymization.test.ts
+          server/routes/__tests__/journalRequirementsExtract.test.ts

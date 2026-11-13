@@ -27,7 +27,8 @@ export type GammaLayout =
   | 'list'
   | 'quote'
   | 'split'
-  | 'statement';
+  | 'statement'
+  | 'table';
 
 export interface CardItem {
   title: string;
@@ -197,8 +198,12 @@ export interface ColorBlockedPillar {
   stat?: string;
 }
 
+export type VisualPlanKind = 'diagram' | 'table' | 'grid' | 'image';
+
 export interface SlideCard {
   id: string;
+  /** The visual the presenter chose for this card (Step 02). */
+  visualPlan?: VisualPlanKind;
   order: number;
   actionHeadline: string;
   summary?: string; // 1-sentence analytical takeaway for outline pill cards
@@ -257,6 +262,10 @@ export interface SlideDeck {
   keyMessage?: string;
   /** The points the presenter wants to make, in order (one card each). */
   talkPoints?: string[];
+  /** The reviewed card-by-card outline (Step 01). Slides are built from it. */
+  outline?: Array<{ id: string; title: string; visualType: string; bullets: string[] }>;
+  /** Signature of the outline the current slides were built from. */
+  outlineBuiltFrom?: string;
 }
 
 export type SlideViewMode = 'stage' | 'standalone';

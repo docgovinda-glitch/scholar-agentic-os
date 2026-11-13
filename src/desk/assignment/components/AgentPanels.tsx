@@ -32,6 +32,7 @@ export function AgentStepCard({
   disabledReason,
   children,
   testId,
+  minimal = false,
 }: {
   title: string;
   what: string;
@@ -42,8 +43,19 @@ export function AgentStepCard({
   disabledReason?: string;
   children?: ReactNode;
   testId: string;
+  /** Hide the title, blurb and run button: show only progress/errors and results. */
+  minimal?: boolean;
 }) {
   const busy = state.status === "running";
+  if (minimal) {
+    if (state.status === "idle" && !children) return null;
+    return (
+      <section aria-label={title} data-testid={testId} className="space-y-2">
+        <StatusLine state={state} />
+        {children}
+      </section>
+    );
+  }
   return (
     <section aria-label={title} data-testid={testId} className="rounded-2xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-750 p-4 sm:p-5 space-y-3 shadow-2xs">
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
@@ -76,7 +88,7 @@ const Quote = ({ q }: { q?: string }) => (q ? <span className="block text-[11px]
 const H = ({ children }: { children: ReactNode }) => <h3 className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mt-2">{children}</h3>;
 
 /** Extract: the whole run, plus what the brief asks for and what is missing. */
-export function ExtractAgentPanel({ brief, saveBrief }: { brief?: string; saveBrief?: () => Promise<void> } = {}) {
+export function ExtractAgentPanel({ brief, saveBrief, minimal = false }: { brief?: string; saveBrief?: () => Promise<void>; minimal?: boolean } = {}) {
   const { agent, question } = useAssignmentWorkspace();
   const e = agent.extraction;
   const [answers, setAnswers] = useState<Record<number, string>>({});
@@ -90,7 +102,7 @@ export function ExtractAgentPanel({ brief, saveBrief }: { brief?: string; saveBr
 
   return (
     <div className="space-y-3" data-testid="agent-extract">
-      <section aria-label="Work through the assignment" className="rounded-2xl border border-amber-200/80 dark:border-amber-500/30 bg-amber-50/60 dark:bg-amber-500/5 p-4 space-y-2">
+      {!minimal && <section aria-label="Work through the assignment" className="rounded-2xl border border-amber-200/80 dark:border-amber-500/30 bg-amber-50/60 dark:bg-amber-500/5 p-4 space-y-2">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <p className="text-xs text-neutral-800 dark:text-neutral-200">
             <span className="font-semibold">Let Scholar work through it:</span> read the brief, plan the piece and its outline, then find and read sources. It stops before drafting so you can check its work.
@@ -122,10 +134,11 @@ export function ExtractAgentPanel({ brief, saveBrief }: { brief?: string; saveBr
             ))}
           </ol>
         )}
-      </section>
+      </section>}
 
       <AgentStepCard
         testId="agent-step-extract"
+        minimal={minimal}
         title="Extract: what the brief asks for"
         what="Your AI reads the brief and any materials you added. Every requirement it lists is quoted from them."
         state={agent.steps.extract}
@@ -205,12 +218,13 @@ export function ExtractAgentPanel({ brief, saveBrief }: { brief?: string; saveBr
 }
 
 /** Understand: what to produce, how, and what research is needed. */
-export function UnderstandAgentPanel() {
+export function UnderstandAgentPanel({ minimal = false }: { minimal?: boolean } = {}) {
   const { agent } = useAssignmentWorkspace();
   const u = agent.understanding;
   return (
     <AgentStepCard
       testId="agent-step-understand"
+      minimal={minimal}
       title="Understand: what to produce and how"
       what="Your AI works out the subject, the approach, how to meet each criterion and what to research, then writes the outline from that plan."
       state={agent.steps.understand}
@@ -219,7 +233,7 @@ export function UnderstandAgentPanel() {
       runLabel="Plan the assignment"
       disabledReason={agent.extraction ? undefined : "Run Extract first, so the plan is based on what the brief asks for."}
     >
-      {u && (
+      {!minimal && u && (
         <div className="text-xs text-neutral-800 dark:text-neutral-200 space-y-1">
           <p><span className="font-semibold">To produce:</span> {u.produce}</p>
           {u.discipline && <p><span className="font-semibold">Subject:</span> {u.discipline}{u.assignmentType ? ` · ${u.assignmentType}` : ""}</p>}
@@ -252,13 +266,14 @@ export function UnderstandAgentPanel() {
 }
 
 /** Sources: real search, AI reading of abstracts, links to the outline. */
-export function SourcesAgentPanel() {
+export function SourcesAgentPanel({ minimal = false }: { minimal?: boolean } = {}) {
   const { agent, sources } = useAssignmentWorkspace();
   const analysed = sources.filter((s) => s.aiRelevance);
   const counts = { high: analysed.filter((s) => s.aiRelevance === "high").length, medium: analysed.filter((s) => s.aiRelevance === "medium").length, low: analysed.filter((s) => s.aiRelevance === "low").length };
   return (
     <AgentStepCard
       testId="agent-step-sources"
+      minimal={minimal}
       title="Sources: find, read and link"
       what="Searches OpenAlex, Crossref and other scholarly indexes with the plan's queries, then your AI reads each abstract: relevance, credibility, evidence quoted word for word, and the outline sections it supports. Only the abstract is read, not the full text."
       state={agent.steps.sources}
@@ -266,7 +281,7 @@ export function SourcesAgentPanel() {
       onRun={() => void agent.runSources()}
       runLabel="Find and read sources"
     >
-      {analysed.length > 0 && (
+      {!minimal && analysed.length > 0 && (
         <div className="text-xs space-y-2">
           <p className="text-neutral-700 dark:text-neutral-300">
             {counts.high} highly relevant, {counts.medium} useful, {counts.low} less relevant. Useful ones are approved and linked to your outline; change that on each card below.

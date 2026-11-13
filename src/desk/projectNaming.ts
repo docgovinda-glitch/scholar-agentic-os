@@ -3,6 +3,7 @@
  * Enforces case-insensitive duplicate title prevention and auto-incrementing
  * fallback for untitled drafts.
  */
+import { deriveDocumentTitle } from "../shared/presentationBrief";
 
 export interface ProjectTitleItem {
   id?: string;
@@ -54,9 +55,9 @@ export const DEFAULT_FORMAT_LABELS: Record<string, string> = {
   "OT-01": "Assignment",
   "OT-02": "Essay",
   "OT-06": "Thesis / Dissertation",
-  "OT-09": "Doctoral Dissertation",
+  "OT-07": "Thesis / Dissertation",
   "OT-10": "Journal Article",
-  "OT-19": "Research Proposal",
+  "OT-15": "Research Proposal",
   "OT-20": "Dissertation",
   "OT-22": "Presentation",
 };
@@ -411,6 +412,13 @@ function cleanTitleCandidate(raw: string): string {
  */
 export function deriveHeuristicTitle(rawText: string): string {
   if (!rawText || typeof rawText !== "string") return "Academic Assignment";
+
+  // A whole brief (uploaded or pasted): its real topic, never the department
+  // banner or the "Word Count:" line that PDF extraction runs into it.
+  if (rawText.split(/\s+/).length >= 40) {
+    const docTitle = deriveDocumentTitle(rawText);
+    if (docTitle && !/^untitled/i.test(docTitle)) return docTitle;
+  }
 
   const lines = rawText
     .split(/\r?\n/)

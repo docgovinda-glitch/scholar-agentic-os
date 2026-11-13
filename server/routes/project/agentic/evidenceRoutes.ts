@@ -1,6 +1,6 @@
 import express from "express";
 import { getProjectStore } from "../../../../src/services/store/projectStore.ts";
-import { streamOpenRouterJSON } from "../../../utils/llm.ts";
+import { streamOpenRouterJSON } from "../../../src/services/scholarBrain.ts";
 import { getSupabaseRestConfig, SupabaseTable } from "../../../src/supabaseRest.ts";
 import { normalizeUnicodeNFC } from "../../../src/utils/scholarlyVoiceGuard.ts";
 import { safeParseAnswerField } from "../../../../src/shared/projectStateSchema.ts";
@@ -214,7 +214,7 @@ Return ONLY valid JSON in this exact format:
 }`;
     let ragContext = "";
     try {
-      const { generateGeminiEmbedding } = await import("../../../utils/llm.ts");
+      const { generateGeminiEmbedding } = await import("../../../src/services/scholarBrain.ts");
       const query = project.answers["core_problem"] || project.answers["working_title"] || "academic evidence extraction";
       const embedding = await generateGeminiEmbedding(query);
       
