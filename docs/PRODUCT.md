@@ -61,7 +61,7 @@ Workspace ids match the catalog: Research Proposal is `OT-15` and the Thesis wor
 
 **AI Access** (`/ai-access`): Overview, Providers, Subscription and Preferences sections. See [`AI-SYSTEM.md`](AI-SYSTEM.md).
 
-**Admin panel** (`/admin/*`): providers and models, premium plans/requests/subscribers, AI resources, platform credentials, budget, usage, opportunities, admin roster, user status, audit log.
+**Admin panel** (`/admin/*`): AI opportunity agent, admin roster, user status, audit log. (Premium plans, platform credentials, the AI resource pool, budget and usage were removed with Premium.)
 
 ## 4. Principles that shape the product
 

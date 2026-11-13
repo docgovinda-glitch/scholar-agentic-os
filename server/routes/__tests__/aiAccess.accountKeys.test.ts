@@ -148,4 +148,57 @@ describe("AI keys saved to the account", () => {
     expect((await request(app).delete("/api/ai-access/connections/gemini").set(auth)).status).toBe(200);
     expect(db.rows).toHaveLength(0);
   });
+
+  it("counts a saved key it cannot read instead of dropping it silently, and keeps the readable ones", async () => {
+    const app = await buildApp();
+    await request(app).put("/api/ai-access/keys/gemini").set(auth).send({ key: SECRET });
+    await request(app).put("/api/ai-access/keys/openai").set(auth).send({ key: "sk-second-key-1234567890" });
+    // The row for one provider was wrapped under a master key this server no longer has.
+    db.rows.find((r) => r.provider_id === "openai")!.encrypted_cek = { ...(db.rows[0].encrypted_cek as object), ciphertext: "AAAA" };
+    const sync = await request(app).get("/api/ai-access/keys/sync").set(auth);
+    expect(sync.status).toBe(200);
+    expect(sync.body.keys).toEqual([expect.objectContaining({ providerId: "gemini", apiKey: SECRET })]);
+    expect(sync.body.unreadable).toBe(1);
+  });
+
+  it("survives a MASTER_KEY rotation when the rows are re-wrapped first, and not when they are not", async () => {
+    const { rewrapKeyRow } = await import("../../src/aiEngine/rewrapKeys");
+    const app = await buildApp();
+    await request(app).put("/api/ai-access/keys/gemini").set(auth).send({ key: SECRET });
+    await request(app).put("/api/ai-access/keys/gemini%232").set(auth).send({ key: "AIzaBackupKey-0000-9999" });
+
+    const oldKey = Buffer.from(process.env.MASTER_KEY!, "base64");
+    const newKeyB64 = generateMasterKeyBase64();
+    const newKey = Buffer.from(newKeyB64, "base64");
+
+    // Re-wrap every row, as scripts/rewrap-user-keys.ts does, then switch the server's key.
+    const before = JSON.stringify(db.rows.map((r) => r.encrypted_key));
+    for (const row of db.rows) {
+      const out = rewrapKeyRow(row as never, oldKey, newKey);
+      expect(out.status).toBe("ok");
+      if (out.status === "ok") row.encrypted_cek = out.encrypted_cek;
+    }
+    expect(JSON.stringify(db.rows.map((r) => r.encrypted_key))).toBe(before); // the API keys themselves are untouched
+    process.env.MASTER_KEY = newKeyB64;
+    const app2 = await buildApp();
+    const after = await request(app2).get("/api/ai-access/keys/sync").set(auth);
+    expect(after.body.unreadable).toBe(0);
+    expect(after.body.keys.map((k: { apiKey: string }) => k.apiKey).sort()).toEqual(["AIzaBackupKey-0000-9999", SECRET].sort());
+
+    // Without re-wrapping, the same rotation would have lost every key.
+    process.env.MASTER_KEY = generateMasterKeyBase64();
+    const app3 = await buildApp();
+    const lost = await request(app3).get("/api/ai-access/keys/sync").set(auth);
+    expect(lost.body.keys).toEqual([]);
+    expect(lost.body.unreadable).toBe(2);
+  });
+
+  it("never re-wraps a row the old key cannot read", async () => {
+    const { rewrapKeyRow } = await import("../../src/aiEngine/rewrapKeys");
+    const app = await buildApp();
+    await request(app).put("/api/ai-access/keys/gemini").set(auth).send({ key: SECRET });
+    const wrongOld = Buffer.from(generateMasterKeyBase64(), "base64");
+    const newKey = Buffer.from(generateMasterKeyBase64(), "base64");
+    expect(rewrapKeyRow(db.rows[0] as never, wrongOld, newKey)).toEqual({ status: "unreadable" });
+  });
 });

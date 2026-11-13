@@ -138,31 +138,33 @@ Because the Express server uses PostgREST over HTTPS (`VITE_SUPABASE_URL` + `SUP
    ```
 
 ### Step 6 — `ENCRYPTION_KEY` / `MASTER_KEY` & Upstream AI Provider Keys
-#### 6.1 Re-Wrap `platform_provider_credentials` Under a Fresh `MASTER_KEY`
+#### 6.1 Re-Wrap the Saved User Keys (`user_provider_keys`) Under a Fresh `MASTER_KEY`
+> Update (the Premium removal, PR #196): `platform_provider_credentials` and its re-wrap script no longer exist. The only table the AI features keep encrypted under `MASTER_KEY` is `user_provider_keys` (users' saved API keys, including backup keys `provider#2` / `#3`). Cloud-drive OAuth tokens are wrapped under the same key by the vault route; check `server/routes/vault.ts` before rotating.
+
+**Order matters: re-wrap first, then change `MASTER_KEY` on the server.** A row still wrapped under the old key becomes unreadable the moment the server starts with the new one, and that user's saved keys stop syncing.
+
 1. Generate a fresh 32-byte base64 `MASTER_KEY` locally without printing it to terminal history:
    ```bash
    node -e 'console.log(require("crypto").randomBytes(32).toString("base64"))'
    ```
-2. Run [`scripts/rewrap-platform-credentials.ts`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/scripts/rewrap-platform-credentials.ts) in **`--dry-run`** mode first (temporarily allowing your operator IP in Supabase Network Restrictions if enabled):
+2. Dry run (writes nothing). The output must show `"unreadableWithOldKey": 0` and `"readableWithOldKey"` equal to `"totalRows"`:
    ```bash
-   OLD_MASTER_KEY="<CURRENT_MASTER_KEY_OR_HEX_ENCRYPTION_KEY>" \
+   OLD_MASTER_KEY="<CURRENT_MASTER_KEY>" \
    NEW_MASTER_KEY="<NEW_MASTER_KEY_BASE64>" \
-   DATABASE_URL="<NEW_DATABASE_URL>" \
-     npx tsx scripts/rewrap-platform-credentials.ts --dry-run
+   DATABASE_URL="<DATABASE_URL>" \
+     npx tsx scripts/rewrap-user-keys.ts
    ```
-   Confirm the JSON output reports `"mode": "dry-run"` and `"verifiedDecryptableRows"` equals `"totalRowsFound"`.
-3. Execute the single-transaction re-wrap (`--execute`):
+   If some rows are unreadable with the old key, stop: they were already lost (an earlier key change) or `OLD_MASTER_KEY` is wrong. `--skip-unreadable` leaves those rows as they are.
+3. Execute (one transaction; refuses to run while unreadable rows exist unless `--skip-unreadable`):
    ```bash
-   OLD_MASTER_KEY="<CURRENT_MASTER_KEY_OR_HEX_ENCRYPTION_KEY>" \
-   NEW_MASTER_KEY="<NEW_MASTER_KEY_BASE64>" \
-   DATABASE_URL="<NEW_DATABASE_URL>" \
-     npx tsx scripts/rewrap-platform-credentials.ts --execute
+   OLD_MASTER_KEY="<CURRENT_MASTER_KEY>" NEW_MASTER_KEY="<NEW_MASTER_KEY_BASE64>" DATABASE_URL="<DATABASE_URL>" \
+     npx tsx scripts/rewrap-user-keys.ts --execute
    ```
-4. Immediately update `MASTER_KEY=<NEW_MASTER_KEY_BASE64>` (and remove legacy `ENCRYPTION_KEY`) in **Render Dashboard → Environment**.
-5. **Confirm Old `MASTER_KEY` Fails**: Re-running `--dry-run` with `OLD_MASTER_KEY` now throws `DecryptionError: Decryption failed — wrong key`.
+4. Immediately update `MASTER_KEY=<NEW_MASTER_KEY_BASE64>` (and remove legacy `ENCRYPTION_KEY`) in **Render Dashboard → Environment**, and redeploy.
+5. **Check:** sign in, open AI Access, and confirm saved keys sync. The server logs `userKeyVault: N saved key row(s) could not be decrypted` and `GET /api/ai-access/keys/sync` returns `unreadable: N` if any row is left behind. Re-running the dry run with `OLD_MASTER_KEY` as `NEW_MASTER_KEY` and the new key as `OLD_MASTER_KEY` must report `unreadableWithOldKey: 0`.
 
 #### 6.2 Upstream LLM Provider Keys & Tavily Key to Rotate
-Because anyone who held both the leaked `SUPABASE_SERVICE_ROLE_KEY` and `MASTER_KEY`/`ENCRYPTION_KEY` before rotation could have decrypted rows in `platform_provider_credentials` (or read `TAVILY_API_KEY`), rotate every configured platform key in its upstream dashboard and save the new key via the Scholar Core **Admin Panel → AI Infrastructure** (or `storeCredential`):
+Because anyone who held both the leaked `SUPABASE_SERVICE_ROLE_KEY` and `MASTER_KEY`/`ENCRYPTION_KEY` before rotation could have decrypted saved user keys (or read `TAVILY_API_KEY`), rotate every configured platform key in its upstream dashboard and save the new key via the Scholar Core **Admin Panel → AI Infrastructure** (or `storeCredential`):
 1. **Tavily Search API** (`TAVILY_API_KEY` — update in both Render Environment and Supabase Edge Function secrets: `npx supabase secrets set TAVILY_API_KEY="<NEW_TAVILY_KEY>" --project-ref gfjhsijrwodjvkisouzw`)
 2. **Google Gemini** (`gemini` — Google AI Studio)
 3. **OpenAI** (`openai` — OpenAI Platform)

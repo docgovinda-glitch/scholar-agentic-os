@@ -54,7 +54,7 @@ Names the code reads, grouped by purpose. "Server" variables are read by `server
 
 | Variable | Purpose |
 | :--- | :--- |
-| `MASTER_KEY` (alias `CREDENTIAL_MASTER_KEY` for the vault route) | Wraps per-credential keys for platform credentials, saved user keys and cloud OAuth tokens |
+| `MASTER_KEY` (alias `CREDENTIAL_MASTER_KEY` for the vault route) | Wraps per-credential keys for saved user keys (including backup keys) and cloud OAuth tokens; rotate it with `scripts/rewrap-user-keys.ts` (see `ROTATION_RUNBOOK.md` §6.1) |
 | `ENCRYPTION_KEY` | Listed in `.env.example` and the blueprint; read only by `scripts/migrate-users-to-supabase.ts` |
 | `LLM_CHALLENGE_SECRET` | HMAC secret for browser-run AI challenges; at least 16 characters and required in production (a random value is used outside production) |
 | `MAIN_ADMIN_EMAIL` (fallback `ADMIN_EMAIL`) | Super-admin account for `/api/admin/ai/*` |
