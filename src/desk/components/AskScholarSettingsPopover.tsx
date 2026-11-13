@@ -139,7 +139,7 @@ export function AskScholarSettingsPopover({
               onClick={() => updateSetting("answerLengthPreference", len)}
               className={`py-1.5 rounded-lg text-[11px] font-semibold capitalize border transition-colors cursor-pointer ${
                 settings.answerLengthPreference === len
-                  ? "bg-indigo-600 text-white border-indigo-600"
+                  ? "bg-neutral-900 text-white border-neutral-900 dark:bg-white dark:text-neutral-900 dark:border-white"
                   : "bg-neutral-50 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-white/10"
               }`}
             >
@@ -166,7 +166,7 @@ export function AskScholarSettingsPopover({
           type="button"
           data-testid="import-references-btn"
           onClick={handleImport}
-          className="w-full inline-flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors cursor-pointer"
+          className="w-full inline-flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold bg-neutral-900 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200 transition-colors cursor-pointer"
         >
           <Upload className="w-3.5 h-3.5" />
           <span>Import to Knowledge Vault</span>
