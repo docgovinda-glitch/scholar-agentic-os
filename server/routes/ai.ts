@@ -189,6 +189,45 @@ async function enrichTopSourcesWithFullText(
  * Intelligent Capability Determination:
  * Analyzes prompt content, attachments, and explicit mode to choose the optimal workflow.
  */
+interface AttachedImage {
+  name: string;
+  mimeType: string;
+  data: string;
+  dataUrl: string;
+}
+
+/** Images arrive as a data URL or bare base64; return both forms with a known MIME type. */
+function normalizeAttachedImages(images: unknown): AttachedImage[] {
+  if (!Array.isArray(images)) return [];
+  return images.map((img: { dataUrl?: unknown; data?: unknown; mimeType?: unknown; name?: unknown }) => {
+    const raw = typeof img?.dataUrl === "string" ? img.dataUrl : typeof img?.data === "string" ? img.data : "";
+    const mimeType =
+      typeof img?.mimeType === "string" && img.mimeType
+        ? img.mimeType
+        : raw.startsWith("data:")
+          ? raw.split(";")[0].replace("data:", "")
+          : "image/jpeg";
+    const base64 = raw.includes(";base64,") ? raw.split(";base64,")[1] : raw;
+    return {
+      name: typeof img?.name === "string" && img.name ? img.name : "image",
+      mimeType,
+      data: base64,
+      dataUrl: raw.startsWith("data:") ? raw : `data:${mimeType};base64,${base64}`,
+    };
+  });
+}
+
+/** A signed, 15-minute challenge binding a browser-run answer to this user, route and prompt. */
+function challengeTokenFor(req: Request, fallbackRoute: string, systemPrompt: string, userPrompt: string): string {
+  const userId = (req as Request & { user?: { id?: string } }).user?.id || "anonymous";
+  return signLlmChallenge({
+    userId: String(userId),
+    routeId: String(req.originalUrl || req.url || fallbackRoute),
+    promptHash: computePromptHash(systemPrompt, userPrompt),
+    expiresAt: Date.now() + 15 * 60 * 1000,
+  });
+}
+
 function determineExecutionMode(
   prompt: string,
   explicitMode?: string,
@@ -303,37 +342,13 @@ export function registerAIRoutes(
         return sendAiFailure(res, new NoClientAiProviderError(), "Deep research");
       }
 
-      const makeChallengeToken = (sysPrompt: string, uPrompt: string): string => {
-        const userId = (req as any)?.user?.id || "anonymous";
-        const routeId = req.originalUrl || req.url || "/api/ai/deep-research";
-        return signLlmChallenge({
-          userId: String(userId),
-          routeId: String(routeId),
-          promptHash: computePromptHash(sysPrompt, uPrompt),
-          expiresAt: Date.now() + 15 * 60 * 1000,
-        });
-      };
+      const makeChallengeToken = (sysPrompt: string, uPrompt: string): string => challengeTokenFor(req, "/api/ai/deep-research", sysPrompt, uPrompt);
 
       const [evidence] = await Promise.all([
         scholarBrain.retrieveEvidence({ query: topic, maxResults: 15, vaultSources }).catch(() => []),
       ]);
 
-      const normalizedImages = (images || []).map((img: any) => {
-        const raw = img.dataUrl || img.data || "";
-        const mimeType =
-          img.mimeType ||
-          (raw.startsWith("data:")
-            ? raw.split(";")[0].replace("data:", "")
-            : "image/jpeg");
-        const base64 = raw.includes(";base64,") ? raw.split(";base64,")[1] : raw;
-        const dataUrl = raw.startsWith("data:") ? raw : `data:${mimeType};base64,${base64}`;
-        return {
-          name: img.name || "image",
-          mimeType,
-          data: base64,
-          dataUrl,
-        };
-      });
+      const normalizedImages = normalizeAttachedImages(images);
 
       const normalizedPreRetrieved = normalizePreRetrievedSources(preRetrievedSources);
       let result;
@@ -434,38 +449,14 @@ export function registerAIRoutes(
         return res.status(400).json({ error: "Empty prompt or query supplied." });
       }
 
-      const makeChallengeToken = (sysPrompt: string, uPrompt: string): string => {
-        const userId = (req as any)?.user?.id || "anonymous";
-        const routeId = req.originalUrl || req.url || "/api/ai/chat";
-        return signLlmChallenge({
-          userId: String(userId),
-          routeId: String(routeId),
-          promptHash: computePromptHash(sysPrompt, uPrompt),
-          expiresAt: Date.now() + 15 * 60 * 1000,
-        });
-      };
+      const makeChallengeToken = (sysPrompt: string, uPrompt: string): string => challengeTokenFor(req, "/api/ai/chat", sysPrompt, uPrompt);
 
       // A browser-run answer (after a 426 hand-off) is verified only once this
       // request's prompt is rebuilt, so the challenge is checked against it.
       const hasBrowserResult = req.body?.llmResult !== undefined && req.body?.llmResult !== null;
       let incomingLlmResult: string | null = null;
       // Normalize images so dataUrl and base64 data are reliably present
-      const normalizedImages = (images || []).map((img: any) => {
-        const raw = img.dataUrl || img.data || "";
-        const mimeType =
-          img.mimeType ||
-          (raw.startsWith("data:")
-            ? raw.split(";")[0].replace("data:", "")
-            : "image/jpeg");
-        const base64 = raw.includes(";base64,") ? raw.split(";base64,")[1] : raw;
-        const dataUrl = raw.startsWith("data:") ? raw : `data:${mimeType};base64,${base64}`;
-        return {
-          name: img.name || "image",
-          mimeType,
-          data: base64,
-          dataUrl,
-        };
-      });
+      const normalizedImages = normalizeAttachedImages(images);
 
       const effectivePrompt = (
         prompt ||
@@ -671,7 +662,7 @@ export function registerAIRoutes(
 
       // 1.5 Process Uploaded Images Metadata
       if (normalizedImages && normalizedImages.length > 0) {
-        const imgDetails = normalizedImages.map((img: any, i: number) => `Attachment ${i + 1}: "${img.name}" (${img.mimeType})`).join(", ");
+        const imgDetails = normalizedImages.map((img, i) => `Attachment ${i + 1}: "${img.name}" (${img.mimeType})`).join(", ");
         contextBlocks.push(`=== VISUAL MEDIA ATTACHMENTS ===\nThe user has attached ${normalizedImages.length} image(s): ${imgDetails}.\nThe image payload is delivered directly to your vision pipeline for detailed visual inspection.\n=== END OF VISUAL MEDIA ATTACHMENTS ===`);
       }
 
@@ -684,7 +675,7 @@ export function registerAIRoutes(
             verifiedCanonical
               .map(
                 (s, idx) =>
-                  `[Source ${idx + 1}] (${s.id}) In-Text Citation: ${s.inTextCitation}\nTitle: "${s.title}"\nAuthors: ${s.authors.join(", ")}\nYear: ${s.year}\nDOI: ${s.doi || "None"}\nVenue/Publisher: ${s.venue || "Academic Repository"}\nURL: ${s.url || "N/A"}`
+                  `[Source ${idx + 1}] (${s.id}) In-Text Citation: ${s.inTextCitation}\nTitle: "${s.title}"\nAuthors: ${s.authors.join(", ")}\nYear: ${s.year}\nDOI: ${s.doi || "None"}\nVenue/Publisher: ${s.venue || "not recorded"}\nURL: ${s.url || "N/A"}`
               )
               .join("\n\n") +
             `\n=== END OF EXCLUSIVE CITATION LEDGER ===`

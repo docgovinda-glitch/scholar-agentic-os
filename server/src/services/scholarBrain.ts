@@ -635,7 +635,7 @@ export const scholarBrain = {
         ? vSrc.authors
         : typeof vSrc.authors === "string"
         ? [vSrc.authors]
-        : ["Unknown Author"];
+        : [];
 
       evidencePool.push({
         id: srcId,
@@ -682,6 +682,7 @@ export const scholarBrain = {
 
       let externalCounter = 1;
       for (const draft of combinedLive) {
+        if (!draft.title) continue; // a record with no title cannot be cited
         const cleanDoi = draft.doi ? draft.doi.toLowerCase().trim() : undefined;
         const normTitle = (draft.title || "").toLowerCase().replace(/[\W_]+/g, " ").trim();
 
@@ -697,8 +698,8 @@ export const scholarBrain = {
         evidencePool.push({
           id: srcId,
           citationToken: token,
-          title: draft.title || "Untitled Scholarly Work",
-          authors: draft.authors && draft.authors.length > 0 ? draft.authors : ["Anonymous"],
+          title: draft.title || "",
+          authors: draft.authors && draft.authors.length > 0 ? draft.authors : [],
           year: draft.year,
           doi: draft.doi,
           url: draft.url,
