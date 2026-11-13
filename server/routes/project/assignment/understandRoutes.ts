@@ -7,8 +7,8 @@ import {
 } from "../../../src/utils/scholarlyVoiceGuard.ts";
 import { getProjectStore } from "../../../../src/services/store/projectStore.ts";
 import { scopeBrief, structureLens } from "../../../../src/domain/assignment/briefScoping.ts";
-import { callOpenRouterJSON, callOpenRouterText, getCandidates, buildAuthorizedPolicy, resolveRequestAiConfig } from "../../../utils/llm.ts";
-import { completeWithFailover } from "../../../../src/platform/gateway/gateway.ts";
+import { callOpenRouterJSON, callOpenRouterText } from "../../../utils/llm.ts";
+import { keyringFromRequest } from "../../../src/ai/routerBridge.ts";
 import { scholarBrain } from "../../../src/services/scholarBrain.ts";
 import {
   auditDocumentLineByLine,

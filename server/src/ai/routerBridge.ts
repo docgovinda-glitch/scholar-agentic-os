@@ -16,6 +16,7 @@
 import type { NextFunction, Request, Response } from "express";
 import { route } from "../../../src/platform/router/router.ts";
 import { CircuitBreaker, MemoryBreakerStore } from "../../../src/platform/router/circuitBreaker.ts";
+import type { Completer, CompletionTask } from "../../../src/platform/completion.ts";
 import type { Candidate, ProviderAdapter, ProviderId, RouteRequest, RouterEvent, TaskClass } from "../../../src/platform/router/types.ts";
 import { keyringToCandidates, parseKeyring, type KeyringEntry } from "../../routes/aiRun.ts";
 import { screenCandidates, serverAdapters } from "./aiEndpointGuard.ts";
@@ -24,6 +25,7 @@ import { LocalModelUnreachableError, NoClientAiProviderError } from "./aiRouteEr
 const ROUTER_TASK: Record<string, TaskClass> = {
   reasoning: "reasoning", drafting: "drafting", "long-context": "long-context", coding: "coding",
   fast: "fast", extraction: "fast", chat: "fast", classification: "fast", vision: "vision",
+  refinement: "drafting", summarisation: "fast", verification: "reasoning", rule_extraction: "reasoning", discovery: "reasoning",
 };
 /** Maps the task names used across the server to the router's task classes. */
 export const toRouterTask = (taskType: string | undefined): TaskClass => ROUTER_TASK[taskType ?? ""] ?? "reasoning";
@@ -51,17 +53,6 @@ export function configureRouterBridge(next: Partial<BridgeDeps>): void { deps = 
 
 const PROVIDER_ALIAS: Record<string, ProviderId> = { custom: "custom", gemini: "google", google: "google", openai: "openai", anthropic: "anthropic", claude: "anthropic", groq: "groq", deepseek: "deepseek", mistral: "mistral", ollama: "ollama", lmstudio: "lmstudio" };
 
-const DEFAULT_MODEL_BY_PROVIDER: Partial<Record<ProviderId, string>> = {
-  google: "gemini-2.5-flash",
-  openai: "gpt-4o-mini",
-  anthropic: "claude-sonnet-4-20250514",
-  groq: "openai/gpt-oss-120b",
-  deepseek: "deepseek-chat",
-  mistral: "mistral-small-latest",
-  ollama: "auto",
-  lmstudio: "auto",
-};
-
 /**
  * The user's AI connections for this request: the keyring, with the legacy
  * single-provider headers (the user's primary choice) first when the keyring
@@ -88,7 +79,8 @@ function legacyEntry(headers: Request["headers"]): KeyringEntry | undefined {
   const provider = PROVIDER_ALIAS[named ?? ""] ?? (named && h("x-ai-base-url") ? "custom" : undefined);
   // A local runner may arrive without a model: the browser picks one on hand-off.
   const rawModel = h("x-ai-model")?.split(/\s*(?:—|–|\u2014|\u2013)\s*/)[0]?.trim();
-  const model = (rawModel && !/\s/.test(rawModel) ? rawModel : undefined) ?? (provider ? DEFAULT_MODEL_BY_PROVIDER[provider] : undefined);
+  // A local runner may arrive without a model: "auto" lets the browser pick one on hand-off.
+  const model = (rawModel && !/\s/.test(rawModel) ? rawModel : undefined) ?? (provider === "ollama" || provider === "lmstudio" ? "auto" : undefined);
   if (!provider || !model) return undefined;
   return { provider, model, apiKey: h("x-ai-api-key"), baseUrl: h("x-ai-base-url") };
 }
@@ -132,8 +124,22 @@ export async function chainFor(req: Scoped, task: TaskClass): Promise<Candidate[
   return chain;
 }
 
+export interface RoutedResult {
+  text: string;
+  label: string;
+  lane: Candidate["lane"];
+  provider: string;
+  model: string;
+  usage: { inputTokens: number; outputTokens: number };
+}
+
 /** Runs one prompt through the router and returns the text. */
 export async function routedText(req: Request, call: RoutedCall): Promise<string> {
+  return (await routedResult(req, call)).text;
+}
+
+/** Runs one prompt through the router and says which connection answered. */
+export async function routedResult(req: Request, call: RoutedCall): Promise<RoutedResult> {
   const scoped = req as Scoped;
   scoped.aiRoute ??= { notices: [] };
   const images = call.images?.filter((i) => i.data) ?? [];
@@ -150,6 +156,7 @@ export async function routedText(req: Request, call: RoutedCall): Promise<string
     minOutputTokens: Math.min(512, call.maxOutputTokens ?? 512),
     temperature: call.temperature,
   };
+  const byId = new Map(chain.map((c) => [c.id, c]));
   let text = "";
   for await (const ev of route(request, chain, call.signal ?? new AbortController().signal, { site: "server", adapters: deps.adapters, breaker: deps.breaker })) {
     summarise(scoped.aiRoute, ev);
@@ -157,7 +164,8 @@ export async function routedText(req: Request, call: RoutedCall): Promise<string
     if (ev.type === "token") text += ev.text;
     if (ev.type === "fallback" && ev.partialOutputDiscarded) text = "";
     if (ev.type === "done") {
-      return text;
+      const c = byId.get(ev.candidateId);
+      return { text, label: ev.label, lane: ev.lane, provider: c?.provider ?? "", model: c?.model ?? "", usage: { inputTokens: ev.usage.inputTokens, outputTokens: ev.usage.outputTokens } };
     }
     if (ev.type === "handoff") throw new RouterHandoffError(ev.label);
     if (ev.type === "error") throw new RouterExhaustedError(ev.message, ev.code);
@@ -210,3 +218,27 @@ export async function aiAvailability(req: Request, task: TaskClass): Promise<"se
 
 /** The label of the model that answered this request, for response metadata. */
 export const answeredByLabel = (req: Request): string => (req as Scoped).aiRoute?.answeredBy?.label ?? "router";
+
+/**
+ * The `Completer` app modules receive on the server (src/platform/completion.ts):
+ * runs the call over this request's AI Access connections. Errors are the ones
+ * `sendAiFailure` answers, so a route only needs `catch (err) { sendAiFailure(...) }`.
+ */
+export function requestCompleter(req: Request): Completer {
+  return async (call) => {
+    try {
+      const r = await routedResult(req, {
+        task: toRouterTask(call.taskClass satisfies CompletionTask),
+        systemPrompt: call.systemPrompt,
+        userPrompt: call.userPrompt,
+        temperature: call.temperature,
+        signal: call.signal,
+      });
+      return { text: r.text, provider: r.provider, model: r.model, inputTokensEstimate: r.usage.inputTokens, outputTokensEstimate: r.usage.outputTokens };
+    } catch (err) {
+      if (err instanceof NoAiConnectedError) throw new NoClientAiProviderError();
+      if (err instanceof RouterHandoffError) throw new LocalModelUnreachableError();
+      throw err;
+    }
+  };
+}

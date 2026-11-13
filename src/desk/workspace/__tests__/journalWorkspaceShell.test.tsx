@@ -59,9 +59,8 @@ describe("Journal workspace frame", () => {
     expect(screen.queryByText(/Studio Navigation|5-Mode Studio Switcher/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/^Stage:/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Gates: \d+\/\d+ passed/)).not.toBeInTheDocument();
-    // The model picker no longer shows an unmeasured context-window figure.
+    // The shared model switcher lives in the header; it shows no unmeasured context-window figure.
     fireEvent.click(within(header).getByRole("button", { name: "AI model" }));
-    expect(screen.getByRole("combobox", { name: "Active model" })).toBeInTheDocument();
     expect(screen.queryByText(/Context Window|32k \/ 1M/)).not.toBeInTheDocument();
   });
 

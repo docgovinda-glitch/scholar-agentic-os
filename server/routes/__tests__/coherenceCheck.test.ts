@@ -14,6 +14,7 @@ vi.mock("../../src/middleware/auth.ts", () => ({
 }));
 
 import request from "supertest";
+import { AI_HEADERS, useFetchBackedAi } from "../../test/aiTestKit.ts";
 import { app } from "../../../server.ts";
 import { __resetProjectStoreForTests } from "../../../src/app/conductor/projectStore.ts";
 import { __resetProjectStoreSelectionForTests } from "../../../src/services/store/projectStore.ts";
@@ -30,6 +31,7 @@ const originalFetch = global.fetch;
 const originalMasterKey = process.env.MASTER_KEY;
 
 beforeEach(() => {
+  useFetchBackedAi();
   // P1-6: Reset ALL layers of store caching to prevent cross-test-file
   // interference. Without both resets, the first test file to run wins the
   // module-level singleton and later files may see the wrong backend.
@@ -101,19 +103,18 @@ function passResponse(issues: unknown[]) {
 
 async function startJobWithTwoSections(projectId: string) {
   await request(app).post(`/api/projects/${projectId}/manuscript/start`).send({});
-  await grantConsent(projectId, "openai");
   global.fetch = vi.fn().mockResolvedValue({
     ok: true,
     json: async () => ({ choices: [{ message: { content: JSON.stringify({ text: "Section text.", memory: "m", citedEvidenceIds: [] }) } }] } ),
   } as Response);
-  await request(app).post(`/api/projects/${projectId}/manuscript/next-section`).send({ provider: "openai", apiKey: "sk-test" });
-  await request(app).post(`/api/projects/${projectId}/manuscript/next-section`).send({ provider: "openai", apiKey: "sk-test" });
+  await request(app).post(`/api/projects/${projectId}/manuscript/next-section`).set(AI_HEADERS).send({});
+  await request(app).post(`/api/projects/${projectId}/manuscript/next-section`).set(AI_HEADERS).send({});
 }
 
 describe("POST /api/projects/:id/manuscript/coherence-check", () => {
   it("404s when no job has been started", async () => {
     const projectId = await createProject();
-    const res = await request(app).post(`/api/projects/${projectId}/manuscript/coherence-check`).send({ provider: "openai", apiKey: "sk-test" });
+    const res = await request(app).post(`/api/projects/${projectId}/manuscript/coherence-check`).set(AI_HEADERS).send({});
     expect(res.status).toBe(404);
   });
 
@@ -122,7 +123,7 @@ describe("POST /api/projects/:id/manuscript/coherence-check", () => {
     await request(app).post(`/api/projects/${projectId}/manuscript/start`).send({});
     const res = await request(app)
       .post(`/api/projects/${projectId}/manuscript/coherence-check`)
-      .send({ provider: "openai", apiKey: "sk-test", dimensions: ["not-a-real-dimension"] });
+      .set(AI_HEADERS).send({ dimensions: ["not-a-real-dimension"] });
     expect(res.status).toBe(400);
   });
 
@@ -134,7 +135,7 @@ describe("POST /api/projects/:id/manuscript/coherence-check", () => {
 
     const res = await request(app)
       .post(`/api/projects/${projectId}/manuscript/coherence-check`)
-      .send({ provider: "openai", apiKey: "sk-test" });
+      .set(AI_HEADERS).send({});
 
     expect(res.status).toBe(200);
     expect(res.body.generationJob.coherenceReport.passesRun).toEqual(["terminology", "argument_continuity", "methodology"]);
@@ -151,7 +152,7 @@ describe("POST /api/projects/:id/manuscript/coherence-check", () => {
     global.fetch = vi.fn().mockResolvedValue(passResponse([]));
     const res = await request(app)
       .post(`/api/projects/${projectId}/manuscript/coherence-check`)
-      .send({ provider: "openai", apiKey: "sk-test", dimensions: ["methodology"] });
+      .set(AI_HEADERS).send({ dimensions: ["methodology"] });
 
     expect(res.status).toBe(200);
     expect(res.body.generationJob.coherenceReport.passesRun).toEqual(["methodology"]);

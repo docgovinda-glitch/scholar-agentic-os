@@ -1,11 +1,6 @@
 import dotenv from 'dotenv';
 import crypto from 'crypto';
 import type express from 'express';
-import { defaultPolicy } from "../../src/platform/warden/policy.js";
-import { recordConsent, type EgressPolicy } from "../../src/platform/warden/warden.js";
-import type { TaskClass } from "../../src/platform/warden/types.js";
-import type { CandidateProvider } from "../../src/platform/gateway/types.js";
-import { resolveClientAiConfig, type ClientAiConfig } from "../src/ai/clientAiConfig.ts";
 import { parseAndRepairLLMJson } from "../../src/shared/llmJsonParser.ts";
 import { InvalidLlmChallengeError } from "../src/ai/aiRouteErrors.ts";
 import { chainFor, NoAiConnectedError, routedText, RouterHandoffError, toRouterTask } from "../src/ai/routerBridge.ts";
@@ -96,93 +91,6 @@ export function verifyLlmChallenge(token: string, expectedUserId: string, prompt
   } catch {
     return false;
   }
-}
-
-export function mapTaskType(taskType: string): TaskClass {
-  const valid: TaskClass[] = [
-    "drafting",
-    "refinement",
-    "chat",
-    "summarisation",
-    "verification",
-    "rule_extraction",
-    "discovery",
-    "embedding",
-    "classification",
-  ];
-  return valid.includes(taskType as TaskClass) ? (taskType as TaskClass) : "chat";
-}
-
-export function buildAuthorizedPolicy(candidates: CandidateProvider[]): EgressPolicy {
-  let policy = defaultPolicy();
-  for (const c of candidates) {
-    if (c.apiKey) {
-      policy = recordConsent(policy, c.provider);
-    }
-  }
-  return policy;
-}
-
-export type RequestAiConfig = ClientAiConfig;
-
-/**
- * Resolves client-owned transient AI configuration from request headers.
- * Never persists keys on the server and never falls back to server env keys.
- */
-export function resolveRequestAiConfig(req?: LlmRequestLike): RequestAiConfig {
-  return resolveClientAiConfig(req?.headers);
-}
-
-/**
- * Returns active candidate AI providers strictly from the caller's transient request headers.
- * Platform-paid or server-sponsored AI keys (process.env.GEMINI_API_KEY, etc.) are strictly disallowed.
- */
-export function getCandidates(req?: LlmRequestLike): CandidateProvider[] {
-  if (req) {
-    const config = resolveRequestAiConfig(req);
-    if (config.candidates.length > 0) {
-      return config.candidates;
-    }
-  }
-  return [];
-}
-
-export interface ClientAiPolicy {
-  status: "not_configured" | "active" | "suspended";
-  isServerAiAuthorized: boolean;
-  reason?: string;
-}
-
-export function getClientAiPolicy(req?: LlmRequestLike): ClientAiPolicy {
-  const isExplicitlyDisabled = process.env.ENABLE_SERVER_AI === "false";
-  const candidates = getCandidates(req);
-  const hasCredentials = candidates.length > 0;
-
-  if (isExplicitlyDisabled) {
-    return {
-      status: "suspended",
-      isServerAiAuthorized: false,
-      reason: "Server AI execution is disabled by configuration.",
-    };
-  }
-
-  if (!hasCredentials) {
-    return {
-      status: "not_configured",
-      isServerAiAuthorized: false,
-      reason: "No client-owned BYOK API key or local AI runner header was supplied for this request.",
-    };
-  }
-
-  return {
-    status: "active",
-    isServerAiAuthorized: true,
-  };
-}
-
-export async function isServerAiAuthorized(req: LlmRequestLike): Promise<boolean> {
-  const policy = getClientAiPolicy(req);
-  return policy.isServerAiAuthorized;
 }
 
 export function handleFrontendLLMOverride(

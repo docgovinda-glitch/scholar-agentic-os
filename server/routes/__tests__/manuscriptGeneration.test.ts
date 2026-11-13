@@ -15,6 +15,7 @@ vi.mock("../../src/middleware/auth.ts", () => ({
 }));
 
 import request from "supertest";
+import { AI_HEADERS, useFetchBackedAi } from "../../test/aiTestKit.ts";
 import { app } from "../../../server.ts";
 import { __resetProjectStoreForTests } from "../../../src/app/conductor/projectStore.ts";
 import { __resetSessionPoliciesForTests } from "../../../src/app/studio/sessionPolicyStore.ts";
@@ -29,6 +30,7 @@ const originalFetch = global.fetch;
 const originalMasterKey = process.env.MASTER_KEY;
 
 beforeEach(() => {
+  useFetchBackedAi();
   __resetProjectStoreForTests();
   __resetSessionPoliciesForTests();
   __resetRateLimitStore();
@@ -102,35 +104,20 @@ describe("POST /api/projects/:id/manuscript/next-section — BYOK path", () => {
     const projectId = await createProject();
     const res = await request(app)
       .post(`/api/projects/${projectId}/manuscript/next-section`)
-      .send({ provider: "openai", apiKey: "sk-test" });
+      .set(AI_HEADERS).send({});
     expect(res.status).toBe(404);
   });
 
-  it("428s on first use, drafting being content-bearing, and does not touch the job", async () => {
-    global.fetch = vi.fn();
-    const projectId = await createProject();
-    await request(app).post(`/api/projects/${projectId}/manuscript/start`).send({});
-
-    const res = await request(app)
-      .post(`/api/projects/${projectId}/manuscript/next-section`)
-      .send({ provider: "openai", apiKey: "sk-test" });
-    expect(res.status).toBe(428);
-
-    const job = await request(app).get(`/api/projects/${projectId}/manuscript/job`);
-    expect(job.body.sections).toEqual([]);
-    expect(job.body.state).toBe("running");
-  });
 
   it("generates and checkpoints the first section once consent is granted, and citableEvidence only ever contains 'citable' evidence", async () => {
     const projectId = await createProject();
     await request(app).post(`/api/projects/${projectId}/manuscript/start`).send({});
-    await grantConsent(projectId, "openai");
 
     global.fetch = vi.fn().mockResolvedValue(sectionResponse("The gap in the literature is X.", "Introduces the gap.", []));
 
     const res = await request(app)
       .post(`/api/projects/${projectId}/manuscript/next-section`)
-      .send({ provider: "openai", apiKey: "sk-test" });
+      .set(AI_HEADERS).send({});
 
     expect(res.status).toBe(200);
     expect(res.body.generationJob.sections).toHaveLength(1);
@@ -142,15 +129,14 @@ describe("POST /api/projects/:id/manuscript/next-section — BYOK path", () => {
   it("continues from the checkpoint on the next call rather than regenerating the first section", async () => {
     const projectId = await createProject();
     await request(app).post(`/api/projects/${projectId}/manuscript/start`).send({});
-    await grantConsent(projectId, "openai");
 
     global.fetch = vi.fn().mockResolvedValue(sectionResponse("Intro text.", "Intro memory.", []));
-    await request(app).post(`/api/projects/${projectId}/manuscript/next-section`).send({ provider: "openai", apiKey: "sk-test" });
+    await request(app).post(`/api/projects/${projectId}/manuscript/next-section`).set(AI_HEADERS).send({});
 
     global.fetch = vi.fn().mockResolvedValue(sectionResponse("Methods text.", "Methods memory.", []));
     const second = await request(app)
       .post(`/api/projects/${projectId}/manuscript/next-section`)
-      .send({ provider: "openai", apiKey: "sk-test" });
+      .set(AI_HEADERS).send({});
 
     expect(second.body.generationJob.sections.map((s: { key: string }) => s.key)).toEqual(["introduction", "methods"]);
   });
@@ -174,7 +160,6 @@ describe("POST /api/projects/:id/manuscript/next-section — BYOK path", () => {
       .send({ actor: "u1", strength: "strong", rationale: "Directly supports it." });
 
     await request(app).post(`/api/projects/${projectId}/manuscript/start`).send({});
-    await grantConsent(projectId, "openai");
 
     let capturedPrompt = "";
     global.fetch = vi.fn((_url: RequestInfo | URL, init?: RequestInit) => {
@@ -184,7 +169,7 @@ describe("POST /api/projects/:id/manuscript/next-section — BYOK path", () => {
 
     const res = await request(app)
       .post(`/api/projects/${projectId}/manuscript/next-section`)
-      .send({ provider: "openai", apiKey: "sk-test" });
+      .set(AI_HEADERS).send({});
 
     expect(res.status).toBe(200);
     expect(capturedPrompt).toContain("X was observed in 40% of cases.");
@@ -194,7 +179,6 @@ describe("POST /api/projects/:id/manuscript/next-section — BYOK path", () => {
   it("two overlapping requests for the same project each generate a DIFFERENT section rather than one clobbering the other's checkpoint", async () => {
     const projectId = await createProject();
     await request(app).post(`/api/projects/${projectId}/manuscript/start`).send({});
-    await grantConsent(projectId, "openai");
 
     // A single shared mock, since both concurrent requests hit the same
     // global.fetch — the section's actual TITLE comes from the server-
@@ -204,8 +188,8 @@ describe("POST /api/projects/:id/manuscript/next-section — BYOK path", () => {
     global.fetch = vi.fn().mockResolvedValue(sectionResponse("Section text.", "Section memory.", []));
 
     const [first, second] = await Promise.all([
-      request(app).post(`/api/projects/${projectId}/manuscript/next-section`).send({ provider: "openai", apiKey: "sk-test" }),
-      request(app).post(`/api/projects/${projectId}/manuscript/next-section`).send({ provider: "openai", apiKey: "sk-test" }),
+      request(app).post(`/api/projects/${projectId}/manuscript/next-section`).set(AI_HEADERS).send({}),
+      request(app).post(`/api/projects/${projectId}/manuscript/next-section`).set(AI_HEADERS).send({}),
     ]);
 
     expect(first.status).toBe(200);
@@ -241,10 +225,8 @@ describe("pause / resume", () => {
     const resumed = await request(app).post(`/api/projects/${projectId}/manuscript/resume`).send({});
     expect(resumed.status).toBe(200);
     expect(resumed.body.state).toBe("running");
-
-    await grantConsent(projectId, "openai");
     global.fetch = vi.fn().mockResolvedValue(sectionResponse("Intro text.", "Intro memory.", []));
-    const gen = await request(app).post(`/api/projects/${projectId}/manuscript/next-section`).send({ provider: "openai", apiKey: "sk-test" });
+    const gen = await request(app).post(`/api/projects/${projectId}/manuscript/next-section`).set(AI_HEADERS).send({});
     expect(gen.status).toBe(200);
   });
 });

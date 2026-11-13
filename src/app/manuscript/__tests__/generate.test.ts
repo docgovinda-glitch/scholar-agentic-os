@@ -1,14 +1,13 @@
+import { fetchCompleter } from "../../../test/fetchCompleter";
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { generateSection, GatewayDenied } from "../generate";
+import { generateSection } from "../generate";
 import type { SectionContextPacket } from "../generate";
-import { defaultPolicy, recordConsent } from "../../../platform/warden/warden";
 
 // Drafting is content-bearing (platform/warden/classify.ts's
 // CONTENT_BEARING_TASKS), so it classifies as user_content and requires
 // consent on first use per provider — real Warden behavior, not a test
 // artifact. Every test below except the dedicated consent test grants it
 // up front so the generation pipeline itself is what's under test.
-const CONSENTED_POLICY = recordConsent(defaultPolicy(), "openai");
 
 const originalFetch = global.fetch;
 afterEach(() => {
@@ -32,11 +31,6 @@ const PACKET: SectionContextPacket = {
 };
 
 describe("app/manuscript: generateSection", () => {
-  it("throws without calling the model when no provider/apiKey is supplied", async () => {
-    global.fetch = vi.fn();
-    await expect(generateSection({ packet: PACKET })).rejects.toThrow(/provider and API key/i);
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
 
   it("parses a well-formed response into a GeneratedSection", async () => {
     mockModelResponse({
@@ -45,7 +39,7 @@ describe("app/manuscript: generateSection", () => {
       citedEvidenceIds: ["ev-1"],
     });
 
-    const result = await generateSection({ packet: PACKET, provider: "openai", apiKey: "sk-test", policy: CONSENTED_POLICY });
+    const result = await generateSection({ packet: PACKET, complete: fetchCompleter });
     expect(result.section.key).toBe("introduction");
     expect(result.section.text).toContain("gap remains");
     expect(result.section.memory).toBe("Introduces the gap this paper addresses.");
@@ -61,37 +55,25 @@ describe("app/manuscript: generateSection", () => {
       citedEvidenceIds: ["ev-1", "ev-999"],
     });
 
-    const result = await generateSection({ packet: PACKET, provider: "openai", apiKey: "sk-test", policy: CONSENTED_POLICY });
+    const result = await generateSection({ packet: PACKET, complete: fetchCompleter });
     expect(result.section.citedEvidenceIds).toEqual(["ev-1"]);
   });
 
   it("never falls back to a fabricated section on unparseable output — throws instead", async () => {
     mockModelResponse("Sure! Here's the introduction section...");
-    await expect(generateSection({ packet: PACKET, provider: "openai", apiKey: "sk-test", policy: CONSENTED_POLICY })).rejects.toThrow(/could not be parsed/i);
+    await expect(generateSection({ packet: PACKET, complete: fetchCompleter })).rejects.toThrow(/could not be parsed/i);
   });
 
   it("rejects a response missing memory or citedEvidenceIds as unparseable rather than defaulting them", async () => {
     mockModelResponse({ text: "Some text." });
-    await expect(generateSection({ packet: PACKET, provider: "openai", apiKey: "sk-test", policy: CONSENTED_POLICY })).rejects.toThrow(/could not be parsed/i);
+    await expect(generateSection({ packet: PACKET, complete: fetchCompleter })).rejects.toThrow(/could not be parsed/i);
   });
 
   it("handles an empty prior-section-memory and empty evidence corpus without crashing (the first section, before any evidence is approved)", async () => {
     mockModelResponse({ text: "Opening text with no citations.", memory: "Sets the stage.", citedEvidenceIds: [] });
     const packet: SectionContextPacket = { ...PACKET, priorSectionMemory: [], citableEvidence: [] };
-    const result = await generateSection({ packet, provider: "openai", apiKey: "sk-test", policy: CONSENTED_POLICY });
+    const result = await generateSection({ packet, complete: fetchCompleter });
     expect(result.section.citedEvidenceIds).toEqual([]);
   });
 
-  it("throws GatewayDenied requiring consent on first use of a provider — drafting is content-bearing, never silently sent", async () => {
-    global.fetch = vi.fn();
-    let caught: unknown;
-    try {
-      await generateSection({ packet: PACKET, provider: "openai", apiKey: "sk-test" });
-    } catch (e) {
-      caught = e;
-    }
-    expect(caught).toBeInstanceOf(GatewayDenied);
-    expect((caught as InstanceType<typeof GatewayDenied>).requiresConsent).toBe(true);
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
 });

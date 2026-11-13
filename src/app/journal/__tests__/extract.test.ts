@@ -1,3 +1,4 @@
+import { fetchCompleter } from "../../../test/fetchCompleter";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { extractJournalRequirements } from "../extract";
 
@@ -24,16 +25,11 @@ afterEach(() => {
 });
 
 describe("app/journal: extractJournalRequirements", () => {
-  it("throws without calling the model when no provider/apiKey is supplied", async () => {
-    global.fetch = vi.fn();
-    await expect(extractJournalRequirements({ guidelinesText: LONG_GUIDELINES })).rejects.toThrow(/provider and API key/i);
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
 
   it("throws without calling the model when the guidelines text is too short", async () => {
     global.fetch = vi.fn();
     await expect(
-      extractJournalRequirements({ guidelinesText: "Too short.", provider: "openai", apiKey: "sk-test" })
+      extractJournalRequirements({ guidelinesText: "Too short.", complete: fetchCompleter })
     ).rejects.toThrow(/too little text/i);
     expect(global.fetch).not.toHaveBeenCalled();
   });
@@ -49,7 +45,7 @@ describe("app/journal: extractJournalRequirements", () => {
       unresolvedFields: [],
     });
 
-    const result = await extractJournalRequirements({ guidelinesText: LONG_GUIDELINES, provider: "openai", apiKey: "sk-test" });
+    const result = await extractJournalRequirements({ guidelinesText: LONG_GUIDELINES, complete: fetchCompleter });
 
     expect(result.proposal.journalName).toBe("Journal of Test Studies");
     expect(result.proposal.wordLimit).toEqual({ min: undefined, max: 8000 });
@@ -67,7 +63,7 @@ describe("app/journal: extractJournalRequirements", () => {
         "\n```"
     );
 
-    const result = await extractJournalRequirements({ guidelinesText: LONG_GUIDELINES, provider: "openai", apiKey: "sk-test" });
+    const result = await extractJournalRequirements({ guidelinesText: LONG_GUIDELINES, complete: fetchCompleter });
     expect(result.proposal.journalName).toBe("Fenced Journal");
     expect(result.proposal.unresolvedFields).toEqual(["citationStyle"]);
   });
@@ -75,7 +71,7 @@ describe("app/journal: extractJournalRequirements", () => {
   it("omits a field entirely rather than inventing a value the model left blank", async () => {
     mockModelResponse({ requiredDeclarations: [], unresolvedFields: ["journalName", "citationStyle", "wordLimit"] });
 
-    const result = await extractJournalRequirements({ guidelinesText: LONG_GUIDELINES, provider: "openai", apiKey: "sk-test" });
+    const result = await extractJournalRequirements({ guidelinesText: LONG_GUIDELINES, complete: fetchCompleter });
     expect(result.proposal.journalName).toBeUndefined();
     expect(result.proposal.citationStyle).toBeUndefined();
     expect(result.proposal.wordLimit).toBeUndefined();
@@ -85,14 +81,14 @@ describe("app/journal: extractJournalRequirements", () => {
   it("never falls back to a heuristic/partial proposal on unparseable output — throws instead", async () => {
     mockModelResponse("Sure! Here are the requirements: word limit 8000, APA style.");
     await expect(
-      extractJournalRequirements({ guidelinesText: LONG_GUIDELINES, provider: "openai", apiKey: "sk-test" })
+      extractJournalRequirements({ guidelinesText: LONG_GUIDELINES, complete: fetchCompleter })
     ).rejects.toThrow(/could not be parsed/i);
   });
 
   it("rejects a response missing requiredDeclarations or unresolvedFields as unparseable rather than guessing defaults", async () => {
     mockModelResponse({ journalName: "Incomplete Journal" });
     await expect(
-      extractJournalRequirements({ guidelinesText: LONG_GUIDELINES, provider: "openai", apiKey: "sk-test" })
+      extractJournalRequirements({ guidelinesText: LONG_GUIDELINES, complete: fetchCompleter })
     ).rejects.toThrow(/could not be parsed/i);
   });
 });

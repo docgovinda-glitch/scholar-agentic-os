@@ -187,6 +187,15 @@ export async function* route(req: RouteRequest, chain: Candidate[], signal: Abor
   if (skippedForContext === chain.length) {
     yield { type: "error", code: "context_overflow", message: "The input is too long for every available model. Shorten it or attach fewer sources.", trace };
   } else {
-    yield { type: "error", code: "exhausted", message: lastFailure ? `All models failed. Last error: ${lastFailure.message}` : "No model was available for this request.", trace };
+    const kinds = trace.filter((t) => t.outcome !== "success" && t.outcome !== "skipped").map((t) => t.outcome);
+    const allOutOfQuota = kinds.length > 0 && kinds.every((k) => k === "quota");
+    const message = allOutOfQuota
+      ? chain.length === 1
+        ? `Your ${chain[0].label} has run out of quota or credits. Add another key or provider in AI Access to keep going.`
+        : "Every connected AI has run out of quota or credits. Add another key or provider in AI Access, or try again after your limits reset."
+      : lastFailure
+        ? `All connected AI models failed. Last error: ${lastFailure.message}`
+        : "No connected AI model was available for this request.";
+    yield { type: "error", code: "exhausted", message, trace };
   }
 }

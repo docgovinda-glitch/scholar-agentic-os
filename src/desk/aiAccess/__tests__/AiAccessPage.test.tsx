@@ -17,6 +17,13 @@ const status = {
   creditBalance: null,
 };
 
+// Models come live from the provider (src/desk/ai/modelChoices.ts); the page never names one.
+vi.mock("../../ai/modelChoices", () => ({
+  fetchModelsForKey: vi.fn(async () => ({
+    models: [{ id: "live-model-a", provider: "groq", family: "f", tier: "balanced", version: [1], badges: [] }],
+  })),
+}));
+
 vi.mock("../aiAccessApi", () => ({
   getAiAccessStatus: vi.fn(async () => status),
   addConnection: vi.fn(async () => ({ success: true })),
@@ -188,37 +195,33 @@ describe("Per-provider configuration", () => {
     expect(await screen.findByText("Account required")).toBeInTheDocument();
   });
 
-  it("offers a real model dropdown for a provider, not a free-text field, with Advanced as an opt-in escape hatch", async () => {
+
+
+  it("lists the models the provider reports for the key, with Advanced as an opt-in escape hatch", async () => {
     renderPage();
     fireEvent.click(await screen.findByRole("button", { name: "Providers" }));
     fireEvent.click(await screen.findByText("Groq"));
-
-    const advancedToggle = await screen.findByRole("checkbox", { name: /Advanced: use a custom model ID/i });
-    expect(advancedToggle).not.toBeChecked();
-
-    // The primary control is a real <select>, listing real catalog models —
-    // not an <input> a user has to already know a model id to fill in.
-    const select = screen.getByRole("combobox");
-    const optionValues = Array.from((select as HTMLSelectElement).options).map((o) => o.value);
-    expect(optionValues).toContain("openai/gpt-oss-120b");
-    expect(screen.queryByPlaceholderText(/Exact model id/i)).not.toBeInTheDocument();
-
-    // Checking Advanced swaps in the free-text field, pre-filled with the
-    // select's current value so switching modes never loses the choice.
-    fireEvent.click(advancedToggle);
-    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
-    const customInput = screen.getByPlaceholderText(/Exact model id/i) as HTMLInputElement;
-    expect(customInput.value).toBe("openai/gpt-oss-120b");
-  });
-
-  it("labels a deprecated model in the dropdown rather than presenting it as current", async () => {
-    renderPage();
-    fireEvent.click(await screen.findByRole("button", { name: "Providers" }));
-    fireEvent.click(await screen.findByText("Anthropic Claude"));
+    const key = screen.getByPlaceholderText(/Paste your key/i);
+    fireEvent.change(key, { target: { value: "gsk_test_key" } });
+    fireEvent.blur(key);
 
     const select = (await screen.findByRole("combobox")) as HTMLSelectElement;
-    const deprecatedOption = Array.from(select.options).find((o) => o.value === "claude-opus-4-8");
-    expect(deprecatedOption?.textContent).toMatch(/deprecated/i);
+    expect(Array.from(select.options).map((o) => o.value)).toContain("live-model-a");
+    const advanced = screen.getByRole("checkbox", { name: /Advanced: use a custom model ID/i });
+    expect(advanced).not.toBeChecked();
+    fireEvent.click(advanced);
+    expect((screen.getByPlaceholderText(/Exact model id/i) as HTMLInputElement).value).toBe("live-model-a");
+  });
+
+  it("will not connect without a model", async () => {
+    const api = await import("../aiAccessApi");
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Providers" }));
+    fireEvent.click(await screen.findByText("Groq"));
+    fireEvent.change(screen.getByPlaceholderText(/Paste your key/i), { target: { value: "gsk_test_key" } });
+    fireEvent.click(screen.getByRole("button", { name: /Test and connect/i }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Choose a model/i);
+    expect(api.addConnection).not.toHaveBeenCalled();
   });
 
   it("verifies a key before saving it, and records the connection", async () => {
@@ -228,7 +231,10 @@ describe("Per-provider configuration", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Providers" }));
     fireEvent.click(await screen.findByText("Groq"));
-    fireEvent.change(screen.getByPlaceholderText(/Paste your key/i), { target: { value: "gsk_test_key" } });
+    const keyInput = screen.getByPlaceholderText(/Paste your key/i);
+    fireEvent.change(keyInput, { target: { value: "gsk_test_key" } });
+    fireEvent.blur(keyInput);
+    await screen.findByRole("combobox");
     fireEvent.click(screen.getByRole("button", { name: /Test and connect/i }));
 
     await waitFor(() => expect(api.verifyProviderKey).toHaveBeenCalledWith("groq", "gsk_test_key"));
@@ -248,7 +254,10 @@ describe("Per-provider configuration", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Providers" }));
     fireEvent.click(await screen.findByText("Groq"));
-    fireEvent.change(screen.getByPlaceholderText(/Paste your key/i), { target: { value: "bad" } });
+    const badKey = screen.getByPlaceholderText(/Paste your key/i);
+    fireEvent.change(badKey, { target: { value: "bad" } });
+    fireEvent.blur(badKey);
+    await screen.findByRole("combobox");
     fireEvent.click(screen.getByRole("button", { name: /Test and connect/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/rejected by the provider/i);

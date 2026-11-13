@@ -14,23 +14,18 @@
  * than a lens that had nothing to say.
  */
 
-import { complete, GatewayDenied } from "../../platform/gateway/gateway";
-import type { EgressPolicy } from "../../platform/warden/warden";
+import type { Completer } from "../../platform/completion";
 import { REVIEW_LENSES } from "../../domain/review/types";
 import type { FindingSeverity, LensReview, ReviewFinding, ReviewLens, ReviewRound } from "../../domain/review/types";
 import type { GeneratedSection } from "../../domain/manuscript/types";
 
-export { GatewayDenied } from "../../platform/gateway/gateway";
 
 export interface RunPeerReviewInput {
   sections: GeneratedSection[];
   roundNumber: number;
   journalRequirements?: { journalName: string };
-  provider?: string;
-  apiKey?: string;
-  model?: string;
-  scopeId?: string;
-  policy?: EgressPolicy;
+  /** Runs the model; see src/platform/completion.ts. */
+  complete: Completer;
   /** Defaults to every lens; a caller may re-run just one failed lens. */
   lenses?: ReviewLens[];
 }
@@ -89,9 +84,6 @@ function tryParseLensReview(raw: string): ParsedLensReview | undefined {
 }
 
 async function runLens(lens: ReviewLens, input: RunPeerReviewInput): Promise<LensReview> {
-  if (!input.provider || !input.apiKey) {
-    throw new Error("Peer review requires a model provider and API key.");
-  }
 
   const systemPrompt = [
     "You are an adversarial peer reviewer for an academic journal, reviewing ONE specific dimension of a complete manuscript draft.",
@@ -105,19 +97,13 @@ async function runLens(lens: ReviewLens, input: RunPeerReviewInput): Promise<Len
     .filter(Boolean)
     .join("\n");
 
-  const result = await complete(
+  const result = await input.complete(
     {
-      provider: input.provider,
-      apiKey: input.apiKey,
-      model: input.model,
       taskClass: "verification",
-      scopeId: input.scopeId,
       systemPrompt,
       userPrompt: `Review this manuscript for ${lens.replace("_", " ")} issues.`,
-      segments: input.sections.map((s) => ({ label: s.key, text: `${s.title}\n\n${s.text}` })),
       responseFormat: "json",
-    },
-    input.policy
+    }
   );
 
   const parsed = tryParseLensReview(result.text);
@@ -138,7 +124,6 @@ export async function runPeerReview(input: RunPeerReviewInput): Promise<ReviewRo
       lensReviews.push(await runLens(lens, input));
       lensesRun.push(lens);
     } catch (err) {
-      if (err instanceof GatewayDenied) throw err; // a consent/deny verdict stops the whole round, same discipline as checkCoherence
       lensErrors[lens] = err instanceof Error ? err.message : "Unknown error";
     }
   }

@@ -407,6 +407,7 @@ export default function ProposalWorkspace({
         }
         aiModelLabel="Grant Panel AI"
         onOpenAiAccess={onOpenAiAccess}
+        aiWorkspace="proposal"
         autosaveStatus={saveStatus}
         projectVersion={projectVersion}
         lastSavedTime={lastSavedTime}

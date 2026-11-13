@@ -537,6 +537,7 @@ function AssignmentWorkspaceInner({
         metricLabel="5 stages"
         aiModelLabel="Socratic Tutor AI"
         onOpenAiAccess={onOpenAiAccess}
+        aiWorkspace="coursework"
         autosaveStatus={saveStatus}
         hidePhaseTabs
         projectVersion={project?.version}

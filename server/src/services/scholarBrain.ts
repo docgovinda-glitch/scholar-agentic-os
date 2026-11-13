@@ -14,18 +14,13 @@
  */
 
 import { NoAiConnectedError, routedText, RouterHandoffError, toRouterTask } from "../ai/routerBridge.ts";
-import { completeWithFailover, streamWithFailover } from "../../../src/platform/gateway/gateway.ts";
-import type { CandidateProvider } from "../../../src/platform/gateway/types.ts";
-import { resolveClientAiConfig } from "../ai/clientAiConfig.ts";
 import { BrowserAiRequiredError, LocalModelUnreachableError, NoClientAiProviderError } from "../ai/aiRouteErrors.ts";
 import {
   createChallengeTokenForRequest,
   readVerifiedBrowserResult,
   type LlmRequestLike,
 } from "../../utils/llm.ts";
-import { defaultPolicy } from "../../../src/platform/warden/policy.ts";
-import { recordConsent, type EgressPolicy } from "../../../src/platform/warden/warden.ts";
-import type { TaskClass } from "../../../src/platform/warden/types.ts";
+import type { CompletionTask as TaskClass } from "../../../src/platform/completion.ts";
 import { applyScholarGuardrails } from "../../../src/shared/scholarGuardrails.ts";
 import { parseAndRepairLLMJson } from "../../../src/shared/llmJsonParser.ts";
 import { chunkAndRerankEvidence } from "./semanticRagEngine.ts";
@@ -36,7 +31,6 @@ import { ag25PrivacyGuard } from "../../../src/app/mesh/agents/ag25PrivacyGuard.
 import { ag26WorkflowCoordinator } from "../../../src/app/mesh/agents/ag26WorkflowCoordinator.ts";
 import { issue, revoke } from "../../../src/services/capabilities/capabilities.ts";
 import { initialProjectGateState } from "../../../src/app/conductor/conductor.ts";
-import { getCandidates } from "../../utils/llm.ts";
 import {
   buildScholarlyVoiceSystemPrompt,
   sanitizeScholarlyText,
@@ -68,13 +62,6 @@ import {
 
 export type CitationStyleKey = "apa7" | "harvard" | "ieee" | "chicago" | "mla9" | "vancouver" | "oscola";
 
-export interface ClientAiHeaders {
-  provider?: string;
-  model?: string;
-  apiKey?: string;
-  baseUrl?: string;
-}
-
 export interface ScholarBrainAiRequestLike {
   headers?: Record<string, string | string[] | undefined>;
   body?: unknown;
@@ -85,7 +72,6 @@ export interface ScholarBrainAiRequestLike {
 
 export interface ScholarBrainCompleteOptions {
   req?: ScholarBrainAiRequestLike;
-  headers?: ClientAiHeaders;
   systemPrompt?: string;
   userPrompt: string;
   taskClass?: TaskClass;
@@ -168,23 +154,6 @@ export interface UnifiedCitationScrubResult extends ScrubResult {
   formattedText: string;
   referencesLedger: string;
   hallucinatedCitationsStripped: string[];
-}
-
-/**
- * Extracts transient client-owned AI credentials from incoming headers.
- * Never persists keys and never reads server env AI keys.
- */
-export function extractTransientClientAiConfig(
-  req?: ScholarBrainAiRequestLike,
-  overrides?: ClientAiHeaders
-): {
-  candidates: CandidateProvider[];
-  provider?: string;
-  model?: string;
-  localModelBrowserOnly: boolean;
-} {
-  const { candidates, provider, model, localModelBrowserOnly } = resolveClientAiConfig(req?.headers, overrides);
-  return { candidates, provider, model, localModelBrowserOnly };
 }
 
 /**
@@ -318,15 +287,7 @@ export const scholarBrain = {
       ? `${voicePrompt}\n\n[TASK DIRECTIVES]\n${options.systemPrompt}`
       : voicePrompt;
 
-    // Explicit settings (options.headers) read as the legacy x-ai-* headers.
-    const o = options.headers;
-    const explicit: Record<string, string> = {};
-    if (o?.provider) explicit["x-ai-provider"] = o.provider;
-    if (o?.model) explicit["x-ai-model"] = o.model;
-    if (o?.apiKey) explicit["x-ai-api-key"] = o.apiKey;
-    if (o?.baseUrl) explicit["x-ai-base-url"] = o.baseUrl;
-    const baseReq = options.req ?? {};
-    const req = (Object.keys(explicit).length ? { ...baseReq, headers: { ...(baseReq.headers ?? {}), ...explicit } } : (options.req ?? { headers: {} })) as LlmRequestLike;
+    const req = (options.req ?? { headers: {} }) as LlmRequestLike;
     const browserPayload = () => ({
       challengeToken: createChallengeTokenForRequest(req, fullSystemPrompt, options.userPrompt),
       systemPrompt: fullSystemPrompt,

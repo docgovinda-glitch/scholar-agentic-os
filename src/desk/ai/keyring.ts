@@ -30,6 +30,9 @@ const CLOUD: Record<string, ProviderId> = {
 };
 const LOCAL: Record<string, ProviderId> = { ollama: "ollama", lmstudio: "lmstudio" };
 
+/** The router provider for an AI Access catalog id, if it has one. */
+export const routerProviderFor = (catalogId: string): ProviderId | undefined => CLOUD[catalogId] ?? LOCAL[catalogId];
+
 function cleanModelChoice(rawModel: string): string {
   const stripped = rawModel
     .split(/\s*(?:—|–|\u2014|\u2013|\u00B7)\s*/)[0]

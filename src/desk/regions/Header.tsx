@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { useState } from "react";
 import GlobalSearchModal from "./GlobalSearchModal";
 import UserAccountMenu from "../components/UserAccountMenu";
-import { useAiConfig } from "../../services/useAiConfig";
+import { useActiveAi } from "../ai/useActiveAi";
 
 /**
  * Region A (docs 22 §2).
@@ -38,7 +38,7 @@ export default function Header({
   onRenameProject?: (newTitle: string) => Promise<void> | void;
   userEmail?: string | null;
 }) {
-  const { config: aiConfig } = useAiConfig();
+  const aiConfig = useActiveAi();
   const current = project.gates?.find((g) => g.status !== "signed_off") ?? project.gates?.[project.gates.length - 1];
   const [searchOpen, setSearchOpen] = useState(false);
 

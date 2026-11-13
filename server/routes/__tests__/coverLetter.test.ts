@@ -15,6 +15,7 @@ vi.mock("../../src/middleware/auth.ts", () => ({
 }));
 
 import request from "supertest";
+import { AI_HEADERS, useFetchBackedAi } from "../../test/aiTestKit.ts";
 import { app } from "../../../server.ts";
 import { __resetProjectStoreForTests } from "../../../src/app/conductor/projectStore.ts";
 import { __resetSessionPoliciesForTests } from "../../../src/app/studio/sessionPolicyStore.ts";
@@ -27,6 +28,7 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "sb_secret_test";
 const originalFetch = global.fetch;
 
 beforeEach(() => {
+  useFetchBackedAi();
   __resetProjectStoreForTests();
   __resetSessionPoliciesForTests();
   __resetRateLimitStore();
@@ -65,7 +67,7 @@ function letterResponse(text: string) {
 describe("POST /api/projects/:id/cover-letter", () => {
   it("400s when no document has been submitted yet", async () => {
     const projectId = await createProject();
-    const res = await request(app).post(`/api/projects/${projectId}/cover-letter`).send({ provider: "openai", apiKey: "sk-test" });
+    const res = await request(app).post(`/api/projects/${projectId}/cover-letter`).set(AI_HEADERS).send({});
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/no document/i);
   });
@@ -73,7 +75,7 @@ describe("POST /api/projects/:id/cover-letter", () => {
   it("400s when no journal requirements have been captured yet", async () => {
     const projectId = await createProject();
     await request(app).put(`/api/projects/${projectId}/document`).send({ document: otTenDocument() });
-    const res = await request(app).post(`/api/projects/${projectId}/cover-letter`).send({ provider: "openai", apiKey: "sk-test" });
+    const res = await request(app).post(`/api/projects/${projectId}/cover-letter`).set(AI_HEADERS).send({});
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/journal requirements/i);
   });
@@ -82,10 +84,9 @@ describe("POST /api/projects/:id/cover-letter", () => {
     const projectId = await createProject();
     await request(app).put(`/api/projects/${projectId}/document`).send({ document: otTenDocument() });
     await request(app).put(`/api/projects/${projectId}/journal-requirements`).send({ journalName: "Water Research", citationStyle: "vancouver", requiredDeclarations: [] });
-    await grantConsent(projectId, "openai");
 
     global.fetch = vi.fn().mockResolvedValue(letterResponse("Dear Editor,\n\nWe submit our manuscript for your consideration.\n\nSincerely,"));
-    const res = await request(app).post(`/api/projects/${projectId}/cover-letter`).send({ provider: "openai", apiKey: "sk-test" });
+    const res = await request(app).post(`/api/projects/${projectId}/cover-letter`).set(AI_HEADERS).send({});
 
     expect(res.status).toBe(200);
     expect(res.body.coverLetter.text).toContain("Dear Editor");
@@ -100,13 +101,12 @@ describe("POST /api/projects/:id/cover-letter", () => {
     const projectId = await createProject();
     await request(app).put(`/api/projects/${projectId}/document`).send({ document: otTenDocument() });
     await request(app).put(`/api/projects/${projectId}/journal-requirements`).send({ journalName: "Water Research", citationStyle: "vancouver", requiredDeclarations: [] });
-    await grantConsent(projectId, "openai");
 
     global.fetch = vi.fn().mockResolvedValue(letterResponse("First draft of the letter."));
-    await request(app).post(`/api/projects/${projectId}/cover-letter`).send({ provider: "openai", apiKey: "sk-test" });
+    await request(app).post(`/api/projects/${projectId}/cover-letter`).set(AI_HEADERS).send({});
 
     global.fetch = vi.fn().mockResolvedValue(letterResponse("Second, revised letter."));
-    const res = await request(app).post(`/api/projects/${projectId}/cover-letter`).send({ provider: "openai", apiKey: "sk-test" });
+    const res = await request(app).post(`/api/projects/${projectId}/cover-letter`).set(AI_HEADERS).send({});
     expect(res.body.coverLetter.text).toBe("Second, revised letter.");
   });
 

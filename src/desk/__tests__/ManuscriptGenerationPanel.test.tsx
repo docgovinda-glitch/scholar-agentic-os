@@ -51,7 +51,7 @@ describe("Desk — ManuscriptGenerationPanel", () => {
   it("shows the AI Access Required state with a working Configure button when nothing is connected", async () => {
     const onOpenAiAccess = vi.fn();
     mockFetch((url) => {
-      if (url.endsWith("/api/ai-access/route")) return { status: 200, body: { ok: false, reasoning: "No AI source is connected yet." } };
+      if (url.endsWith("/manuscript/next-section")) return { status: 400, body: { error: "No AI source is connected yet.", code: "ai_provider_required" } };
       if (url.includes("/manuscript/job")) {
         return { status: 200, body: { state: "running", plan: [{ key: "introduction", title: "Introduction", guidance: "g", targetWords: 500 }], sections: [], totalWordTarget: 3000, updatedAt: "now" } };
       }

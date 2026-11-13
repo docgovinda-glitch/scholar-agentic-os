@@ -1,13 +1,11 @@
 import { useState } from "react";
 import { providerAccessFacts, type CloudProviderSpec } from "../../config/providerCatalog";
-import { getDefaultModelId, getModelsForProvider, type ModelSpec } from "../../config/modelCatalog";
 import ModelSelectField from "./ModelSelectField";
-import { bestDiscovered, curatedToSpec } from "./bestModels";
 import type { ConnectionTier, ProviderView } from "./useAiAccess";
-import { discoverProviderModels, getCachedDiscoveredModels, type DiscoveredModel } from "../../services/modelDiscovery";
-import { runProviderDiagnostics, type DiagnosticReport } from "../../services/aiDiagnostics";
+import type { CuratedModel } from "../../platform/router/modelCuration";
+import { fetchModelsForKey } from "../ai/modelChoices";
 import { readProviderKey } from "../../services/userAiSettings";
-import { invalidateClientAiRuntimeConfig } from "../../services/useAiConfig";
+import { verifyProviderKey } from "./aiAccessApi";
 
 /**
  * The configuration surface for ONE cloud provider.
@@ -47,21 +45,18 @@ export default function ProviderDetail({
 }) {
   const facts = providerAccessFacts(spec);
   const tier: ConnectionTier = tierProp ?? view.tier ?? "byok";
-  const models = getModelsForProvider(spec.id, "byok");
   const [apiKey, setApiKey] = useState("");
-  const [model, setModel] = useState(view.selectedModel ?? getDefaultModelId(spec.id));
+  const [model, setModel] = useState(view.selectedModel ?? "");
   const [baseUrl, setBaseUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
   const [makeDefault, setMakeDefault] = useState(!view.connected);
 
-  const [discoveredModels, setDiscoveredModels] = useState<DiscoveredModel[]>(() => getCachedDiscoveredModels(spec.id) || []);
+  const [liveModels, setLiveModels] = useState<CuratedModel[]>([]);
   const [discovering, setDiscovering] = useState(false);
   const [discoveryMsg, setDiscoveryMsg] = useState<string | null>(null);
 
-  const [diagnosticsRunning, setDiagnosticsRunning] = useState(false);
-  const [diagnosticReport, setDiagnosticReport] = useState<DiagnosticReport | null>(null);
 
   const [pingRunning, setPingRunning] = useState(false);
   const [pingResult, setPingResult] = useState<{ ok: boolean; latencyMs?: number; message?: string } | null>(null);
@@ -80,23 +75,13 @@ export default function ProviderDetail({
         });
         return;
       }
-      const report = await runProviderDiagnostics(spec.id, key || "", model, baseUrl.trim() || undefined);
+      const check = await verifyProviderKey(spec.id, key || "", baseUrl.trim() || undefined);
       const latencyMs = Date.now() - start;
-      const isPass = report.overallStatus === "healthy" || report.overallStatus === "degraded";
-      if (isPass) {
-        setPingResult({
-          ok: true,
-          latencyMs,
-          message: `Responsive in ${latencyMs}ms • Model: ${model || "Default"} • Health: ${report.overallStatus}`,
-        });
-      } else {
-        const failStep = report.steps.find((s) => s.status === "fail");
-        setPingResult({
-          ok: false,
-          latencyMs,
-          message: failStep ? `${failStep.name}: ${failStep.details}` : (report.error || "Connection test failed."),
-        });
-      }
+      setPingResult(
+        check.ok
+          ? { ok: true, latencyMs, message: `Key accepted in ${latencyMs}ms${check.modelsDetected ? ` • ${check.modelsDetected} models available` : ""}` }
+          : { ok: false, latencyMs, message: check.error || "Connection test failed." }
+      );
     } catch (e: any) {
       setPingResult({
         ok: false,
@@ -110,46 +95,6 @@ export default function ProviderDetail({
 
   // With a live list, show only the best of it (router curation rules); the
   // full list and a custom id stay one click away.
-  const [showAllModels, setShowAllModels] = useState(false);
-  const best = bestDiscovered(spec.id, discoveredModels);
-  const accessModes: ModelSpec["accessModes"] = ["byok"];
-  const bestSpecs = best.map((m) => curatedToSpec(spec.id, m, accessModes));
-  const showingBest = best.length > 0 && !showAllModels;
-
-  // Combine catalog models with dynamically discovered models
-  const effectiveModels: ModelSpec[] = [...models];
-  for (const dm of discoveredModels) {
-    const mId = dm.modelId || dm.id;
-    const existingIdx = effectiveModels.findIndex((m) => m.modelId === mId);
-    const specEntry: ModelSpec = {
-      id: `${spec.id}:${mId}`,
-      providerId: spec.id,
-      modelId: mId,
-      displayName: `${dm.displayName || mId} (Live Discovered)`,
-      status: "current",
-      accessModes: ["byok"],
-      capabilities: dm.capabilities,
-      contextWindow: dm.contextWindow ?? null,
-      inputModalities: ["text"],
-      outputModalities: ["text"],
-      relativeQuality: "balanced",
-      relativeSpeed: "fast",
-      pricing: null,
-      lastVerified: new Date().toISOString().split("T")[0],
-      verified: true,
-      notes: dm.source === "live_discovery" ? "Discovered live from provider account" : "Discovered metadata",
-    };
-    if (existingIdx >= 0) {
-      effectiveModels[existingIdx] = {
-        ...effectiveModels[existingIdx],
-        ...specEntry,
-        displayName: `${effectiveModels[existingIdx].displayName} (Live Discovered)`,
-      };
-    } else {
-      effectiveModels.unshift(specEntry);
-    }
-  }
-
   async function handleRefreshModels() {
     setDiscovering(true);
     setDiscoveryMsg(null);
@@ -159,12 +104,13 @@ export default function ProviderDetail({
         setDiscoveryMsg("Please enter an API key to discover models for this account.");
         return;
       }
-      const discoResult = await discoverProviderModels(spec.id, key, baseUrl.trim() || undefined, true);
-      if (discoResult.ok && discoResult.models.length > 0) {
-        setDiscoveredModels(discoResult.models);
-        setDiscoveryMsg(`Discovered ${discoResult.models.length} model(s) for your account.`);
+      const found = await fetchModelsForKey(spec.id, key, baseUrl.trim() || undefined);
+      setLiveModels(found.models);
+      if (found.models.length > 0) {
+        setDiscoveryMsg(`${found.models.length} model(s) available on your account.`);
+        if (!model || !found.models.some((m) => m.id === model)) setModel(found.models[0].id);
       } else {
-        setDiscoveryMsg(discoResult.error || "No live models returned from /models. Using catalog fallbacks.");
+        setDiscoveryMsg(found.error || "The provider returned no models. You can type a model id under Advanced.");
       }
     } catch (e: any) {
       setDiscoveryMsg(`Discovery notice: ${e.message}`);
@@ -173,19 +119,7 @@ export default function ProviderDetail({
     }
   }
 
-  async function handleRunDiagnostics() {
-    setDiagnosticsRunning(true);
-    setDiagnosticReport(null);
-    try {
-      const key = apiKey.trim() || (await readProviderKey(spec.id));
-      const report = await runProviderDiagnostics(spec.id, key || "", model, baseUrl.trim() || undefined);
-      setDiagnosticReport(report);
-    } catch (e: any) {
-      setError(`Diagnostics failed: ${e.message}`);
-    } finally {
-      setDiagnosticsRunning(false);
-    }
-  }
+
 
   async function handleConnect() {
     setBusy(true);
@@ -196,12 +130,15 @@ export default function ProviderDetail({
         setError("This provider needs a custom address — see the note under the field.");
         return;
       }
+      if (!model.trim()) {
+        setError("Choose a model first. Press \"Refresh models\" to list what your key can use, or type a model id under Advanced.");
+        return;
+      }
       const outcome = await onConnect({ apiKey: apiKey.trim(), model: model.trim(), baseUrl: baseUrl.trim() || undefined, makeDefault, tier });
       if (!outcome.ok) {
         setError(outcome.error ?? "Could not connect.");
         return;
       }
-      invalidateClientAiRuntimeConfig();
       setApiKey("");
       setResult(
         outcome.modelsDetected != null
@@ -217,17 +154,14 @@ export default function ProviderDetail({
 
   async function handleSaveModel() {
     await onSetModel(model.trim());
-    invalidateClientAiRuntimeConfig();
   }
 
   async function handleMakeDefault() {
     await onMakeDefault();
-    invalidateClientAiRuntimeConfig();
   }
 
   async function handleDisconnect() {
     await onDisconnect();
-    invalidateClientAiRuntimeConfig();
   }
 
   return (
@@ -285,7 +219,7 @@ export default function ProviderDetail({
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
             onBlur={() => {
-              if (apiKey.trim() && discoveredModels.length === 0) {
+              if (apiKey.trim() && liveModels.length === 0) {
                 void handleRefreshModels();
               }
             }}
@@ -318,17 +252,7 @@ export default function ProviderDetail({
         <Step n={3} title="Choose a model">
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-xs text-[color:var(--text-muted)]">
-              {showingBest
-                ? `The ${best.length} best of ${discoveredModels.length} models on your account`
-                : `${effectiveModels.length} models available (${discoveredModels.length} live discovered)`}
-              {best.length > 0 && (
-                <>
-                  {" · "}
-                  <button type="button" onClick={() => setShowAllModels((v) => !v)} className="font-semibold text-[color:var(--accent-solid)] hover:underline">
-                    {showAllModels ? "Show best only" : "Show all"}
-                  </button>
-                </>
-              )}
+              {liveModels.length > 0 ? `${liveModels.length} models, listed by ${spec.name} for your key` : "Models are listed by the provider once your key is entered."}
             </span>
             <button
               type="button"
@@ -336,7 +260,7 @@ export default function ProviderDetail({
               disabled={discovering}
               className="text-xs font-semibold text-[color:var(--accent-solid)] hover:underline disabled:opacity-50 cursor-pointer"
             >
-              {discovering ? "Scanning /models…" : "↻ Discover Models"}
+              {discovering ? "Loading models…" : "↻ Refresh models"}
             </button>
           </div>
           {discoveryMsg && (
@@ -344,18 +268,7 @@ export default function ProviderDetail({
               {discoveryMsg}
             </p>
           )}
-          <ModelSelectField
-            id={`model-${spec.id}`}
-            models={showingBest ? withCurrent(bestSpecs, effectiveModels, model) : effectiveModels}
-            value={model}
-            onChange={setModel}
-          />
-          {showingBest && <BadgeEvidence models={best} selected={model} />}
-          <p className="mt-1 text-xs text-[color:var(--text-muted)]">
-            {effectiveModels.length > 0
-              ? "Live discovered and verified models are prioritized. Advanced allows specifying any model ID."
-              : "No catalogued models for this provider yet — type any model id this provider accepts."}
-          </p>
+          <ModelSelectField id={`model-${spec.id}`} models={liveModels} value={model} onChange={setModel} />
           {view.connected && (
             <button
               type="button"
@@ -387,15 +300,7 @@ export default function ProviderDetail({
               disabled={pingRunning || (!view.connected && !apiKey.trim())}
               className="rounded-[var(--radius-md)] border border-emerald-600/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 px-3 py-2 text-sm font-medium disabled:opacity-50 cursor-pointer flex items-center gap-1.5 transition-colors"
             >
-              <span>{pingRunning ? "Pinging…" : "⚡ Quick Ping Test"}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleRunDiagnostics()}
-              disabled={diagnosticsRunning || (!view.connected && !apiKey.trim())}
-              className="rounded-[var(--radius-md)] border border-[color:var(--border-control)] px-3 py-2 text-sm font-medium text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] disabled:opacity-50 cursor-pointer"
-            >
-              {diagnosticsRunning ? "Running Diagnostics…" : "Run Full Diagnostics"}
+              <span>{pingRunning ? "Testing…" : "Test connection"}</span>
             </button>
           </div>
           {pingResult && (
@@ -421,43 +326,6 @@ export default function ProviderDetail({
         </Step>
       </ol>
 
-      {/* Diagnostics Report */}
-      {diagnosticReport && (
-        <div className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-4 space-y-3 shadow-sm">
-          <div className="flex items-center justify-between border-b border-[color:var(--border-subtle)] pb-2">
-            <div className="flex items-center gap-2">
-              <span className={`w-2.5 h-2.5 rounded-full ${
-                diagnosticReport.overallStatus === "healthy"
-                  ? "bg-emerald-500"
-                  : diagnosticReport.overallStatus === "degraded"
-                  ? "bg-amber-500"
-                  : "bg-rose-500"
-              }`} />
-              <h4 className="text-xs font-bold uppercase tracking-wider text-[color:var(--text-primary)]">
-                AI Diagnostics — {diagnosticReport.overallStatus.toUpperCase()}
-              </h4>
-            </div>
-            <span className="text-[10px] text-[color:var(--text-muted)] font-mono">{diagnosticReport.timestamp}</span>
-          </div>
-          <div className="space-y-1.5">
-            {diagnosticReport.steps.map((step, idx) => (
-              <div key={idx} className="flex items-center justify-between text-xs py-1 border-b border-[color:var(--border-subtle)] last:border-0">
-                <div className="flex items-center gap-2">
-                  <span>
-                    {step.status === "pass" ? "✅" : step.status === "warn" ? "⚠️" : step.status === "fail" ? "❌" : "⏭️"}
-                  </span>
-                  <span className="font-medium text-[color:var(--text-primary)]">{step.name}</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-[color:var(--text-secondary)]">{step.details}</span>
-                  {step.durationMs ? <span className="ml-2 text-[10px] font-mono text-[color:var(--text-muted)]">({step.durationMs}ms)</span> : null}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {error && (
         <p role="alert" className="rounded-[var(--radius-md)] border border-[color:var(--state-danger)] bg-[color:var(--state-danger-subtle)] px-3 py-2 text-sm text-[color:var(--state-danger)]">
           {error}
@@ -480,14 +348,6 @@ export default function ProviderDetail({
               Make default
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => void handleRunDiagnostics()}
-            disabled={diagnosticsRunning}
-            className="rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] px-3 py-1.5 text-xs font-medium text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)]"
-          >
-            {diagnosticsRunning ? "Diagnosing…" : "Run Diagnostics"}
-          </button>
           <button
             type="button"
             onClick={() => void handleDisconnect()}
@@ -544,26 +404,4 @@ export function Chip({ tone, children }: { tone: "good" | "warn" | "neutral"; ch
         ? "border-[color:var(--state-warning)] bg-[color:var(--state-warning-subtle)] text-[color:var(--state-warning)]"
         : "border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]";
   return <span className={`inline-block rounded-full border px-2 py-0.5 text-[11px] font-medium ${cls}`}>{children}</span>;
-}
-
-/** Keeps the saved model visible in the best-only list, so choosing "best" never hides the current choice. */
-function withCurrent(best: ModelSpec[], all: ModelSpec[], current: string): ModelSpec[] {
-  if (!current || best.some((m) => m.modelId === current)) return best;
-  const saved = all.find((m) => m.modelId === current);
-  return saved ? [...best, { ...saved, displayName: `${saved.displayName} (current)` }] : best;
-}
-
-/** Why the selected model carries its badges, in plain words. */
-function BadgeEvidence({ models, selected }: { models: ReturnType<typeof bestDiscovered>; selected: string }) {
-  const m = models.find((x) => x.id === selected);
-  if (!m || m.badges.length === 0) return null;
-  return (
-    <ul className="mt-1 space-y-0.5 text-xs text-[color:var(--text-secondary)]" aria-label="Why this model is recommended">
-      {m.badges.map((b) => (
-        <li key={b.id}>
-          <span className="font-semibold text-[color:var(--text-primary)]">{b.label}:</span> {b.evidence}
-        </li>
-      ))}
-    </ul>
-  );
 }

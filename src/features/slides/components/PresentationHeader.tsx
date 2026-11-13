@@ -1,3 +1,4 @@
+import { AiModelSwitcher } from "../../../desk/ai/AiModelSwitcher";
 import React from 'react';
 import { ArrowLeft, Lightbulb, MessagesSquare, PanelLeftOpen, Play } from 'lucide-react';
 import type { PresentationStudioStep } from '../types/slides';
@@ -152,6 +153,7 @@ export default function PresentationHeader({
             />
           </span>
         )}
+        <AiModelSwitcher workspace="presentation" />
         {onOpenQaSimulator && (
           <button
             type="button"

@@ -211,7 +211,7 @@ export function useAiAccess() {
         provider: input.makeDefault ? input.providerId : settings.provider,
         preferences: {
           ...settings.preferences,
-          [`${input.providerId}Model`]: input.model || settings.preferences[`${input.providerId}Model`] || spec.defaultModel,
+          [`${input.providerId}Model`]: input.model || settings.preferences[`${input.providerId}Model`],
           ...(input.baseUrl ? { [`${input.providerId}BaseUrl`]: input.baseUrl } : {}),
         },
       };

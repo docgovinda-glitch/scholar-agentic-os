@@ -2,9 +2,9 @@ import { getSupabaseClient, isSupabaseConfigured } from "../../services/supabase
 import { buildKeyring, encodeKeyring } from "../ai/keyring";
 import { inspectAiResponse } from "../ai/aiRouteNotices";
 import { liveAiStatus } from "../ai/liveAiStatus";
-import { type RoutingTaskType, routeDecision } from "../aiAccess/aiAccessApi";
-import { completeWithFailover, streamWithFailover } from "../../platform/gateway/gateway";
-import { defaultPolicy, recordConsent } from "../../platform/warden/warden";
+import { runAiText } from "../ai/aiRun";
+import type { TaskClass } from "../../platform/router/types";
+import type { RoutingTaskType } from "../aiAccess/aiAccessApi";
 import type { ProjectView } from "../types";
 import { readProviderKey, providersWithStoredKey } from "../../services/userAiSettings";
 import { originalFetch } from "../originalFetch";
@@ -18,12 +18,6 @@ import {
   getMigratedDraftRealId,
   recoverDraftProject,
 } from "../ephemeralProjectStore";
-import { getClientAiRuntimeConfig } from "../../services/useAiConfig";
-import { resolveClientCandidates } from "../../services/clientRouter";
-import type { CandidateProvider } from "../../platform/gateway/types";
-import { getCloudProvider } from "../../config/providerCatalog";
-import { startExecutionScope, updateExecutionScope, endExecutionScope } from "../../services/executionState";
-import type { FailoverEvent } from "../../services/providerFailover";
 import { applyScholarGuardrails } from "../../shared/scholarGuardrails";
 import { parseAndRepairLLMJson } from "../../shared/llmJsonParser";
 
@@ -128,7 +122,8 @@ export async function authHeaders(): Promise<Record<string, string>> {
 export const AI_ROUTE_PATTERNS: RegExp[] = [
   /^\/api\/ai(\/|$)/,
   /^\/api\/drafting(\/|$)/,
-  /^\/api\/projects\/[^/]+\/(agent|agentic|assignment|thesis|proposal|presentation)(\/|$)/,
+  /^\/api\/projects\/[^/]+\/(agent|agentic|assignment|thesis|proposal|presentation|manuscript|journal-requirements|cover-letter|anonymization)(\/|$)/,
+  /^\/api\/studio\/refine(\/|$)/,
 ];
 
 export function routeUsesClientAi(input: string): boolean {
@@ -179,20 +174,9 @@ export async function authedFetch(input: string, init: RequestInit = {}): Promis
     }
   }
 
-  // The user's own AI key goes only to routes that run AI on the server for
+  // The user's AI connections go only to routes that run AI on the server for
   // this request (see AI_ROUTE_PATTERNS), never with every API call.
-  const aiConfig = routeUsesClientAi(input) ? await getClientAiRuntimeConfig().catch(() => null) : null;
   const transientAiHeaders: Record<string, string> = {};
-  if (aiConfig && aiConfig.isConfigured) {
-    const cleanProvider = sanitizeHttpHeaderValue(aiConfig.provider);
-    const cleanModel = sanitizeHttpHeaderValue(aiConfig.modelId?.split(/\s*(?:—|–|\u2014|\u2013)\s*/)[0]);
-    const cleanKey = sanitizeHttpHeaderValue(aiConfig.apiKey);
-    const cleanBase = sanitizeHttpHeaderValue(aiConfig.baseUrl);
-    if (cleanProvider) transientAiHeaders["x-ai-provider"] = cleanProvider;
-    if (cleanModel) transientAiHeaders["x-ai-model"] = cleanModel;
-    if (cleanKey) transientAiHeaders["x-ai-api-key"] = cleanKey;
-    if (cleanBase) transientAiHeaders["x-ai-base-url"] = cleanBase;
-  }
   // Every AI connection on this device, in order, so the server can switch to
   // the next one visibly when a provider fails.
   if (routeUsesClientAi(input)) {
@@ -293,11 +277,7 @@ async function streamFetch(
             fullContent += chunk;
             onEvent("chunk", { token: chunk });
           },
-          (failoverEvt) => {
-            if (failoverEvt.userMessage) {
-              onEvent("log", { message: `⚠️ ${failoverEvt.userMessage}` });
-            }
-          }
+          signal
         );
         const textResult = typeof finalResult === "string" ? finalResult : JSON.stringify(finalResult);
         const parsed = parseAndRepairLLMJson<unknown>(textResult);
@@ -443,191 +423,34 @@ async function streamFetch(
   }
 }
 
-let activeManualModelOverride: { providerId: string; modelId?: string } | null = null;
-
-export function setGlobalManualModelOverride(override: { providerId: string; modelId?: string } | null) {
-  activeManualModelOverride = override;
-}
-
-function routingTaskTypeToTaskClass(taskType: RoutingTaskType): "drafting" | "refinement" | "chat" | "summarisation" | "verification" | "rule_extraction" | "discovery" | "embedding" | "classification" {
-  switch (taskType) {
-    case "simple":       return "chat";
-    case "reasoning":    return "verification";
-    case "coding":       return "drafting";
-    case "long-context": return "summarisation";
-    case "multimodal":   return "drafting";
-    default:             return "chat";
-  }
-}
-
+/**
+ * Runs one prompt in the browser over the user's AI Access connections
+ * (key rotation, fallback and local-model hand-off included) and returns the
+ * text. Used for the 426 hand-off and for features that stream into the page.
+ */
 export async function executeAgenticLLM(
   systemPrompt: string,
   userPrompt: string,
   taskType: RoutingTaskType = "reasoning",
   onChunk?: (chunk: string) => void,
-  onFailoverEvent?: (event: FailoverEvent) => void
-) {
-  // Searching is done by the conversations that need it (Ask Scholar and the
-  // workspace chats ground every answer). Structured tasks (outlines, JSON,
-  // drafts) get exactly the prompt they were given.
-  const effectiveSystemPrompt = systemPrompt;
-
-  // 1. Resolve candidates client-side first using policy-driven client router
-  const clientDecision = await resolveClientCandidates(taskType, {
-    manualOverride: activeManualModelOverride,
-  }).catch(() => null);
-
-  let candidates: CandidateProvider[] = [];
-
-  if (clientDecision && clientDecision.ok && clientDecision.allCandidates.length > 0) {
-    candidates = clientDecision.allCandidates.map((c) => ({
-      provider: c.provider,
-      model: c.model,
-      apiKey: c.apiKey,
-    }));
-  } else {
-    // Fallback: check server preview if client resolution had 0 candidates
-    const decision = await routeDecision(taskType).catch(() => null);
-    if (decision && decision.ok) {
-      const choices = [decision.choice, ...decision.fallbacks];
-      for (const c of choices) {
-        if (c.tier === "byok") {
-          const key = await readProviderKey(c.providerId);
-          if (key) candidates.push({ provider: c.providerId, model: c.modelId, apiKey: key });
-        } else if (c.tier === "local") {
-          candidates.push({ provider: c.providerId, model: c.modelId, apiKey: "local-no-credential-required" });
-        }
-      }
-    }
-  }
-
-  if (activeManualModelOverride) {
-    const key = await readProviderKey(activeManualModelOverride.providerId);
-    if (key && !candidates.some((c) => c.provider === activeManualModelOverride!.providerId)) {
-      candidates.unshift({
-        provider: activeManualModelOverride.providerId,
-        model: activeManualModelOverride.modelId,
-        apiKey: key,
-      });
-    }
-  }
-
-  if (candidates.length === 0) {
-    throw new Error(
-      clientDecision?.reasoning ||
-      "No active AI credentials or local runners are configured on this device. Please connect an API key or local runner in AI Access."
-    );
-  }
-
-  const taskClass = routingTaskTypeToTaskClass(taskType);
-  const executionId = `exec-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  const initialCandidate = candidates[0];
-  const initialSpec = getCloudProvider(initialCandidate.provider);
-  startExecutionScope(
-    executionId,
-    initialCandidate.provider,
-    initialSpec?.name || initialCandidate.provider,
-    initialCandidate.model
-  );
-
-  const handleFailoverEvent = (event: FailoverEvent) => {
-    if (event.type === "switch") {
-      const rawId = event.providerId || "";
-      const [provId, modId] = rawId.split("::");
-      const nextCandidate = candidates.find(
-        (c) =>
-          c.provider === rawId ||
-          c.provider === provId ||
-          `${c.provider}::${c.model || "default"}` === `${provId}::${modId}`
-      );
-      const targetProvider = nextCandidate?.provider || provId || rawId;
-      const targetModel = nextCandidate?.model || (modId && modId !== "default" ? modId : undefined);
-      const spec = getCloudProvider(targetProvider);
-      updateExecutionScope(executionId, {
-        providerId: targetProvider,
-        activeProvider: targetProvider,
-        providerName: spec?.name || targetProvider,
-        modelId: targetModel,
-        activeModel: targetModel,
-        isFallback: true,
-        status: "fallback",
-        message: event.userMessage,
-      });
-    } else if (event.type === "success") {
-      updateExecutionScope(executionId, {
-        status: "executing",
-        message: event.userMessage,
-      });
-    }
-    onFailoverEvent?.(event);
-  };
-
-  // Use completeWithFailover from the gateway
-  const req = {
-    systemPrompt: effectiveSystemPrompt,
-    userPrompt,
-    taskClass,
-    local: candidates[0].apiKey === "local-no-credential-required",
-    caching: taskType === "long-context",
-    segments: [],
-  };
-
-  // Consent is inherent to user-configured BYOK providers
-  let policy = defaultPolicy();
-  for (const c of candidates) {
-    if (c.apiKey) {
-      policy = recordConsent(policy, c.provider);
-    }
-  }
-
+  signal?: AbortSignal
+): Promise<string> {
+  const task: TaskClass = taskType === "long-context" ? "long-context" : taskType === "simple" ? "fast" : taskType === "coding" ? "coding" : "reasoning";
+  const run = liveAiStatus.begin();
+  let text: string;
   try {
-    if (onChunk) {
-      let full = "";
-      const result = await streamWithFailover(
-        req,
-        (chunk) => {
-          full += chunk;
-          onChunk(chunk);
-        },
-        {
-          candidates,
-          onEvent: handleFailoverEvent,
-          operationId: executionId,
-          stageId: taskType,
-        },
-        policy
-      );
-      if (!result.ok) {
-        const errMsg = (result as { error?: { message?: string } }).error?.message || "AI generation is temporarily unavailable.";
-        endExecutionScope(executionId, "error", errMsg);
-        throw new Error(errMsg);
+    text = await runAiText(
+      { task, messages: [...(systemPrompt ? [{ role: "system" as const, content: systemPrompt }] : []), { role: "user" as const, content: userPrompt }] },
+      signal ?? run.signal,
+      (ev) => {
+        run.publish(ev);
+        if (ev.type === "token") onChunk?.(ev.text);
       }
-      endExecutionScope(executionId, "success");
-      const guarded = applyScholarGuardrails(full);
-      return guarded.text;
-    } else {
-      const result = await completeWithFailover(
-        req,
-        {
-          candidates,
-          onEvent: handleFailoverEvent,
-          operationId: executionId,
-          stageId: taskType,
-        },
-        policy
-      );
-      if (!result.ok) {
-        const errMsg = (result as { error?: { message?: string } }).error?.message || "AI generation is temporarily unavailable.";
-        endExecutionScope(executionId, "error", errMsg);
-        throw new Error(errMsg);
-      }
-      endExecutionScope(executionId, "success");
-      const rawText = typeof result.value === "string" ? result.value : result.value.text;
-      const guarded = applyScholarGuardrails(rawText);
-      return guarded.text;
-    }
+    );
   } catch (err) {
-    endExecutionScope(executionId, "error", (err as Error).message);
+    run.end(err);
     throw err;
   }
+  run.end();
+  return applyScholarGuardrails(text).text;
 }

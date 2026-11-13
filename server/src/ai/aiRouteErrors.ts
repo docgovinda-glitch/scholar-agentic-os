@@ -93,6 +93,11 @@ export function sendAiFailure(res: Response, err: unknown, feature: string): voi
     res.status(400).json({ error: AI_PROVIDER_REQUIRED_MESSAGE, code: "ai_provider_required" });
     return;
   }
+  if (err instanceof Error && err.name === "RouterExhaustedError") {
+    const code = (err as Error & { code?: string }).code;
+    res.status(code === "context_overflow" ? 413 : 502).json({ error: err.message, code: code === "context_overflow" ? "ai_context_overflow" : "ai_unavailable" });
+    return;
+  }
   console.warn(`[${feature}] AI request failed:`, err instanceof Error ? err.message : err);
   res.status(502).json({
     error: `${feature} could not be generated: the AI provider failed or returned an unusable answer. Nothing was produced. Try again.`,

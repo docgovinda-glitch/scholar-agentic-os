@@ -9,7 +9,6 @@ import {
 import { checkLocalRuntimeConnectivity } from "../../services/localRuntimeConnectivity";
 import { Chip } from "./ProviderDetail";
 import type { ProviderView } from "./useAiAccess";
-import { invalidateClientAiRuntimeConfig } from "../../services/useAiConfig";
 
 /**
  * The configuration and diagnostics surface for ONE local runner (Ollama, LM Studio, etc.).
@@ -130,7 +129,6 @@ export default function LocalRunnerDetail({
         setProbeError(outcome.error ?? "Could not save this runner.");
         return;
       }
-      invalidateClientAiRuntimeConfig();
       setSaved("Saved. Scholar can now use this runner.");
     } finally {
       setSaving(false);
@@ -139,17 +137,14 @@ export default function LocalRunnerDetail({
 
   async function handleSaveModel() {
     await onSetModel(model.trim());
-    invalidateClientAiRuntimeConfig();
   }
 
   async function handleMakeDefault() {
     await onMakeDefault();
-    invalidateClientAiRuntimeConfig();
   }
 
   async function handleDisconnect() {
     await onDisconnect();
-    invalidateClientAiRuntimeConfig();
   }
 
   function handleCopyCommand(cmd: string) {

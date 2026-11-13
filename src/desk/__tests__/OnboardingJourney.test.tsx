@@ -79,6 +79,12 @@ vi.mock("../../services/supabaseClient", () => ({
 const verifyProviderKey = vi.fn();
 const addConnection = vi.fn();
 const removeConnection = vi.fn();
+// Models come live from the provider; the journey only needs one to pick.
+vi.mock("../ai/modelChoices", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../ai/modelChoices")>()),
+  fetchModelsForKey: vi.fn(async () => ({ models: [{ id: "live-model-a", provider: "groq", family: "f", tier: "balanced", version: [1], badges: [] }] })),
+}));
+
 const getAiAccessStatus = vi.fn();
 vi.mock("../aiAccess/aiAccessApi", () => ({
   verifyProviderKey: (...args: unknown[]) => verifyProviderKey(...args),
@@ -217,7 +223,10 @@ describe("the canonical first-login journey", () => {
     // covers in isolation — then advance via the onboarding header's Continue.
     fireEvent.click(await screen.findByRole("button", { name: "Providers" }));
     fireEvent.click(await screen.findByText("Groq"));
-    fireEvent.change(await screen.findByPlaceholderText(/Paste your key/i), { target: { value: "sk-my-secret" } });
+    const keyInput = await screen.findByPlaceholderText(/Paste your key/i);
+    fireEvent.change(keyInput, { target: { value: "sk-my-secret" } });
+    fireEvent.blur(keyInput);
+    await screen.findByRole("combobox");
     fireEvent.click(screen.getByRole("button", { name: /Test and connect/i }));
     await waitFor(() => expect(addConnection).toHaveBeenCalledWith("groq", "byok", 3));
 

@@ -15,19 +15,14 @@
  * "no user approval, no citation"-style gate the spec applies to evidence.
  */
 
-import { complete, GatewayDenied } from "../../platform/gateway/gateway";
-import type { EgressPolicy } from "../../platform/warden/warden";
+import type { Completer } from "../../platform/completion";
 import { countWords, MIN_GUIDELINES_WORDS, type JournalRequirementsProposal } from "../../domain/journal/types";
 
-export { GatewayDenied } from "../../platform/gateway/gateway";
 
 export interface ExtractJournalRequirementsInput {
   guidelinesText: string;
-  provider?: string;
-  apiKey?: string;
-  model?: string;
-  scopeId?: string;
-  policy?: EgressPolicy;
+  /** Runs the model; see src/platform/completion.ts. */
+  complete: Completer;
 }
 
 export interface JournalExtractionUsage {
@@ -98,31 +93,19 @@ export function tryParseProposal(raw: string): JournalRequirementsProposal | und
 export async function extractJournalRequirements(
   input: ExtractJournalRequirementsInput
 ): Promise<ExtractJournalRequirementsResult> {
-  if (!input.provider || !input.apiKey) {
-    throw new Error("Journal requirements extraction requires a model provider and API key.");
-  }
   if (countWords(input.guidelinesText) < MIN_GUIDELINES_WORDS) {
     throw new Error(
       `Paste at least ${MIN_GUIDELINES_WORDS} words of the journal's own author guidelines — too little text to extract from reliably.`
     );
   }
 
-  const result = await complete(
+  const result = await input.complete(
     {
-      provider: input.provider,
-      apiKey: input.apiKey,
-      model: input.model,
       taskClass: "rule_extraction",
-      scopeId: input.scopeId,
       systemPrompt: journalExtractionPrompt(),
       userPrompt: input.guidelinesText,
-      // Labelled "guideline" so the Warden's classifier (platform/warden/
-      // classify.ts) treats this as public source material, not user_content
-      // — it's the journal's own published guidelines, not the user's prose.
-      segments: [{ label: "Journal author guidelines (pasted by user)", text: input.guidelinesText }],
       responseFormat: "json",
-    },
-    input.policy
+    }
   );
 
   const proposal = tryParseProposal(result.text);

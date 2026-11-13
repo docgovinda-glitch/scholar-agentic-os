@@ -16,7 +16,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type express from "express";
 import { z } from "zod";
 import { requireAuth } from "../src/middleware/auth.ts";
-import { serverCanReachLocalModels } from "../src/ai/clientAiConfig.ts";
+import { serverCanReachLocalModels } from "../src/ai/serverLocalAccess.ts";
 import { route, type RouterOptions } from "../../src/platform/router/router.ts";
 import { pipeToSse } from "../../src/platform/router/sseBridge.ts";
 import { CircuitBreaker, MemoryBreakerStore } from "../../src/platform/router/circuitBreaker.ts";

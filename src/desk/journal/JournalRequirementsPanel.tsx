@@ -1,14 +1,10 @@
 import { useEffect, useState } from "react";
 import {
-  StudioConsentRequiredError,
-  StudioDeniedError,
   StudioNoAiSourceError,
   extractJournalRequirements,
   getJournalRequirements,
   saveJournalRequirements,
 } from "../api";
-import { routeDecision } from "../aiAccess/aiAccessApi";
-import { readProviderKey } from "../../services/userAiSettings";
 import type { JournalRequirements, JournalRequirementsProposal, ProjectView } from "../types";
 
 /**
@@ -87,42 +83,10 @@ function toPayload(form: FormState, source: JournalRequirements["source"]) {
   };
 }
 
-/**
- * Walks the Scholar AI Engine's routing decision for this task exactly like
- * src/desk/regions/StudioPanel.tsx's Auto mode does — try each candidate in
- * order, falling through on failure, stopping immediately on a consent/deny
- * verdict since that's a privacy answer, not "this provider is down". The
- * "local" tier is skipped: extraction has no local-execution pipeline the
- * way Studio's refine() does, so a local candidate here would just fail;
- * skipping it moves straight to the next real candidate instead.
- */
+/** The server runs the extraction over the user's AI Access connections, rotating keys and falling back itself. */
 async function runExtraction(projectId: string, guidelinesText: string): Promise<JournalRequirementsProposal> {
-  const decision = await routeDecision("reasoning");
-  if (!decision.ok) {
-    throw new StudioNoAiSourceError(decision.reasoning);
-  }
-
-  const candidates = [decision.choice, ...decision.fallbacks];
-  let lastError: Error = new StudioNoAiSourceError("No AI source is currently available.");
-
-  for (const choice of candidates) {
-    if (choice.tier === "local") continue;
-    try {
-      const apiKey = await readProviderKey(choice.providerId);
-      if (!apiKey) {
-        lastError = new StudioNoAiSourceError(
-          `${choice.providerId} is connected but its key isn't stored on this device. Open AI Access to reconnect it.`
-        );
-        continue;
-      }
-      const { proposal } = await extractJournalRequirements({ projectId, guidelinesText, provider: choice.providerId, apiKey, model: choice.modelId });
-      return proposal;
-    } catch (e) {
-      if (e instanceof StudioConsentRequiredError || e instanceof StudioDeniedError) throw e;
-      lastError = e as Error;
-    }
-  }
-  throw lastError;
+  const { proposal } = await extractJournalRequirements({ projectId, guidelinesText });
+  return proposal;
 }
 
 export default function JournalRequirementsPanel({

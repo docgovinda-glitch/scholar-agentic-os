@@ -1,6 +1,7 @@
 import express, { Request, Response } from "express";
 import { requireAuth } from "../src/middleware/auth.ts";
-import { getClientAiPolicy, readVerifiedBrowserResult, resolveRequestAiConfig, signLlmChallenge, computePromptHash } from "../utils/llm.ts";
+import { readVerifiedBrowserResult, signLlmChallenge, computePromptHash } from "../utils/llm.ts";
+import { keyringFromRequest } from "../src/ai/routerBridge.ts";
 import { InvalidLlmChallengeError, LocalModelUnreachableError, NoClientAiProviderError, sendAiFailure } from "../src/ai/aiRouteErrors.ts";
 import { aiAvailability, answeredByLabel, routedCompletion } from "../src/ai/routerBridge.ts";
 import type { ResearchLlm } from "../src/research/deepResearchEngine.ts";
@@ -305,27 +306,16 @@ export function registerAIRoutes(
    */
   router.get("/status", async (req: Request, res: Response) => {
     try {
-      const aiConfig = resolveRequestAiConfig(req);
-      const candidates = aiConfig.candidates;
-      const policy = getClientAiPolicy(req);
-      const operational = candidates.length > 0 && policy.status === "active";
+      const ring = keyringFromRequest(req);
+      const operational = ring.length > 0;
+      const isLocal = (provider: string) => provider === "ollama" || provider === "lmstudio";
 
-      const providers = candidates.map((c) => ({
-        id: c.provider,
-        name:
-          c.provider === "gemini"
-            ? "Google Gemini"
-            : c.provider === "openrouter"
-            ? "OpenRouter"
-            : c.provider === "anthropic" || c.provider === "claude"
-            ? "Anthropic Claude"
-            : c.provider,
-        model: c.model || aiConfig.model || "dynamic",
-        tier: "byok",
-        capabilities:
-          c.provider === "gemini"
-            ? ["text", "vision", "reasoning", "multimodal"]
-            : ["text", "reasoning"],
+      const providers = ring.map((e) => ({
+        id: e.provider,
+        name: e.label ?? e.provider,
+        model: e.model,
+        tier: isLocal(e.provider) ? "local" : "byok",
+        capabilities: e.provider === "google" ? ["text", "vision", "reasoning", "multimodal"] : ["text", "reasoning"],
         status: "active",
       }));
 
@@ -338,11 +328,11 @@ export function registerAIRoutes(
         configured: operational,
         serverSponsoredAi: false,
         providers,
-        activeRoute: candidates[0]?.provider || null,
-        activeModel: aiConfig.model || null,
+        activeRoute: ring[0]?.provider || null,
+        activeModel: ring[0]?.model || null,
         capabilities: {
           text: operational,
-          vision: operational && candidates.some((c) => c.provider === "gemini" || c.provider === "openrouter"),
+          vision: operational && ring.some((e) => e.provider === "google" || e.provider === "openai" || e.provider === "anthropic"),
           document: true,
           webSearch: true,
           deepResearch: operational,

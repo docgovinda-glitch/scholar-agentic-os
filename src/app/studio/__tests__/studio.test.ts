@@ -1,5 +1,6 @@
+import { fetchCompleter } from "../../../test/fetchCompleter";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { refine, GatewayDenied } from "../studio";
+import { refine } from "../studio";
 import { MIN_VOICE_PROFILE_WORDS } from "../../../domain/language/types";
 import { buildVoiceProfile } from "../../../domain/language/voiceProfile";
 
@@ -15,16 +16,6 @@ function mockStructuredResponse(revised: string, changes: { original: string; re
 }
 
 describe("app/studio: Level 1 (Proofread) — fully deterministic, no network", () => {
-  it("runs with no provider/apiKey at all and makes no outbound call", async () => {
-    global.fetch = vi.fn();
-    const result = await refine({
-      passageId: "p1",
-      level: "proofread",
-      text: "The results was  significant.",
-    });
-    expect(global.fetch).not.toHaveBeenCalled();
-    expect(result.diff.changes.length).toBeGreaterThan(0);
-  });
 
   it("protects quoted text from correction even when it contains an error", async () => {
     const text = 'The paper states, "the datas was significant" in its abstract.';
@@ -40,33 +31,16 @@ describe("app/studio: Level 1 (Proofread) — fully deterministic, no network", 
   });
 });
 
-describe("app/studio: model-backed levels (2–5) go through the Warden", () => {
+describe("app/studio: model-backed levels (2–5) run on the connected AI", () => {
   afterEach(() => {
     global.fetch = originalFetch;
   });
 
-  it("throws GatewayDenied requiring consent on first use, and calls no provider", async () => {
-    global.fetch = vi.fn();
-    let caught: unknown;
-    try {
-      await refine({
-        passageId: "p3",
-        level: "clarity",
-        text: "This shows that it is quite important.",
-        provider: "openai",
-        apiKey: "sk-test",
-      });
-    } catch (e) {
-      caught = e;
-    }
-    expect(caught).toBeInstanceOf(GatewayDenied);
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
 
-  it("requires provider and apiKey for any level above proofread", async () => {
+  it("requires an AI connection for any level above proofread", async () => {
     await expect(
       refine({ passageId: "p4", level: "clarity", text: "Some text." })
-    ).rejects.toThrow(/requires a model provider/);
+    ).rejects.toThrow(/needs an AI connection/);
   });
 });
 
@@ -75,60 +49,18 @@ describe("app/studio: meaning verification separates content from language chang
     global.fetch = originalFetch;
   });
 
-  it("requires consent on first use of a provider for a model-backed level", async () => {
-    global.fetch = vi.fn();
-    await expect(
-      refine({
-        passageId: "p5a",
-        level: "clarity",
-        text: "the results suggest a relationship",
-        provider: "openai",
-        apiKey: "sk-test",
-      })
-    ).rejects.toBeInstanceOf(GatewayDenied);
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
 
-  it("once consent is recorded on the session policy, surfaces a claim-strength change as category 'content' with a meaningNote, ahead of language changes", async () => {
-    mockStructuredResponse("the results demonstrate a clear pattern in the outcomes.", [
-      { original: "suggest", replacement: "demonstrate", reason: "Stronger verb." },
-      { original: "a relationship", replacement: "a clear pattern in the outcomes", reason: "More specific." },
-    ]);
-
-    const { recordConsent, defaultPolicy } = await import("../../../platform/warden/warden");
-    const policy = recordConsent(defaultPolicy(), "openai");
-
-    const result = await refine({
-      passageId: "p5",
-      level: "clarity",
-      text: "the results suggest a relationship",
-      provider: "openai",
-      apiKey: "sk-test",
-      policy,
-    });
-
-    expect(result.contentChangeCount).toBeGreaterThan(0);
-    const contentChange = result.diff.changes.find((c) => c.category === "content");
-    expect(contentChange).toBeDefined();
-    expect(contentChange!.meaningNote).toContain("strengthens");
-    // content changes sort first
-    expect(result.diff.changes[0].category).toBe("content");
-  });
 
   it("a purely stylistic structured response produces only language-category changes", async () => {
     mockStructuredResponse("The cohort comprised 240 participants.", [
       { original: "sample", replacement: "cohort", reason: "Avoids repetition later in the paragraph." },
     ]);
-    const { recordConsent, defaultPolicy } = await import("../../../platform/warden/warden");
-    const policy = recordConsent(defaultPolicy(), "openai");
 
     const result = await refine({
       passageId: "p5b",
       level: "clarity",
       text: "The sample comprised 240 participants.",
-      provider: "openai",
-      apiKey: "sk-test",
-      policy,
+      complete: fetchCompleter,
     });
     expect(result.contentChangeCount).toBe(0);
     expect(result.languageChangeCount).toBe(1);

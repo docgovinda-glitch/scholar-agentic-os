@@ -1,6 +1,6 @@
 import type { InterventionLevel, L1Profile, RefinementDiff, VoiceProfile } from "../../domain/language/types";
 import type { VoiceDriftReport } from "../../domain/language/voiceProfile";
-import type { EgressPolicy } from "../../platform/warden/warden";
+import type { Completer } from "../../platform/completion";
 
 export interface StudioRefineInput {
   passageId: string;
@@ -9,19 +9,11 @@ export interface StudioRefineInput {
   discipline?: string;
   l1?: L1Profile;
   voiceProfile?: VoiceProfile;
-  /** Which provider serves model-backed levels (2–5). Ignored for "proofread". */
-  provider?: string;
-  apiKey?: string;
-  /** Which of the provider's models to use — passed through to the Gateway; the adapter's own default applies when omitted. */
-  model?: string;
-  scopeId?: string;
-  /** Session-scoped egress policy (carries prior provider consent). Defaults to a fresh, unconsented policy. */
-  policy?: EgressPolicy;
-  /** True when `provider` is a local runtime — passed through to the Warden (see platform/warden/types.ts's EgressRequest.local). */
-  local?: boolean;
+  /** Runs the model for levels 2-5 (see src/platform/completion.ts). Ignored for "proofread". */
+  complete?: Completer;
 }
 
-/** Present only when a model-backed level actually called the Gateway — absent for "proofread". Populated from platform/gateway's own CompletionResult, not re-estimated here, so this and the Gateway's own accounting can never drift. */
+/** Present only when a model-backed level actually called the model; absent for "proofread". */
 export interface StudioRefineUsage {
   provider: string;
   model: string;
@@ -38,4 +30,3 @@ export interface StudioRefineResult {
   usage?: StudioRefineUsage;
 }
 
-export type { EgressPolicy };

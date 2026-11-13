@@ -86,8 +86,8 @@ describe("Desk — JournalRequirementsPanel", () => {
   it("shows the AI Access Required state with a working Configure button when no AI source is connected", async () => {
     const onOpenAiAccess = vi.fn();
     mockFetch((url, method) => {
-      if (url.endsWith("/api/ai-access/route")) {
-        return { status: 200, body: { ok: false, reasoning: "No AI source is connected yet." } };
+      if (url.endsWith("/journal-requirements/extract")) {
+        return { status: 400, body: { error: "No AI source is connected yet.", code: "ai_provider_required" } };
       }
       if (method === "GET") return { status: 404, body: {} };
       return { status: 500, body: {} };

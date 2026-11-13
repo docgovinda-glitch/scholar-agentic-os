@@ -6,8 +6,8 @@ import {
   normalizeUnicodeNFC,
 } from "../../../src/utils/scholarlyVoiceGuard.ts";
 import { getProjectStore } from "../../../../src/services/store/projectStore.ts";
-import { callOpenRouterJSON, callOpenRouterText, getCandidates, buildAuthorizedPolicy, resolveRequestAiConfig } from "../../../utils/llm.ts";
-import { completeWithFailover } from "../../../../src/platform/gateway/gateway.ts";
+import { callOpenRouterJSON, callOpenRouterText } from "../../../utils/llm.ts";
+import { keyringFromRequest } from "../../../src/ai/routerBridge.ts";
 import { scholarBrain } from "../../../src/services/scholarBrain.ts";
 import { sendAiFailure, UnusableAiResponseError } from "../../../src/ai/aiRouteErrors.ts";
 import {
@@ -212,8 +212,7 @@ ${tutorialOrPeelRules}`;
     });
 
     let effectiveDraft = "";
-    const aiConfig = resolveRequestAiConfig(req);
-    if (aiConfig.candidates.length > 0) {
+    if (keyringFromRequest(req).length > 0) {
       try {
         const brainResult = await scholarBrain.complete({
           req,

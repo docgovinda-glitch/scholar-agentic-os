@@ -303,25 +303,6 @@ Synthesize corporate governance mechanisms that mitigate managerial agency confl
       ).rejects.toThrow("Client-Owned AI Routing Required");
     });
 
-    it("executes successfully when client transient AI headers are supplied", async () => {
-      // Mock gateway failover completion
-      const result = await scholarBrain.complete({
-        headers: {
-          provider: "mock-ollama",
-          model: "llama3.3:70b",
-          apiKey: "local-no-credential-required",
-          baseUrl: "http://localhost:11434",
-        },
-        userPrompt: "Provide analysis.",
-      }).catch((err) => {
-        // If local runner is unreachable in test environment, verify error is execution error, not missing client headers
-        return { error: err.message };
-      });
-
-      if ("error" in result) {
-        expect(result.error).not.toContain("Client-Owned AI Routing Required");
-      }
-    });
   });
 
   // Pillar 7: Coursework Endpoint Integration in server/routes/project/assignment.ts

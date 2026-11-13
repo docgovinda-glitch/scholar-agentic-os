@@ -448,7 +448,7 @@ describe("Architectural Unification Step 2: System-Wide scholarBrain Integration
       burstinessMetrics: { averageLength: 18, variance: 6, burstinessScore: 0.3, isSufficientlyBurst: true },
     });
   }
-  const aiHeaders = { "x-ai-provider": "mock-provider", "x-ai-model": "mock-model", "x-ai-api-key": "test-key" };
+  const aiHeaders = { "x-ai-provider": "openai", "x-ai-model": "mock-model", "x-ai-api-key": "test-key" };
 
   describe("Arm 3: Research Proposal OT-19 (/study-section-simulate, /aims-audit & /draft-section)", () => {
     it("POST /study-section-simulate returns the AI panel's scores for the stored proposal", async () => {
@@ -606,23 +606,5 @@ describe("Architectural Unification Step 2: System-Wide scholarBrain Integration
       ).rejects.toThrow("Client-Owned AI Routing Required");
     });
 
-    it("accepts client transient headers without persisting credentials or hardcoding models", async () => {
-      const result = await scholarBrain.complete({
-        headers: {
-          provider: "mock-ollama",
-          model: "llama3.3:70b",
-          apiKey: "local-no-credential-required",
-          baseUrl: "http://localhost:11434",
-        },
-        userPrompt: "Generate a summary.",
-      }).catch((err) => {
-        // In local test environment without running Ollama daemon, ensure error is gateway connection failure, NOT missing credentials
-        return { error: err.message };
-      });
-
-      if ("error" in result) {
-        expect(result.error).not.toContain("Client-Owned AI Routing Required");
-      }
-    });
   });
 });

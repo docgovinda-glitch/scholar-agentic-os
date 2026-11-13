@@ -15,6 +15,7 @@ vi.mock("../../src/middleware/auth.ts", () => ({
 }));
 
 import request from "supertest";
+import { AI_HEADERS, useFetchBackedAi } from "../../test/aiTestKit.ts";
 import { app } from "../../../server.ts";
 import { __resetProjectStoreForTests } from "../../../src/app/conductor/projectStore.ts";
 import { __resetSessionPoliciesForTests } from "../../../src/app/studio/sessionPolicyStore.ts";
@@ -27,6 +28,7 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "sb_secret_test";
 const originalFetch = global.fetch;
 
 beforeEach(() => {
+  useFetchBackedAi();
   __resetProjectStoreForTests();
   __resetSessionPoliciesForTests();
   __resetRateLimitStore();
@@ -56,18 +58,17 @@ function lensResponse(findings: unknown[], overallAssessment = "Assessment.") {
 
 async function startJobWithSection(projectId: string) {
   await request(app).post(`/api/projects/${projectId}/manuscript/start`).send({});
-  await grantConsent(projectId, "openai");
   global.fetch = vi.fn().mockResolvedValue({
     ok: true,
     json: async () => ({ choices: [{ message: { content: JSON.stringify({ text: "Section text.", memory: "m", citedEvidenceIds: [] }) } }] } ),
   } as Response);
-  await request(app).post(`/api/projects/${projectId}/manuscript/next-section`).send({ provider: "openai", apiKey: "sk-test" });
+  await request(app).post(`/api/projects/${projectId}/manuscript/next-section`).set(AI_HEADERS).send({});
 }
 
 describe("POST /api/projects/:id/manuscript/peer-review", () => {
   it("404s when no job has been started", async () => {
     const projectId = await createProject();
-    const res = await request(app).post(`/api/projects/${projectId}/manuscript/peer-review`).send({ provider: "openai", apiKey: "sk-test" });
+    const res = await request(app).post(`/api/projects/${projectId}/manuscript/peer-review`).set(AI_HEADERS).send({});
     expect(res.status).toBe(404);
   });
 
@@ -76,7 +77,7 @@ describe("POST /api/projects/:id/manuscript/peer-review", () => {
     await request(app).post(`/api/projects/${projectId}/manuscript/start`).send({});
     const res = await request(app)
       .post(`/api/projects/${projectId}/manuscript/peer-review`)
-      .send({ provider: "openai", apiKey: "sk-test", lenses: ["not-a-real-lens"] });
+      .set(AI_HEADERS).send({ lenses: ["not-a-real-lens"] });
     expect(res.status).toBe(400);
   });
 
@@ -85,7 +86,7 @@ describe("POST /api/projects/:id/manuscript/peer-review", () => {
     await startJobWithSection(projectId);
 
     global.fetch = vi.fn().mockResolvedValue(lensResponse([], "Nothing wrong with this dimension."));
-    const res = await request(app).post(`/api/projects/${projectId}/manuscript/peer-review`).send({ provider: "openai", apiKey: "sk-test" });
+    const res = await request(app).post(`/api/projects/${projectId}/manuscript/peer-review`).set(AI_HEADERS).send({});
 
     expect(res.status).toBe(200);
     expect(res.body.peerReviewHistory.rounds).toHaveLength(1);
@@ -104,10 +105,10 @@ describe("POST /api/projects/:id/manuscript/peer-review", () => {
     await startJobWithSection(projectId);
 
     global.fetch = vi.fn().mockResolvedValue(lensResponse([{ summary: "s", detail: "d", severity: "critical", sectionKeys: ["introduction"] }], "Serious issue."));
-    await request(app).post(`/api/projects/${projectId}/manuscript/peer-review`).send({ provider: "openai", apiKey: "sk-test", lenses: ["evidence"] });
+    await request(app).post(`/api/projects/${projectId}/manuscript/peer-review`).set(AI_HEADERS).send({ lenses: ["evidence"] });
 
     global.fetch = vi.fn().mockResolvedValue(lensResponse([], "Resolved."));
-    const second = await request(app).post(`/api/projects/${projectId}/manuscript/peer-review`).send({ provider: "openai", apiKey: "sk-test", lenses: ["evidence"] });
+    const second = await request(app).post(`/api/projects/${projectId}/manuscript/peer-review`).set(AI_HEADERS).send({ lenses: ["evidence"] });
 
     expect(second.body.peerReviewHistory.rounds).toHaveLength(2);
     expect(second.body.peerReviewHistory.rounds[0].roundNumber).toBe(1);

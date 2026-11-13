@@ -34,7 +34,9 @@ export function classify(err: unknown, signal: AbortSignal): Failure {
     const code = (err.code ?? "").toLowerCase();
     if (code.includes("context") || /context.{0,20}(length|window)|too many tokens|maximum context/i.test(msg))
       return f("context_overflow", msg, false, true, { httpStatus: s });
-    if (s === 429 && /quota|billing|insufficient/i.test(msg + code)) return f("quota", msg, false, true, { httpStatus: s });
+    // Out of credits or quota: no amount of retrying helps, so move to the next key or provider at once.
+    if (s === 402 || ((s === 429 || s === 403) && /quota|billing|insufficient|exhausted|credit|limit.{0,10}reached/i.test(msg + code)))
+      return f("quota", msg, false, true, { httpStatus: s });
     if (s === 429) return f("rate_limit", msg, true, true, { httpStatus: s, retryAfterMs: retryAfterMs(err.headers) });
     if (s === 401 || s === 403) return f("auth", msg, false, true, { httpStatus: s });
     if (s === 529 || s === 503) return f("overloaded", msg, true, true, { httpStatus: s, retryAfterMs: retryAfterMs(err.headers) });

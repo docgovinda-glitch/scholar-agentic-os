@@ -1,5 +1,7 @@
 import crypto from "crypto";
 import express from "express";
+import { requestCompleter } from "../src/ai/routerBridge.ts";
+import { sendAiFailure } from "../src/ai/aiRouteErrors.ts";
 import { catalog } from "../../src/app/atlas/atlas.ts";
 import {
   computeG0ExitCriteria,
@@ -37,8 +39,7 @@ import { removeSource, claimsDependingOnSource } from "../../src/domain/claim/gr
 import { countWords, MIN_GUIDELINES_WORDS } from "../../src/domain/journal/types.ts";
 import type { JournalRequirements } from "../../src/domain/journal/types.ts";
 import { isOutputTypeEnabled, MAINTENANCE_MESSAGE } from "./outputTypeAccess.ts";
-import { extractJournalRequirements, GatewayDenied } from "../../src/app/journal/extract.ts";
-import { getPolicyForSession } from "../../src/app/studio/sessionPolicyStore.ts";
+import { extractJournalRequirements } from "../../src/app/journal/extract.ts";
 import { getSupabaseRestConfig, SupabaseTable } from "../src/supabaseRest.ts";
 import { summarize } from "../../src/app/conductor/conductor.ts";
 
@@ -614,7 +615,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     app.post("/api/projects/:id/journal-requirements/extract", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
-    const { guidelinesText, provider, apiKey, model } = req.body ?? {};
+    const { guidelinesText } = req.body ?? {};
 
     if (typeof guidelinesText !== "string" || countWords(guidelinesText) < MIN_GUIDELINES_WORDS) {
       return res.status(400).json({
@@ -628,20 +629,11 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     try {
       const result = await extractJournalRequirements({
         ...baseInput,
-        provider: typeof provider === "string" ? provider : undefined,
-        apiKey: typeof apiKey === "string" ? apiKey : undefined,
-        model: typeof model === "string" ? model : undefined,
+        complete: requestCompleter(req),
       });
       return res.json({ proposal: result.proposal });
     } catch (err) {
-      if (err instanceof GatewayDenied) {
-        if (err.requiresConsent) {
-          return res.status(428).json({ error: "consent_required", reason: err.message, provider });
-        }
-        return res.status(403).json({ error: "denied", reason: err.message });
-      }
-      const message = err instanceof Error ? err.message : "Unknown error";
-      return res.status(500).json({ error: message });
+      return sendAiFailure(res, err, "Journal requirements extraction");
     }
   }));
 

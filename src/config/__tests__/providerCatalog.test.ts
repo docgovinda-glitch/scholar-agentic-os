@@ -55,19 +55,11 @@ describe("cloud provider catalog", () => {
     CLOUD_PROVIDERS.forEach((spec) => {
       expect(spec.name, spec.id).toBeTruthy();
       expect(spec.description, spec.id).toBeTruthy();
-      expect(spec.defaultModel, spec.id).toBeTruthy();
-      expect(spec.models.length, spec.id).toBeGreaterThan(0);
       expect(spec.freeTierNote, spec.id).toBeTruthy();
       expect(spec.chatPath.startsWith("/"), spec.id).toBe(true);
     });
   });
 
-  it("always includes the default model in the suggestion list", () => {
-    // Otherwise the UI's datalist omits the very value it prefills.
-    CLOUD_PROVIDERS.forEach((spec) => {
-      expect(spec.models, spec.id).toContain(spec.defaultModel);
-    });
-  });
 
   it("uses HTTPS everywhere and never leaves a trailing slash", () => {
     CLOUD_PROVIDERS.forEach((spec) => {

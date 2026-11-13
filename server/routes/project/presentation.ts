@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { asyncRoute, loadOwnedProject, getSharedStore } from "../project.ts";
-import { getCandidates } from "../../utils/llm.ts";
+import { keyringFromRequest } from "../../src/ai/routerBridge.ts";
 import {
   sanitizeScholarlyText,
   normalizeUnicodeNFC,
@@ -12,7 +12,6 @@ import {
   sendAiFailure,
   UnusableAiResponseError,
 } from "../../src/ai/aiRouteErrors.ts";
-import { resolveClientAiConfig } from "../../src/ai/clientAiConfig.ts";
 import {
   memoryDecks,
   setMemoryDeck,
@@ -352,11 +351,8 @@ router.post(
       vaultSources,
     }).catch(() => []);
 
-    const candidates = getCandidates(req);
-    // A local model only the user's browser can reach still gets the AI deck (426 hand-off).
-    const browserLocalAi = resolveClientAiConfig(req.headers).localModelBrowserOnly;
-
-    if (candidates.length > 0 || browserLocalAi) {
+    // Any connection counts, including a local model only the browser can reach (426 hand-off).
+    if (keyringFromRequest(req).length > 0) {
       try {
         const systemPrompt = `You design presentation decks in the style of Gamma: each slide is a visual card, not a wall of bullets.
 Write a ${requestedSlides}-card deck for the given topic and material.

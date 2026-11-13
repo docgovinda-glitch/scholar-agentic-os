@@ -1,4 +1,6 @@
 import express from "express";
+import { requestCompleter } from "../../../src/ai/routerBridge.ts";
+import { sendAiFailure } from "../../../src/ai/aiRouteErrors.ts";
 import { catalog } from "../../../../src/app/atlas/atlas.ts";
 import {
   computeG4ExitCriteria,
@@ -28,14 +30,13 @@ import {
   pauseJob,
   GenerationJobError,
 } from "../../../../src/domain/manuscript/stateMachine.ts";
-import { generateSection, GatewayDenied } from "../../../../src/app/manuscript/generate.ts";
+import { generateSection } from "../../../../src/app/manuscript/generate.ts";
 import { checkCoherence } from "../../../../src/app/coherence/checkCoherence.ts";
 import type { CoherenceDimension } from "../../../../src/domain/coherence/types.ts";
 import { COHERENCE_DIMENSIONS } from "../../../../src/domain/coherence/types.ts";
 import { runPeerReview } from "../../../../src/app/review/peerReview.ts";
 import type { ReviewLens } from "../../../../src/domain/review/types.ts";
 import { REVIEW_LENSES } from "../../../../src/domain/review/types.ts";
-import { getPolicyForSession } from "../../../../src/app/studio/sessionPolicyStore.ts";
 import { generateCoverLetter } from "../../../../src/app/coverLetter/generateCoverLetter.ts";
 import { proposeAnonymization } from "../../../../src/app/anonymization/proposeAnonymization.ts";
 import { applyAnonymization, AnonymizationApplyError } from "../../../../src/app/anonymization/applyAnonymization.ts";
@@ -146,9 +147,7 @@ export function registerManuscriptAndGateRoutes(
         return res.status(409).json({ error: "Every planned section is already generated." });
       }
 
-      const { provider, apiKey, model } = req.body ?? {};
       const packet = buildSectionContextPacket(record, planned);
-      const policy = getPolicyForSession(`${currentUserId(req)}:manuscript:${record.projectId}`);
 
       async function checkpoint(generatedSection: Awaited<ReturnType<typeof generateSection>>["section"]) {
         const generationJob = appendSection(record!.generationJob!, generatedSection);
@@ -159,24 +158,15 @@ export function registerManuscriptAndGateRoutes(
       try {
         const result = await generateSection({
           packet,
-          provider: typeof provider === "string" ? provider : undefined,
-          apiKey: typeof apiKey === "string" ? apiKey : undefined,
-          model: typeof model === "string" ? model : undefined,
-          policy,
+        complete: requestCompleter(req),
         });
         const updated = await checkpoint(result.section);
         return res.json({ generationJob: updated.generationJob });
       } catch (err) {
-        if (err instanceof GatewayDenied) {
-          if (err.requiresConsent) {
-            return res.status(428).json({ error: "consent_required", reason: err.message, provider });
-          }
-          return res.status(403).json({ error: "denied", reason: err.message });
-        }
         const message = err instanceof Error ? err.message : "Unknown error";
         const generationJob = failJob(record.generationJob, message);
         await store.save({ ...record, generationJob });
-        return res.status(500).json({ error: message });
+        return sendAiFailure(res, err, "Section generation");
       }
     });
   }));
@@ -234,13 +224,12 @@ export function registerManuscriptAndGateRoutes(
       if (!record.generationJob) {
         return res.status(404).json({ error: `Project "${req.params.id}" has no generation job started yet.` });
       }
-      const { provider, apiKey, model, dimensions } = req.body ?? {};
+      const { dimensions } = req.body ?? {};
       if (dimensions !== undefined && (!Array.isArray(dimensions) || !dimensions.every((d) => COHERENCE_DIMENSIONS.includes(d)))) {
         return res.status(400).json({ error: `Invalid field: dimensions. Must be a subset of: ${COHERENCE_DIMENSIONS.join(", ")}` });
       }
 
       const sections = record.generationJob.sections;
-      const policy = getPolicyForSession(`${currentUserId(req)}:manuscript:${record.projectId}`);
 
       async function saveReport(coherenceReport: Awaited<ReturnType<typeof checkCoherence>>) {
         const generationJob = { ...record!.generationJob!, coherenceReport };
@@ -251,21 +240,13 @@ export function registerManuscriptAndGateRoutes(
       try {
         const coherenceReport = await checkCoherence({
           sections,
-          provider: typeof provider === "string" ? provider : undefined,
-          apiKey: typeof apiKey === "string" ? apiKey : undefined,
-          model: typeof model === "string" ? model : undefined,
-          policy,
+        complete: requestCompleter(req),
           dimensions,
         });
         const updated = await saveReport(coherenceReport);
         return res.json({ generationJob: updated.generationJob });
       } catch (err) {
-        if (err instanceof GatewayDenied) {
-          if (err.requiresConsent) return res.status(428).json({ error: "consent_required", reason: err.message, provider });
-          return res.status(403).json({ error: "denied", reason: err.message });
-        }
-        const message = err instanceof Error ? err.message : "Unknown error";
-        return res.status(500).json({ error: message });
+        return sendAiFailure(res, err, "This step");
       }
     });
   }));
@@ -289,7 +270,7 @@ export function registerManuscriptAndGateRoutes(
       if (!record.generationJob) {
         return res.status(404).json({ error: `Project "${req.params.id}" has no generation job started yet.` });
       }
-      const { provider, apiKey, model, lenses } = req.body ?? {};
+      const { lenses } = req.body ?? {};
       if (lenses !== undefined && (!Array.isArray(lenses) || !lenses.every((l) => REVIEW_LENSES.includes(l)))) {
         return res.status(400).json({ error: `Invalid field: lenses. Must be a subset of: ${REVIEW_LENSES.join(", ")}` });
       }
@@ -297,7 +278,6 @@ export function registerManuscriptAndGateRoutes(
       const sections = record.generationJob.sections;
       const roundNumber = record.peerReviewHistory.rounds.length + 1;
       const journalRequirements = record.journalRequirements ? { journalName: record.journalRequirements.journalName } : undefined;
-      const policy = getPolicyForSession(`${currentUserId(req)}:manuscript:${record.projectId}`);
 
       async function saveRound(round: Awaited<ReturnType<typeof runPeerReview>>) {
         const peerReviewHistory = { rounds: [...record!.peerReviewHistory.rounds, round] };
@@ -311,22 +291,14 @@ export function registerManuscriptAndGateRoutes(
           sections,
           roundNumber,
           journalRequirements,
-          provider: typeof provider === "string" ? provider : undefined,
-          apiKey: typeof apiKey === "string" ? apiKey : undefined,
-          model: typeof model === "string" ? model : undefined,
-          policy,
+        complete: requestCompleter(req),
           lenses,
         });
         const updated = await saveRound(round);
         return res.json({ peerReviewHistory: updated.peerReviewHistory, gates: summarize(updated.gates) });
       } catch (err) {
-        if (err instanceof GatewayDenied) {
-          if (err.requiresConsent) return res.status(428).json({ error: "consent_required", reason: err.message, provider });
-          return res.status(403).json({ error: "denied", reason: err.message });
-        }
         if (err instanceof GateTransitionError) return res.status(409).json({ error: err.message });
-        const message = err instanceof Error ? err.message : "Unknown error";
-        return res.status(500).json({ error: message });
+        return sendAiFailure(res, err, "This step");
       }
     });
   }));
@@ -408,30 +380,20 @@ export function registerManuscriptAndGateRoutes(
       if (!record.journalRequirements) {
         return res.status(400).json({ error: "Cannot generate a cover letter before journal requirements are captured (the target journal is what the letter is addressed to)." });
       }
-      const { provider, apiKey, model } = req.body ?? {};
       const document = record.document;
       const journalRequirements = record.journalRequirements;
-      const policy = getPolicyForSession(`${currentUserId(req)}:manuscript:${record.projectId}`);
 
 
       try {
         const { coverLetter } = await generateCoverLetter({
           document,
           journalRequirements,
-          provider: typeof provider === "string" ? provider : undefined,
-          apiKey: typeof apiKey === "string" ? apiKey : undefined,
-          model: typeof model === "string" ? model : undefined,
-          policy,
+        complete: requestCompleter(req),
         });
         const updated = await store.save({ ...record, coverLetter });
         return res.json({ coverLetter: updated.coverLetter });
       } catch (err) {
-        if (err instanceof GatewayDenied) {
-          if (err.requiresConsent) return res.status(428).json({ error: "consent_required", reason: err.message, provider });
-          return res.status(403).json({ error: "denied", reason: err.message });
-        }
-        const message = err instanceof Error ? err.message : "Unknown error";
-        return res.status(500).json({ error: message });
+        return sendAiFailure(res, err, "This step");
       }
     });
   }));
@@ -463,28 +425,18 @@ export function registerManuscriptAndGateRoutes(
     if (!record.document) {
       return res.status(400).json({ error: "Cannot propose anonymization for a project with no document submitted yet." });
     }
-    const { provider, apiKey, model } = req.body ?? {};
     const document = record.document;
-    const policy = getPolicyForSession(`${currentUserId(req)}:manuscript:${record.projectId}`);
 
 
     try {
       const anonymizationReport = await proposeAnonymization({
         document,
-        provider: typeof provider === "string" ? provider : undefined,
-        apiKey: typeof apiKey === "string" ? apiKey : undefined,
-        model: typeof model === "string" ? model : undefined,
-        policy,
+        complete: requestCompleter(req),
       });
       const updated = await store.save({ ...record, anonymizationReport });
       return res.json({ anonymizationReport: updated.anonymizationReport });
     } catch (err) {
-      if (err instanceof GatewayDenied) {
-        if (err.requiresConsent) return res.status(428).json({ error: "consent_required", reason: err.message, provider });
-        return res.status(403).json({ error: "denied", reason: err.message });
-      }
-      const message = err instanceof Error ? err.message : "Unknown error";
-      return res.status(500).json({ error: message });
+      return sendAiFailure(res, err, "This step");
     }
   }));
 
