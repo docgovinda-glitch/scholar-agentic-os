@@ -28,13 +28,6 @@ async function getJson(f: Fetch, url: string): Promise<Json> {
   return (await res.json()) as Json;
 }
 
-function openAlexUrl(path: string, params: Record<string, string>): string {
-  const q = new URLSearchParams(params);
-  if (process.env.OPENALEX_API_KEY) q.set("api_key", process.env.OPENALEX_API_KEY);
-  if (process.env.OPENALEX_MAILTO) q.set("mailto", process.env.OPENALEX_MAILTO);
-  return `https://api.openalex.org/${path}?${q.toString()}`;
-}
-
 const cleanDoi = (d: unknown) => (typeof d === "string" && d ? d.replace(/^https?:\/\/(dx\.)?doi\.org\//i, "") : undefined);
 const firstString = (v: unknown) => {
   const s = Array.isArray(v) ? (typeof v[0] === "string" ? v[0] : undefined) : typeof v === "string" ? v : undefined;
