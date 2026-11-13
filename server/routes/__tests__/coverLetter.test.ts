@@ -15,7 +15,7 @@ vi.mock("../../src/middleware/auth.ts", () => ({
 }));
 
 import request from "supertest";
-import { AI_HEADERS, useFetchBackedAi } from "../../test/aiTestKit.ts";
+import { AI_HEADERS, keyringHeader, useFetchBackedAi } from "../../test/aiTestKit.ts";
 import { app } from "../../../server.ts";
 import { __resetProjectStoreForTests } from "../../../src/app/conductor/projectStore.ts";
 import { __resetSessionPoliciesForTests } from "../../../src/app/studio/sessionPolicyStore.ts";
@@ -116,4 +116,32 @@ describe("POST /api/projects/:id/cover-letter", () => {
     expect(res.status).toBe(404);
   });
 
+
+  it("hands the prompt to the browser when the user's AI is a local model, then saves the browser's answer", async () => {
+    const saved = process.env.ALLOW_SERVER_LOCAL_AI;
+    process.env.ALLOW_SERVER_LOCAL_AI = "false"; // as on a deployed server
+    try {
+      const projectId = await createProject();
+      await request(app).put(`/api/projects/${projectId}/document`).send({ document: otTenDocument() });
+      await request(app).put(`/api/projects/${projectId}/journal-requirements`).send({ journalName: "Water Research", citationStyle: "vancouver", requiredDeclarations: [] });
+      const local = keyringHeader("ollama", "llama");
+
+      const first = await request(app).post(`/api/projects/${projectId}/cover-letter`).set(local).send({});
+      expect(first.status).toBe(426);
+      expect(first.body.requireFrontendLLM).toBe(true);
+      expect(first.body.challengeToken).toBeTruthy();
+
+      // A result signed for some other prompt is not accepted.
+      const forged = await request(app).post(`/api/projects/${projectId}/cover-letter`).set(local)
+        .send({ browserResults: [{ challengeToken: "not.a-token", llmResult: "Forged letter" }] });
+      expect(forged.status).toBe(426);
+
+      const second = await request(app).post(`/api/projects/${projectId}/cover-letter`).set(local)
+        .send({ browserResults: [{ challengeToken: first.body.challengeToken, llmResult: "Dear Editor, from my own computer." }] });
+      expect(second.status).toBe(200);
+      expect(second.body.coverLetter.text).toContain("from my own computer");
+    } finally {
+      if (saved === undefined) delete process.env.ALLOW_SERVER_LOCAL_AI; else process.env.ALLOW_SERVER_LOCAL_AI = saved;
+    }
+  });
 });

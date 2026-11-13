@@ -14,7 +14,7 @@
  * same fact as "no issues were found."
  */
 
-import type { Completer } from "../../platform/completion";
+import { CompletionInterrupted, type Completer } from "../../platform/completion";
 import { COHERENCE_DIMENSIONS } from "../../domain/coherence/types";
 import type { CoherenceDimension, CoherenceIssue, CoherenceReport, CoherenceSeverity } from "../../domain/coherence/types";
 import type { GeneratedSection } from "../../domain/manuscript/types";
@@ -114,6 +114,7 @@ export async function checkCoherence(input: CheckCoherenceInput): Promise<Cohere
       issues.push(...passIssues);
       passesRun.push(dimension);
     } catch (err) {
+      if (err instanceof CompletionInterrupted) throw err;
       passErrors[dimension] = err instanceof Error ? err.message : "Unknown error";
     }
   }

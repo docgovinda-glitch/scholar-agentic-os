@@ -1,7 +1,8 @@
+import { CompletionInterrupted } from "../../../src/platform/completion.ts";
 import type { Response } from "express";
 
 /** Thrown when a request carries no usable client AI provider (BYOK key or local runner). */
-export class NoClientAiProviderError extends Error {
+export class NoClientAiProviderError extends CompletionInterrupted {
   constructor() {
     super(
       "Client-Owned AI Routing Required: no AI connection (x-ai-keyring) was sent with this request. Server-side fallback keys are strictly prohibited."
@@ -14,7 +15,7 @@ export class NoClientAiProviderError extends Error {
  * The user's AI is a model on their own computer, and this feature runs on
  * Scholar Core's server, which cannot reach it.
  */
-export class LocalModelUnreachableError extends Error {
+export class LocalModelUnreachableError extends CompletionInterrupted {
   constructor() {
     super("The selected AI is a local model on the user's computer, which the server cannot reach.");
     this.name = "LocalModelUnreachableError";
@@ -42,7 +43,7 @@ export interface BrowserAiPayload {
  * the exact prompt to the browser (426), which runs it and sends the result back
  * with the signed challenge token.
  */
-export class BrowserAiRequiredError extends Error {
+export class BrowserAiRequiredError extends CompletionInterrupted {
   readonly payload: BrowserAiPayload;
   constructor(payload: BrowserAiPayload) {
     super("This request runs on the user's browser-local AI.");

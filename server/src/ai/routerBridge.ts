@@ -16,7 +16,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { route } from "../../../src/platform/router/router.ts";
 import { CircuitBreaker, MemoryBreakerStore } from "../../../src/platform/router/circuitBreaker.ts";
-import type { Completer, CompletionTask } from "../../../src/platform/completion.ts";
 import type { Candidate, ProviderAdapter, ProviderId, RouteRequest, RouterEvent, TaskClass } from "../../../src/platform/router/types.ts";
 import { keyringToCandidates, parseKeyring, type KeyringEntry } from "../../routes/aiRun.ts";
 import { screenCandidates, serverAdapters } from "./aiEndpointGuard.ts";
@@ -189,27 +188,3 @@ export async function aiAvailability(req: Request, task: TaskClass): Promise<"se
 
 /** The label of the model that answered this request, for response metadata. */
 export const answeredByLabel = (req: Request): string => (req as Scoped).aiRoute?.answeredBy?.label ?? "router";
-
-/**
- * The `Completer` app modules receive on the server (src/platform/completion.ts):
- * runs the call over this request's AI Access connections. Errors are the ones
- * `sendAiFailure` answers, so a route only needs `catch (err) { sendAiFailure(...) }`.
- */
-export function requestCompleter(req: Request): Completer {
-  return async (call) => {
-    try {
-      const r = await routedResult(req, {
-        task: toRouterTask(call.taskClass satisfies CompletionTask),
-        systemPrompt: call.systemPrompt,
-        userPrompt: call.userPrompt,
-        temperature: call.temperature,
-        signal: call.signal,
-      });
-      return { text: r.text, provider: r.provider, model: r.model, inputTokensEstimate: r.usage.inputTokens, outputTokensEstimate: r.usage.outputTokens };
-    } catch (err) {
-      if (err instanceof NoAiConnectedError) throw new NoClientAiProviderError();
-      if (err instanceof RouterHandoffError) throw new LocalModelUnreachableError();
-      throw err;
-    }
-  };
-}

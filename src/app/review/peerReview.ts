@@ -14,7 +14,7 @@
  * than a lens that had nothing to say.
  */
 
-import type { Completer } from "../../platform/completion";
+import { CompletionInterrupted, type Completer } from "../../platform/completion";
 import { REVIEW_LENSES } from "../../domain/review/types";
 import type { FindingSeverity, LensReview, ReviewFinding, ReviewLens, ReviewRound } from "../../domain/review/types";
 import type { GeneratedSection } from "../../domain/manuscript/types";
@@ -124,6 +124,7 @@ export async function runPeerReview(input: RunPeerReviewInput): Promise<ReviewRo
       lensReviews.push(await runLens(lens, input));
       lensesRun.push(lens);
     } catch (err) {
+      if (err instanceof CompletionInterrupted) throw err;
       lensErrors[lens] = err instanceof Error ? err.message : "Unknown error";
     }
   }

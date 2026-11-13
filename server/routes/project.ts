@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import express from "express";
-import { requestCompleter } from "../src/ai/routerBridge.ts";
+import { requestCompleter } from "../src/ai/browserHandoff.ts";
 import { sendAiFailure } from "../src/ai/aiRouteErrors.ts";
 import { catalog } from "../../src/app/atlas/atlas.ts";
 import {

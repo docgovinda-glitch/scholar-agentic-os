@@ -11,7 +11,7 @@
  */
 
 import express from "express";
-import { requestCompleter } from "../src/ai/routerBridge.ts";
+import { requestCompleter } from "../src/ai/browserHandoff.ts";
 import { sendAiFailure } from "../src/ai/aiRouteErrors.ts";
 import { refine } from "../../src/app/studio/studio.ts";
 import { INTERVENTION_LEVELS, MIN_VOICE_PROFILE_WORDS } from "../../src/domain/language/types.ts";

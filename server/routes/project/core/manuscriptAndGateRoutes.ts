@@ -1,6 +1,6 @@
 import express from "express";
-import { requestCompleter } from "../../../src/ai/routerBridge.ts";
-import { sendAiFailure } from "../../../src/ai/aiRouteErrors.ts";
+import { requestCompleter } from "../../../src/ai/browserHandoff.ts";
+import { sendAiFailure, BrowserAiRequiredError } from "../../../src/ai/aiRouteErrors.ts";
 import { catalog } from "../../../../src/app/atlas/atlas.ts";
 import {
   computeG4ExitCriteria,
@@ -163,6 +163,8 @@ export function registerManuscriptAndGateRoutes(
         const updated = await checkpoint(result.section);
         return res.json({ generationJob: updated.generationJob });
       } catch (err) {
+        // A browser hand-off is not a failure: the job stays as it was until the browser answers.
+        if (err instanceof BrowserAiRequiredError) return sendAiFailure(res, err, "Section generation");
         const message = err instanceof Error ? err.message : "Unknown error";
         const generationJob = failJob(record.generationJob, message);
         await store.save({ ...record, generationJob });

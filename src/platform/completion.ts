@@ -32,3 +32,10 @@ export interface CompletionOutcome {
 }
 
 export type Completer = (call: CompletionCall) => Promise<CompletionOutcome>;
+
+/**
+ * An error that ends the whole operation instead of counting as one failed
+ * step: no AI connected, or the call must continue in the browser. Multi-call
+ * modules (coherence passes, review lenses) rethrow it rather than record it.
+ */
+export class CompletionInterrupted extends Error {}

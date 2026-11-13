@@ -14,7 +14,7 @@ vi.mock("../../src/middleware/auth.ts", () => ({
 }));
 
 import request from "supertest";
-import { AI_HEADERS, useFetchBackedAi } from "../../test/aiTestKit.ts";
+import { AI_HEADERS, keyringHeader, useFetchBackedAi } from "../../test/aiTestKit.ts";
 import { app } from "../../../server.ts";
 import { __resetProjectStoreForTests } from "../../../src/app/conductor/projectStore.ts";
 import { __resetProjectStoreSelectionForTests } from "../../../src/services/store/projectStore.ts";
@@ -159,4 +159,28 @@ describe("POST /api/projects/:id/manuscript/coherence-check", () => {
   });
 
 
+
+  it("with a local-model-only user, runs each of the three passes through the browser, one round trip per pass", async () => {
+    const saved = process.env.ALLOW_SERVER_LOCAL_AI;
+    process.env.ALLOW_SERVER_LOCAL_AI = "false";
+    try {
+      const projectId = await createProject();
+      await startJobWithTwoSections(projectId);
+      const local = keyringHeader("ollama", "llama");
+      const browserResults: Array<{ challengeToken: string; llmResult: string }> = [];
+      let status = 0;
+      let body: any;
+      for (let round = 0; round < 6 && status !== 200; round++) {
+        const res = await request(app).post(`/api/projects/${projectId}/manuscript/coherence-check`).set(local).send({ browserResults });
+        status = res.status;
+        body = res.body;
+        if (status === 426) browserResults.push({ challengeToken: res.body.challengeToken, llmResult: JSON.stringify({ issues: [] }) });
+      }
+      expect(status).toBe(200);
+      expect(browserResults).toHaveLength(3);
+      expect(body.generationJob.coherenceReport.passesRun).toEqual(["terminology", "argument_continuity", "methodology"]);
+    } finally {
+      if (saved === undefined) delete process.env.ALLOW_SERVER_LOCAL_AI; else process.env.ALLOW_SERVER_LOCAL_AI = saved;
+    }
+  });
 });
