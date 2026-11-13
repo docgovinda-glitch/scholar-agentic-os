@@ -41,6 +41,7 @@ import {
   storeProviderKey,
   type UserAiSettings,
 } from "../../services/userAiSettings";
+import { keyIdsFor } from "../../config/keySlots";
 import { removeKeyFromAccount, saveKeyToAccount, syncKeysWithAccount } from "./accountKeys";
 import { addConnection, getAiAccessStatus, removeConnection, verifyProviderKey, type AiAccessStatus, type VerifyKeyResult } from "./aiAccessApi";
 
@@ -251,8 +252,11 @@ export function useAiAccess() {
   const disconnect = useCallback(
     async (providerId: string) => {
       await removeConnection(providerId);
-      await removeKeyFromAccount(providerId);
-      forgetProviderKey(providerId);
+      // The main key and every backup key.
+      for (const keyId of keyIdsFor(providerId)) {
+        await removeKeyFromAccount(keyId);
+        forgetProviderKey(keyId);
+      }
       setKeyed(providersWithStoredKey());
       await refresh();
     },

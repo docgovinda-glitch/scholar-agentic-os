@@ -20,7 +20,7 @@ export class AiCallError extends Error {
 /** `byok:openai:gpt-x` → provider "openai", model "gpt-x". */
 function splitCandidateId(id: string): { provider: string; model: string } {
   const [, provider = "", ...rest] = id.split(":");
-  return { provider, model: rest.join(":") };
+  return { provider, model: rest.join(":").replace(/#\d+$/, "") };
 }
 
 export const browserCompleter: Completer = async (call) => {

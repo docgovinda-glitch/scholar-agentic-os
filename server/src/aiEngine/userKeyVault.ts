@@ -15,6 +15,7 @@
 import { decryptToString, encrypt, generateCEK, getMasterKeyFromEnv, unwrapKey, wrapKey } from "../../../src/services/crypto/crypto";
 import type { EncryptedPayload } from "../../../src/services/crypto/types";
 import { getCloudProvider } from "../../../src/config/providerCatalog";
+import { parseKeyId } from "../../../src/config/keySlots";
 import { getSupabaseRestConfig, SupabaseTable } from "../supabaseRest";
 
 interface KeyRow extends Record<string, unknown> {
@@ -49,9 +50,9 @@ function table() {
 
 const uidFilter = (userId: string) => `user_id=eq.${encodeURIComponent(userId)}`;
 
-/** Only cloud providers in the catalogue take keys; local runners have none. */
+/** Only cloud providers in the catalogue take keys (a main key or a "#2"/"#3" backup); local runners have none. */
 export function checkProviderId(providerId: string): void {
-  if (!getCloudProvider(providerId)) throw new UserKeyError(`Unknown provider "${providerId}".`);
+  if (!getCloudProvider(parseKeyId(providerId).providerId)) throw new UserKeyError(`Unknown provider "${providerId}".`);
 }
 
 /** Rejects empty, oversized or multi-line values before anything is stored. */

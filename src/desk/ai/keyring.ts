@@ -6,6 +6,7 @@
  */
 import { loadUserAiSettings, providersWithStoredKey, readProviderKey, type UserAiSettings } from "../../services/userAiSettings";
 import type { ProviderId } from "../../platform/router/types";
+import { keyIdsFor } from "../../config/keySlots";
 import { syncKeysWithAccount } from "../aiAccess/accountKeys";
 
 export interface KeyringEntry {
@@ -14,6 +15,8 @@ export interface KeyringEntry {
   apiKey?: string;
   baseUrl?: string;
   label?: string;
+  /** Which of the provider's keys this is (1 = main); keeps backups apart in the router. */
+  slot?: number;
   contextWindow?: number;
   maxOutputTokens?: number;
 }
@@ -86,13 +89,18 @@ async function buildKeyringFromDevice(
   for (const id of order) {
     const provider = CLOUD[id];
     if (!provider) continue;
-    const rawKey = await readKey(id);
-    const key = rawKey ? rawKey.replace(/^\s*bearer\s+/i, "").replace(/[^\x21-\x7E]/g, "").trim() : null;
     const choice = pick(id);
-    if (!key || !choice) continue;
+    if (!choice) continue;
     const endpoint = prefs[`${id}Endpoint`] || prefs[`${id}BaseUrl`];
     const cleanBase = endpoint ? endpoint.replace(/[^\x20-\x7E]/g, "").trim() : "";
-    entries.push({ provider, apiKey: key, ...choice, ...(cleanBase ? { baseUrl: cleanBase } : {}) });
+    // The main key first, then any backup keys: a key that runs out hands over to the next.
+    for (const [index, keyId] of keyIdsFor(id).entries()) {
+      if (index > 0 && !storedProviders.includes(keyId)) continue;
+      const rawKey = await readKey(keyId);
+      const key = rawKey ? rawKey.replace(/^\s*bearer\s+/i, "").replace(/[^\x21-\x7E]/g, "").trim() : null;
+      if (!key) continue;
+      entries.push({ provider, apiKey: key, ...choice, ...(cleanBase ? { baseUrl: cleanBase } : {}), ...(index > 0 ? { slot: index + 1, label: `${choice.model} · backup key ${index + 1}` } : {}) });
+    }
   }
   // A local model goes last: it is the fallback that works offline.
   for (const id of Object.keys(LOCAL)) {

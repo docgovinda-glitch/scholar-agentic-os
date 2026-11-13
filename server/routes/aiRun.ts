@@ -36,6 +36,8 @@ const keyringEntry = z.object({
   contextWindow: z.number().int().positive().max(10_000_000).optional(),
   maxOutputTokens: z.number().int().positive().max(1_000_000).optional(),
   label: z.string().max(120).optional(),
+  /** Which of the provider's keys this is (1 = main), so a backup key has its own id and circuit. */
+  slot: z.number().int().min(1).max(9).optional(),
 });
 export type KeyringEntry = z.infer<typeof keyringEntry>;
 
@@ -82,7 +84,7 @@ const DEFAULT_MAX_OUT = 4_096;
 
 export function keyringToCandidates(entries: KeyringEntry[]): Candidate[] {
   return entries.map((e) => ({
-    id: `${LOCAL.has(e.provider) ? "local" : "byok"}:${e.provider}:${e.model}`,
+    id: `${LOCAL.has(e.provider) ? "local" : "byok"}:${e.provider}:${e.model}${e.slot && e.slot > 1 ? `#${e.slot}` : ""}`,
     lane: LOCAL.has(e.provider) ? "local" : "byok",
     provider: e.provider,
     model: e.model,
@@ -176,7 +178,7 @@ export function registerAiRunRoutes(app: express.Express, deps: AiRunDeps = {}):
     try { keyring = parseKeyring(req.headers["x-ai-keyring"]); } catch (e) { res.status(400).json({ error: (e as Error).message }); return; }
     const speeds = measuredSpeeds();
     const results = await Promise.all(
-      keyring.filter((k) => !LOCAL.has(k.provider)).map(async (k) => {
+      keyring.filter((k, i) => !LOCAL.has(k.provider) && keyring.findIndex((o) => o.provider === k.provider && o.baseUrl === k.baseUrl) === i).map(async (k) => {
         const cacheKey = createHash("sha256").update(`${k.provider}\0${k.baseUrl ?? ""}\0${k.apiKey ?? ""}`).digest("hex");
         const hit = modelCache.get(cacheKey);
         if (hit && Date.now() - hit.at < MODEL_CACHE_MS) return { provider: k.provider, models: hit.models };

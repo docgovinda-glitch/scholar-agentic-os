@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, RefreshCw } from "lucide-react";
 import { connectionsNeedingModel } from "./keyring";
+import { lastAiAnswer, type LastAnswer } from "./liveAiStatus";
 import { activeConnection, clearModelCache, fetchLiveModels, recommendFor, selectModel, type ProviderModels, type WorkspaceId } from "./modelChoices";
 import type { KeyringEntry } from "./keyring";
 
@@ -16,7 +17,10 @@ export function AiModelSwitcher({ workspace, className = "" }: { workspace: Work
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [needsModel, setNeedsModel] = useState<string[]>([]);
+  const [answer, setAnswer] = useState<LastAnswer | null>(lastAiAnswer.get());
   const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => lastAiAnswer.subscribe(setAnswer), []);
 
   useEffect(() => {
     activeConnection().then(setActive).catch(() => setActive(undefined));
@@ -67,6 +71,11 @@ export function AiModelSwitcher({ workspace, className = "" }: { workspace: Work
         <span className="max-w-[140px] truncate">{label}</span>
         <ChevronDown className="w-3 h-3" aria-hidden="true" />
       </button>
+      {answer && (
+        <span role="status" className={`ml-1.5 text-[10px] ${answer.switched ? "text-[color:var(--state-warning)]" : "text-[color:var(--text-muted)]"}`} title="Which model answered your last AI step">
+          {answer.switched ? "Backup answered: " : "Answered by "}{answer.label}
+        </span>
+      )}
       {open && (
         <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto p-3 rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] shadow-xl z-50 space-y-3">
           <div className="flex items-center justify-between">

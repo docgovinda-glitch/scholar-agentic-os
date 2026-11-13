@@ -16,6 +16,22 @@ let runId = 0;
 const listeners = new Set<Listener>();
 const emit = () => listeners.forEach((l) => l(state));
 
+/** Who answered the most recent AI step, from streaming steps and from JSON answers alike. */
+export interface LastAnswer { label: string; lane: "byok" | "local"; switched: boolean; at: number }
+let lastAnswer: LastAnswer | null = null;
+const answerListeners = new Set<(a: LastAnswer | null) => void>();
+export const lastAiAnswer = {
+  get: (): LastAnswer | null => lastAnswer,
+  subscribe(l: (a: LastAnswer | null) => void): () => void {
+    answerListeners.add(l);
+    return () => answerListeners.delete(l);
+  },
+  record(label: string, lane: "byok" | "local", switched: boolean): void {
+    lastAnswer = { label, lane, switched, at: Date.now() };
+    answerListeners.forEach((l) => l(lastAnswer));
+  },
+};
+
 export const liveAiStatus = {
   get: (): AiRunState => state,
   subscribe(l: Listener): () => void {
@@ -35,6 +51,7 @@ export const liveAiStatus = {
       publish(ev: unknown) {
         if (!mine() || !isRouterEvent(ev)) return;
         state = reduceAiRun(state, ev);
+        if (ev.type === "done") lastAiAnswer.record(ev.label, ev.lane, state.notices.some((n) => n.kind === "fallback"));
         emit();
       },
       /** Ends the run. A run that never saw a router event (a non-AI stream) simply disappears. */

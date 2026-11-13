@@ -43,7 +43,7 @@ function app() {
 
 beforeEach(() => {
   calls.length = 0;
-  configureRouterBridge({ adapters: { openai: fake, anthropic: fake, google: fake }, breaker: new CircuitBreaker(new MemoryBreakerStore()), premium: undefined });
+  configureRouterBridge({ adapters: { openai: fake, anthropic: fake, google: fake }, breaker: new CircuitBreaker(new MemoryBreakerStore()) });
 });
 
 describe("existing AI steps through the router", () => {
@@ -56,6 +56,27 @@ describe("existing AI steps through the router", () => {
     expect(JSON.stringify(res.body)).not.toContain(SECRET);
   });
 
+
+  it("switches to a backup key of the same provider when the main key is out of quota, and reports it", async () => {
+    const keyAware: ProviderAdapter = {
+      async *stream(c: Candidate): AsyncIterable<AdapterChunk> {
+        calls.push(`${c.id}`);
+        if (c.credential?.apiKey === "main-key") throw new ProviderHttpError(429, "You exceeded your current quota, please check your billing details");
+        yield { type: "text", text: "answered with the backup key" };
+      },
+    };
+    configureRouterBridge({ adapters: { openai: keyAware } });
+    const res = await request(app()).post("/step")
+      .set("x-ai-keyring", ring([
+        { provider: "openai", model: "m1", apiKey: "main-key" },
+        { provider: "openai", model: "m1", apiKey: "backup-key", slot: 2, label: "m1 · backup key 2" },
+      ])).send({});
+    expect(res.status).toBe(200);
+    expect(res.body.text).toBe("answered with the backup key");
+    expect(calls).toEqual(["byok:openai:m1", "byok:openai:m1#2"]);
+    expect(res.body.aiRoute.answeredBy.label).toBe("m1 · backup key 2");
+    expect(res.body.aiRoute.notices.map((n: { text: string }) => n.text).join(" ")).toMatch(/quota/);
+  });
 
   it("no AI connected keeps the browser hand-off (426 with a signed challenge)", async () => {
     const res = await request(app()).post("/step").send({});

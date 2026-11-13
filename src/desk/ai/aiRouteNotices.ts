@@ -4,6 +4,7 @@
  * answer shortened to fit the context. A clean first-choice answer shows
  * nothing. Text comes from the server's `aiRoute` summary as is.
  */
+import { lastAiAnswer } from "./liveAiStatus";
 import { showAppToast, type ToastVariant } from "../../components/ui/FeedbackSystem";
 
 export interface AiRouteSummary {
@@ -26,6 +27,7 @@ const recent = new Map<string, number>();
 const DEDUPE_MS = 10_000;
 
 export function reportAiRoute(summary: AiRouteSummary, now = Date.now(), show = showAppToast): void {
+  if (summary.answeredBy) lastAiAnswer.record(summary.answeredBy.label, summary.answeredBy.lane, summary.notices.some((n) => n.kind === "fallback"));
   const t = describeAiRoute(summary);
   if (!t) return;
   const last = recent.get(t.message);

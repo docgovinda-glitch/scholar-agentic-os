@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { providerAccessFacts, type CloudProviderSpec } from "../../config/providerCatalog";
 import ModelSelectField from "./ModelSelectField";
+import BackupKeys from "./BackupKeys";
 import type { ConnectionTier, ProviderView } from "./useAiAccess";
 import type { CuratedModel } from "../../platform/router/modelCuration";
 import { fetchModelsForKey } from "../ai/modelChoices";
@@ -336,6 +337,8 @@ export default function ProviderDetail({
           {result}
         </p>
       )}
+
+      {view.connected && <BackupKeys providerId={spec.id} providerName={spec.name} baseUrl={baseUrl.trim() || undefined} />}
 
       {view.connected && (
         <div className="flex flex-wrap gap-2 border-t border-[color:var(--border-subtle)] pt-4">
