@@ -35,7 +35,7 @@ For local work leave `VITE_CAPTCHA_SITE_KEY` empty: the placeholder value in `.e
 
 `.husky/pre-commit` runs `npm run lint`. `package.json` has no `prepare` script, so enable the hook once per clone with `npx husky`.
 
-`scripts/` also holds operational tools (`smoke-prod.mjs`/`.sh`, `verify-deployment-readiness.sh`, `verify-local-supabase.sh`, `db/replay-migrations.sh`, `db/schema-diff.sh`, `db/test-credits.sql`, `rewrap-platform-credentials.ts`, `reset-all-vaults.ts`, `create_bucket.ts`); read the header comment of each before running it, and never point them at production without the procedure in [`../RUNBOOK.md`](../RUNBOOK.md).
+`scripts/` also holds operational tools (`smoke-prod.mjs`/`.sh`, `verify-deployment-readiness.sh`, `verify-local-supabase.sh`, `db/replay-migrations.sh`, `db/schema-diff.sh`, `rewrap-platform-credentials.ts`, `reset-all-vaults.ts`, `create_bucket.ts`); read the header comment of each before running it, and never point them at production without the procedure in [`../RUNBOOK.md`](../RUNBOOK.md).
 
 ## 4. Tests
 
