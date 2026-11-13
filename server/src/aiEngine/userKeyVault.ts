@@ -103,24 +103,31 @@ export async function saveUserKey(userId: string, providerId: string, apiKey: st
 }
 
 /**
- * The user's own keys in plaintext, for their own browser. A row that cannot
- * be decrypted (for example after a MASTER_KEY rotation) is left out rather
- * than failing every other key.
+ * The user's own keys in plaintext, for their own browser, and how many rows
+ * could not be read (for example after a MASTER_KEY change without re-wrapping,
+ * see scripts/rewrap-user-keys.ts). An unreadable row is left out rather than
+ * failing every other key, but it is counted so it is never silent.
  */
-export async function readUserKeys(userId: string): Promise<SavedKey[]> {
+export async function readUserKeysWithStats(userId: string): Promise<{ keys: SavedKey[]; unreadable: number }> {
   const masterKey = getMasterKeyFromEnv();
   const rows = await table().select(`${uidFilter(userId)}&order=provider_id`);
-  const out: SavedKey[] = [];
+  const keys: SavedKey[] = [];
+  let unreadable = 0;
   for (const row of rows) {
     if (row.user_id !== userId) continue;
     try {
       const cek = unwrapKey(row.encrypted_cek, masterKey);
-      out.push({ providerId: row.provider_id, apiKey: decryptToString(row.encrypted_key, cek), updatedAt: row.updated_at });
+      keys.push({ providerId: row.provider_id, apiKey: decryptToString(row.encrypted_key, cek), updatedAt: row.updated_at });
     } catch {
-      /* unreadable row: skipped, see above */
+      unreadable += 1;
     }
   }
-  return out;
+  if (unreadable > 0) console.warn(`userKeyVault: ${unreadable} saved key row(s) could not be decrypted (master key changed without re-wrapping?)`);
+  return { keys, unreadable };
+}
+
+export async function readUserKeys(userId: string): Promise<SavedKey[]> {
+  return (await readUserKeysWithStats(userId)).keys;
 }
 
 export async function deleteUserKey(userId: string, providerId: string): Promise<void> {

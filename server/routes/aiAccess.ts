@@ -7,7 +7,7 @@ import { getSupabaseRestConfig, SupabaseTable } from "../src/supabaseRest";
 import { getCloudProvider } from "../../src/config/providerCatalog";
 import { LOCAL_RUNNERS } from "../../src/config/localRunnerCatalog";
 import { rateLimit } from "../src/middleware/rateLimit";
-import { deleteUserKey, listUserKeys, readUserKeys, saveUserKey, UserKeyError, vaultAvailable } from "../src/aiEngine/userKeyVault";
+import { deleteUserKey, listUserKeys, readUserKeysWithStats, saveUserKey, UserKeyError, vaultAvailable } from "../src/aiEngine/userKeyVault";
 
 /**
  * User-facing AI Access routes (Section 20). Every route reads/writes only
@@ -118,7 +118,7 @@ export function registerAiAccessRoutes(app: express.Express): void {
   router.get("/keys/sync", keyLimit, noStore, async (req, res) => {
     if (!vaultAvailable()) return vaultOff(res);
     try {
-      res.json({ keys: await readUserKeys(userId(req)) });
+      res.json(await readUserKeysWithStats(userId(req)));
     } catch (err) {
       keyFail(res, err);
     }
