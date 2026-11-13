@@ -123,24 +123,6 @@ describe("POST /api/projects/:id/manuscript/peer-review", () => {
     expect(g5.outstandingBlocking).toEqual([]);
   });
 
-  it("402s a non-entitled Premium user, never reaching the provider", async () => {
-    global.fetch = vi.fn((input: RequestInfo | URL) => {
-      const url = typeof input === "string" ? input : input.toString();
-      const respondJson = (body: unknown, status = 200) => Promise.resolve({ ok: status < 300, status, text: async () => JSON.stringify(body), json: async () => body } as Response);
-      if (url.includes("/rest/v1/user_entitlements")) return respondJson([]);
-      if (url.includes("/rest/v1/user_ai_connections")) return respondJson([]);
-      if (url.includes("/rest/v1/provider_health")) return respondJson([]);
-      if (url.includes("/rest/v1/ai_providers")) return respondJson([]);
-      return respondJson({}, 500);
-    }) as unknown as typeof fetch;
-
-    const projectId = await createProject();
-    await request(app).post(`/api/projects/${projectId}/manuscript/start`).send({});
-
-    const res = await request(app).post(`/api/projects/${projectId}/manuscript/peer-review`).send({ useEngine: "premium" });
-    expect(res.status).toBe(402);
-    expect(res.body.error).toMatch(/Premium subscription/i);
-  });
 });
 
 describe("GET /api/projects/:id/manuscript/peer-review", () => {

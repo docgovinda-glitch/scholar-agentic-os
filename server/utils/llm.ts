@@ -6,7 +6,6 @@ import { recordConsent, type EgressPolicy } from "../../src/platform/warden/ward
 import type { TaskClass } from "../../src/platform/warden/types.js";
 import type { CandidateProvider } from "../../src/platform/gateway/types.js";
 import { resolveClientAiConfig, type ClientAiConfig } from "../src/ai/clientAiConfig.ts";
-import { getEntitlement, isEntitlementActive } from "../src/aiEngine/entitlements.js";
 import { parseAndRepairLLMJson } from "../../src/shared/llmJsonParser.ts";
 import { InvalidLlmChallengeError } from "../src/ai/aiRouteErrors.ts";
 import { chainFor, NoAiConnectedError, routedText, RouterHandoffError, toRouterTask } from "../src/ai/routerBridge.ts";

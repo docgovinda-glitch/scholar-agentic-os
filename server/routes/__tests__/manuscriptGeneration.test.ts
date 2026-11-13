@@ -219,35 +219,6 @@ describe("POST /api/projects/:id/manuscript/next-section — BYOK path", () => {
   });
 });
 
-describe("POST /api/projects/:id/manuscript/next-section — Premium path", () => {
-  function mockDb(overrides: Partial<{ entitlement: object[]; balance: object[] }> = {}) {
-    global.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
-      const url = typeof input === "string" ? input : input.toString();
-      const respondJson = (body: unknown, status = 200) =>
-        Promise.resolve({ ok: status < 300, status, text: async () => JSON.stringify(body), json: async () => body } as Response);
-      if (url.includes("/rest/v1/user_entitlements")) return respondJson(overrides.entitlement ?? []);
-      if (url.includes("/rest/v1/user_ai_connections")) return respondJson([]);
-      if (url.includes("/rest/v1/provider_health")) return respondJson([]);
-      if (url.includes("/rest/v1/ai_providers")) return respondJson([]);
-      if (url.includes("/rest/v1/credit_balances")) return respondJson(overrides.balance ?? []);
-      if (url.includes("/rest/v1/premium_plans")) return respondJson([{ id: "premium_basic", monthly_credits: 5000, daily_credits: 200, per_task_max_credits: 50, concurrency_limit: 2 }]);
-      if (url.includes("/rest/v1/user_quota_overrides")) return respondJson([]);
-      if (url.includes("/rest/v1/ai_resources")) return respondJson([]);
-      if (url.includes("/rest/v1/plan_resources")) return respondJson([]);
-      return respondJson({}, 500);
-    }) as unknown as typeof fetch;
-  }
-
-  it("402s a non-entitled user, never reaching the provider", async () => {
-    mockDb({ entitlement: [] });
-    const projectId = await createProject();
-    await request(app).post(`/api/projects/${projectId}/manuscript/start`).send({});
-
-    const res = await request(app).post(`/api/projects/${projectId}/manuscript/next-section`).send({ useEngine: "premium" });
-    expect(res.status).toBe(402);
-    expect(res.body.error).toMatch(/Premium subscription/i);
-  });
-});
 
 describe("pause / resume", () => {
   it("pauses a running job and refuses to pause it twice", async () => {

@@ -2,13 +2,12 @@
  * One AI endpoint for every feature: POST /api/ai/run streams router events
  * (SSE), GET /api/ai/models returns the curated model list for the user's keys.
  *
- * Chain per request: the user's Premium resources (when entitled and within
- * quota) → the user's own keys in their order → their local model (handed to
- * the browser). `preferLane: "byok"` puts the user's own keys first.
+ * Chain per request: the user's own keys in their order → their local model
+ * (handed to the browser).
  *
  * Keys: BYOK keys arrive per request in the `x-ai-keyring` header (base64url
  * JSON). They live in memory for that request only: never stored, logged or
- * returned. Premium keys come from the vault and never leave the server.
+ * returned. 
  *
  * A base URL the user names is screened (`aiEndpointGuard`): https only, public
  * addresses only, connection pinned. A blocked endpoint is skipped with a reason.
@@ -68,21 +67,11 @@ const runBody = z.object({
   desiredOutputTokens: z.number().int().positive().max(200_000).default(4096),
   minOutputTokens: z.number().int().positive().max(200_000).default(256),
   temperature: z.number().min(0).max(2).optional(),
-  preferLane: z.enum(["auto", "byok", "premium"]).default("auto"),
 });
-
-/** Premium hooks, injected so the route can be tested without a database. */
-export interface PremiumPort {
-  /** Ordered Premium candidates for this user and task, or a reason they get none. */
-  candidates(userId: string, task: RouteRequest["task"]): Promise<{ candidates: Candidate[]; unavailable?: string }>;
-  /** Charge for a finished Premium request. Returns false when the charge was refused. */
-  charge(userId: string, candidate: Candidate, usage: { inputTokens: number; outputTokens: number }, requestId: string): Promise<boolean>;
-}
 
 export interface AiRunDeps {
   adapters?: RouterOptions["adapters"];
   breaker?: CircuitBreaker;
-  premium?: PremiumPort;
   routerOptions?: Partial<RouterOptions>;
   listModels?: typeof listLiveModels;
 }
@@ -143,10 +132,7 @@ export function registerAiRunRoutes(app: express.Express, deps: AiRunDeps = {}):
     const body = parsed.data;
     const screened = await screenCandidates(keyringToCandidates(keyring));
     const own = screened.kept;
-    const premium = deps.premium ? await deps.premium.candidates(userId, body.task).catch(() => ({ candidates: [] as Candidate[], unavailable: "Premium is temporarily unavailable." })) : { candidates: [] as Candidate[] };
-    const cloudOwn = own.filter((c) => c.lane === "byok");
-    const local = own.filter((c) => c.lane === "local");
-    const chain = body.preferLane === "byok" ? [...cloudOwn, ...premium.candidates, ...local] : [...premium.candidates, ...cloudOwn, ...local];
+    const chain = [...own.filter((c) => c.lane === "byok"), ...own.filter((c) => c.lane === "local")];
 
     if (chain.length === 0 && screened.blocked.length) {
       res.status(400).json({ error: screened.blocked.map((b) => `${b.label}: ${b.reason}`).join("; "), code: "ai_endpoint_blocked" });
@@ -154,7 +140,7 @@ export function registerAiRunRoutes(app: express.Express, deps: AiRunDeps = {}):
     }
     if (chain.length === 0) {
       res.status(400).json({
-        error: premium.unavailable ? `${premium.unavailable} Add your own AI key or a local model in AI Access.` : "No AI is connected. Add your own AI key or a local model in AI Access.",
+        error: "No AI is connected. Add your own AI key or a local model in AI Access.",
         code: "ai_provider_required",
       });
       return;
@@ -179,10 +165,6 @@ export function registerAiRunRoutes(app: express.Express, deps: AiRunDeps = {}):
         if (ev.type === "metrics") {
           const c = byId.get(ev.candidateId);
           if (c && ev.outputTokens > 50) recordSpeed(`${c.provider}:${c.model}`, ev.tokensPerSecond);
-        }
-        if (ev.type === "done" && ev.lane === "premium" && deps.premium) {
-          const c = byId.get(ev.candidateId);
-          if (c) await deps.premium.charge(userId, c, ev.usage, request.requestId).catch(() => false);
         }
         yield ev;
       }

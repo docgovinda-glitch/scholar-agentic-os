@@ -19,29 +19,6 @@ import { ALL_L1_PROFILES } from "../../src/domain/language/l1Patterns.ts";
 import { buildVoiceProfile } from "../../src/domain/language/voiceProfile.ts";
 import type { InterventionLevel, VoiceProfile } from "../../src/domain/language/types.ts";
 import { requireAuth, type AuthenticatedUser } from "../src/middleware/auth.ts";
-import { estimateMaxCreditsForInput } from "../src/aiEngine/creditPolicy.ts";
-import { runPremium, type PremiumOutcome } from "../src/ai/premium.ts";
-
-/**
- * Studio's Premium path. The server re-derives entitlement and quota itself
- * (the client's `useEngine: "premium"` flag is never a grant), runs on
- * Scholar's own credential and charges only for a call that answered.
- * It never drops to Free/BYOK: tier fallback is the client's job
- * (StudioPanel.tsx). Steps and their reasons: server/src/ai/premium.ts.
- */
-async function runPremiumRefine(
-  userId: string,
-  refineInput: Omit<Parameters<typeof refine>[0], "provider" | "apiKey" | "model">
-): Promise<PremiumOutcome<Awaited<ReturnType<typeof refine>>>> {
-  return runPremium({
-    userId,
-    estimatedCredits: estimateMaxCreditsForInput(refineInput.text),
-    taskType: "refinement",
-    describe: (label) => `studio refine: ${label}`,
-    call: (target) => refine({ ...refineInput, ...target }),
-    usageOf: (result) => result.usage,
-  });
-}
 
 function isValidLevel(level: unknown): level is InterventionLevel {
   return typeof level === "string" && (INTERVENTION_LEVELS as string[]).includes(level);
@@ -139,7 +116,7 @@ export function registerStudioRoutes(app: express.Express, studioLimit: express.
       });
     }
 
-    const { sessionId, passageId, text, level, discipline, l1, voiceProfile, provider, model, scopeId, useEngine } = req.body ?? {};
+    const { sessionId, passageId, text, level, discipline, l1, voiceProfile, provider, model, scopeId } = req.body ?? {};
 
     if (typeof sessionId !== "string" || sessionId.length === 0) {
       return res.status(400).json({ error: "Missing required field: sessionId" });
@@ -162,6 +139,12 @@ export function registerStudioRoutes(app: express.Express, studioLimit: express.
       return res.status(400).json({ error: "Malformed voiceProfile — use the object returned by POST /api/studio/voice-profile." });
     }
 
+    if (level !== "proofread") {
+      return res.status(400).json({
+        error: "Model-backed levels run in your browser with the AI you set up in AI Access. The server never holds your key, so only proofread runs here.",
+      });
+    }
+
     const policy = getPolicyForSession(scopedSession(req, sessionId));
     const baseInput = {
       passageId,
@@ -174,39 +157,7 @@ export function registerStudioRoutes(app: express.Express, studioLimit: express.
       policy,
     };
 
-    const wantsPremium = useEngine === "premium";
 
-    if (wantsPremium) {
-      const userId = (req as express.Request & { user: AuthenticatedUser }).user.id;
-      // runPremiumRefine reads Supabase before it reaches its own try/catch
-      // (routing candidates, entitlement, quota), and a SupabaseRestError from
-      // any of those throws straight out. Express 4 does not catch rejections
-      // from an async handler and this app installs no error middleware, so
-      // outside a try this left the request with no response at all — the
-      // client hung until it timed out. Everything below is already inside
-      // the handler's own try; only this call was not.
-      let outcome: Awaited<ReturnType<typeof runPremiumRefine>>;
-      try {
-        outcome = await runPremiumRefine(userId, baseInput);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Unknown error";
-        return res.status(503).json({ error: `Premium routing is unavailable right now: ${message}` });
-      }
-
-      if (!outcome.ok) {
-        // Matches the manual path's own 428/403 body shape exactly (below)
-        // — src/desk/api.ts's refinePassage() parses both identically
-        // regardless of which path produced them.
-        if (outcome.status === 428) {
-          return res.status(428).json({ error: "consent_required", reason: outcome.error, provider: outcome.provider });
-        }
-        if (outcome.status === 403) {
-          return res.status(403).json({ error: "denied", reason: outcome.error });
-        }
-        return res.status(outcome.status).json({ error: outcome.error });
-      }
-      return res.json({ ...outcome.result, aiSource: outcome.aiSource });
-    }
 
     try {
       const result = await refine({

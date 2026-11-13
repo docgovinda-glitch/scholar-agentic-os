@@ -76,25 +76,6 @@ describe("POST /api/ai/run", () => {
     expect(text).not.toContain(SECRET);
   });
 
-  it("Premium runs first and is charged; preferLane=byok puts the user's key first", async () => {
-    const charge = vi.fn(async () => true);
-    const premium: PremiumPort = {
-      async candidates() {
-        return { candidates: [{ id: "premium:r1", lane: "premium", provider: "google", model: "pool-model", label: "Scholar Pro · Premium", contextWindow: 100_000, maxOutputTokens: 4096, runsIn: "server", credential: { apiKey: "vault-key" } }] };
-      },
-      charge,
-    };
-    const ring = keyring([{ provider: "openai", model: "own-model", apiKey: SECRET }]);
-    const parse = (r: any, cb: any) => { let d = ""; r.on("data", (c: Buffer) => (d += c)); r.on("end", () => cb(null, d)); };
-
-    const first = await request(app(premium)).post("/api/ai/run").set("x-ai-keyring", ring).send(body).buffer(true).parse(parse);
-    expect(first.body).toContain("answer from pool-model");
-    expect(charge).toHaveBeenCalledWith("user-1", expect.objectContaining({ id: "premium:r1" }), { inputTokens: 10, outputTokens: 4, source: "provider" }, expect.any(String));
-    expect(first.body).not.toContain("vault-key");
-
-    const own = await request(app(premium)).post("/api/ai/run").set("x-ai-keyring", ring).send({ ...body, preferLane: "byok" }).buffer(true).parse(parse);
-    expect(own.body).toContain("answer from own-model");
-  });
 
   it("on a deployed server, local models are handed to the browser instead of being dropped", async () => {
     const saved = process.env.ALLOW_SERVER_LOCAL_AI;

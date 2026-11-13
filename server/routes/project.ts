@@ -45,7 +45,6 @@ import { summarize } from "../../src/app/conductor/conductor.ts";
 import {
   isValidDocument,
   isValidJournalRequirementsInput,
-  runPremiumJournalExtraction,
   recomputeG1,
   recomputeG2 as _recomputeG2,
   recomputeG3,
@@ -615,7 +614,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     app.post("/api/projects/:id/journal-requirements/extract", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
-    const { guidelinesText, provider, apiKey, model, useEngine } = req.body ?? {};
+    const { guidelinesText, provider, apiKey, model } = req.body ?? {};
 
     if (typeof guidelinesText !== "string" || countWords(guidelinesText) < MIN_GUIDELINES_WORDS) {
       return res.status(400).json({
@@ -624,29 +623,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     }
 
     const baseInput = { guidelinesText, scopeId: record.projectId };
-    const wantsPremium = useEngine === "premium" && typeof provider !== "string" && typeof apiKey !== "string";
 
-    if (wantsPremium) {
-      const userId = currentUserId(req);
-      let outcome: Awaited<ReturnType<typeof runPremiumJournalExtraction>>;
-      try {
-        outcome = await runPremiumJournalExtraction(userId, baseInput);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Unknown error";
-        return res.status(503).json({ error: `Premium routing is unavailable right now: ${message}` });
-      }
-
-      if (!outcome.ok) {
-        if (outcome.status === 428) {
-          return res.status(428).json({ error: "consent_required", reason: outcome.error, provider: outcome.provider });
-        }
-        if (outcome.status === 403) {
-          return res.status(403).json({ error: "denied", reason: outcome.error });
-        }
-        return res.status(outcome.status).json({ error: outcome.error });
-      }
-      return res.json({ proposal: outcome.result.proposal, aiSource: outcome.aiSource });
-    }
 
     try {
       const result = await extractJournalRequirements({

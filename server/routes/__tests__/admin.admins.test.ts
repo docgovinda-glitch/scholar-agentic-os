@@ -156,7 +156,7 @@ describe("POST /api/admin/ai/admins", () => {
     const res = await request(app)
       .post("/api/admin/ai/admins")
       .set("Authorization", "Bearer admin-token")
-      .send({ userId: TARGET_ID, scopes: ["manage_premium", "not_a_real_scope"] });
+      .send({ userId: TARGET_ID, scopes: ["manage_opportunities", "not_a_real_scope"] });
     expect(res.status).toBe(400);
   });
 
@@ -165,7 +165,7 @@ describe("POST /api/admin/ai/admins", () => {
     const res = await request(app)
       .post("/api/admin/ai/admins")
       .set("Authorization", "Bearer admin-token")
-      .send({ userId: TARGET_ID, scopes: ["manage_premium", "manage_users"] });
+      .send({ userId: TARGET_ID, scopes: ["manage_opportunities", "manage_users"] });
     expect(res.status).toBe(200);
   });
 });
@@ -176,7 +176,7 @@ describe("PATCH /api/admin/ai/admins/:userId/scopes", () => {
     const res = await request(app)
       .patch(`/api/admin/ai/admins/${TARGET_ID}/scopes`)
       .set("Authorization", "Bearer admin-token")
-      .send({ scopes: ["manage_budget"] });
+      .send({ scopes: ["manage_users"] });
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ success: true });
   });
@@ -195,7 +195,7 @@ describe("PATCH /api/admin/ai/admins/:userId/scopes", () => {
     const res = await request(app)
       .patch(`/api/admin/ai/admins/${ADMIN_ID}/scopes`)
       .set("Authorization", "Bearer admin-token")
-      .send({ scopes: ["manage_budget"] });
+      .send({ scopes: ["manage_users"] });
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/cannot change your own permissions/i);
   });

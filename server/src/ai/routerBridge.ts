@@ -4,8 +4,7 @@
  * and Ask Scholar share one chain, one failover policy and one way of telling
  * the user what happened.
  *
- * - Chain per request: Premium resources (entitled, within quota) → the
- *   user's keys from `x-ai-keyring` (or the legacy single-provider x-ai-*
+ * - Chain per request: the user's keys from `x-ai-keyring` (or the legacy single-provider x-ai-*
  *   headers) → their local model.
  * - A provider failure moves to the next candidate with a visible event; it
  *   never silently hands the request to the browser. The browser hand-off
@@ -18,7 +17,7 @@ import type { NextFunction, Request, Response } from "express";
 import { route } from "../../../src/platform/router/router.ts";
 import { CircuitBreaker, MemoryBreakerStore } from "../../../src/platform/router/circuitBreaker.ts";
 import type { Candidate, ProviderAdapter, ProviderId, RouteRequest, RouterEvent, TaskClass } from "../../../src/platform/router/types.ts";
-import { keyringToCandidates, parseKeyring, type KeyringEntry, type PremiumPort } from "../../routes/aiRun.ts";
+import { keyringToCandidates, parseKeyring, type KeyringEntry } from "../../routes/aiRun.ts";
 import { screenCandidates, serverAdapters } from "./aiEndpointGuard.ts";
 import { LocalModelUnreachableError, NoClientAiProviderError } from "./aiRouteErrors.ts";
 
@@ -46,7 +45,7 @@ export class NoAiConnectedError extends Error {
   constructor() { super("No AI is connected. Add your own AI key or a local model in AI Access."); this.name = "NoAiConnectedError"; }
 }
 
-interface BridgeDeps { adapters: Partial<Record<ProviderId, ProviderAdapter>>; breaker: CircuitBreaker; premium?: PremiumPort }
+interface BridgeDeps { adapters: Partial<Record<ProviderId, ProviderAdapter>>; breaker: CircuitBreaker }
 let deps: BridgeDeps = { adapters: serverAdapters(), breaker: new CircuitBreaker(new MemoryBreakerStore()) };
 export function configureRouterBridge(next: Partial<BridgeDeps>): void { deps = { ...deps, ...next }; }
 
@@ -125,8 +124,7 @@ export async function chainFor(req: Scoped, task: TaskClass): Promise<Candidate[
   const offered = keyringToCandidates(keyringFromRequest(req));
   const { kept: own, blocked } = await screenCandidates(offered);
   for (const b of blocked) (req.aiRoute ??= { notices: [] }).notices.push({ kind: "skipped", text: `Skipped ${b.label}: ${b.reason}` });
-  const premium = deps.premium && req.user?.id ? (await deps.premium.candidates(req.user.id, task).catch(() => ({ candidates: [] as Candidate[] }))).candidates : [];
-  const chain = [...premium, ...own.filter((c) => c.lane === "byok"), ...own.filter((c) => c.lane === "local")];
+  const chain = [...own.filter((c) => c.lane === "byok"), ...own.filter((c) => c.lane === "local")];
   if (!chain.length && blocked.length) {
     throw new RouterExhaustedError(blocked.map((b) => `${b.label}: ${b.reason}`).join("; "), "non_retryable");
   }
@@ -152,7 +150,6 @@ export async function routedText(req: Request, call: RoutedCall): Promise<string
     minOutputTokens: Math.min(512, call.maxOutputTokens ?? 512),
     temperature: call.temperature,
   };
-  const byId = new Map(chain.map((c) => [c.id, c]));
   let text = "";
   for await (const ev of route(request, chain, call.signal ?? new AbortController().signal, { site: "server", adapters: deps.adapters, breaker: deps.breaker })) {
     summarise(scoped.aiRoute, ev);
@@ -160,8 +157,6 @@ export async function routedText(req: Request, call: RoutedCall): Promise<string
     if (ev.type === "token") text += ev.text;
     if (ev.type === "fallback" && ev.partialOutputDiscarded) text = "";
     if (ev.type === "done") {
-      const c = byId.get(ev.candidateId);
-      if (c?.lane === "premium" && deps.premium && scoped.user?.id) await deps.premium.charge(scoped.user.id, c, ev.usage, request.requestId).catch(() => false);
       return text;
     }
     if (ev.type === "handoff") throw new RouterHandoffError(ev.label);
@@ -200,8 +195,7 @@ export async function routedCompletion(req: Request, call: RoutedCall): Promise<
 }
 
 /**
- * Where this request's AI would run, without calling it: "server" (Premium or
- * a cloud key), "browser" (the first choice is the user's local model) or
+ * Where this request's AI would run, without calling it: "server" (a cloud key), "browser" (the first choice is the user's local model) or
  * "none". Lets a route hand off before doing expensive retrieval.
  */
 export async function aiAvailability(req: Request, task: TaskClass): Promise<"server" | "browser" | "none"> {
