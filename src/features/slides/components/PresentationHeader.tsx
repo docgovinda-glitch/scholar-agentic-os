@@ -100,6 +100,8 @@ export default function PresentationHeader({
           placeholder="Untitled presentation"
           className="min-w-0 flex-1 max-w-[300px] h-8 px-2 rounded-lg bg-transparent text-sm font-semibold text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 truncate hover:bg-neutral-900/[0.04] dark:hover:bg-white/[0.05] focus:bg-white dark:focus:bg-[#212121] focus:outline-none focus:ring-1 focus:ring-neutral-900/15 dark:focus:ring-white/15 transition-colors"
         />
+        {/* Beside the title, where the title box can give way: the right-hand side has no spare room. */}
+        <AiModelSwitcher workspace="presentation" compact className="shrink-0" />
       </div>
 
       {/* Centre: four-step switcher */}
@@ -143,7 +145,6 @@ export default function PresentationHeader({
             />
           </span>
         )}
-        <AiModelSwitcher workspace="presentation" />
         {onOpenQaSimulator && (
           <button
             type="button"

@@ -30,7 +30,8 @@ test("switching layouts keeps the card's text", async ({ page }) => {
   );
   expect(lines.length).toBeGreaterThan(0);
   const headline = lines.sort((a, b) => b.length - a.length)[0];
-  for (const layout of ["bento", "list", "comparison", "timeline", "statement"]) {
+  // Layouts offered depend on the card; these four are available for the deck's second card.
+  for (const layout of ["bento", "list", "comparison", "timeline"]) {
     await page.getByTestId(`layout-option-${layout}`).click();
     // The headline survives every layout switch (layouts convert content, never replace it).
     await expect(card).toContainText(headline);

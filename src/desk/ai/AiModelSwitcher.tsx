@@ -9,7 +9,7 @@ import type { KeyringEntry } from "./keyring";
  * central AI Access setting, so it applies to all five workspaces. Models come
  * live from each connected provider; the recommended one is marked for this workspace.
  */
-export function AiModelSwitcher({ workspace, className = "" }: { workspace: WorkspaceId; className?: string }) {
+export function AiModelSwitcher({ workspace, className = "", compact = false }: { workspace: WorkspaceId; className?: string; /** Dot and chevron only, with no model name or "answered by" text, for headers with no room. */ compact?: boolean }) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState<KeyringEntry | undefined>();
   const [providers, setProviders] = useState<ProviderModels[] | null>(null);
@@ -61,15 +61,15 @@ export function AiModelSwitcher({ workspace, className = "" }: { workspace: Work
         onClick={() => { setOpen((o) => !o); if (!providers) void load(false); }}
         aria-expanded={open}
         aria-label="AI model"
-        title={active ? `Active model: ${modelName(active)} (${active.via ?? active.provider})` : "Connect an AI in AI Access"}
+        title={`${active ? `Active model: ${modelName(active)} (${active.via ?? active.provider})` : "Connect an AI in AI Access"}${answer ? ` · ${answer.switched ? "Backup answered" : "Answered by"} ${answer.label}` : ""}`}
         className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium border border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] cursor-pointer"
       >
         <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${active ? "bg-emerald-500" : "bg-amber-500"}`} aria-hidden="true" />
-        <span className="max-w-[140px] truncate">{label}</span>
+        {!compact && <span className="hidden xl:inline max-w-[110px] truncate">{label}</span>}
         <ChevronDown className="w-3 h-3" aria-hidden="true" />
       </button>
-      {answer && (
-        <span role="status" className={`ml-1.5 text-[10px] ${answer.switched ? "text-[color:var(--state-warning)]" : "text-[color:var(--text-muted)]"}`} title="Which model answered your last AI step">
+      {answer && !compact && (
+        <span role="status" className={`ml-1.5 hidden 2xl:inline-block max-w-[180px] truncate align-middle text-[10px] ${answer.switched ? "text-[color:var(--state-warning)]" : "text-[color:var(--text-muted)]"}`} title="Which model answered your last AI step">
           {answer.switched ? "Backup answered: " : "Answered by "}{answer.label}
         </span>
       )}
