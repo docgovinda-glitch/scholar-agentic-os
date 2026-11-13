@@ -3,6 +3,8 @@
  * when set) and Crossref as the fallback. Both are free public indexes; no AI
  * and no cost. Only what the index returns is passed on.
  */
+import type { RawSourceInput } from "../../../src/citation_compliance/cslEngine.ts";
+import { searchCrossref, searchOpenAlex, type ProviderOptions } from "../../../src/shared/retrieval/providers.ts";
 import {
   abstractFromInvertedIndex,
   decodeEntities,
@@ -43,51 +45,40 @@ const crossrefYear = (item: Json) => {
   return parts?.[0]?.[0];
 };
 
-async function openAlexPapers(f: Fetch, interest: string, n: number, since: number): Promise<ScoutPaper[]> {
-  const data = await getJson(
-    f,
-    openAlexUrl("works", {
-      search: interest,
-      filter: `from_publication_date:${since}-01-01,has_abstract:true,type:article`,
-      "per-page": String(n),
-      select: "id,doi,title,publication_year,abstract_inverted_index,primary_location,authorships",
-    })
-  );
-  return ((data.results as Json[]) ?? []).map((w, i) => ({
+function toScoutPaper(r: RawSourceInput, i: number, source: ScoutPaper["source"]): ScoutPaper {
+  return {
     key: `p${i + 1}`,
-    title: String(w.title ?? "Untitled"),
-    year: typeof w.publication_year === "number" ? w.publication_year : undefined,
-    venue: ((w.primary_location as Json | null)?.source as Json | null)?.display_name as string | undefined,
-    doi: cleanDoi(w.doi),
-    url: typeof w.doi === "string" ? w.doi : (w.id as string | undefined),
-    authors: ((w.authorships as Json[]) ?? []).map((a) => (a.author as Json | undefined)?.display_name).filter((x): x is string => typeof x === "string"),
-    abstract: abstractFromInvertedIndex(w.abstract_inverted_index as Record<string, number[]> | null),
-    source: "openalex" as const,
-  }));
+    title: r.title || "Untitled",
+    year: typeof r.year === "number" ? r.year : Number(r.year) || undefined,
+    venue: r.venue,
+    doi: r.doi,
+    url: r.url,
+    authors: Array.isArray(r.authors) ? (r.authors as unknown[]).filter((a): a is string => typeof a === "string") : [],
+    abstract: r.snippet || "",
+    source,
+  };
+}
+
+function scoutOptions(f: Fetch, extraParams: Record<string, string>): ProviderOptions {
+  return {
+    fetchImpl: f as typeof fetch,
+    extraParams,
+    mailto: process.env.OPENALEX_MAILTO,
+    openAlexApiKey: process.env.OPENALEX_API_KEY,
+    timeoutMs: 15_000,
+  };
+}
+
+async function openAlexPapers(f: Fetch, interest: string, n: number, since: number): Promise<ScoutPaper[]> {
+  const res = await searchOpenAlex(interest, n, 1, scoutOptions(f, { filter: `from_publication_date:${since}-01-01,has_abstract:true,type:article` }));
+  if (res.error && res.items.length === 0) throw new Error(res.error);
+  return res.items.map((r, i) => toScoutPaper(r, i, "openalex"));
 }
 
 async function crossrefPapers(f: Fetch, interest: string, n: number, since: number): Promise<ScoutPaper[]> {
-  const q = new URLSearchParams({
-    query: interest,
-    filter: `from-pub-date:${since}-01-01,type:journal-article,has-abstract:true`,
-    rows: String(n),
-    select: "DOI,title,abstract,container-title,published,published-print,published-online,created,author",
-  });
-  const data = await getJson(f, `https://api.crossref.org/works?${q.toString()}`);
-  return (((data.message as Json)?.items as Json[]) ?? []).map((item, i) => {
-    const doi = cleanDoi(item.DOI);
-    return {
-      key: `p${i + 1}`,
-      title: firstString(item.title) ?? "Untitled",
-      year: crossrefYear(item),
-      venue: firstString(item["container-title"]),
-      doi,
-      url: doi ? `https://doi.org/${doi}` : undefined,
-      authors: ((item.author as Json[]) ?? []).map((a) => [a.given, a.family].filter(Boolean).join(" ")).filter(Boolean),
-      abstract: stripJats(item.abstract as string | undefined),
-      source: "crossref" as const,
-    };
-  });
+  const res = await searchCrossref(interest, n, 1, scoutOptions(f, { filter: `from-pub-date:${since}-01-01,type:journal-article,has-abstract:true` }));
+  if (res.error && res.items.length === 0) throw new Error(res.error);
+  return res.items.map((r, i) => toScoutPaper(r, i, "crossref"));
 }
 
 /** Up to n recent papers with abstracts on the interest; OpenAlex first, then Crossref. */

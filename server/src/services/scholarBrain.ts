@@ -12,7 +12,7 @@
  * 5. Deterministic Mark-Weighted Word Allocator: Proportional allocation across assignment questions.
  */
 
-import { buildAskGeneralPrompt, buildAskSearchPrompt } from "./askPrompts.ts";
+import { buildAskGeneralPrompt, buildAskSearchPrompt } from "../../../src/shared/askPrompts.ts";
 import { NoAiConnectedError, routedText, RouterHandoffError, toRouterTask } from "../ai/routerBridge.ts";
 import { BrowserAiRequiredError, LocalModelUnreachableError, NoClientAiProviderError } from "../ai/aiRouteErrors.ts";
 import {

@@ -178,7 +178,7 @@ describe("the search bar & delete confirmation modal", () => {
     expect(await screen.findByPlaceholderText("Search projects...")).toBeInTheDocument();
 
     // Consolidated transparent AI prompt bar on main dashboard
-    const promptInput = screen.getByPlaceholderText(/Paste text, drop files\/images, or draft research instructions/i);
+    const promptInput = screen.getByPlaceholderText(/Ask a question, paste your brief, or drop files/i);
     expect(promptInput).toBeInTheDocument();
     expect(promptInput).toHaveClass("bg-transparent");
   });
@@ -585,7 +585,7 @@ describe("landing workspace hero & academic workspace cards", () => {
     expect(screen.queryByRole("heading", { name: "Thesis / Dissertation" })).not.toBeInTheDocument();
 
     // Consolidated transparent AI prompt bar immediately below cards
-    const promptBar = screen.getByPlaceholderText(/Paste text, drop files\/images, or draft research instructions/i);
+    const promptBar = screen.getByPlaceholderText(/Ask a question, paste your brief, or drop files/i);
     expect(promptBar).toBeInTheDocument();
 
     // Projects section, secondary search, and progress cards are purged from main canvas
@@ -688,7 +688,7 @@ describe("landing workspace hero & academic workspace cards", () => {
     expect(mainCanvas.className).not.toContain("bg-[var(--bg-canvas)]");
 
     // 2. Shared Container Alignment & Bottom Docking
-    const promptInput = screen.getByPlaceholderText(/Paste text, drop files\/images, or draft research instructions/i);
+    const promptInput = screen.getByPlaceholderText(/Ask a question, paste your brief, or drop files/i);
     const promptForm = promptInput.closest("form")!;
     const sharedParent = promptForm.parentElement!;
 
@@ -779,7 +779,7 @@ describe("minimal website assistant", () => {
     expect(await screen.findByText(/Executive Scholarly Synthesis & Verified Literature Brief on Biology/i, {}, { timeout: 2000 })).toBeInTheDocument();
     expect(screen.getAllByText(/1540 words/i)[0]).toBeInTheDocument();
 
-    const handoffBtn = screen.getByRole("button", { name: /Launch in 4-Phase Essay Engine \(OT-01\)/i });
+    const handoffBtn = screen.getByRole("button", { name: /Continue in 4-Phase Coursework Engine/i });
     expect(handoffBtn).toBeInTheDocument();
     fireEvent.click(handoffBtn);
 
@@ -803,20 +803,6 @@ describe("minimal website assistant", () => {
     // The toast, plus its copy in the screen-reader live region once announced.
     const notices = await screen.findAllByText(/couldn't answer \(provider 500\)\. This answer came directly from your browser/i, {}, { timeout: 3000 });
     expect(notices[0]).toBeInTheDocument();
-  });
-
-  it("resets conversation when Reset Chat button is clicked", async () => {
-    listProjects.mockResolvedValue({ items: [] });
-    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
-
-    const toggleBtn = screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i });
-    fireEvent.click(toggleBtn);
-
-    const resetBtn = await screen.findByRole("button", { name: "Reset Chat" });
-    fireEvent.click(resetBtn);
-
-    expect(screen.queryByText(/Hello! I am your Scholar Core Website Assistant/i)).not.toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/Ask a research question/i)).toBeInTheDocument();
   });
 
   it("renders slide-in AI assistant sidebar on toggle", async () => {
@@ -1158,7 +1144,7 @@ describe("distinct academic format USPs & specs", () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
-    const promptTextarea = screen.getByPlaceholderText(/Paste text, drop files\/images, or draft research instructions/i) as HTMLTextAreaElement;
+    const promptTextarea = screen.getByPlaceholderText(/Ask a question, paste your brief, or drop files/i) as HTMLTextAreaElement;
     expect(promptTextarea).toBeInTheDocument();
     const promptForm = promptTextarea.closest("form")!;
 
@@ -1259,7 +1245,7 @@ describe("prompt isolation & rich markdown rendering", () => {
     const toggleBtn = screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i });
     fireEvent.click(toggleBtn);
 
-    const mainTextarea = screen.getByPlaceholderText(/Paste text, drop files\/images, or draft research instructions/i) as HTMLTextAreaElement;
+    const mainTextarea = screen.getByPlaceholderText(/Ask a question, paste your brief, or drop files/i) as HTMLTextAreaElement;
     const sidebarInput = screen.getByPlaceholderText(/Ask a research question/i) as HTMLInputElement;
 
     // Both are initially empty
@@ -1281,7 +1267,7 @@ describe("prompt isolation & rich markdown rendering", () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
-    const mainTextarea = screen.getByPlaceholderText(/Paste text, drop files\/images, or draft research instructions/i) as HTMLTextAreaElement;
+    const mainTextarea = screen.getByPlaceholderText(/Ask a question, paste your brief, or drop files/i) as HTMLTextAreaElement;
     fireEvent.change(mainTextarea, { target: { value: "Hello" } });
 
     // Should not render the intrusive popover, duplicate submit, or matching projects card

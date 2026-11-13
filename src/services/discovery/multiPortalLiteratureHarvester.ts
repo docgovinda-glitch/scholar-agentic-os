@@ -15,6 +15,8 @@
  * normalizes DOIs, unifies thematic clusters, and classifies landmark/seminal works.
  */
 
+import type { RawSourceInput } from "../../citation_compliance/cslEngine";
+import { searchCrossref, searchEuropePmc, searchOpenAlex, stripMarkup } from "../../shared/retrieval/providers";
 import { type LiteratureItem } from "../../desk/workspace/agentPrompts/literaturePrompts";
 import { normalizeDoi, normalizeTitle, calculateTokenSimilarity } from "../vault/duplicateDetection";
 export { normalizeDoi, normalizeTitle, calculateTokenSimilarity };
@@ -74,42 +76,7 @@ export interface MultiPortalHarvestResult {
   landmarkCount: number;
 }
 
-/**
- * Reconstructs plain-text abstract from OpenAlex's abstract_inverted_index.
- */
-export function reconstructOpenAlexAbstract(invertedIndex?: Record<string, number[]> | null): string {
-  if (!invertedIndex || typeof invertedIndex !== "object") return "";
-  const wordEntries: [number, string][] = [];
-  for (const [word, positions] of Object.entries(invertedIndex)) {
-    if (Array.isArray(positions)) {
-      for (const pos of positions) {
-        if (typeof pos === "number") {
-          wordEntries.push([pos, word]);
-        }
-      }
-    }
-  }
-  wordEntries.sort((a, b) => a[0] - b[0]);
-  return wordEntries.map((e) => e[1]).join(" ");
-}
-
-/**
- * Extracts and cleans text from HTML / XML tags (e.g. from CrossRef JATS tags or arXiv XML).
- */
-export function stripMarkup(text?: string | null): string {
-  if (!text) return "";
-  return text
-    .replace(/<jats:[^>]+>/gi, "")
-    .replace(/<\/jats:[^>]+>/gi, "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+export { reconstructOpenAlexAbstract, stripMarkup } from "../../shared/retrieval/providers";
 
 /**
  * Generates multi-angle keyword search seeds from the working title and research domain.
@@ -148,132 +115,44 @@ export function generateSearchSeeds(
   };
 }
 
+/** Shared-provider record -> harvester item. Fields a provider did not send stay empty (no placeholder venue or abstract). */
+function toHarvestItem(r: RawSourceInput, portal: OpenPortal, idx: number, landmarkCitations: number): PortalHarvestItem {
+  const doi = r.doi ? normalizeDoi(r.doi) || undefined : undefined;
+  const citations = r.citedByCount ?? 0;
+  return {
+    id: `${portal}-${doi ? doi.replace(/[^\w-]/g, "_") : idx}`,
+    portal,
+    doi,
+    title: r.title || "Untitled",
+    authors: Array.isArray(r.authors) ? (r.authors as unknown[]).filter((a): a is string => typeof a === "string") : [],
+    year: Number(r.year) || undefined,
+    journal: r.venue || "",
+    source: "external" as const,
+    relevanceScore: 0,
+    themes: r.themes ?? [],
+    abstract: r.snippet || "",
+    isLandmark: citations >= landmarkCitations,
+    url: r.url || (doi ? `https://doi.org/${doi}` : undefined),
+    citationCount: citations,
+    isOpenAccess: Boolean(r.isOpenAccess),
+    ...(r.openAccessUrl ? { openAccessPdfUrl: r.openAccessUrl } : {}),
+  };
+}
+
 /**
  * Harvester 1: OpenAlex (250M+ works, free open scholarly graph)
  */
 export async function harvestFromOpenAlex(query: string, limit = 30): Promise<PortalHarvestItem[]> {
-  try {
-    const url = `https://api.openalex.org/works?search=${encodeURIComponent(query)}&per-page=${limit}&sort=relevance_score:desc`;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        Accept: "application/json",
-        "User-Agent": "ScholarCore/2.0 (mailto:scholar-core@users.noreply.github.com)",
-      },
-    });
-    clearTimeout(timeoutId);
-
-    if (!res.ok) return [];
-    const data = await res.json();
-    if (!data || !Array.isArray(data.results)) return [];
-
-    return data.results.map((work: any, idx: number) => {
-      const doi = work.doi ? normalizeDoi(work.doi) || undefined : undefined;
-      const authors = Array.isArray(work.authorships)
-        ? work.authorships.map((a: any) => a.author?.display_name).filter(Boolean)
-        : [];
-      const venue =
-        work.primary_location?.source?.display_name ||
-        work.host_venue?.name ||
-        "Scholarly Journal";
-      const themes = Array.isArray(work.concepts)
-        ? work.concepts.slice(0, 4).map((c: any) => c.display_name.toLowerCase().replace(/\s+/g, "-"))
-        : [];
-      const abstract = reconstructOpenAlexAbstract(work.abstract_inverted_index);
-      const citations = work.cited_by_count || 0;
-      const isOpenAccess = Boolean(work.open_access?.is_oa || work.primary_location?.is_oa);
-      const oaUrl = work.open_access?.oa_url || work.primary_location?.pdf_url || undefined;
-
-      return {
-        id: `openalex-${work.id?.split("/").pop() || idx}`,
-        portal: "openalex" as OpenPortal,
-        doi,
-        title: stripMarkup(work.title || work.display_name || "Untitled"),
-        authors,
-        year: Number(work.publication_year) || undefined,
-        journal: venue,
-        source: "external" as const,
-        relevanceScore: 0,
-        themes,
-        abstract: abstract || "",
-        isLandmark: citations >= 100,
-        url: work.doi || work.primary_location?.landing_page_url || (work.id ? `https://openalex.org/${work.id.split("/").pop()}` : undefined),
-        citationCount: citations,
-        isOpenAccess,
-        openAccessPdfUrl: oaUrl,
-      };
-    });
-  } catch {
-    return [];
-  }
+  const { items } = await searchOpenAlex(query, limit, 1, { timeoutMs: 8000 });
+  return items.map((r, idx) => toHarvestItem(r, "openalex", idx, 100));
 }
 
 /**
  * Harvester 2: CrossRef (150M+ DOIs, international scholarly registrar)
  */
 export async function harvestFromCrossref(query: string, limit = 30): Promise<PortalHarvestItem[]> {
-  try {
-    const url = `https://api.crossref.org/works?query=${encodeURIComponent(query)}&rows=${limit}&sort=relevance`;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        Accept: "application/json",
-        "User-Agent": "ScholarCore/2.0 (mailto:scholar-core@users.noreply.github.com)",
-      },
-    });
-    clearTimeout(timeoutId);
-
-    if (!res.ok) return [];
-    const data = await res.json();
-    const items = data?.message?.items;
-    if (!Array.isArray(items)) return [];
-
-    return items.map((item: any, idx: number) => {
-      const doi = item.DOI ? normalizeDoi(item.DOI) || undefined : undefined;
-      const authors = Array.isArray(item.author)
-        ? item.author
-            .map((a: any) => (a.given && a.family ? `${a.family}, ${a.given}` : a.name || a.family || ""))
-            .filter(Boolean)
-        : [];
-      const title = Array.isArray(item.title) ? item.title[0] : item.title;
-      const container = Array.isArray(item["container-title"]) ? item["container-title"][0] : item["container-title"];
-      const year =
-        item.published?.["date-parts"]?.[0]?.[0] ||
-        item.created?.["date-parts"]?.[0]?.[0] ||
-        undefined;
-      const citations = item["is-referenced-by-count"] || 0;
-      const subjects = Array.isArray(item.subject)
-        ? item.subject.slice(0, 3).map((s: string) => s.toLowerCase().replace(/\s+/g, "-"))
-        : [];
-      const abstract = stripMarkup(item.abstract);
-
-      return {
-        id: `crossref-${doi ? doi.replace(/[^\w-]/g, "_") : idx}`,
-        portal: "crossref" as OpenPortal,
-        doi,
-        title: stripMarkup(title || "Untitled"),
-        authors,
-        year: Number(year) || undefined,
-        journal: container || "",
-        source: "external" as const,
-        relevanceScore: 0,
-        themes: subjects,
-        abstract: abstract || "",
-        isLandmark: citations >= 100,
-        url: item.URL || (doi ? `https://doi.org/${doi}` : undefined),
-        citationCount: citations,
-        isOpenAccess: Boolean(item.license && item.license.length > 0),
-      };
-    });
-  } catch {
-    return [];
-  }
+  const { items } = await searchCrossref(query, limit, 1, { timeoutMs: 8000 });
+  return items.map((r, idx) => toHarvestItem(r, "crossref", idx, 100));
 }
 
 /**
@@ -440,50 +319,8 @@ export async function harvestFromDataCite(query: string, limit = 25): Promise<Po
  * Harvester 6: Europe PMC (Open access biomedical and life sciences research)
  */
 export async function harvestFromEuropePmc(query: string, limit = 25): Promise<PortalHarvestItem[]> {
-  try {
-    const url = `https://europepmc.org/Restful/WebService/rest/v1/search?query=${encodeURIComponent(query)}&format=json&pageSize=${limit}&resultType=core`;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
-
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeoutId);
-
-    if (!res.ok) return [];
-    const contentType = res.headers.get("content-type") || "";
-    if (!contentType.includes("json")) return [];
-
-    const data = await res.json();
-    const results = data?.resultList?.result;
-    if (!Array.isArray(results)) return [];
-
-    return results.map((item: any, idx: number) => {
-      const doi = item.doi ? normalizeDoi(item.doi) || undefined : undefined;
-      const authors = item.authorString
-        ? item.authorString.split(",").map((a: string) => a.trim()).filter(Boolean)
-        : [];
-      const citations = item.citedByCount || 0;
-
-      return {
-        id: `europepmc-${item.id || idx}`,
-        portal: "europepmc" as OpenPortal,
-        doi,
-        title: stripMarkup(item.title || "Untitled"),
-        authors,
-        year: Number(item.pubYear) || undefined,
-        journal: item.journalTitle || "",
-        source: "external" as const,
-        relevanceScore: 0,
-        themes: ["europe-pmc"],
-        abstract: stripMarkup(item.abstractText) || "",
-        isLandmark: citations >= 80,
-        url: doi ? `https://doi.org/${doi}` : item.pmcid ? `https://europepmc.org/articles/${item.pmcid}` : undefined,
-        citationCount: citations,
-        isOpenAccess: item.isOpenAccess === "Y",
-      };
-    });
-  } catch {
-    return [];
-  }
+  const { items } = await searchEuropePmc(query, limit, { timeoutMs: 6000 });
+  return items.map((r, idx) => toHarvestItem(r, "europepmc", idx, 80));
 }
 
 /**

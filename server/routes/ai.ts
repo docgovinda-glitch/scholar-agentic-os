@@ -28,7 +28,7 @@ import type { VerifiedSourceItem } from "../src/utils/citationLockScrubber.ts";
 import { countExactWords } from "../src/utils/wordBudgetAllocator.ts";
 import { evaluateBurstiness } from "../src/utils/scholarlyVoiceGuard.ts";
 import { chunkAndRerankEvidence } from "../src/services/semanticRagEngine.ts";
-import { askStyleDescription } from "../src/services/askPrompts.ts";
+import { ASK_BASE_IDENTITY, askStyleDescription } from "../../src/shared/askPrompts.ts";
 import { deleteThread, listThreads, parseThreads, saveThreads } from "../src/askThreads/threadStore.ts";
 
 /** Deep research runs each of its AI steps through the request's router chain. */
@@ -517,7 +517,7 @@ export function registerAIRoutes(
     try {
       const {
         prompt,
-        systemPrompt = "You are Scholar Core Socratic Assistant, an authoritative academic companion. Provide precise, rigorous, intellectually honest answers with clear citations. Where appropriate, use structured data formats like Markdown tables to compare or organize information. Prioritize the most recent and highly relevant empirical data, incorporating analytical depth.",
+        systemPrompt = ASK_BASE_IDENTITY,
         history = [],
         files = [],
         images = [],
@@ -791,7 +791,7 @@ export function registerAIRoutes(
             title: s.title,
             url: s.url || (s.doi ? `https://doi.org/${s.doi}` : `#vault-${s.id}`),
             doi: s.doi,
-            snippet: `Internal Knowledge Vault source (${s.venue || "Scholarly Vault"}).`,
+            snippet: "",
             venue: s.venue || "Knowledge Vault",
             year: String(s.year),
             authors: s.authors,
@@ -815,7 +815,7 @@ export function registerAIRoutes(
             title: v.title || `Vault Source ${idx + 1}`,
             url: v.url || (v.doi ? `https://doi.org/${v.doi}` : `#vault-${idx + 1}`),
             doi: v.doi,
-            snippet: v.snippet || v.notes || v.abstract || `Saved in Knowledge Vault (${v.venue || v.journal || "Vault"}).`,
+            snippet: v.snippet || v.notes || v.abstract || "",
             venue: v.venue || v.journal || "Knowledge Vault",
             year: String(v.year),
             authors: Array.isArray(v.authors) ? v.authors : [String(v.author)],

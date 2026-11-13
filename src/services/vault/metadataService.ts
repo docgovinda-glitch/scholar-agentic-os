@@ -9,6 +9,7 @@
  * Never fabricates data. Returns confidence indicators ("verified" vs "needs_review").
  */
 
+import { lookupCrossrefByDoi, lookupOpenAlexByDoi } from "../../shared/retrieval/providers";
 import { authedJsonFetch } from "../../desk/api";
 import type { SourceMetadata } from "./sourceTypes";
 import { normalizeDoi } from "./duplicateDetection";
@@ -67,6 +68,12 @@ export function generateAPA7Citation(meta: {
   }
 
   return `${authorStr} ${yearStr}. ${titleStr}${sourceStr}${linkStr}`.trim();
+}
+
+/** "Family, Given" -> "Given Family" (citation text is built from given-name-first names). */
+function givenNameFirst(name: string): string {
+  const [family, ...given] = name.split(",");
+  return given.length > 0 ? `${given.join(",").trim()} ${family.trim()}` : name.trim();
 }
 
 /**
@@ -144,51 +151,22 @@ export async function resolveDoiMetadata(rawDoi: string): Promise<ResolvedMetada
     // Fall back to direct OpenAlex API
   }
 
-  // 2. OpenAlex free API (CORS enabled, highly reliable)
-  try {
-    const openAlexUrl = `https://api.openalex.org/works/https://doi.org/${clean}`;
-    const res = await fetch(openAlexUrl, {
-      headers: { Accept: "application/json" },
-    });
+  // 2. OpenAlex, then Crossref, through the shared provider lookups
+  for (const lookup of [lookupOpenAlexByDoi, lookupCrossrefByDoi]) {
+    try {
+      const found = await lookup(clean, { timeoutMs: 8000 });
+      if (!found || !found.title) continue;
+      const authors = (Array.isArray(found.authors) ? (found.authors as string[]) : []).map(givenNameFirst);
+      const year = found.year ? String(found.year) : "";
+      const journal = found.venue || "";
+      const title = found.title;
 
-    if (res.ok) {
-      const data = await res.json();
-      const title = data.title || "";
-      const authors: string[] = (data.authorships || [])
-        .map((a: any) => a.author?.display_name)
-        .filter(Boolean);
-      const year = data.publication_year ? String(data.publication_year) : "";
-      const journal =
-        data.primary_location?.source?.display_name ||
-        data.host_venue?.name ||
-        "";
-
-      const citation = generateAPA7Citation({
-        authors,
-        year,
-        title,
-        journal,
-        doi: clean,
-      });
-
-      const takeaways = generateKeyPointsAndNotes({
-        title,
-        authors,
-        year,
-        journal,
-      });
+      const citation = generateAPA7Citation({ authors, year, title, journal, doi: clean });
+      const takeaways = generateKeyPointsAndNotes({ title, authors, year, journal });
 
       return {
         success: true,
-        metadata: {
-          title,
-          authors,
-          year,
-          journal,
-          doi: clean,
-          url: `https://doi.org/${clean}`,
-          type: "paper",
-        },
+        metadata: { title, authors, year, journal, doi: clean, url: `https://doi.org/${clean}`, type: "paper" },
         citation,
         confidence: "verified",
         keyPoints: takeaways.keyPoints,
@@ -196,76 +174,10 @@ export async function resolveDoiMetadata(rawDoi: string): Promise<ResolvedMetada
         whySaved: takeaways.whySaved,
         keyQuote: takeaways.keyQuote,
       };
+    } catch {
+      // try the next index
     }
-  } catch {
-    // Fall through to Crossref
   }
-
-  // 3. Crossref API
-  try {
-    const crossrefUrl = `https://api.crossref.org/works/${clean}`;
-    const res = await fetch(crossrefUrl, {
-      headers: { Accept: "application/json" },
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      const item = data.message;
-      const title = item.title?.[0] || "";
-      const authors: string[] = (item.author || []).map((a: any) => {
-        if (a.given && a.family) return `${a.given} ${a.family}`;
-        return a.family || a.name || "";
-      });
-      const dateParts =
-        item["published-print"]?.["date-parts"]?.[0] ||
-        item["published-online"]?.["date-parts"]?.[0] ||
-        item.published?.["date-parts"]?.[0] ||
-        item.issued?.["date-parts"]?.[0] ||
-        item.created?.["date-parts"]?.[0] ||
-        item["journal-issue"]?.published?.["date-parts"]?.[0] ||
-        item["journal-issue"]?.["published-print"]?.["date-parts"]?.[0] ||
-        item["journal-issue"]?.["published-online"]?.["date-parts"]?.[0];
-
-      const year = dateParts?.[0] ? String(dateParts[0]) : "";
-      const journal = Array.isArray(item["container-title"])
-        ? item["container-title"][0]
-        : item["container-title"] || "";
-
-      const citation = generateAPA7Citation({
-        authors,
-        year,
-        title,
-        journal,
-        doi: clean,
-      });
-
-      const takeaways = generateKeyPointsAndNotes({
-        title,
-        authors,
-        year,
-        journal,
-      });
-
-      return {
-        success: true,
-        metadata: {
-          title,
-          authors,
-          year,
-          journal,
-          doi: clean,
-          url: `https://doi.org/${clean}`,
-          type: "paper",
-        },
-        citation,
-        confidence: "verified",
-        keyPoints: takeaways.keyPoints,
-        suggestedTags: takeaways.suggestedTags,
-        whySaved: takeaways.whySaved,
-        keyQuote: takeaways.keyQuote,
-      };
-    }
-  } catch {}
 
   // 4. DataCite API (CORS enabled, covers arXiv, Zenodo, Figshare, institutional repos)
   try {

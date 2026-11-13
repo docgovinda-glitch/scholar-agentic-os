@@ -56,6 +56,8 @@ export interface HandoffInput {
   /** The question that produced the answer (defaults to the last user message). */
   question?: string;
   files?: HandoffFile[];
+  /** Names of images discussed in the conversation. Their analysis is in the conversation; the bytes are not copied. */
+  imageNames?: string[];
   sources?: HandoffSourceInput[];
   citationStyle: string;
   suggestedTitle?: string;
@@ -113,6 +115,7 @@ export function buildWorkspaceHandoff(input: HandoffInput): WorkspaceHandoff {
     .slice(-MAX_FILES)
     .map((f) => ({ name: f.name, type: f.type ?? "", text: f.text.slice(0, MAX_FILE_CHARS) }));
   const sources = normalizeHandoffSources(input.sources);
+  const imageNames = [...new Set((input.imageNames ?? []).filter(Boolean))].slice(0, 12);
 
   const conversation = turns.map((m) => ({ role: m.sender, text: m.text.slice(0, MAX_TURN_CHARS) }));
   const documentText = files.map((f) => `--- ${f.name} ---\n${f.text}`).join("\n\n");
@@ -122,11 +125,12 @@ export function buildWorkspaceHandoff(input: HandoffInput): WorkspaceHandoff {
     working_title: title,
     citation_style: input.citationStyle,
     targetWordCount: input.wordCountTarget,
-    backgroundNotes: `Ask Scholar synthesis (carried over from the conversation):\n\n${input.answerText}`,
+    backgroundNotes: `Ask Scholar synthesis (carried over from the conversation):\n\n${input.answerText}${imageNames.length > 0 ? `\n\nImages discussed in the conversation (their analysis is above): ${imageNames.join(", ")}.` : ""}`,
     preliminaryEvidence: sourceNotes(sources),
     discovered_sources: JSON.stringify(sources),
     ask_conversation: conversation,
     ask_documents: files,
+    ask_images: imageNames.map((name) => ({ name })),
   };
 
   let specific: Record<string, unknown>;

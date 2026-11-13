@@ -1,8 +1,12 @@
 /**
- * Prompt text for AskScholar, owned by scholarBrain (the only module that imports this file).
- * Keeps the platform facts, citation standard and answer-length rules in one place so every
+ * Prompt text for AskScholar. The server builds answers from it through `scholarBrain.askSystemPrompt`;
+ * the browser uses it only for its own-key fallback, so both read one set of rules. Keeps the platform facts, citation standard and answer-length rules in one place so every
  * surface that reaches the brain behaves the same.
  */
+
+/** Who the assistant is: the base every Ask prompt builds on. */
+export const ASK_BASE_IDENTITY =
+  "You are AskScholar, the research assistant of Scholar Core: precise, rigorous and intellectually honest, with clear citations where claims rest on sources.";
 
 export const ASK_STYLE_DESCRIPTIONS: Record<string, string> = {
   apa: "APA 7th Edition (author-date, e.g. (Author, Year))",

@@ -12,7 +12,8 @@
  */
 
 import { normalizeDoi, normalizeTitle, calculateTokenSimilarity } from "../vault/duplicateDetection";
-import { reconstructOpenAlexAbstract, stripMarkup } from "./multiPortalLiteratureHarvester";
+import type { RawSourceInput } from "../../citation_compliance/cslEngine";
+import { fetchOpenAlexCitedBy, fetchOpenAlexReferences } from "../../shared/retrieval/providers";
 
 export interface CitationGraphNode {
   id: string;
@@ -173,136 +174,52 @@ export function buildInitialCitationGraph(
   };
 }
 
-/**
- * Searches OpenAlex or synthesizes backward citations (references cited by the selected paper).
- */
-export async function fetchBackwardCitations(
-  paper: CitationGraphNode,
-  limit = 8
-): Promise<CitationGraphNode[]> {
-  try {
-    const doi = paper.doi ? normalizeDoi(paper.doi) : null;
-    let url = "";
-    if (doi) {
-      url = `https://api.openalex.org/works/https://doi.org/${encodeURIComponent(doi)}`;
-    } else {
-      url = `https://api.openalex.org/works?search=${encodeURIComponent(paper.title)}&per-page=1`;
-    }
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 6000);
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: { Accept: "application/json", "User-Agent": "ScholarCore/2.0" },
-    });
-    clearTimeout(timeout);
-
-    if (res.ok) {
-      const data = await res.json();
-      const work = doi ? data : (data.results && data.results[0]);
-      if (work && Array.isArray(work.referenced_works) && work.referenced_works.length > 0) {
-        const refIds = work.referenced_works.slice(0, limit);
-        const refQuery = refIds.map((r: string) => r.split("/").pop()).join("|");
-        const refRes = await fetch(`https://api.openalex.org/works?filter=openalex_id:${refQuery}&per-page=${limit}`, {
-          headers: { Accept: "application/json", "User-Agent": "ScholarCore/2.0" },
-        });
-        if (refRes.ok) {
-          const refData = await refRes.json();
-          if (Array.isArray(refData.results) && refData.results.length > 0) {
-            return refData.results.map((r: any, idx: number) => ({
-              id: `ref-${r.id?.split("/").pop() || idx}`,
-              doi: r.doi ? normalizeDoi(r.doi) || undefined : undefined,
-              title: stripMarkup(r.title || r.display_name || `Reference ${idx + 1}`),
-              authors: Array.isArray(r.authorships)
-                ? r.authorships.map((a: any) => a.author?.display_name).filter(Boolean)
-                : ["Referenced Scholar"],
-              year: Number(r.publication_year) || (paper.year ? paper.year - 2 : 2018),
-              journal: r.primary_location?.source?.display_name || "Academic Journal",
-              venue: r.primary_location?.source?.display_name || "Academic Journal",
-              abstract: reconstructOpenAlexAbstract(r.abstract_inverted_index) || `Foundational antecedent cited by ${paper.title}.`,
-              url: r.doi || (r.id ? `https://openalex.org/${r.id.split("/").pop()}` : undefined),
-              citationCount: r.cited_by_count || Math.floor(Math.random() * 90) + 20,
-              isOpenAccess: Boolean(r.open_access?.is_oa),
-              openAccessPdfUrl: r.open_access?.oa_url,
-              nodeType: "discovered_backward" as const,
-              depth: paper.depth + 1,
-              inDegree: 1,
-              outDegree: 0,
-              isLandmark: (r.cited_by_count || 0) >= 100,
-              stance: "supporting" as const,
-              snippet: `Seminal theoretical foundation establishing methodological precedent for subsequent inquiries.`,
-            }));
-          }
-        }
-      }
-    }
-  } catch {
-    // Network or rate limit fallback
-  }
-
-  // Synthesize rigorous backward references if external endpoint is offline
-  return generateDeterministicAntecedents(paper, limit);
+function toGraphNode(
+  r: RawSourceInput,
+  kind: "discovered_backward" | "discovered_forward",
+  parent: CitationGraphNode,
+  idx: number
+): CitationGraphNode {
+  const prefix = kind === "discovered_backward" ? "ref" : "fwd";
+  const citations = r.citedByCount ?? 0;
+  return {
+    id: `${prefix}-${r.id || idx}`,
+    doi: r.doi ? normalizeDoi(r.doi) || undefined : undefined,
+    title: r.title || "Untitled",
+    authors: Array.isArray(r.authors) ? (r.authors as unknown[]).filter((a): a is string => typeof a === "string") : [],
+    year: Number(r.year) || undefined,
+    journal: r.venue,
+    venue: r.venue,
+    abstract: r.snippet || undefined,
+    url: r.url,
+    citationCount: citations,
+    isOpenAccess: Boolean(r.isOpenAccess),
+    openAccessPdfUrl: r.openAccessUrl,
+    nodeType: kind,
+    depth: parent.depth + 1,
+    inDegree: kind === "discovered_backward" ? 1 : 0,
+    outDegree: kind === "discovered_backward" ? 0 : 1,
+    isLandmark: citations >= (kind === "discovered_backward" ? 100 : 80),
+    // The stance of a citation is not known from the index; it is never guessed.
+    stance: "mentioning",
+  };
 }
 
 /**
- * Searches OpenAlex or synthesizes forward citations (papers citing the selected work).
+ * Works the selected paper cites, from OpenAlex. Returns nothing when the index cannot be reached:
+ * no placeholder papers are ever substituted.
  */
-export async function fetchForwardCitations(
-  paper: CitationGraphNode,
-  limit = 8
-): Promise<CitationGraphNode[]> {
-  try {
-    const doi = paper.doi ? normalizeDoi(paper.doi) : null;
-    let workId = "";
-    if (doi) {
-      const res = await fetch(`https://api.openalex.org/works/https://doi.org/${encodeURIComponent(doi)}`, {
-        headers: { Accept: "application/json", "User-Agent": "ScholarCore/2.0" },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        workId = data.id?.split("/").pop();
-      }
-    }
+export async function fetchBackwardCitations(paper: CitationGraphNode, limit = 8): Promise<CitationGraphNode[]> {
+  const { items } = await fetchOpenAlexReferences({ doi: paper.doi, title: paper.title }, limit, { timeoutMs: 8000 });
+  return items.map((r, idx) => toGraphNode(r, "discovered_backward", paper, idx));
+}
 
-    if (workId) {
-      const citesUrl = `https://api.openalex.org/works?filter=cites:${workId}&per-page=${limit}&sort=cited_by_count:desc`;
-      const citesRes = await fetch(citesUrl, {
-        headers: { Accept: "application/json", "User-Agent": "ScholarCore/2.0" },
-      });
-      if (citesRes.ok) {
-        const data = await citesRes.json();
-        if (Array.isArray(data.results) && data.results.length > 0) {
-          return data.results.map((c: any, idx: number) => ({
-            id: `fwd-${c.id?.split("/").pop() || idx}`,
-            doi: c.doi ? normalizeDoi(c.doi) || undefined : undefined,
-            title: stripMarkup(c.title || c.display_name || `Extension Paper ${idx + 1}`),
-            authors: Array.isArray(c.authorships)
-              ? c.authorships.map((a: any) => a.author?.display_name).filter(Boolean)
-              : ["Subsequent Researcher"],
-            year: Number(c.publication_year) || (paper.year ? paper.year + 1 : 2024),
-            journal: c.primary_location?.source?.display_name || "Peer-Reviewed Proceedings",
-            venue: c.primary_location?.source?.display_name || "Peer-Reviewed Proceedings",
-            abstract: reconstructOpenAlexAbstract(c.abstract_inverted_index) || `Subsequent research extending the empirical findings of ${paper.title}.`,
-            url: c.doi || (c.id ? `https://openalex.org/${c.id.split("/").pop()}` : undefined),
-            citationCount: c.cited_by_count || Math.floor(Math.random() * 45) + 5,
-            isOpenAccess: Boolean(c.open_access?.is_oa),
-            openAccessPdfUrl: c.open_access?.oa_url,
-            nodeType: "discovered_forward" as const,
-            depth: paper.depth + 1,
-            inDegree: 0,
-            outDegree: 1,
-            isLandmark: (c.cited_by_count || 0) >= 80,
-            stance: idx % 3 === 1 ? ("contradicting" as const) : ("supporting" as const),
-            snippet: `Recent empirical follow-up evaluating boundary conditions and generalizability.`,
-          }));
-        }
-      }
-    }
-  } catch {
-    // Network or rate limit fallback
-  }
-
-  return generateDeterministicExtensions(paper, limit);
+/**
+ * Works that cite the selected paper, most cited first, from OpenAlex. Returns nothing when unreachable.
+ */
+export async function fetchForwardCitations(paper: CitationGraphNode, limit = 8): Promise<CitationGraphNode[]> {
+  const { items } = await fetchOpenAlexCitedBy({ doi: paper.doi, title: paper.title }, limit, { timeoutMs: 8000 });
+  return items.map((r, idx) => toGraphNode(r, "discovered_forward", paper, idx));
 }
 
 /**
@@ -730,87 +647,3 @@ function escapeXml(unsafe: string): string {
     }
   });
 }
-
-/**
- * Deterministic generation of foundational antecedents (for robust offline or rate-limited operation).
- */
-function generateDeterministicAntecedents(paper: CitationGraphNode, limit: number): CitationGraphNode[] {
-  const baseYear = paper.year ? paper.year - 3 : 2018;
-  const titleTokens = paper.title.split(" ").filter((w) => w.length > 4);
-  const coreKeyword = titleTokens[0] || "Foundational";
-
-  const results: CitationGraphNode[] = [];
-  for (let i = 0; i < limit; i++) {
-    const year = Math.max(2010, baseYear - i);
-    const authorSur = ["Kahneman", "Vaswani", "Tversky", "Bengio", "LeCun", "Pearl", "Sutton", "Goodfellow"][i % 8];
-    const authorInit = String.fromCharCode(65 + i);
-    results.push({
-      id: `antecedent-${paper.id}-${i}`,
-      doi: `10.1000/scholar.fnd.${Math.abs(hashString(paper.id + i))}`,
-      title: `${coreKeyword} Foundations and Structural Dynamics in Scholarly Systems: An Antecedent Analysis (Vol. ${i + 1})`,
-      authors: [`${authorSur}, ${authorInit}.`],
-      year,
-      journal: "Journal of Theoretical and Empirical Science",
-      venue: "Journal of Theoretical and Empirical Science",
-      abstract: `Seminal theoretical antecedent establishing the foundational conceptual basis cited by ${paper.title}. Formulates foundational equations and structural properties.`,
-      url: `https://doi.org/10.1000/scholar.fnd.${Math.abs(hashString(paper.id + i))}`,
-      citationCount: 120 + (limit - i) * 35,
-      isOpenAccess: true,
-      nodeType: "discovered_backward",
-      depth: paper.depth + 1,
-      inDegree: 1,
-      outDegree: 0,
-      isLandmark: true,
-      stance: "supporting",
-      snippet: `Foundational study cited as establishing the empirical benchmark model.`,
-    });
-  }
-  return results;
-}
-
-/**
- * Deterministic generation of forward extensions (for robust offline or rate-limited operation).
- */
-function generateDeterministicExtensions(paper: CitationGraphNode, limit: number): CitationGraphNode[] {
-  const baseYear = paper.year ? paper.year + 1 : 2024;
-  const titleTokens = paper.title.split(" ").filter((w) => w.length > 4);
-  const coreKeyword = titleTokens[0] || "Advanced";
-
-  const results: CitationGraphNode[] = [];
-  for (let i = 0; i < limit; i++) {
-    const year = Math.min(new Date().getFullYear(), baseYear + (i % 2));
-    const authorSur = ["Chen", "Rodriguez", "Nakamoto", "Zhang", "Gupta", "Muller", "O'Connor", "Dubois"][i % 8];
-    const authorInit = String.fromCharCode(70 + i);
-    results.push({
-      id: `extension-${paper.id}-${i}`,
-      doi: `10.1000/scholar.ext.${Math.abs(hashString(paper.id + i * 7))}`,
-      title: `Longitudinal Re-evaluation and Boundary Extensions of ${coreKeyword}: Empirical Evidence from Heterogeneous Cohorts`,
-      authors: [`${authorSur}, ${authorInit}.`],
-      year,
-      journal: "Nature Reviews Research & Methodologies",
-      venue: "Nature Reviews Research & Methodologies",
-      abstract: `Recent forward extension citing ${paper.title}. Investigates longitudinal generalizability and tests competing explanations across multi-site datasets.`,
-      url: `https://doi.org/10.1000/scholar.ext.${Math.abs(hashString(paper.id + i * 7))}`,
-      citationCount: 25 + (limit - i) * 8,
-      isOpenAccess: true,
-      nodeType: "discovered_forward",
-      depth: paper.depth + 1,
-      inDegree: 0,
-      outDegree: 1,
-      isLandmark: (limit - i) >= 4,
-      stance: i % 2 === 1 ? "contradicting" : "supporting",
-      snippet: `Subsequent investigation citing this study to demonstrate divergent boundary effects.`,
-    });
-  }
-  return results;
-}
-
-function hashString(str: string): number {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = (hash << 5) - hash + str.charCodeAt(i);
-    hash |= 0;
-  }
-  return hash;
-}
-

@@ -1,3 +1,4 @@
+import { lookupCrossrefByDoi } from "../shared/retrieval/providers";
 /**
  * CSL-JSON Citation Verification, Retraction Checking, Metadata Extraction,
  * and Multi-Style Rendering Engine (Section 6).
@@ -100,6 +101,8 @@ export interface RawSourceInput {
   metadataMismatchWithDoi?: boolean;
   crossrefUpdateTo?: Array<{ type?: string; label?: string }>;
   citedByCount?: number;
+  themes?: string[];
+  isOpenAccess?: boolean;
   snippet?: string;
   domain?: string;
 }
@@ -686,42 +689,16 @@ export async function verifyAndEnrichDOIMetadataBatch(
   await Promise.allSettled(
     indicesToLookup.map(async ({ idx, doi }) => {
       try {
-        const res = await fetch(`https://api.crossref.org/works/${encodeURIComponent(doi)}`, {
-          signal: options.signal ?? AbortSignal.timeout(2500),
-        });
-        if (!res.ok) return;
-        const data = (await res.json()) as {
-          message?: {
-            title?: string[];
-            author?: Array<{ given?: string; family?: string; name?: string }>;
-            "container-title"?: string[];
-            volume?: string;
-            issue?: string;
-            page?: string;
-            publisher?: string;
-            "update-to"?: Array<{ type?: string; label?: string }>;
-            published?: { "date-parts"?: number[][] };
-            "published-print"?: { "date-parts"?: number[][] };
-            "published-online"?: { "date-parts"?: number[][] };
-          };
-        };
-        const msg = data?.message;
-        if (!msg || typeof msg !== "object") return;
+        const found = await lookupCrossrefByDoi(doi, { signal: options.signal, timeoutMs: 2500 });
+        if (!found) return;
 
-        const crTitle = Array.isArray(msg.title) ? (msg.title[0] || "").replace(/<[^>]+>/g, "").trim() : "";
+        const crTitle = (found.title || "").trim();
         const orig = enriched[idx];
         const mismatch = Boolean(orig.title && crTitle && !hasSignificantTitleOverlap(orig.title, crTitle));
-
-        const crAuthors = (msg.author ?? [])
-          .map((a) => (a.family && a.given ? `${a.family}, ${a.given}` : a.name || a.family || ""))
-          .filter(Boolean);
-        const crVenue = Array.isArray(msg["container-title"]) ? msg["container-title"][0] : undefined;
-        const dateParts =
-          msg.published?.["date-parts"]?.[0] ||
-          msg["published-print"]?.["date-parts"]?.[0] ||
-          msg["published-online"]?.["date-parts"]?.[0];
-        const crYear = dateParts?.[0];
-        const updateTo = msg["update-to"];
+        const crAuthors = Array.isArray(found.authors) ? (found.authors as string[]) : [];
+        const crVenue = found.venue;
+        const crYear = typeof found.year === "number" ? found.year : Number(found.year) || undefined;
+        const updateTo = found.crossrefUpdateTo;
         const isRetracted = Array.isArray(updateTo)
           ? updateTo.some((u) => /retract/i.test(`${u.type || ""} ${u.label || ""}`))
           : false;
@@ -732,10 +709,10 @@ export async function verifyAndEnrichDOIMetadataBatch(
           year: crYear,
           venue: crVenue,
           journal: crVenue,
-          volume: msg.volume,
-          issue: msg.issue,
-          pages: msg.page,
-          publisher: msg.publisher,
+          volume: found.volume,
+          issue: found.issue,
+          pages: found.pages,
+          publisher: found.publisher,
           crossrefUpdateTo: updateTo,
           isRetracted: Boolean(isRetracted || orig.isRetracted),
           retractionNotice: isRetracted

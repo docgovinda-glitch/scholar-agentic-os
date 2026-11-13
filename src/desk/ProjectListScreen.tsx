@@ -115,13 +115,13 @@ import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import { useBackToClose } from "../hooks/useBackToClose";
 import { useDeviceClass } from "../hooks/useDeviceClass";
 import {
-  ASK_ANSWER_GUIDE,
-  buildStyleAwareAnswerGuide,
   askFailureMessage,
   liveSourcesAsCitations,
 } from "./dashboard/askScholarAnswer";
 import { loadUserAiSettings } from "../services/userAiSettings";
-import { PromptBarActionMenu, type PromptMode } from "./PromptBarActionMenu";
+import { type PromptMode } from "./PromptBarActionMenu";
+import { AskPromptBox } from "./ask/AskPromptBox";
+import { ASK_BASE_IDENTITY, buildAskGeneralPrompt } from "../shared/askPrompts";
 import {
   ASK_SCHOLAR_CITATION_STYLES,
   getCitationStyleInfo,
@@ -772,7 +772,6 @@ export default function ProjectListScreen({
   const [mainAttachments, setMainAttachments] = useState<AgentAttachmentItem[]>([]);
   const [isMainUploadingAttachment, setIsMainUploadingAttachment] = useState<boolean>(false);
   const [mainAiMode, setMainAiMode] = useState<PromptMode>("auto");
-  const [isDragging, setIsDragging] = useState(false);
   const guideTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Sidebar Chat / Website Assistant State
@@ -879,8 +878,7 @@ export default function ProjectListScreen({
     };
   }, [userEmail]);
 
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const guideInputRef = useRef<HTMLTextAreaElement | HTMLInputElement | null>(null);
+  const guideInputRef = useRef<HTMLTextAreaElement | null>(null);
   const sidebarFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Follow the answer only while the reader is at the bottom. If they scroll up to
@@ -903,24 +901,18 @@ export default function ProjectListScreen({
     else el.scrollTop = el.scrollHeight;
   }, []);
 
-  // Auto-scroll chat container to bottom as AskScholar streams tokens, thinks, or appends messages
+  // Follow the answer: smooth for a new message, instant while tokens stream (a smooth
+  // animation restarted on every token makes the page shudder).
+  const lastScrolledCountRef = useRef(0);
   useEffect(() => {
     // Sending a message always brings the reader back to the bottom.
     if (guideMessages[guideMessages.length - 1]?.sender === "user") stickToBottomRef.current = true;
-    if (!stickToBottomRef.current) return;
-    if (chatCanvasRef.current) {
-      if (typeof chatCanvasRef.current.scrollTo === "function") {
-        chatCanvasRef.current.scrollTo({
-          top: chatCanvasRef.current.scrollHeight,
-          behavior: "smooth",
-        });
-      } else {
-        chatCanvasRef.current.scrollTop = chatCanvasRef.current.scrollHeight;
-      }
-    }
-    if (messagesEndRef.current && typeof messagesEndRef.current.scrollIntoView === "function") {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
-    }
+    const el = chatCanvasRef.current;
+    if (!el || !stickToBottomRef.current) return;
+    const newMessage = guideMessages.length !== lastScrolledCountRef.current;
+    lastScrolledCountRef.current = guideMessages.length;
+    if (typeof el.scrollTo === "function") el.scrollTo({ top: el.scrollHeight, behavior: newMessage ? "smooth" : "auto" });
+    else el.scrollTop = el.scrollHeight;
   }, [streamingGuideText, isGuideThinking, askPhase?.step, askPhase?.detail, guideMessages.length]);
 
   // Handle outside clicks to close the mobile academic workspace dropdown
@@ -1084,10 +1076,6 @@ export default function ProjectListScreen({
 
   const removeMainAttachment = (id: string) => {
     setMainAttachments((prev) => prev.filter((a) => a.id !== id));
-  };
-
-  const addMainFiles = (files: File[]) => {
-    handleMainFileSelect(files);
   };
 
   const handleSidebarFileSelect = (files: FileList | File[] | null) => {
@@ -1661,15 +1649,19 @@ export default function ProjectListScreen({
 
         let agentResponse: (AgenticQueryResponse & { ok?: boolean }) | undefined;
         const styleInfo = getCitationStyleInfo(askCitationStyle);
-        const styleAwareGuide = buildStyleAwareAnswerGuide(askCitationStyle, askUserSettings.answerLengthPreference);
-        const systemPrompt = `You are AskScholar (Scholar Core AI Research Assistant), a scholarly research assistant for students, researchers, and professionals across STEM, management and business, social sciences, humanities, health, law, and education. Ground your answer in authentic scholarly and open-web sources, format every citation in ${styleInfo.name}, ignore any retrieved snippet that is off-topic to the user's question, and never fabricate sources, DOIs, or placeholder metadata ("Unknown Author", "n.d.").\n\n${styleAwareGuide}`;
+        const systemPrompt = buildAskGeneralPrompt({
+          base: ASK_BASE_IDENTITY,
+          style: askCitationStyle,
+          length: askUserSettings.answerLengthPreference,
+        });
 
         // Smart auto-grounding:
         // - Chat is the default entry point and automatically decides when to retrieve sources.
-        const isLiveCurrentEventsQuery =
-          /\b(?:latest|current|recent|today|yesterday|this week|this month|this year|202[5-7]|election|midterm|who won|breaking news|stock price|inflation rate|search the web)\b/i.test(
-            query
-          );
+        const thisYear = new Date().getFullYear();
+        const isLiveCurrentEventsQuery = new RegExp(
+          `\\b(?:latest|current|recent|today|yesterday|this week|this month|this year|${thisYear - 1}|${thisYear}|${thisYear + 1}|election|midterm|who won|breaking news|stock price|inflation rate|search the web)\\b`,
+          "i"
+        ).test(query);
         const isPureConversationalOrCoding =
           /^(?:hi|hello|hey|good morning|good evening|thanks|thank you)\b/i.test(query.trim()) ||
           /\b(?:write a python|write a javascript|write a typescript|fix this bug|debug this code|write a regex)\b/i.test(query);
@@ -1740,7 +1732,7 @@ export default function ProjectListScreen({
           (targetMode !== "normal" ||
             query.toLowerCase().includes("deep research") ||
             query.toLowerCase().includes("search the web") ||
-            /\b(?:essay|paper|coursework|thesis|dissertation|proposal|review|analysis|history|nepal|congress|study|clinical)\b/i.test(query));
+            /\b(?:essay|paper|coursework|thesis|dissertation|proposal|review|analysis|history|study)\b/i.test(query));
 
         if (currentAttachments.length === 0 && threadFiles.length === 0 && targetMode === "normal" && !isAcademicOrDeliverable) {
           // Standard text generation — streams tokens live via executeAgenticLLM
@@ -1756,7 +1748,6 @@ export default function ProjectListScreen({
             // Server fallback
             agentResponse = await executeAgenticQuery({
               prompt: query,
-              systemPrompt: effectiveSystemPrompt,
               mode: targetMode,
               citationStyle: askCitationStyle,
               answerLength: askUserSettings.answerLengthPreference,
@@ -1788,7 +1779,6 @@ export default function ProjectListScreen({
           try {
             agentResponse = await executeAgenticQuery({
               prompt: query,
-              systemPrompt: effectiveSystemPrompt,
               mode: targetMode,
               citationStyle: askCitationStyle,
               answerLength: askUserSettings.answerLengthPreference,
@@ -2038,6 +2028,7 @@ export default function ProjectListScreen({
           answerText: researchMessage.text,
           question: handoff?.topic || researchMessage.originatingQuestion || priorUserMsg?.text,
           files: askThreadFiles,
+          imageNames: conversation.flatMap((m) => (m.attachments ?? []).filter((a) => a.isImage).map((a) => a.name)),
           sources: handoff?.retrievedSources || researchMessage.citations || liveSourcesAsCitations(researchMessage.liveSources) || [],
           citationStyle: askCitationStyle,
           suggestedTitle: handoff?.suggestedTitle,
@@ -2381,169 +2372,40 @@ export default function ProjectListScreen({
     handleCreate(tile.id);
   };
 
-  // A tap on the box's padding (not on a control) should focus the input, as people expect.
-  const focusInputOnBackgroundTap = (ref: React.MutableRefObject<HTMLTextAreaElement | HTMLInputElement | null>) =>
-    (e: React.MouseEvent) => {
-      if ((e.target as HTMLElement).closest('button, a, input, select, textarea, [role="menu"], [role="listbox"], [role="dialog"]')) return;
-      ref.current?.focus();
-    };
-
   const mainPromptForm = (
-    <form
-      onClick={focusInputOnBackgroundTap(guideTextareaRef)}
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (mainPromptInput.trim() || mainAttachments.length > 0) {
-          handleSendMainPrompt();
-        }
-      }}
-      onDragOver={(e) => {
-        e.preventDefault();
-        setIsDragging(true);
-      }}
-      onDragLeave={(e) => {
-        if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-        setIsDragging(false);
-      }}
-      onDrop={(e) => {
-        e.preventDefault();
-        setIsDragging(false);
-        if (e.dataTransfer.files?.length) {
-          addMainFiles(Array.from(e.dataTransfer.files));
-        }
-      }}
-      className={`pointer-events-auto flex flex-col justify-between w-full rounded-2xl bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/10 shadow-sm focus-within:border-neutral-400 dark:focus-within:border-white/20 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[color:var(--accent)] p-3 transition-all duration-200 ${isDragging
-        ? "border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/10 dark:bg-blue-950/20"
-        : ""
-        }`}
+    <AskPromptBox
+      className="pointer-events-auto"
+      value={mainPromptInput}
+      onValueChange={setMainPromptInput}
+      onSend={handleSendMainPrompt}
+      attachments={mainAttachments}
+      onRemoveAttachment={removeMainAttachment}
+      onAttachFiles={handleMainFileSelect}
+      isUploading={isMainUploadingAttachment}
+      mode={mainAiMode}
+      onModeChange={setMainAiMode}
+      isThinking={isGuideThinking}
+      placeholder={isPhone ? "Ask a research question or paste your brief…" : "Ask a question, paste your brief, or drop files…"}
+      ariaLabel="Research instructions or assignment guidelines"
+      sendLabel="Send message"
+      inputId="main-research-instruction-input"
+      inputName="researchInstructions"
+      minRows={isPhone ? 2 : 1}
+      maxHeightPx={120}
+      inputRef={guideTextareaRef}
     >
-      {/* Pending Attachments Chips */}
-      {mainAttachments.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5 pb-1.5 border-b border-neutral-200/50 dark:border-white/5 mb-1.5 overflow-x-auto max-h-16">
-          {mainAttachments.map((att) => (
-            <div
-              key={att.id}
-              className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-white/10 text-xs text-neutral-800 dark:text-neutral-200 shadow-2xs"
-            >
-              {att.isImage ? (
-                att.previewUrl ? (
-                  <img src={att.previewUrl} alt={att.name} className="w-4 h-4 object-cover rounded" />
-                ) : (
-                  <Paperclip className="w-3 h-3 text-blue-500" />
-                )
-              ) : (
-                <FileText className="w-3 h-3 text-amber-500" />
-              )}
-              <span className="truncate max-w-[150px] font-medium text-[11px]">{att.name}</span>
-              <button
-                type="button"
-                onClick={() => removeMainAttachment(att.id)}
-                aria-label={`Remove ${att.name}`}
-                className="p-0.5 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors cursor-pointer"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </div>
-          ))}
-          {isMainUploadingAttachment && (
-            <span className="text-[11px] text-neutral-400 flex items-center gap-1 animate-pulse">
-              <Loader2 className="w-3 h-3 animate-spin text-blue-500" /> Parsing attachment...
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Top: Transparent flexible input */}
-      <div className="w-full flex items-center">
-        <textarea
-          ref={guideTextareaRef}
-          rows={isPhone ? 2 : 1}
-          value={mainPromptInput}
-          onChange={(e) => {
-            setMainPromptInput(e.target.value);
-            e.target.style.height = "auto";
-            e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
-          }}
-          onKeyDown={(e) => {
-            if (e.nativeEvent.isComposing || (e as unknown as { keyCode?: number }).keyCode === 229) return;
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              if (mainPromptInput.trim() || mainAttachments.length > 0) {
-                handleSendMainPrompt();
-              }
-            } else if (e.key === "Backspace" && mainPromptInput === "" && mainAttachments.length > 0) {
-              removeMainAttachment(mainAttachments[mainAttachments.length - 1].id);
-            }
-          }}
-          onPaste={(e) => {
-            const items = e.clipboardData?.items;
-            if (!items) return;
-            const newFiles: File[] = [];
-            for (let i = 0; i < items.length; i++) {
-              if (items[i].kind === "file") {
-                const file = items[i].getAsFile();
-                if (file) newFiles.push(file);
-              }
-            }
-            if (newFiles.length > 0) {
-              e.preventDefault();
-              addMainFiles(newFiles);
-            }
-          }}
-          id="main-research-instruction-input"
-          name="researchInstructions"
-          aria-label="Research instructions or assignment guidelines"
-          placeholder={isPhone ? "Ask a research question or paste your brief…" : "Paste text, drop files/images, or draft research instructions..."}
-          style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent", fieldSizing: "content", minHeight: isPhone ? 48 : undefined } as React.CSSProperties}
-          className="w-full flex-1 bg-transparent text-base sm:text-sm font-normal text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 border-none outline-none focus:outline-none focus:ring-0 min-w-0 shadow-none focus:shadow-none resize-none leading-relaxed prompt-bare-input max-h-28 overflow-y-auto scholar-scrollbar"
-        />
-      </div>
-
-      {/* Bottom Action Row: Attachments, Mode Selector, Citation Style & Preferences on left, Submit button on right */}
-      <div className="flex items-center justify-between gap-2 mt-1.5 pt-1.5 border-t border-neutral-200/50 dark:border-white/5 w-full flex-wrap">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <PromptBarActionMenu
-            currentMode={mainAiMode}
-            onSelectMode={setMainAiMode}
-            onAttachFiles={handleMainFileSelect}
+      {!isAiSidebarOpen && (
+        <>
+          <CitationStylePicker value={askCitationStyle} onChange={handleUpdateCitationStyle} direction="up" />
+          <AskScholarSettingsPopover
+            settings={askUserSettings}
+            direction="up"
+            onUpdateSettings={handleAskSettingsUpdate}
+            onImportReferences={handleImportVaultReferences}
           />
-          {!isAiSidebarOpen && (
-            <>
-              <CitationStylePicker
-                value={askCitationStyle}
-                onChange={handleUpdateCitationStyle}
-                direction="up"
-              />
-              <AskScholarSettingsPopover
-                settings={askUserSettings}
-                direction="up"
-                onUpdateSettings={handleAskSettingsUpdate}
-                onImportReferences={handleImportVaultReferences}
-              />
-            </>
-          )}
-        </div>
-
-        <div className="relative group">
-          <button
-            type="submit"
-            title="Send message (Enter)"
-            aria-label="Send message"
-            disabled={(!mainPromptInput.trim() && mainAttachments.length === 0) || isGuideThinking}
-            className="flex-shrink-0 w-11 h-11 sm:w-8 sm:h-8 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer bg-neutral-900 text-white hover:bg-neutral-800 active:scale-95 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100 shadow-sm disabled:bg-neutral-200/80 dark:disabled:bg-white/10 disabled:text-neutral-400 dark:disabled:text-neutral-500 disabled:shadow-none disabled:cursor-not-allowed"
-          >
-            {isGuideThinking ? (
-              <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <ArrowUp className="w-4 h-4 stroke-[2.25]" />
-            )}
-          </button>
-          <span className="hidden group-hover:block absolute bottom-full mb-2 right-0 px-2 py-1 text-[11px] bg-neutral-900 text-white dark:bg-neutral-800 rounded shadow-md whitespace-nowrap pointer-events-none z-30">
-            Send message (Enter)
-          </span>
-        </div>
-      </div>
-    </form>
+        </>
+      )}
+    </AskPromptBox>
   );
 
   return (
@@ -3827,7 +3689,7 @@ export default function ProjectListScreen({
                         className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/10 text-xs font-semibold text-neutral-800 dark:text-neutral-200 shadow-2xs active:scale-95 transition-all"
                       >
                         <FolderOpen className="w-4 h-4 text-sky-500" />
-                        <span>Academic Workspaces ▾</span>
+                        <span>Academic workspaces</span>
                       </button>
                     </div>
                   </div>
@@ -4745,15 +4607,15 @@ export default function ProjectListScreen({
                           {msg.sender === "assistant" && msg.recommendedWorkspaceHandoff && (
                             <div className="mt-2.5 p-2.5 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/20 border border-emerald-200/80 dark:border-emerald-800/40 flex items-center justify-between gap-2 flex-wrap">
                               <span className="text-[11px] font-medium text-emerald-900 dark:text-emerald-200">
-                                Recommended Workspace: {msg.recommendedWorkspaceHandoff.formatLabel}
+                                Suggested next step: {msg.recommendedWorkspaceHandoff.formatLabel}
                               </span>
                               <div className="flex items-center gap-1.5">
                                 <button
                                   type="button"
-                                  onClick={() => void handleBootProjectFromResearch(msg, "OT-01")}
+                                  onClick={() => void handleBootProjectFromResearch(msg, msg.recommendedWorkspaceHandoff!.targetFormatId)}
                                   className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
                                 >
-                                  <span>Launch in 4-Phase Essay Engine (OT-01)</span>
+                                  <span>Continue in {msg.recommendedWorkspaceHandoff.formatLabel}</span>
                                   <ArrowRight className="w-3 h-3" />
                                 </button>
                               </div>
@@ -4919,7 +4781,6 @@ export default function ProjectListScreen({
                         )}
                       </div>
                     )}
-                    <div ref={messagesEndRef} />
                   </div>
                 )}
                 {showJumpToLatest && hasStartedChatting && (
@@ -4939,163 +4800,39 @@ export default function ProjectListScreen({
               {/* Pinned Floating Input Component (Module 3.4) */}
               <div className="p-3 sm:p-4 pb-[max(0.875rem,env(safe-area-inset-bottom))] bg-white/95 dark:bg-ink-800/95 backdrop-blur-md border-t border-neutral-200/80 dark:border-white/10 shrink-0">
                 <div className={isLandingPage ? "w-full max-w-4xl mx-auto" : "w-full"}>
-                  {/* Status & Reset Bar. On phones the header already shows the title and AI dot, and New Chat replaces Reset, so only a disconnected AI is worth the space. */}
-                  <div className={`${isPhone && isOnline && (!aiStatus || aiStatus.connected) ? "hidden" : "flex"} [@media(max-height:500px)]:hidden items-center justify-between px-1 mb-2`}>
-                    <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 dark:text-neutral-400">
-                      <Lightbulb className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400 shrink-0" aria-hidden="true" />
-                      <span className="font-medium text-neutral-700 dark:text-neutral-300">Ask Scholar</span>
-                      {!isOnline ? (
-                        <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400 font-medium" role="status">
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" aria-hidden="true" />
-                          <span>You're offline</span>
-                        </span>
-                      ) : aiStatus ? (
-                        aiStatus.connected ? (
-                          <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold" title={`Operational provider: ${aiStatus.provider || "Operational"}`}>
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            <span>{aiStatus.statusText}</span>
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={onOpenAiAccess}
-                            className="text-neutral-600 dark:text-neutral-400 font-medium hover:underline cursor-pointer flex items-center gap-1"
-                            title="No operational AI providers. Click to configure AI Access."
-                          >
-                            <span className="w-1.5 h-1.5 rounded-full bg-neutral-400" />
-                            <span>AI Disconnected</span>
-                            <span className="text-[9px] underline">Configure ↗</span>
-                          </button>
-                        )
-                      ) : (
-                        <span className="text-neutral-400 text-[10px] animate-pulse">• Checking AI...</span>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        aria-label="Reset Chat"
-                        onClick={() => {
-                          handleStartNewAskThread();
-                        }}
-                        className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                        title="Reset conversation"
-                      >
-                        <RotateCcw className="w-3 h-3" />
-                        <span>Reset</span>
+                  {/* A notice appears only when something needs attention; a healthy connection is silent. */}
+                  {!isOnline ? (
+                    <p role="status" className="mb-2 flex items-center gap-1.5 px-1 text-[11px] font-medium text-amber-700 dark:text-amber-400">
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true" />
+                      You're offline. Questions will send when you reconnect.
+                    </p>
+                  ) : aiStatus && !aiStatus.connected ? (
+                    <p className="mb-2 flex items-center gap-1.5 px-1 text-[11px] text-neutral-600 dark:text-neutral-400">
+                      <span className="h-1.5 w-1.5 rounded-full bg-neutral-400" aria-hidden="true" />
+                      <span>No AI is connected.</span>
+                      <button type="button" onClick={onOpenAiAccess} className="cursor-pointer font-medium text-neutral-900 underline underline-offset-2 hover:opacity-80 dark:text-neutral-100">
+                        Set up AI Access
                       </button>
-                    </div>
-                  </div>
+                    </p>
+                  ) : null}
 
-                  {/* Pending Attachments Chips in Sidebar */}
-                  {sidebarAttachments.length > 0 && (
-                    <div className="flex flex-wrap items-center gap-1.5 mb-2 px-1">
-                      {sidebarAttachments.map((att) => (
-                        <div
-                          key={att.id}
-                          className="flex items-center gap-1.5 px-2 py-0.5 rounded-xl bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-white/10 text-xs text-neutral-800 dark:text-neutral-200 shadow-2xs animate-in fade-in"
-                        >
-                          {att.isImage ? (
-                            att.previewUrl ? (
-                              <img src={att.previewUrl} alt={att.name} className="w-4 h-4 object-cover rounded" />
-                            ) : (
-                              <Paperclip className="w-3.5 h-3.5 text-blue-500" />
-                            )
-                          ) : (
-                            <FileText className="w-3.5 h-3.5 text-amber-500" />
-                          )}
-                          <span className="truncate max-w-[140px] font-medium text-[11px]">{att.name}</span>
-                          <button
-                            type="button"
-                            onClick={() => removeSidebarAttachment(att.id)}
-                            className="text-neutral-400 hover:text-red-500 p-0.5 rounded-full hover:bg-neutral-200 dark:hover:bg-white/10 cursor-pointer transition-colors"
-                            title="Remove attachment"
-                            aria-label="Remove attachment"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      ))}
-                      {isSidebarUploadingAttachment && (
-                        <span className="text-[11px] text-neutral-400 flex items-center gap-1.5 animate-pulse">
-                          <Loader2 className="w-3 h-3 animate-spin text-blue-500" /> Parsing attachment...
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Input Wrapper Pill */}
-                  <form
-                    onClick={focusInputOnBackgroundTap(guideInputRef)}
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      if (guideInput.trim() || sidebarAttachments.length > 0) {
-                        handleSendGuideMessage();
-                      }
-                    }}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      if (e.dataTransfer.files?.length) {
-                        handleSidebarFileSelect(Array.from(e.dataTransfer.files));
-                      }
-                    }}
-                    className="relative flex flex-col rounded-2xl bg-white dark:bg-ink-750 p-3 shadow-sm border border-neutral-200/90 dark:border-white/10 focus-within:border-neutral-400 dark:focus-within:border-white/25 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[color:var(--accent)] focus-within:shadow-md transition-all duration-200"
+                  <AskPromptBox
+                    value={guideInput}
+                    onValueChange={setGuideInput}
+                    onSend={() => handleSendGuideMessage()}
+                    attachments={sidebarAttachments}
+                    onRemoveAttachment={removeSidebarAttachment}
+                    onAttachFiles={handleSidebarFileSelect}
+                    isUploading={isSidebarUploadingAttachment}
+                    mode={sidebarAiMode}
+                    onModeChange={setSidebarAiMode}
+                    isThinking={isGuideThinking}
+                    onStop={handleStopGuideGeneration}
+                    placeholder="Ask a research question…"
+                    ariaLabel="Ask Scholar question input"
+                    sendLabel="Send question"
+                    inputRef={guideInputRef}
                   >
-                    <div className="w-full px-1">
-                      <textarea
-                        ref={guideInputRef as any}
-                        rows={1}
-                        value={guideInput}
-                        onChange={(e) => {
-                          setGuideInput(e.target.value);
-                          e.target.style.height = "auto";
-                          e.target.style.height = `${Math.min(e.target.scrollHeight, 130)}px`;
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.nativeEvent.isComposing || (e as unknown as { keyCode?: number }).keyCode === 229) return;
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            if (guideInput.trim() || sidebarAttachments.length > 0) {
-                              handleSendGuideMessage();
-                            }
-                          } else if (e.key === "Backspace" && guideInput === "" && sidebarAttachments.length > 0) {
-                            removeSidebarAttachment(sidebarAttachments[sidebarAttachments.length - 1].id);
-                          }
-                        }}
-                        onPaste={(e) => {
-                          const items = e.clipboardData?.items;
-                          if (!items) return;
-                          const newFiles: File[] = [];
-                          for (let i = 0; i < items.length; i++) {
-                            if (items[i].kind === "file") {
-                              const file = items[i].getAsFile();
-                              if (file) newFiles.push(file);
-                            }
-                          }
-                          if (newFiles.length > 0) {
-                            e.preventDefault();
-                            handleSidebarFileSelect(newFiles);
-                          }
-                        }}
-                        aria-label="Ask Scholar question input"
-                        placeholder="Ask a research question…"
-                        style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent", fieldSizing: "content" } as React.CSSProperties}
-                        className="w-full bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-base sm:text-sm text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 shadow-none focus:shadow-none resize-none prompt-bare-input max-h-32 min-h-[36px] overflow-y-auto scholar-scrollbar leading-relaxed"
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between gap-2 pt-1.5 mt-1 border-t border-neutral-200/50 dark:border-white/5 sm:flex-wrap">
-                      <div className="flex items-center gap-1 sm:gap-1.5 min-w-0 flex-wrap sm:flex-wrap">
-                        <PromptBarActionMenu
-                          currentMode={sidebarAiMode}
-                          onSelectMode={setSidebarAiMode}
-                          onAttachFiles={handleSidebarFileSelect}
-                        />
-
                         {/* Phones: style and preferences live here, next to the box, not crowding the header */}
                         {isPhone && (
                           <>
@@ -5160,7 +4897,7 @@ export default function ProjectListScreen({
                           )}
                         </button>
 
-                        {sidebarAiMode === "deep_research" && (
+                    {sidebarAiMode === "deep_research" && (
                           <button
                             type="button"
                             data-testid="propose-deep-research-plan-btn"
@@ -5173,39 +4910,7 @@ export default function ProjectListScreen({
                             <span>Propose Plan</span>
                           </button>
                         )}
-                      </div>
-
-                      <div className="relative group shrink-0">
-                        {isGuideThinking ? (
-                          <button
-                            type="button"
-                            onClick={handleStopGuideGeneration}
-                            className="w-11 h-11 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:opacity-90 shadow-xs active:scale-95"
-                            title="Stop generating"
-                            aria-label="Stop generating"
-                          >
-                            <Square className="w-3.5 h-3.5 fill-current" />
-                          </button>
-                        ) : (
-                          <button
-                            type="submit"
-                            disabled={!guideInput.trim() && sidebarAttachments.length === 0}
-                            className={`w-11 h-11 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer ${guideInput.trim() || sidebarAttachments.length > 0
-                              ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 shadow-xs active:scale-95"
-                              : "bg-neutral-200/80 dark:bg-white/10 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
-                              }`}
-                            title="Send question (Enter)"
-                            aria-label="Send question"
-                          >
-                            <ArrowUp className="w-4 h-4 stroke-[2.25]" />
-                          </button>
-                        )}
-                        <span className="hidden group-hover:block absolute bottom-full mb-2 right-0 px-2 py-1 text-[11px] bg-neutral-900 text-white dark:bg-neutral-800 rounded shadow-md whitespace-nowrap pointer-events-none z-30">
-                          {isGuideThinking ? "Stop generating" : "Send question (Enter)"}
-                        </span>
-                      </div>
-                    </div>
-                  </form>
+                  </AskPromptBox>
                 </div>
               </div>
             </div>

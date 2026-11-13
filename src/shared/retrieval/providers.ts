@@ -17,6 +17,10 @@ export interface ProviderOptions {
   /** OpenAlex API key (OPENALEX_API_KEY), optional. */
   openAlexApiKey?: string;
   timeoutMs?: number;
+  /** Extra query parameters for search calls (provider filters such as a publication-year floor). */
+  extraParams?: Record<string, string>;
+  /** Injected fetch (tests, or a caller with its own transport). Defaults to the global fetch. */
+  fetchImpl?: typeof fetch;
 }
 
 /** Provider outcome. `error` is set when the provider failed, so callers can tell "no hits" from "down". */
@@ -107,14 +111,14 @@ export function scoreRelevance(
   };
 }
 
-function reconstructAbstract(index?: Record<string, number[]>): string {
+export function reconstructOpenAlexAbstract(index?: Record<string, number[]> | null): string {
   if (!index || typeof index !== "object") return "";
   const words: Array<[number, string]> = [];
   for (const [word, positions] of Object.entries(index)) {
     if (Array.isArray(positions)) for (const pos of positions) words.push([pos, word]);
   }
   words.sort((a, b) => a[0] - b[0]);
-  return words.map((w) => w[1]).join(" ").slice(0, 1800);
+  return words.map((w) => w[1]).join(" ");
 }
 
 function bareDoi(doi?: string | null): string | undefined {
@@ -132,7 +136,7 @@ function withTimeout(options: ProviderOptions): AbortSignal | undefined {
 }
 
 async function getJson<T>(url: string, options: ProviderOptions, label: string, headers?: Record<string, string>): Promise<T> {
-  const res = await fetch(url, { signal: withTimeout(options), headers: { Accept: "application/json", ...headers } });
+  const res = await (options.fetchImpl ?? fetch)(url, { signal: withTimeout(options), headers: { Accept: "application/json", ...headers } });
   if (!res.ok) throw new Error(`${label} ${res.status}`);
   return (await res.json()) as T;
 }
@@ -152,12 +156,14 @@ interface OpenAlexWork {
   is_retracted?: boolean;
   type?: string;
   biblio?: { volume?: string; issue?: string; first_page?: string; last_page?: string };
-  open_access?: { oa_url?: string };
+  open_access?: { oa_url?: string; is_oa?: boolean };
   authorships?: Array<{ author?: { display_name?: string } }>;
   abstract_inverted_index?: Record<string, number[]>;
+  concepts?: Array<{ display_name?: string }>;
   primary_location?: {
     landing_page_url?: string;
     pdf_url?: string;
+    is_oa?: boolean;
     source?: { display_name?: string; type?: string };
   };
 }
@@ -166,6 +172,7 @@ function openAlexParams(options: ProviderOptions, base: Record<string, string>):
   const params = new URLSearchParams(base);
   if (options.mailto) params.set("mailto", options.mailto);
   if (options.openAlexApiKey) params.set("api_key", options.openAlexApiKey);
+  for (const [k, v] of Object.entries(options.extraParams ?? {})) params.set(k, v);
   return params;
 }
 
@@ -179,10 +186,11 @@ function mapOpenAlex(works: OpenAlexWork[], sourceType?: string): RawSourceInput
         : w.biblio?.first_page;
     const journalArticle = w.type === "article" && w.primary_location?.source?.type === "journal";
     return {
+      id: w.id ? w.id.split("/").pop() : undefined,
       title: w.title || w.display_name || "",
       url: w.doi ?? w.primary_location?.landing_page_url ?? w.id ?? "",
       doi,
-      snippet: reconstructAbstract(w.abstract_inverted_index),
+      snippet: reconstructOpenAlexAbstract(w.abstract_inverted_index).slice(0, 1800),
       year: w.publication_year,
       publicationDate: w.publication_date,
       authors: (w.authorships ?? []).map((a) => a.author?.display_name).filter((n): n is string => Boolean(n)),
@@ -195,6 +203,8 @@ function mapOpenAlex(works: OpenAlexWork[], sourceType?: string): RawSourceInput
       isRetracted: w.is_retracted === true,
       sourceType: sourceType ?? (w.type === "preprint" ? "preprint" : journalArticle ? "peer-reviewed article" : "scholarly work"),
       citedByCount: w.cited_by_count ?? 0,
+      themes: (w.concepts ?? []).slice(0, 4).map((c) => (c.display_name ?? "").toLowerCase().replace(/\s+/g, "-")).filter(Boolean),
+      isOpenAccess: Boolean(w.open_access?.is_oa || w.primary_location?.is_oa),
     } as RawSourceInput;
   });
 }
@@ -246,11 +256,45 @@ interface CrossrefItem {
   publisher?: string;
   type?: string;
   "is-referenced-by-count"?: number;
+  subject?: string[];
+  license?: unknown[];
   "update-to"?: Array<{ type?: string; label?: string }>;
   published?: { "date-parts"?: number[][] };
   "published-print"?: { "date-parts"?: number[][] };
   "published-online"?: { "date-parts"?: number[][] };
   created?: { "date-parts"?: number[][] };
+}
+
+function mapCrossrefItem(item: CrossrefItem): RawSourceInput {
+  const doi = bareDoi(item.DOI);
+  const venue = Array.isArray(item["container-title"]) ? item["container-title"][0] : undefined;
+  const dateParts =
+    item.published?.["date-parts"]?.[0] ||
+    item["published-print"]?.["date-parts"]?.[0] ||
+    item["published-online"]?.["date-parts"]?.[0] ||
+    item.created?.["date-parts"]?.[0];
+  return {
+    title: Array.isArray(item.title) ? stripMarkup(item.title[0] || "") : "",
+    url: item.URL || (doi ? `https://doi.org/${doi}` : ""),
+    doi,
+    snippet: item.abstract ? stripMarkup(item.abstract).slice(0, 1800) : "",
+    year: dateParts?.[0],
+    publicationDate: Array.isArray(dateParts) && dateParts.length > 0 ? dateParts.join("-") : undefined,
+    authors: (item.author ?? [])
+      .map((a) => (a.family && a.given ? `${a.family}, ${a.given}` : a.name || a.family || ""))
+      .filter(Boolean),
+    venue,
+    journal: venue,
+    volume: item.volume,
+    issue: item.issue,
+    pages: item.page,
+    publisher: item.publisher,
+    crossrefUpdateTo: item["update-to"],
+    sourceType: item.type === "proceedings-article" ? "conference paper" : item.type === "journal-article" ? "peer-reviewed article" : "scholarly work",
+    citedByCount: item["is-referenced-by-count"] ?? 0,
+    themes: (item.subject ?? []).slice(0, 3).map((x) => x.toLowerCase().replace(/\s+/g, "-")),
+    isOpenAccess: Array.isArray(item.license) && item.license.length > 0,
+  } as RawSourceInput;
 }
 
 export async function searchCrossref(
@@ -267,6 +311,7 @@ export async function searchCrossref(
       rows: String(effectiveRows),
       sort: "relevance",
       ...(offset > 0 ? { offset: String(offset) } : {}),
+      ...(options.extraParams ?? {}),
     });
     const data = await getJson<{ message?: { items?: CrossrefItem[] } }>(
       `https://api.crossref.org/works?${params.toString()}`,
@@ -274,35 +319,7 @@ export async function searchCrossref(
       "CrossRef",
       { "User-Agent": CROSSREF_USER_AGENT }
     );
-    const items = (data.message?.items ?? []).map((item): RawSourceInput => {
-      const doi = bareDoi(item.DOI);
-      const venue = Array.isArray(item["container-title"]) ? item["container-title"][0] : undefined;
-      const dateParts =
-        item.published?.["date-parts"]?.[0] ||
-        item["published-print"]?.["date-parts"]?.[0] ||
-        item["published-online"]?.["date-parts"]?.[0] ||
-        item.created?.["date-parts"]?.[0];
-      return {
-        title: Array.isArray(item.title) ? stripMarkup(item.title[0] || "") : "",
-        url: item.URL || (doi ? `https://doi.org/${doi}` : ""),
-        doi,
-        snippet: item.abstract ? stripMarkup(item.abstract).slice(0, 1800) : "",
-        year: dateParts?.[0],
-        publicationDate: Array.isArray(dateParts) && dateParts.length > 0 ? dateParts.join("-") : undefined,
-        authors: (item.author ?? [])
-          .map((a) => (a.family && a.given ? `${a.family}, ${a.given}` : a.name || a.family || ""))
-          .filter(Boolean),
-        venue,
-        journal: venue,
-        volume: item.volume,
-        issue: item.issue,
-        pages: item.page,
-        publisher: item.publisher,
-        crossrefUpdateTo: item["update-to"],
-        sourceType: item.type === "proceedings-article" ? "conference paper" : item.type === "journal-article" ? "peer-reviewed article" : "scholarly work",
-        citedByCount: item["is-referenced-by-count"] ?? 0,
-      } as RawSourceInput;
-    });
+    const items = (data.message?.items ?? []).map(mapCrossrefItem);
     return { provider: "crossref", items };
   } catch (err) {
     return failure("crossref", err);
@@ -405,6 +422,8 @@ export async function searchEuropePmc(query: string, pageSize = 12, options: Pro
         openAccessUrl: r.isOpenAccess === "Y" && r.pmcid ? `https://europepmc.org/articles/${r.pmcid}?pdf=render` : undefined,
         sourceType: "peer-reviewed article",
         citedByCount: r.citedByCount ?? 0,
+        themes: ["europe-pmc"],
+        isOpenAccess: r.isOpenAccess === "Y",
       } as RawSourceInput;
     });
     return { provider: "europe_pmc", items };
@@ -451,4 +470,91 @@ export async function searchEric(query: string, rows = 12, options: ProviderOpti
   } catch (err) {
     return failure("eric", err);
   }
+}
+
+interface PaperRef {
+  doi?: string;
+  title: string;
+}
+
+/** Resolves one OpenAlex work from a DOI (exact) or, failing that, its title (best match). */
+async function resolveOpenAlexWork(paper: PaperRef, options: ProviderOptions): Promise<OpenAlexWork & { referenced_works?: string[] } | undefined> {
+  if (paper.doi) {
+    const doi = bareDoi(paper.doi);
+    const params = openAlexParams(options, {});
+    return getJson(`https://api.openalex.org/works/https://doi.org/${encodeURIComponent(doi ?? "")}?${params.toString()}`, options, "OpenAlex");
+  }
+  const params = openAlexParams(options, { search: paper.title, "per-page": "1" });
+  const data = await getJson<{ results?: Array<OpenAlexWork & { referenced_works?: string[] }> }>(
+    `https://api.openalex.org/works?${params.toString()}`,
+    options,
+    "OpenAlex"
+  );
+  return data.results?.[0];
+}
+
+/** Works the given paper cites (its reference list), from OpenAlex. */
+export async function fetchOpenAlexReferences(paper: PaperRef, limit = 8, options: ProviderOptions = {}): Promise<ProviderResult> {
+  try {
+    const work = await resolveOpenAlexWork(paper, options);
+    const refs = (work?.referenced_works ?? []).slice(0, limit).map((r) => r.split("/").pop()).filter(Boolean);
+    if (refs.length === 0) return { provider: "openalex", items: [] };
+    const params = openAlexParams(options, { filter: `openalex_id:${refs.join("|")}`, "per-page": String(limit) });
+    const data = await getJson<{ results?: OpenAlexWork[] }>(`https://api.openalex.org/works?${params.toString()}`, options, "OpenAlex");
+    return { provider: "openalex", items: mapOpenAlex(data.results ?? []) };
+  } catch (err) {
+    return failure("openalex", err);
+  }
+}
+
+/** Works that cite the given paper, most cited first, from OpenAlex. */
+export async function fetchOpenAlexCitedBy(paper: PaperRef, limit = 8, options: ProviderOptions = {}): Promise<ProviderResult> {
+  try {
+    const work = await resolveOpenAlexWork(paper, options);
+    const id = work?.id?.split("/").pop();
+    if (!id) return { provider: "openalex", items: [] };
+    const params = openAlexParams(options, { filter: `cites:${id}`, "per-page": String(limit), sort: "cited_by_count:desc" });
+    const data = await getJson<{ results?: OpenAlexWork[] }>(`https://api.openalex.org/works?${params.toString()}`, options, "OpenAlex");
+    return { provider: "openalex", items: mapOpenAlex(data.results ?? []) };
+  } catch (err) {
+    return failure("openalex", err);
+  }
+}
+
+/** One work by DOI from OpenAlex. `undefined` when OpenAlex has no record; throws on a transport failure. */
+export async function lookupOpenAlexByDoi(doi: string, options: ProviderOptions = {}): Promise<RawSourceInput | undefined> {
+  const clean = bareDoi(doi);
+  if (!clean) return undefined;
+  const params = openAlexParams(options, {});
+  try {
+    const work = await getJson<OpenAlexWork>(`https://api.openalex.org/works/https://doi.org/${clean}?${params.toString()}`, options, "OpenAlex");
+    return mapOpenAlex([work])[0];
+  } catch (err) {
+    if (err instanceof Error && /\b404\b/.test(err.message)) return undefined;
+    throw err;
+  }
+}
+
+/** The raw Crossref record for a DOI (for callers that need Crossmark relations). `undefined` on 404. */
+export async function fetchCrossrefMessage(doi: string, options: ProviderOptions = {}): Promise<(CrossrefItem & Record<string, unknown>) | undefined> {
+  const clean = bareDoi(doi);
+  if (!clean) return undefined;
+  try {
+    const data = await getJson<{ message?: CrossrefItem & Record<string, unknown> }>(
+      `https://api.crossref.org/works/${encodeURIComponent(clean)}`,
+      options,
+      "CrossRef",
+      { "User-Agent": CROSSREF_USER_AGENT }
+    );
+    return data.message;
+  } catch (err) {
+    if (err instanceof Error && /\b404\b/.test(err.message)) return undefined;
+    throw err;
+  }
+}
+
+/** One work by DOI from Crossref, including retraction notices (`crossrefUpdateTo`). */
+export async function lookupCrossrefByDoi(doi: string, options: ProviderOptions = {}): Promise<RawSourceInput | undefined> {
+  const message = await fetchCrossrefMessage(doi, options);
+  return message ? mapCrossrefItem(message) : undefined;
 }

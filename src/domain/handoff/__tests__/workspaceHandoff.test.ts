@@ -50,4 +50,10 @@ describe("buildWorkspaceHandoff", () => {
     expect(out).toHaveLength(2);
     expect(out[0].authors).toEqual([]);
   });
+
+  it("records image names and says where their analysis is, instead of dropping them silently", () => {
+    const h = buildWorkspaceHandoff({ targetFormatId: "OT-15", messages, answerText: "x", citationStyle: "apa", imageNames: ["chart.png", "chart.png"] });
+    expect(h.intake.ask_images).toEqual([{ name: "chart.png" }]);
+    expect(String(h.intake.backgroundNotes)).toContain("chart.png");
+  });
 });
