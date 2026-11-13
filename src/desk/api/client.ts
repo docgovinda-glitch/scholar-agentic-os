@@ -491,8 +491,7 @@ export async function executeAgenticLLM(
     if (decision && decision.ok) {
       const choices = [decision.choice, ...decision.fallbacks];
       for (const c of choices) {
-        if (c.tier === "premium") continue;
-        if (c.tier === "byok" || c.tier === "free") {
+        if (c.tier === "byok") {
           const key = await readProviderKey(c.providerId);
           if (key) candidates.push({ provider: c.providerId, model: c.modelId, apiKey: key });
         } else if (c.tier === "local") {

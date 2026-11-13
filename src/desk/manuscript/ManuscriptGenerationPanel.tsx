@@ -62,7 +62,7 @@ const STATE_LABEL: Record<GenerationJob["state"], string> = {
  * other failure just falls through to the next candidate.
  */
 async function walkRoutingCandidates<T>(
-  call: (byok: { provider: string; apiKey: string; model?: string } | { useEngine: "premium" }) => Promise<T>
+  call: (byok: { provider: string; apiKey: string; model?: string }) => Promise<T>
 ): Promise<T> {
   const decision = await routeDecision("reasoning");
   if (!decision.ok) {
@@ -75,9 +75,6 @@ async function walkRoutingCandidates<T>(
   for (const choice of candidates) {
     if (choice.tier === "local") continue;
     try {
-      if (choice.tier === "premium") {
-        return await call({ useEngine: "premium" });
-      }
       const apiKey = await readProviderKey(choice.providerId);
       if (!apiKey) {
         lastError = new StudioNoAiSourceError(

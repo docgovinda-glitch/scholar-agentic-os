@@ -46,7 +46,6 @@ export async function refinePassage(params: {
   voiceProfile?: VoiceProfile;
   provider?: string;
   model?: string;
-  useEngine?: "premium";
 }): Promise<StudioRefineResult> {
   const res = await authedJsonFetch("/api/studio/refine", "POST", params);
   if (res.status === 428) {
@@ -74,7 +73,6 @@ export async function extractJournalRequirements(params: {
   provider?: string;
   apiKey?: string;
   model?: string;
-  useEngine?: "premium";
 }): Promise<{ proposal: JournalRequirementsProposal }> {
   const { projectId, ...requestBody } = params;
   const res = await authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/journal-requirements/extract`, "POST", requestBody);
@@ -108,7 +106,6 @@ export async function generateNextSection(params: {
   provider?: string;
   apiKey?: string;
   model?: string;
-  useEngine?: "premium";
 }): Promise<{ generationJob: GenerationJob }> {
   const { projectId, ...requestBody } = params;
   const res = await authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/manuscript/next-section`, "POST", requestBody);
@@ -132,7 +129,6 @@ export async function runCoherenceCheck(params: {
   provider?: string;
   apiKey?: string;
   model?: string;
-  useEngine?: "premium";
 }): Promise<{ generationJob: GenerationJob }> {
   const { projectId, ...requestBody } = params;
   const res = await authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/manuscript/coherence-check`, "POST", requestBody);
@@ -160,7 +156,6 @@ export async function runPeerReview(params: {
   provider?: string;
   apiKey?: string;
   model?: string;
-  useEngine?: "premium";
   lenses?: ReviewLens[];
 }): Promise<{ peerReviewHistory: PeerReviewHistory; gates: GateSummary[] }> {
   const { projectId, ...requestBody } = params;
@@ -199,7 +194,6 @@ export async function generateCoverLetter(params: {
   provider?: string;
   apiKey?: string;
   model?: string;
-  useEngine?: "premium";
 }): Promise<{ coverLetter: CoverLetter }> {
   const { projectId, ...requestBody } = params;
   const res = await authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/cover-letter`, "POST", requestBody);

@@ -82,39 +82,6 @@ describe("Desk — JournalRequirementsPanel", () => {
     await waitFor(() => expect(onSaved).toHaveBeenCalledWith([{ gate: "G1", name: "Requirements", status: "ready", outstandingBlocking: [] }]));
   });
 
-  it("applies an AI proposal to the form via the Premium tier without ever auto-saving it", async () => {
-    mockFetch((url, method) => {
-      if (url.endsWith("/api/ai-access/route")) {
-        return { status: 200, body: { ok: true, choice: { tier: "premium", providerId: "premium", reasoning: "Premium is available." }, fallbacks: [] } };
-      }
-      if (url.includes("/journal-requirements/extract")) {
-        return {
-          status: 200,
-          body: {
-            proposal: {
-              journalName: "AI-Found Journal",
-              requiredDeclarations: ["Funding statement"],
-              unresolvedFields: ["citationStyle"],
-            },
-          },
-        };
-      }
-      if (method === "GET") return { status: 404, body: {} };
-      return { status: 500, body: {} };
-    });
-    render(<JournalRequirementsPanel projectId={PROJECT_ID} />);
-
-    await screen.findByLabelText("Journal name *");
-    fireEvent.change(screen.getByPlaceholderText("Paste the journal's author guidelines here…"), {
-      target: { value: "Some guidelines text about this journal's requirements, long enough to submit." },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Extract with AI" }));
-
-    const input = (await screen.findByLabelText("Journal name *")) as HTMLInputElement;
-    await waitFor(() => expect(input.value).toBe("AI-Found Journal"));
-    expect(screen.getByText(/didn't state: citationStyle/)).toBeInTheDocument();
-    expect(screen.getByText(/Nothing has been saved yet/)).toBeInTheDocument();
-  });
 
   it("shows the AI Access Required state with a working Configure button when no AI source is connected", async () => {
     const onOpenAiAccess = vi.fn();

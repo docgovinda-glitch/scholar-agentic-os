@@ -44,7 +44,7 @@ import {
 import { removeKeyFromAccount, saveKeyToAccount, syncKeysWithAccount } from "./accountKeys";
 import { addConnection, getAiAccessStatus, removeConnection, verifyProviderKey, type AiAccessStatus, type VerifyKeyResult } from "./aiAccessApi";
 
-export type ConnectionTier = "local" | "free" | "byok";
+export type ConnectionTier = "local" | "byok";
 
 /** A provider as AI Access shows it: catalogue facts joined to this user's live state. */
 export interface ProviderView {
@@ -80,7 +80,6 @@ export interface AiAccessState {
   local: ProviderView[];
   /** Everything currently connected, across tiers. */
   connected: ProviderView[];
-  premiumActive: boolean;
 }
 
 export interface ConnectCloudInput {
@@ -180,7 +179,6 @@ export function useAiAccess() {
 
   const { cloud, local } = useMemo(build, [build]);
   const connected = useMemo(() => [...local, ...cloud].filter((p) => p.connected), [cloud, local]);
-  const premiumActive = status?.entitlement.active ?? false;
 
   /** Verify a key with the provider, store it on this device, and record the connection. */
   const connectCloud = useCallback(
@@ -296,7 +294,6 @@ export function useAiAccess() {
     cloud,
     local,
     connected,
-    premiumActive,
     refresh,
     connectCloud,
     connectLocal,

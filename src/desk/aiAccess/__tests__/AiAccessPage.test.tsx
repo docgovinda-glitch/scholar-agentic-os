@@ -77,9 +77,9 @@ function renderPage() {
 }
 
 describe("AI Access navigation", () => {
-  it("offers 4 action-oriented tabs: Overview, Providers, Subscription, Preferences", async () => {
+  it("offers 4 action-oriented tabs: Overview, Providers, Premium, Preferences", async () => {
     renderPage();
-    for (const label of ["Overview", "Providers", "Subscription", "Preferences"]) {
+    for (const label of ["Overview", "Providers", "Premium", "Preferences"]) {
       expect(await screen.findByRole("button", { name: label })).toBeInTheDocument();
     }
     expect(screen.queryByRole("button", { name: "Local AI" })).not.toBeInTheDocument();
@@ -237,7 +237,7 @@ describe("Per-provider configuration", () => {
     const account = await import("../accountKeys");
     expect(store.storeProviderKey).toHaveBeenCalledWith("groq", "gsk_test_key");
     expect(account.saveKeyToAccount).toHaveBeenCalledWith("groq", "gsk_test_key");
-    expect(api.addConnection).toHaveBeenCalledWith("groq", "free", 7);
+    expect(api.addConnection).toHaveBeenCalledWith("groq", "byok", 7);
   });
 
   it("does not save anything when verification fails", async () => {
@@ -263,7 +263,7 @@ describe("Multiple simultaneous connections", () => {
   it("shows every connected provider at once, across tiers", async () => {
     status.connections = [
       { provider_id: "ollama", tier: "local", status: "connected", models_detected: 2 },
-      { provider_id: "groq", tier: "free", status: "connected", models_detected: 9 },
+      { provider_id: "groq", tier: "byok", status: "connected", models_detected: 9 },
       { provider_id: "openai", tier: "byok", status: "connected", models_detected: 30 },
     ];
     renderPage();
@@ -276,51 +276,6 @@ describe("Multiple simultaneous connections", () => {
   });
 });
 
-describe("Subscription", () => {
-  it("never asks for an API key, and reports status as server-decided", async () => {
-    renderPage();
-    fireEvent.click(await screen.findByRole("button", { name: "Subscription" }));
-
-    expect(await screen.findByText(/Subscription status: Not subscribed/i)).toBeInTheDocument();
-    expect(screen.queryByPlaceholderText(/Paste your key/i)).not.toBeInTheDocument();
-    // Status is decided on the server; the pane offers a request rather than
-    // a switch.
-    expect(await screen.findByText(/verified on Scholar Core's server/i)).toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: /Request Premium/i })).toBeInTheDocument();
-  });
-
-  it("names Premium capabilities by the admin's label, never the provider behind them", async () => {
-    const api = await import("../aiAccessApi");
-    status.entitlement = { status: "active", active: true };
-    vi.mocked(api.getPremiumCatalog).mockResolvedValueOnce({
-      active: true,
-      planId: "premium_basic",
-      resources: [{ id: "r1", label: "Advanced writing", description: "Best quality drafting", capabilities: ["reasoning"] }],
-    });
-    renderPage();
-    fireEvent.click(await screen.findByRole("button", { name: "Subscription" }));
-
-    expect(await screen.findByText(/Subscription status: Active/i)).toBeInTheDocument();
-    expect(await screen.findByText("Advanced writing")).toBeInTheDocument();
-    // The provider-agnostic promise: nothing in this pane names a provider or
-    // a model, so an admin can re-point the capability freely.
-    expect(document.body.textContent).not.toMatch(/openai|gpt-4o|gemini/i);
-  });
-
-  it("lets a non-subscriber request Premium — the path that previously dead-ended", async () => {
-    const api = await import("../aiAccessApi");
-    vi.mocked(api.getOfferedPlans).mockResolvedValueOnce([
-      { id: "premium_basic", name: "Premium Basic", description: "For everyday writing", monthlyCredits: 5000, weeklyCredits: null, dailyCredits: 200, perTaskMaxCredits: 50, concurrencyLimit: 2 },
-    ]);
-    renderPage();
-    fireEvent.click(await screen.findByRole("button", { name: "Subscription" }));
-
-    fireEvent.click(await screen.findByLabelText(/Premium Basic/i));
-    fireEvent.click(screen.getByRole("button", { name: /Request Premium/i }));
-
-    await waitFor(() => expect(api.requestPremium).toHaveBeenCalledWith("premium_basic", undefined));
-  });
-});
 
 describe("Error handling", () => {
   it("surfaces the HTTP failure when an error response has no object body", async () => {
@@ -418,7 +373,7 @@ describe("AI Access upgrade: honest status, quick start, live routing", () => {
 
   it("shows which AI each task would use now, with fallbacks, from the live router", async () => {
     status.connections = [
-      { provider_id: "groq", tier: "free", status: "connected", models_detected: 9 },
+      { provider_id: "groq", tier: "byok", status: "connected", models_detected: 9 },
       { provider_id: "ollama", tier: "local", status: "connected", models_detected: 2 },
     ];
     renderPage();
@@ -434,7 +389,7 @@ describe("AI Access upgrade: honest status, quick start, live routing", () => {
   });
 
   it("filters providers to free-to-start and connected ones", async () => {
-    status.connections = [{ provider_id: "groq", tier: "free", status: "connected", models_detected: 9 }];
+    status.connections = [{ provider_id: "groq", tier: "byok", status: "connected", models_detected: 9 }];
     renderPage();
     fireEvent.click(await screen.findByRole("button", { name: "Providers" }));
     fireEvent.click(await screen.findByRole("button", { name: "Connected (1)" }));

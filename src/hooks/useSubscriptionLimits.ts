@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { getProfile } from "../services/supabaseAuthService";
-import { getAiAccessStatus } from "../desk/aiAccess/aiAccessApi";
 
 export type AccountTier = "admin" | "premium" | "pro" | "free";
 
@@ -102,16 +101,7 @@ export function useSubscriptionLimits(options?: SubscriptionLimitOptions): Subsc
           detectedTier = options.planIdOverride as AccountTier;
         }
       } else {
-        const aiStatus = await getAiAccessStatus().catch(() => null);
-        if (aiStatus?.entitlement?.active) {
-          const plan = (aiStatus.entitlement.planId || "").toLowerCase();
-          if (plan === "premium" || plan === "pro") {
-            determinedPremium = true;
-            if (!determinedAdmin) {
-              detectedTier = plan === "pro" ? "pro" : "premium";
-            }
-          }
-        }
+        // Premium is not offered yet: every account is on the free tier.
       }
 
       if (!mountedRef.current) return;

@@ -179,34 +179,6 @@ describe("AccountSettingsScreen — editing profile fields", () => {
   });
 });
 
-describe("AccountSettingsScreen — system-controlled fields", () => {
-  it("shows the current plan and disables Upgrade when no handler is wired", async () => {
-    render(<AccountSettingsScreen onClose={() => {}} />);
-    await screen.findByLabelText("Full name");
-
-    expect(await screen.findByText("Free")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Upgrade to Premium" })).toBeDisabled();
-  });
-
-  it("shows Premium and 'Manage Premium Plan' when the entitlement is active", async () => {
-    getAiAccessStatus.mockResolvedValue({ connections: [], entitlement: { status: "active", active: true, planId: "premium" }, quota: null, creditBalance: null });
-    render(<AccountSettingsScreen onClose={() => {}} />);
-    await screen.findByLabelText("Full name");
-
-    expect(await screen.findByText("Premium")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Manage Premium Plan" })).toBeInTheDocument();
-  });
-
-  it("calls onManagePremium when the plan button is clicked", async () => {
-    const onManagePremium = vi.fn();
-    render(<AccountSettingsScreen onClose={() => {}} onManagePremium={onManagePremium} />);
-    await screen.findByLabelText("Full name");
-
-    fireEvent.click(screen.getByRole("button", { name: "Upgrade to Premium" }));
-    expect(onManagePremium).toHaveBeenCalled();
-  });
-});
-
 describe("AccountSettingsScreen — institutional ID removal", () => {
   it("renders no institutional ID or document upload UI anywhere on the screen", async () => {
     render(<AccountSettingsScreen onClose={() => {}} />);

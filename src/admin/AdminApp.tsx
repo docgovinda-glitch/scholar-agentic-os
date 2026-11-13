@@ -82,7 +82,7 @@ export default function AdminApp() {
     return (
       <Routes>
         <Route path="/:tab" element={<AdminPanelRoute onClose={handleSignOut} identity={identity} />} />
-        <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
+        <Route path="*" element={<Navigate to="/admin/opportunities" replace />} />
       </Routes>
     );
   }
@@ -98,7 +98,7 @@ export default function AdminApp() {
 function AdminPanelRoute({ onClose, identity }: { onClose: () => void; identity: AdminIdentity }) {
   const navigate = useNavigate();
   const { tab } = useParams<{ tab: string }>();
-  if (!isAdminTab(tab)) return <Navigate to="/admin/dashboard" replace />;
+  if (!isAdminTab(tab)) return <Navigate to="/admin/opportunities" replace />;
 
   return (
     <AdminPanel

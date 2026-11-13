@@ -17,7 +17,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import AdminApp from "../AdminApp";
 
 // AdminApp renders a <Routes> tree of its own, using paths ("/login",
-// "/:tab") and Navigate targets ("/admin/login", "/admin/dashboard") that
+// "/:tab") and Navigate targets ("/admin/login", "/admin/opportunities") that
 // only resolve correctly nested under the same "/admin/*" parent route it
 // gets from main.tsx in production — so tests mount it the same way, rather
 // than bare, to exercise the real nesting rather than a simplified stand-in.
@@ -80,15 +80,15 @@ vi.mock("../../desk/admin/AdminPanel", () => ({
       <p>AI Infrastructure (stub)</p>
       <p>{identity.isMainAdmin ? "main admin" : `scopes: ${identity.scopes.join(",")}`}</p>
       <p>Active tab: {tab}</p>
-      <button onClick={() => onTabChange("providers")}>Providers</button>
+      <button onClick={() => onTabChange("users")}>Users</button>
       <button onClick={onClose}>{closeLabel}</button>
     </div>
   ),
   // Real validity check, not stubbed to always-true: AdminApp's own route
-  // guard (redirecting an unknown :tab to /admin/dashboard) is exactly what
+  // guard (redirecting an unknown :tab to /admin/opportunities) is exactly what
   // "renders the admin panel..." etc below rely on to reach the stub at all.
   isAdminTab: (value: string | undefined) =>
-    ["dashboard", "providers", "resources", "premium", "usage", "budget", "opportunities", "users", "admins", "audit"].includes(value ?? ""),
+    ["opportunities", "users", "admins", "audit"].includes(value ?? ""),
 }));
 
 afterEach(() => {
@@ -118,27 +118,27 @@ describe("AdminApp", () => {
 
   it("renders the admin panel for a signed-in admin, with its actual scopes", async () => {
     sessionState = { session: { access_token: "t" } };
-    whoAmIMock.mockResolvedValue({ isAdmin: true, isMainAdmin: false, scopes: ["manage_premium", "manage_users"] });
+    whoAmIMock.mockResolvedValue({ isAdmin: true, isMainAdmin: false, scopes: ["manage_opportunities", "manage_users"] });
 
     renderAdminApp();
 
     expect(await screen.findByText("AI Infrastructure (stub)")).toBeInTheDocument();
-    expect(screen.getByText("scopes: manage_premium,manage_users")).toBeInTheDocument();
+    expect(screen.getByText("scopes: manage_opportunities,manage_users")).toBeInTheDocument();
   });
 
-  it("gives each admin tab its own URL, defaults to dashboard, and lets Back step back through tabs", async () => {
+  it("gives each admin tab its own URL, defaults to opportunities, and lets Back step back through tabs", async () => {
     sessionState = { session: { access_token: "t" } };
     whoAmIMock.mockResolvedValue({ isAdmin: true, isMainAdmin: true, scopes: [] });
 
     renderAdminApp();
 
-    expect(await screen.findByText("Active tab: dashboard")).toBeInTheDocument();
+    expect(await screen.findByText("Active tab: opportunities")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Providers" }));
-    expect(await screen.findByText("Active tab: providers")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Users" }));
+    expect(await screen.findByText("Active tab: users")).toBeInTheDocument();
 
     window.history.back();
-    await waitFor(() => expect(screen.getByText("Active tab: dashboard")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Active tab: opportunities")).toBeInTheDocument());
   });
 
   it("marks the main admin distinctly", async () => {

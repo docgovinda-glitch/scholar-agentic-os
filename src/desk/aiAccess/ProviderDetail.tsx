@@ -46,8 +46,8 @@ export default function ProviderDetail({
   onBack: () => void;
 }) {
   const facts = providerAccessFacts(spec);
-  const [tier, setTier] = useState<ConnectionTier>(() => tierProp ?? view.tier ?? (facts.usableWithoutPaying ? "free" : "byok"));
-  const models = getModelsForProvider(spec.id, tier === "free" ? "free" : "byok");
+  const tier: ConnectionTier = tierProp ?? view.tier ?? "byok";
+  const models = getModelsForProvider(spec.id, "byok");
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState(view.selectedModel ?? getDefaultModelId(spec.id));
   const [baseUrl, setBaseUrl] = useState("");
@@ -112,7 +112,7 @@ export default function ProviderDetail({
   // full list and a custom id stay one click away.
   const [showAllModels, setShowAllModels] = useState(false);
   const best = bestDiscovered(spec.id, discoveredModels);
-  const accessModes: ModelSpec["accessModes"] = tier === "free" ? ["free", "byok"] : ["byok"];
+  const accessModes: ModelSpec["accessModes"] = ["byok"];
   const bestSpecs = best.map((m) => curatedToSpec(spec.id, m, accessModes));
   const showingBest = best.length > 0 && !showAllModels;
 
@@ -127,7 +127,7 @@ export default function ProviderDetail({
       modelId: mId,
       displayName: `${dm.displayName || mId} (Live Discovered)`,
       status: "current",
-      accessModes: tier === "free" ? ["free", "byok"] : ["byok"],
+      accessModes: ["byok"],
       capabilities: dm.capabilities,
       contextWindow: dm.contextWindow ?? null,
       inputModalities: ["text"],
@@ -251,43 +251,6 @@ export default function ProviderDetail({
       </header>
 
       <FactRow facts={facts} tier={tier} connected={view.connected} />
-
-      {facts.usableWithoutPaying && (
-        <div className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-3.5">
-          <span className="block text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)] mb-2">
-            Select Connection Tier
-          </span>
-          <div className="inline-flex rounded-[var(--radius-sm)] border border-[color:var(--border-control)] bg-[color:var(--surface-inset)] p-1">
-            <button
-              type="button"
-              onClick={() => setTier("free")}
-              className={`rounded-[var(--radius-sm)] px-3 py-1.5 text-xs font-medium transition-colors ${
-                tier === "free"
-                  ? "bg-[color:var(--surface-raised)] text-[color:var(--text-primary)] shadow-xs font-semibold"
-                  : "text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
-              }`}
-            >
-              Free Tier
-            </button>
-            <button
-              type="button"
-              onClick={() => setTier("byok")}
-              className={`rounded-[var(--radius-sm)] px-3 py-1.5 text-xs font-medium transition-colors ${
-                tier === "byok"
-                  ? "bg-[color:var(--surface-raised)] text-[color:var(--text-primary)] shadow-xs font-semibold"
-                  : "text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
-              }`}
-            >
-              Pro / BYOK Key
-            </button>
-          </div>
-          <p className="mt-2 text-xs text-[color:var(--text-muted)]">
-            {tier === "free"
-              ? "Use with your free account. Subject to provider rate limits."
-              : "Use your paid key with your own custom quota and higher limits."}
-          </p>
-        </div>
-      )}
 
       {view.connected ? (
         <section className="rounded-[var(--radius-md)] border border-[color:var(--state-success)] bg-[color:var(--state-success-subtle)] p-4">
@@ -556,7 +519,7 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
 function FactRow({ facts, tier, connected }: { facts: ReturnType<typeof providerAccessFacts>; tier: ConnectionTier; connected: boolean }) {
   const chips: Array<{ label: string; tone: "good" | "warn" | "neutral" }> = [
     { label: facts.costLabel, tone: facts.usableWithoutPaying ? "good" : facts.costLabel === "Paid" ? "warn" : "neutral" },
-    { label: tier === "free" ? "Free tier use" : "Bring your own key", tone: "neutral" },
+    { label: "Bring your own key", tone: "neutral" },
     { label: facts.requiresApiKey ? "API key required" : "No API key needed", tone: "neutral" },
     { label: facts.requiresRegistration ? "Account required" : "No account needed", tone: "neutral" },
     { label: facts.usageLimits ? "Has usage limits" : "No published limit", tone: facts.usageLimits ? "warn" : "neutral" },

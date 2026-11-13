@@ -56,7 +56,7 @@ const PROVIDERS: string[] = CLOUD_PROVIDERS.map((p) => p.id);
 
 // Every model-backed Studio level is language refinement — none are
 // multimodal/long-context/code-generation — so a single Omni Router task
-// type applies uniformly, matching runPremiumRefine's server-side choice
+// type applies uniformly, 
 // (server/routes/studio.ts) so the client's preview and the server's actual
 // execution can never disagree about which tier ranks first.
 const STUDIO_TASK_TYPE = "reasoning" as const;
@@ -71,10 +71,6 @@ function sourceLabel(tier: string): string {
   switch (tier) {
     case "local":
       return "Local";
-    case "premium":
-      return "Scholar Premium";
-    case "free":
-      return "Free";
     case "byok":
       return "BYOK";
     case "manual":
@@ -246,7 +242,7 @@ export default function StudioPanel({
       // goes through refinePassage()'s HTTP round trip — everything else
       // still falls through to the refinePassage() call after this block.
       let r: StudioRefineResult | undefined;
-      const refineExtra: { provider?: string; apiKey?: string; model?: string; useEngine?: "premium" } = {};
+      const refineExtra: { provider?: string; apiKey?: string; model?: string } = {};
 
       if (activeLevel.needsProvider) {
         if (mode === "advanced") {
@@ -275,13 +271,6 @@ export default function StudioPanel({
           let localUnavailableNote: string | null = null;
 
           for (const c of candidates) {
-            if (c.tier === "premium") {
-              refineExtra.useEngine = "premium";
-              chosenProviderId = c.providerId;
-              chosenTier = c.tier;
-              chosenReasoning = c.reasoning;
-              break;
-            }
             if (c.tier === "local") {
               // Executed inline, not just selected: a connection record
               // ("this device — or another one — set this runner up once")
@@ -401,17 +390,14 @@ export default function StudioPanel({
             voiceProfile: voiceProfile || undefined,
             provider: refineExtra.provider,
             model: refineExtra.model,
-            useEngine: refineExtra.useEngine,
           });
         }
       }
       setResult(r);
       setExecutedSource(
-        r.aiSource
-          ? { tier: r.aiSource.tier, provider: r.aiSource.provider, model: r.aiSource.model, creditsUsed: r.aiSource.creditsUsed, reasoning: chosenReasoning }
-          : r.usage
-            ? { tier: chosenTier, provider: r.usage.provider, model: r.usage.model, reasoning: chosenReasoning }
-            : null
+        r.usage
+          ? { tier: chosenTier, provider: r.usage.provider, model: r.usage.model, reasoning: chosenReasoning }
+          : null
       );
 
       // Record to Writing History if enabled (docs 32 §8)

@@ -7,7 +7,7 @@ export type ProviderId =
   | "custom";
 
 /** Who pays and where the call runs. */
-export type Lane = "premium" | "byok" | "local";
+export type Lane = "byok" | "local";
 
 export interface Candidate {
   /** Stable id for the breaker and the trace, e.g. "byok:anthropic:claude-x". */

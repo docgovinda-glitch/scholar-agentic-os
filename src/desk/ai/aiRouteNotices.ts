@@ -7,7 +7,7 @@
 import { showAppToast, type ToastVariant } from "../../components/ui/FeedbackSystem";
 
 export interface AiRouteSummary {
-  answeredBy?: { label: string; lane: "premium" | "byok" | "local" };
+  answeredBy?: { label: string; lane: "byok" | "local" };
   notices: Array<{ kind: "fallback" | "retry" | "skipped" | "limit"; text: string }>;
   usage?: { inputTokens: number; outputTokens: number };
 }

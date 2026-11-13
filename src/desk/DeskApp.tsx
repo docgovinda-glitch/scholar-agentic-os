@@ -406,7 +406,6 @@ function SettingsRoute() {
   return (
     <AccountSettingsScreen
       onClose={() => navigate(returnTo(location))}
-      onManagePremium={() => navigate("/ai-access/subscription", { replace: true })}
     />
   );
 }

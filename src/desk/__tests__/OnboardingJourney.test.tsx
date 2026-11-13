@@ -219,7 +219,7 @@ describe("the canonical first-login journey", () => {
     fireEvent.click(await screen.findByText("Groq"));
     fireEvent.change(await screen.findByPlaceholderText(/Paste your key/i), { target: { value: "sk-my-secret" } });
     fireEvent.click(screen.getByRole("button", { name: /Test and connect/i }));
-    await waitFor(() => expect(addConnection).toHaveBeenCalledWith("groq", "free", 3));
+    await waitFor(() => expect(addConnection).toHaveBeenCalledWith("groq", "byok", 3));
 
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 

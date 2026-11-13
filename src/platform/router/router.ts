@@ -89,7 +89,7 @@ export async function* route(req: RouteRequest, chain: Candidate[], signal: Abor
       yield { type: "handoff", to: c.id, label: c.label, reason: pending ? `${pending.from.label} failed: ${pending.failure.message}` : "Runs on your device" };
       return;
     }
-    if ((c.lane === "byok" || c.lane === "premium") && !c.credential?.apiKey) {
+    if (c.lane === "byok" && !c.credential?.apiKey) {
       yield { type: "candidate_skipped", candidateId: c.id, label: c.label, reason: "no_credential", detail: "No key available for this provider" };
       continue;
     }

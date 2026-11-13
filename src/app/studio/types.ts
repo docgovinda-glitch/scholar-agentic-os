@@ -29,14 +29,6 @@ export interface StudioRefineUsage {
   outputTokensEstimate: number;
 }
 
-/** Present only on the server-mediated Premium path (server/routes/studio.ts's runPremiumRefine) — the "Why this AI?" transparency Priority 6 asks for. Never present for a manual/Advanced-override or client-driven Free/BYOK call, since those already show the user their own choice. */
-export interface StudioAiSource {
-  tier: "premium";
-  provider: string;
-  model: string;
-  creditsUsed: number;
-}
-
 export interface StudioRefineResult {
   diff: RefinementDiff;
   voiceDrift?: VoiceDriftReport;
@@ -44,7 +36,6 @@ export interface StudioRefineResult {
   contentChangeCount: number;
   languageChangeCount: number;
   usage?: StudioRefineUsage;
-  aiSource?: StudioAiSource;
 }
 
 export type { EgressPolicy };

@@ -3,6 +3,13 @@ import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import StudioPanel from "../regions/StudioPanel";
+
+// routeDecision reads this device's keyring in production. These tests drive the
+// decision through the mocked fetch instead, so each case can name its own pick.
+vi.mock("../aiAccess/aiAccessApi", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../aiAccess/aiAccessApi")>()),
+  routeDecision: async () => (await fetch("/api/ai-access/route", { method: "POST" })).json(),
+}));
 import { storeProviderKey } from "../../services/userAiSettings";
 import { grantLocalConsent } from "../regions/localStudioExecution";
 import { __resetSessionPoliciesForTests } from "../../app/studio/sessionPolicyStore";
@@ -457,51 +464,6 @@ describe("Desk — StudioPanel", () => {
       expect(global.fetch).not.toHaveBeenCalledWith("/api/studio/refine", expect.anything());
     });
 
-    it("routes to Premium without ever asking for or sending a key", async () => {
-      let capturedBody: Record<string, unknown> | null = null;
-      mockFetch((url, init) => {
-        if (url === "/api/ai-access/route") {
-          return {
-            status: 200,
-            body: { ok: true, choice: { tier: "premium", providerId: "openai", modelId: "gpt-4o-mini", reasoning: "Using Scholar Premium (openai) — this uses your Premium credits." }, fallbacks: [] },
-          };
-        }
-        if (url === "/api/studio/refine") {
-          capturedBody = JSON.parse((init?.body as string) ?? "{}");
-          return {
-            status: 200,
-            body: {
-              diff: { passageId: "desk-studio-passage", level: "clarity", originalText: "x", changes: [], voiceApplied: false },
-              contentChangeCount: 0,
-              languageChangeCount: 0,
-              aiSource: { tier: "premium", provider: "openai", model: "gpt-4o-mini", creditsUsed: 2 },
-            },
-          };
-        }
-        throw new Error(`Unmocked: ${url}`);
-      });
-
-      render(<StudioPanel sessionId="s1" />);
-      fireEvent.change(screen.getAllByRole("combobox")[0], { target: { value: "clarity" } });
-      await screen.findByText("Will use: openai · premium");
-      expect(screen.queryByPlaceholderText("API key")).not.toBeInTheDocument();
-
-      fireEvent.change(screen.getByPlaceholderText(/Paste a passage/), { target: { value: "Some text to refine." } });
-      fireEvent.click(screen.getByText("Refine"));
-
-      expect(await screen.findByText(/AI used: openai \(gpt-4o-mini\) · premium · 2 credits/)).toBeInTheDocument();
-      await waitFor(() => expect(capturedBody).not.toBeNull());
-      expect(capturedBody).toMatchObject({ useEngine: "premium" });
-      expect(capturedBody).not.toHaveProperty("apiKey");
-
-      // "Why this AI?" for Premium: Source/Provider/Model/Credits used — never a credential.
-      fireEvent.click(screen.getAllByText("Why this AI?")[0]);
-      expect(await screen.findByText("Scholar Premium")).toBeInTheDocument();
-      expect(screen.getByText("Provider:")).toBeInTheDocument();
-      expect(screen.getByText("Credits used:")).toBeInTheDocument();
-      expect(screen.getByText("2")).toBeInTheDocument();
-      expect(screen.queryByText(/sk-/)).not.toBeInTheDocument();
-    });
 
     /** Studio's default routing decision used by every local test below — mockFetch() only ever needs to answer /api/ai-access/route; anything else hitting Scholar's own API is a bug in the code under test. */
     function mockOnlyLocalRoute(reasoning = "Using your local ollama — runs on your own computer, nothing leaves your device.") {

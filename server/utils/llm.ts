@@ -147,13 +147,13 @@ export function getCandidates(req?: LlmRequestLike): CandidateProvider[] {
   return [];
 }
 
-export interface PremiumAiPolicy {
+export interface ClientAiPolicy {
   status: "not_configured" | "active" | "suspended";
   isServerAiAuthorized: boolean;
   reason?: string;
 }
 
-export function getPremiumAiPolicy(req?: LlmRequestLike): PremiumAiPolicy {
+export function getClientAiPolicy(req?: LlmRequestLike): ClientAiPolicy {
   const isExplicitlyDisabled = process.env.ENABLE_SERVER_AI === "false";
   const candidates = getCandidates(req);
   const hasCredentials = candidates.length > 0;
@@ -181,7 +181,7 @@ export function getPremiumAiPolicy(req?: LlmRequestLike): PremiumAiPolicy {
 }
 
 export async function isServerAiAuthorized(req: LlmRequestLike): Promise<boolean> {
-  const policy = getPremiumAiPolicy(req);
+  const policy = getClientAiPolicy(req);
   return policy.isServerAiAuthorized;
 }
 
@@ -283,8 +283,7 @@ export function readVerifiedBrowserResult(
 }
 
 // ── Unified router (src/platform/router) ────────────────────────────────────
-// Every text call below runs through one chain per request: Premium (when
-// entitled) → the user's keys → their local model. A provider failure moves to
+// Every text call below runs through one chain per request: the user's keys → their local model. A provider failure moves to
 // the next model with a visible event; the browser hand-off (426) happens only
 // when no server-side model is connected or the next model is a local one.
 

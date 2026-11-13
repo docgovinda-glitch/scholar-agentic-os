@@ -108,10 +108,6 @@ async function runExtraction(projectId: string, guidelinesText: string): Promise
   for (const choice of candidates) {
     if (choice.tier === "local") continue;
     try {
-      if (choice.tier === "premium") {
-        const { proposal } = await extractJournalRequirements({ projectId, guidelinesText, useEngine: "premium" });
-        return proposal;
-      }
       const apiKey = await readProviderKey(choice.providerId);
       if (!apiKey) {
         lastError = new StudioNoAiSourceError(

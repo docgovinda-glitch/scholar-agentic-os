@@ -55,48 +55,6 @@ describe("useSubscriptionLimits Hook", () => {
     expect(check1.allowed).toBe(true);
   });
 
-  it("identifies Pro/Premium tier accounts and grants 50MB capacity", async () => {
-    vi.mocked(supabaseAuthService.getProfile).mockResolvedValue({
-      success: true,
-      profile: {
-        username: "pro_student",
-        fullName: "Pro Student",
-        email: "pro@scholar.edu",
-        phone: "",
-        phoneCountryCode: "",
-        phoneE164: "",
-        affiliation: "Oxford",
-        userType: "student",
-        educationLevel: "undergraduate",
-      },
-    });
-    vi.mocked(aiAccessApi.getAiAccessStatus).mockResolvedValue({
-      connections: [],
-      entitlement: { status: "active", active: true, planId: "premium" },
-      quota: null,
-      creditBalance: null,
-    });
-
-    const { result } = renderHook(() => useSubscriptionLimits());
-
-    await waitFor(() => {
-      expect(result.current.isLoading).toBe(false);
-    });
-
-    expect(result.current.isAdmin).toBe(false);
-    expect(result.current.isPremium).toBe(true);
-    expect(result.current.maxFileSizeMB).toBe(50);
-    expect(result.current.maxBriefsPerAssignment).toBe(Infinity);
-
-    // Allows 45MB file
-    const checkAllow = result.current.canUploadBrief({ size: 45 * 1024 * 1024 }, 2);
-    expect(checkAllow.allowed).toBe(true);
-
-    // Rejects 55MB file
-    const checkReject = result.current.canUploadBrief({ size: 55 * 1024 * 1024 }, 2);
-    expect(checkReject.allowed).toBe(false);
-    expect(checkReject.reason).toBe("size_limit_exceeded");
-  });
 
   it("enforces Free tier limits: max 5MB and max 1 brief per assignment", async () => {
     vi.mocked(supabaseAuthService.getProfile).mockResolvedValue({

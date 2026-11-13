@@ -1,6 +1,6 @@
 import express, { Request, Response } from "express";
 import { requireAuth } from "../src/middleware/auth.ts";
-import { getPremiumAiPolicy, readVerifiedBrowserResult, resolveRequestAiConfig, signLlmChallenge, computePromptHash } from "../utils/llm.ts";
+import { getClientAiPolicy, readVerifiedBrowserResult, resolveRequestAiConfig, signLlmChallenge, computePromptHash } from "../utils/llm.ts";
 import { InvalidLlmChallengeError, LocalModelUnreachableError, NoClientAiProviderError, sendAiFailure } from "../src/ai/aiRouteErrors.ts";
 import { aiAvailability, answeredByLabel, routedCompletion } from "../src/ai/routerBridge.ts";
 import type { ResearchLlm } from "../src/research/deepResearchEngine.ts";
@@ -307,7 +307,7 @@ export function registerAIRoutes(
     try {
       const aiConfig = resolveRequestAiConfig(req);
       const candidates = aiConfig.candidates;
-      const policy = getPremiumAiPolicy(req);
+      const policy = getClientAiPolicy(req);
       const operational = candidates.length > 0 && policy.status === "active";
 
       const providers = candidates.map((c) => ({
