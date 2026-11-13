@@ -8,6 +8,8 @@
  * so the UI never shows zero results.
  */
 
+import type { RawSourceInput } from "../../../citation_compliance/cslEngine";
+import { searchCrossref, searchOpenAlex, searchSemanticScholar } from "../../../shared/retrieval/providers";
 import type { DiscoveredSource, SourceVerificationStatus } from "../types";
 import { authedJsonFetch } from "../../api";
 import { buildSourceSearchQueries, briefDomainTerms, anchorQueries, scoreSourceRelevance } from "../../../utils/briefSourceQueries";
@@ -214,58 +216,35 @@ async function serverMultiPortal(query: string, maxResults: number): Promise<Ser
   return data.success && Array.isArray(data.sources) ? data.sources : [];
 }
 
-async function directOpenAlex(query: string, maxResults: number): Promise<ServerDiscoveredDraft[]> {
-  const res = await fetch(`https://api.openalex.org/works?search=${encodeURIComponent(query)}&per-page=${maxResults}`, { signal: AbortSignal.timeout(12_000) });
-  if (!res.ok) return [];
-  const data = await res.json();
-  return (data.results || []).map((w: any) => ({
-    title: w.title || w.display_name || "Untitled",
-    authors: (w.authorships || []).map((a: any) => a.author?.display_name).filter(Boolean),
-    url: w.doi || w.primary_location?.landing_page_url,
-    doi: typeof w.doi === "string" ? w.doi.replace(/^https?:\/\/doi\.org\//, "") : undefined,
-    year: w.publication_year,
-    venue: w.primary_location?.source?.display_name,
+/** Shared-provider record -> the draft shape this stage maps from. */
+function rawToDraft(r: RawSourceInput, via: string, tier: "A" | "B"): ServerDiscoveredDraft {
+  const year = typeof r.year === "number" ? r.year : Number(r.year) || undefined;
+  return {
+    title: r.title || "Untitled",
+    authors: Array.isArray(r.authors) ? (r.authors as unknown[]).filter((a): a is string => typeof a === "string") : [],
+    url: r.url,
+    doi: r.doi,
+    year,
+    venue: r.venue,
     sourceType: "scholarly",
-    authorityTier: w.type === "article" && w.primary_location?.source?.type === "journal" ? "A" : "B",
-    discoveredVia: "openalex",
-  }));
+    authorityTier: tier,
+    discoveredVia: via,
+  } as ServerDiscoveredDraft;
+}
+
+async function directOpenAlex(query: string, maxResults: number): Promise<ServerDiscoveredDraft[]> {
+  const { items } = await searchOpenAlex(query, maxResults, 1, { timeoutMs: 12_000 });
+  return items.map((r) => rawToDraft(r, "openalex", r.sourceType === "peer-reviewed article" ? "A" : "B"));
 }
 
 async function directCrossref(query: string, maxResults: number): Promise<ServerDiscoveredDraft[]> {
-  const res = await fetch(`https://api.crossref.org/works?query.bibliographic=${encodeURIComponent(query)}&rows=${maxResults}`, { signal: AbortSignal.timeout(12_000) });
-  if (!res.ok) return [];
-  const data = await res.json();
-  return (data.message?.items || []).map((w: any) => ({
-    title: (w.title && w.title[0]) || "Untitled",
-    authors: (w.author || []).map((a: any) => [a.given, a.family].filter(Boolean).join(" ")).filter(Boolean),
-    url: w.URL,
-    doi: w.DOI,
-    year: w.issued?.["date-parts"]?.[0]?.[0],
-    venue: w["container-title"]?.[0],
-    sourceType: "scholarly",
-    authorityTier: w.type === "journal-article" ? "A" : "B",
-    discoveredVia: "crossref",
-  }));
+  const { items } = await searchCrossref(query, maxResults, 1, { timeoutMs: 12_000 });
+  return items.map((r) => rawToDraft(r, "crossref", r.sourceType === "peer-reviewed article" ? "A" : "B"));
 }
 
 async function directSemanticScholar(query: string, maxResults: number): Promise<ServerDiscoveredDraft[]> {
-  const res = await fetch(
-    `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(query)}&limit=${maxResults}&fields=title,authors,year,url,venue,externalIds`,
-    { signal: AbortSignal.timeout(12_000) }
-  );
-  if (!res.ok) return [];
-  const data = await res.json();
-  return (data.data || []).map((w: any) => ({
-    title: w.title || "Untitled",
-    authors: (w.authors || []).map((a: any) => a.name).filter(Boolean),
-    url: w.url,
-    doi: w.externalIds?.DOI,
-    year: w.year,
-    venue: w.venue,
-    sourceType: "scholarly",
-    authorityTier: "A",
-    discoveredVia: "semantic_scholar",
-  }));
+  const { items } = await searchSemanticScholar(query, maxResults, { timeoutMs: 12_000 });
+  return items.map((r) => rawToDraft(r, "semantic_scholar", "A"));
 }
 
 function settledValues<T>(results: PromiseSettledResult<T[]>[]): T[] {
@@ -278,7 +257,7 @@ function settledValues<T>(results: PromiseSettledResult<T[]>[]): T[] {
 
 /**
  * Discover scholarly sources via the server's multi-portal API.
- * Falls back to mock catalog if the server is unavailable.
+ * If the server returns nothing, the public indexes are queried through the shared provider adapters.
  *
  * @param question - The research question / assignment prompt
  * @param citationStyle - Citation style for formatting fallback sources

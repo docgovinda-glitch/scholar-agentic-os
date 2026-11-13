@@ -56,47 +56,19 @@ describe("snowballSamplingService", () => {
     expect(firstNode.depth).toBe(0);
   });
 
-  it("fetches backward citations (foundational antecedents)", async () => {
+  it("never invents papers when the citation index is unreachable", async () => {
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("network down"));
     const seed = buildInitialCitationGraph([sampleSeeds[0]]).nodes[0];
-    const backward = await fetchBackwardCitations(seed, 4);
 
-    expect(backward).toHaveLength(4);
-    for (const paper of backward) {
-      expect(paper.nodeType).toBe("discovered_backward");
-      expect(paper.depth).toBe(1);
-      expect(paper.title).toBeTruthy();
-      expect(paper.authors.length).toBeGreaterThan(0);
-    }
-  });
+    expect(await fetchBackwardCitations(seed, 4)).toEqual([]);
+    expect(await fetchForwardCitations(seed, 4)).toEqual([]);
 
-  it("fetches forward citations (extensions and replications)", async () => {
-    const seed = buildInitialCitationGraph([sampleSeeds[0]]).nodes[0];
-    const forward = await fetchForwardCitations(seed, 4);
-
-    expect(forward).toHaveLength(4);
-    for (const paper of forward) {
-      expect(paper.nodeType).toBe("discovered_forward");
-      expect(paper.depth).toBe(1);
-      expect(paper.title).toBeTruthy();
-    }
-  });
-
-  it("performs recursive snowball expansion and prevents duplicate nodes", async () => {
     const initialGraph = buildInitialCitationGraph(sampleSeeds);
-    const targetNodeId = initialGraph.nodes[0].id;
-
-    const expandedGraph = await performSnowballExpansion(initialGraph, targetNodeId, {
-      breadth: 6,
-      direction: "bidirectional",
-    });
-
-    expect(expandedGraph.nodes.length).toBeGreaterThan(initialGraph.nodes.length);
-    expect(expandedGraph.edges.length).toBeGreaterThan(initialGraph.edges.length);
-    expect(expandedGraph.lastExpandedNodeId).toBe(targetNodeId);
-
-    // Verify all IDs are unique
-    const idSet = new Set(expandedGraph.nodes.map((n) => n.id));
-    expect(idSet.size).toBe(expandedGraph.nodes.length);
+    const expanded = await performSnowballExpansion(initialGraph, initialGraph.nodes[0].id, { breadth: 6, direction: "bidirectional" });
+    expect(expanded.nodes).toHaveLength(initialGraph.nodes.length);
+    expect(expanded.edges).toHaveLength(initialGraph.edges.length);
+    expect(expanded.lastExpandedNodeId).toBe(initialGraph.nodes[0].id);
+    vi.restoreAllMocks();
   });
 
   it("analyzes graph topology, in-degree/out-degree, and research gaps", () => {

@@ -301,13 +301,13 @@ describe("Ask Scholar Citation Engine & Referencing System", () => {
 
       // User selects IEEE
       fireEvent.click(within(listbox).getByRole("option", { name: /^IEEE/ }));
-      expect(localStorage.getItem("scholar_ask_citation_style")).toBe("ieee");
+      expect(JSON.parse(localStorage.getItem("scholar_ask_user_settings_v1") || "{}").preferredCitationStyle).toBe("ieee");
       expect(screen.getByRole("button", { name: /Referencing style: IEEE/i })).toBeInTheDocument();
 
       // User switches to Harvard
       fireEvent.click(screen.getByRole("button", { name: /Referencing style:/i }));
       fireEvent.click(screen.getByRole("option", { name: /^Harvard/ }));
-      expect(localStorage.getItem("scholar_ask_citation_style")).toBe("harvard");
+      expect(JSON.parse(localStorage.getItem("scholar_ask_user_settings_v1") || "{}").preferredCitationStyle).toBe("harvard");
     });
   });
 });

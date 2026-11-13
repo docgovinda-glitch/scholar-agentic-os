@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { ASK_ANSWER_GUIDE, askFailureMessage, liveSourcesAsCitations } from "../askScholarAnswer";
+import { ASK_BASE_IDENTITY, buildAskGeneralPrompt } from "../../../shared/askPrompts";
+import { askFailureMessage, liveSourcesAsCitations } from "../askScholarAnswer";
 
 describe("Ask Scholar answers", () => {
   it("numbers the search results so [1] opens the first source, with year and DOI read from the record", () => {
@@ -43,8 +44,11 @@ describe("Ask Scholar answers", () => {
     expect(askFailureMessage(new Error("No AI providers are configured"), 0, true).kind).toBe("no-ai");
   });
 
-  it("asks for a direct answer first and only the given sources", () => {
-    expect(ASK_ANSWER_GUIDE).toMatch(/direct answer/);
-    expect(ASK_ANSWER_GUIDE).toMatch(/never invent a source/);
+  it("builds the answer prompt from the shared rules: style, length, real sources only", () => {
+    const prompt = buildAskGeneralPrompt({ base: ASK_BASE_IDENTITY, style: "harvard", length: "concise" });
+    expect(prompt).toMatch(/Harvard/);
+    expect(prompt).toMatch(/180-320 words/);
+    expect(prompt).toMatch(/Never invent authors, years, titles, venues, DOIs or URLs/);
+    expect(prompt).toMatch(/never add a DOI to a source that has none/);
   });
 });

@@ -5,6 +5,8 @@ import { requireAuth } from "../src/middleware/auth.ts";
 import { createUploadInstance } from "../src/middleware/uploadGuard.ts";
 import { getSupabaseRestConfig, SupabaseTable } from "../src/supabaseRest.ts";
 import type { CanonicalReference } from "../../src/citation_compliance/model/reference.ts";
+import type { RawSourceInput } from "../../src/citation_compliance/cslEngine.ts";
+import { lookupCrossrefByDoi, lookupDataCiteByDoi } from "../../src/shared/retrieval/providers.ts";
 import { safeFetchHtml, extractLightweightUrlMetadata } from "../utils/ssrfGuard.ts";
 import { encrypt, decryptToString } from "../../src/services/crypto/crypto.ts";
 
@@ -332,104 +334,35 @@ router.post("/lookup-doi", async (req: Request, res: Response) => {
   }
 
   try {
-    let title = "";
-    let authors: string[] = [];
-    let year = "";
-    let journal = "";
-    let volume: string | undefined;
-    let issue: string | undefined;
-    let page: string | undefined;
-    let abstract = "";
-    let matched = false;
-
-    // 1. First query CrossRef
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 8000);
-      const url = `https://api.crossref.org/works/${encodeURIComponent(cleanDoi)}`;
-      const response = await fetch(url, {
-        headers: {
-          Accept: "application/json",
-          "User-Agent": "ScholarCore/2.0 (mailto:support@scholar-core.org)",
-        },
-        signal: controller.signal,
-      }).finally(() => clearTimeout(timer));
-
-      if (response.ok) {
-        const json = (await response.json()) as any;
-        const item = json?.message;
-        if (item) {
-          matched = true;
-          title = Array.isArray(item.title) ? item.title[0] : item.title || cleanDoi;
-          authors = (item.author || [])
-            .map((a: any) => `${a.given || ""} ${a.family || ""}`.trim())
-            .filter(Boolean);
-
-          const dateParts =
-            item["published-print"]?.["date-parts"]?.[0] ||
-            item["published-online"]?.["date-parts"]?.[0] ||
-            item.published?.["date-parts"]?.[0] ||
-            item.issued?.["date-parts"]?.[0] ||
-            item.created?.["date-parts"]?.[0] ||
-            item["journal-issue"]?.published?.["date-parts"]?.[0] ||
-            item["journal-issue"]?.["published-print"]?.["date-parts"]?.[0] ||
-            item["journal-issue"]?.["published-online"]?.["date-parts"]?.[0];
-
-          if (Array.isArray(dateParts) && dateParts.length > 0 && dateParts[0]) {
-            year = String(dateParts[0]);
-          }
-
-          journal = Array.isArray(item["container-title"])
-            ? item["container-title"][0]
-            : item["container-title"] || item.publisher || "";
-          volume = item.volume ? String(item.volume) : undefined;
-          issue = item.issue ? String(item.issue) : undefined;
-          page = item.page ? String(item.page) : undefined;
-          abstract = item.abstract ? item.abstract.replace(/<[^>]+>/g, " ").trim() : "";
-        }
-      }
-    } catch {}
-
-    // 2. Fallback to DataCite (covers arXiv, Zenodo, Figshare, and institutional repositories)
-    if (!matched) {
+    // Crossref first, then DataCite (arXiv, Zenodo, Figshare, repositories), through the shared providers.
+    let found: RawSourceInput | undefined;
+    for (const lookup of [lookupCrossrefByDoi, lookupDataCiteByDoi]) {
       try {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 8000);
-        const dcUrl = `https://api.datacite.org/dois/${encodeURIComponent(cleanDoi)}`;
-        const dcResponse = await fetch(dcUrl, {
-          headers: { Accept: "application/json" },
-          signal: controller.signal,
-        }).finally(() => clearTimeout(timer));
-
-        if (dcResponse.ok) {
-          const dcJson = (await dcResponse.json()) as any;
-          const attr = dcJson?.data?.attributes;
-          if (attr) {
-            matched = true;
-            title = attr.titles?.[0]?.title || cleanDoi;
-            authors = (attr.creators || [])
-              .map((c: any) => c.name || `${c.givenName || ""} ${c.familyName || ""}`.trim())
-              .filter(Boolean);
-
-            const dcYear =
-              attr.publicationYear ||
-              attr.dates?.find((d: any) => d.dateType === "Issued" || d.dateType === "Created" || d.dateType === "Submitted")?.date?.slice(0, 4);
-            if (dcYear) {
-              year = String(dcYear);
-            }
-
-            journal = attr.container?.title || attr.publisher || "";
-            abstract = attr.descriptions?.[0]?.description
-              ? attr.descriptions[0].description.replace(/<[^>]+>/g, " ").trim()
-              : "";
-          }
+        const hit = await lookup(cleanDoi, { timeoutMs: 8000 });
+        if (hit?.title) {
+          found = hit;
+          break;
         }
-      } catch {}
+      } catch {
+        // try the next registry
+      }
     }
-
-    if (!matched) {
+    if (!found) {
       return res.status(404).json({ error: `DOI not found on CrossRef or DataCite (${cleanDoi})` });
     }
+
+    const title = found.title as string;
+    // "Family, Given" (shared providers) -> "Given Family" (citation text)
+    const authors = (Array.isArray(found.authors) ? (found.authors as string[]) : []).map((n) => {
+      const [family, ...given] = n.split(",");
+      return given.length > 0 ? `${given.join(",").trim()} ${family.trim()}` : n.trim();
+    });
+    const year = found.year ? String(found.year) : "";
+    const journal = found.venue || found.publisher || "";
+    const volume = found.volume || undefined;
+    const issue = found.issue || undefined;
+    const page = found.pages || undefined;
+    const abstract = found.snippet || "";
 
     const canonicalReference: CanonicalReference = {
       kind: "JournalArticle",
@@ -452,22 +385,16 @@ router.post("/lookup-doi", async (req: Request, res: Response) => {
       url: `https://doi.org/${cleanDoi}`,
     };
 
-    const authorStr =
-      authors.length > 0
-        ? authors.length > 2
-          ? `${authors[0]} et al.`
-          : authors.join(" & ")
-        : "Unknown Author";
-    const citation = `${authorStr} (${year || "n.d."}). ${title}. ${journal ? `${journal}, ` : ""}${volume ? `${volume}` : ""}${issue ? `(${issue})` : ""}${page ? `, ${page}` : ""}. https://doi.org/${cleanDoi}`
+    const authorStr = authors.length > 2 ? `${authors[0]} et al.` : authors.join(" & ");
+    // With no named author the title leads, as the styles do; no placeholder author is written.
+    const citation = `${authorStr ? `${authorStr} ` : ""}(${year || "n.d."}). ${title}. ${journal ? `${journal}, ` : ""}${volume ? `${volume}` : ""}${issue ? `(${issue})` : ""}${page ? `, ${page}` : ""}. https://doi.org/${cleanDoi}`
       .replace(/\s+/g, " ")
       .trim();
 
     res.json({
       success: true,
       title,
-      content:
-        abstract ||
-        `Academic paper indexed with DOI: ${cleanDoi}\nPublished in ${journal || "Scholarly Journal"} (${year || "n.d."}).`,
+      content: abstract,
       sourceType: "reference",
       authors,
       year: year || "",

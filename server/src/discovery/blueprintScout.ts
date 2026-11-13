@@ -3,6 +3,8 @@
  * when set) and Crossref as the fallback. Both are free public indexes; no AI
  * and no cost. Only what the index returns is passed on.
  */
+import type { RawSourceInput } from "../../../src/citation_compliance/cslEngine.ts";
+import { fetchOpenAlexSourceDetails, searchCrossref, searchOpenAlex, type ProviderOptions } from "../../../src/shared/retrieval/providers.ts";
 import {
   abstractFromInvertedIndex,
   decodeEntities,
@@ -26,13 +28,6 @@ async function getJson(f: Fetch, url: string): Promise<Json> {
   return (await res.json()) as Json;
 }
 
-function openAlexUrl(path: string, params: Record<string, string>): string {
-  const q = new URLSearchParams(params);
-  if (process.env.OPENALEX_API_KEY) q.set("api_key", process.env.OPENALEX_API_KEY);
-  if (process.env.OPENALEX_MAILTO) q.set("mailto", process.env.OPENALEX_MAILTO);
-  return `https://api.openalex.org/${path}?${q.toString()}`;
-}
-
 const cleanDoi = (d: unknown) => (typeof d === "string" && d ? d.replace(/^https?:\/\/(dx\.)?doi\.org\//i, "") : undefined);
 const firstString = (v: unknown) => {
   const s = Array.isArray(v) ? (typeof v[0] === "string" ? v[0] : undefined) : typeof v === "string" ? v : undefined;
@@ -43,51 +38,40 @@ const crossrefYear = (item: Json) => {
   return parts?.[0]?.[0];
 };
 
-async function openAlexPapers(f: Fetch, interest: string, n: number, since: number): Promise<ScoutPaper[]> {
-  const data = await getJson(
-    f,
-    openAlexUrl("works", {
-      search: interest,
-      filter: `from_publication_date:${since}-01-01,has_abstract:true,type:article`,
-      "per-page": String(n),
-      select: "id,doi,title,publication_year,abstract_inverted_index,primary_location,authorships",
-    })
-  );
-  return ((data.results as Json[]) ?? []).map((w, i) => ({
+function toScoutPaper(r: RawSourceInput, i: number, source: ScoutPaper["source"]): ScoutPaper {
+  return {
     key: `p${i + 1}`,
-    title: String(w.title ?? "Untitled"),
-    year: typeof w.publication_year === "number" ? w.publication_year : undefined,
-    venue: ((w.primary_location as Json | null)?.source as Json | null)?.display_name as string | undefined,
-    doi: cleanDoi(w.doi),
-    url: typeof w.doi === "string" ? w.doi : (w.id as string | undefined),
-    authors: ((w.authorships as Json[]) ?? []).map((a) => (a.author as Json | undefined)?.display_name).filter((x): x is string => typeof x === "string"),
-    abstract: abstractFromInvertedIndex(w.abstract_inverted_index as Record<string, number[]> | null),
-    source: "openalex" as const,
-  }));
+    title: r.title || "Untitled",
+    year: typeof r.year === "number" ? r.year : Number(r.year) || undefined,
+    venue: r.venue,
+    doi: r.doi,
+    url: r.url,
+    authors: Array.isArray(r.authors) ? (r.authors as unknown[]).filter((a): a is string => typeof a === "string") : [],
+    abstract: r.snippet || "",
+    source,
+  };
+}
+
+function scoutOptions(f: Fetch, extraParams: Record<string, string>): ProviderOptions {
+  return {
+    fetchImpl: f as typeof fetch,
+    extraParams,
+    mailto: process.env.OPENALEX_MAILTO,
+    openAlexApiKey: process.env.OPENALEX_API_KEY,
+    timeoutMs: 15_000,
+  };
+}
+
+async function openAlexPapers(f: Fetch, interest: string, n: number, since: number): Promise<ScoutPaper[]> {
+  const res = await searchOpenAlex(interest, n, 1, scoutOptions(f, { filter: `from_publication_date:${since}-01-01,has_abstract:true,type:article` }));
+  if (res.error && res.items.length === 0) throw new Error(res.error);
+  return res.items.map((r, i) => toScoutPaper(r, i, "openalex"));
 }
 
 async function crossrefPapers(f: Fetch, interest: string, n: number, since: number): Promise<ScoutPaper[]> {
-  const q = new URLSearchParams({
-    query: interest,
-    filter: `from-pub-date:${since}-01-01,type:journal-article,has-abstract:true`,
-    rows: String(n),
-    select: "DOI,title,abstract,container-title,published,published-print,published-online,created,author",
-  });
-  const data = await getJson(f, `https://api.crossref.org/works?${q.toString()}`);
-  return (((data.message as Json)?.items as Json[]) ?? []).map((item, i) => {
-    const doi = cleanDoi(item.DOI);
-    return {
-      key: `p${i + 1}`,
-      title: firstString(item.title) ?? "Untitled",
-      year: crossrefYear(item),
-      venue: firstString(item["container-title"]),
-      doi,
-      url: doi ? `https://doi.org/${doi}` : undefined,
-      authors: ((item.author as Json[]) ?? []).map((a) => [a.given, a.family].filter(Boolean).join(" ")).filter(Boolean),
-      abstract: stripJats(item.abstract as string | undefined),
-      source: "crossref" as const,
-    };
-  });
+  const res = await searchCrossref(interest, n, 1, scoutOptions(f, { filter: `from-pub-date:${since}-01-01,type:journal-article,has-abstract:true` }));
+  if (res.error && res.items.length === 0) throw new Error(res.error);
+  return res.items.map((r, i) => toScoutPaper(r, i, "crossref"));
 }
 
 /** Up to n recent papers with abstracts on the interest; OpenAlex first, then Crossref. */
@@ -106,37 +90,26 @@ export async function scoutPapers(interest: string, n = 15, f: Fetch = fetch): P
 export async function scoutJournals(query: string, f: Fetch = fetch): Promise<{ journals: VenueMatch[]; since: number }> {
   const since = fromYear();
   try {
-    const data = await getJson(
-      f,
-      openAlexUrl("works", {
-        search: query,
-        filter: `from_publication_date:${since}-01-01,type:article,primary_location.source.type:journal`,
-        "per-page": "100",
-        select: "title,primary_location",
-      })
-    );
-    const works: VenueWork[] = ((data.results as Json[]) ?? []).map((w) => {
-      const src = ((w.primary_location as Json | null)?.source as Json | null) ?? {};
-      return {
-        title: String(w.title ?? ""),
-        venue: src.display_name as string | undefined,
-        venueId: typeof src.id === "string" ? src.id.replace("https://openalex.org/", "") : undefined,
-        issn: src.issn_l as string | undefined,
-        publisher: src.host_organization_name as string | undefined,
-      };
-    });
+    const res = await searchOpenAlex(query, 100, 1, scoutOptions(f, { filter: `from_publication_date:${since}-01-01,type:article,primary_location.source.type:journal`, select: "title,primary_location" }));
+    if (res.error && res.items.length === 0) throw new Error(res.error);
+    const works: VenueWork[] = res.items.map((r) => ({
+      title: r.title ?? "",
+      venue: r.venue,
+      venueId: r.venueId,
+      issn: r.issn,
+      publisher: r.publisher,
+    }));
     const journals = rankVenues(works, "openalex");
     if (journals.length) {
       // Homepage and open-access status, from the index's record of each journal.
       try {
-        const ids = journals.map((j) => j.id).join("|");
-        const srcs = await getJson(f, openAlexUrl("sources", { filter: `openalex_id:${ids}`, select: "id,homepage_url,is_oa,host_organization_name,issn_l" }));
-        for (const s of (srcs.results as Json[]) ?? []) {
-          const j = journals.find((x) => x.id === String(s.id).replace("https://openalex.org/", ""));
+        const details = await fetchOpenAlexSourceDetails(journals.map((j) => j.id), scoutOptions(f, {}));
+        for (const d of details) {
+          const j = journals.find((x) => x.id === d.id);
           if (!j) continue;
-          if (typeof s.homepage_url === "string") j.homepage = s.homepage_url;
-          if (typeof s.is_oa === "boolean") j.isOpenAccess = s.is_oa;
-          if (!j.publisher && typeof s.host_organization_name === "string") j.publisher = s.host_organization_name;
+          if (d.homepage) j.homepage = d.homepage;
+          if (typeof d.isOpenAccess === "boolean") j.isOpenAccess = d.isOpenAccess;
+          if (!j.publisher && d.publisher) j.publisher = d.publisher;
         }
       } catch {
         // the ranking stands without the extra details
@@ -146,18 +119,8 @@ export async function scoutJournals(query: string, f: Fetch = fetch): Promise<{ 
   } catch {
     // fall through to Crossref
   }
-  const q = new URLSearchParams({
-    query,
-    filter: `from-pub-date:${since}-01-01,type:journal-article`,
-    rows: "100",
-    select: "title,container-title,ISSN,publisher",
-  });
-  const data = await getJson(f, `https://api.crossref.org/works?${q.toString()}`);
-  const works: VenueWork[] = (((data.message as Json)?.items as Json[]) ?? []).map((item) => ({
-    title: firstString(item.title) ?? "",
-    venue: firstString(item["container-title"]),
-    issn: firstString(item.ISSN),
-    publisher: typeof item.publisher === "string" ? decodeEntities(item.publisher) : undefined,
-  }));
+  const cr = await searchCrossref(query, 100, 1, scoutOptions(f, { filter: `from-pub-date:${since}-01-01,type:journal-article` }));
+  if (cr.error && cr.items.length === 0) throw new Error(cr.error);
+  const works: VenueWork[] = cr.items.map((r) => ({ title: r.title ?? "", venue: r.venue, issn: r.issn, publisher: r.publisher }));
   return { journals: rankVenues(works, "crossref"), since };
 }

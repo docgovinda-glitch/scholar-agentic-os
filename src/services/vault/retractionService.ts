@@ -5,6 +5,7 @@
  * to identify retracted publications, withdrawals, and expressions of concern.
  */
 
+import { fetchCrossrefMessage } from "../../shared/retrieval/providers";
 import { updateVaultItemDetails, type VaultItem, type RetractionStatus } from "../vaultContents";
 
 export interface RetractionCheckResult {
@@ -44,6 +45,15 @@ function cleanDoi(raw: string): string {
     .toLowerCase();
 }
 
+/** The Crossmark update fields this check reads. */
+interface CrossmarkUpdate {
+  type?: string;
+  "type-label"?: string;
+  DOI?: string;
+  updated?: { "date-time"?: string };
+  date?: { "date-time"?: string };
+}
+
 /**
  * Checks a single item for retraction notices.
  */
@@ -74,29 +84,15 @@ export async function checkItemRetraction(item: VaultItem): Promise<RetractionCh
 
   // 2. Query Crossref API for updates, retractions, and Crossmark assertions
   try {
-    const encodedDoi = encodeURIComponent(doi);
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 6000);
-
-    const res = await fetch(`https://api.crossref.org/works/${encodedDoi}`, {
-      headers: {
-        "User-Agent": "ScholarOS-IntegrityWatch/2.0 (mailto:integrity@scholar.os)",
-      },
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-
-    if (!res.ok) {
+    const message = await fetchCrossrefMessage(doi, { timeoutMs: 6000 });
+    if (!message) {
       return { status: "unknown", isRetracted: false };
     }
 
-    const data = await res.json();
-    const message = data.message;
-
     // Check Crossmark update-to relations
-    const updateTo = message["update-to"] || [];
+    const updateTo = (message["update-to"] || []) as CrossmarkUpdate[];
     const relation = message["relation"] || {};
-    const updates = message["updates"] || [];
+    const updates = (Array.isArray(message["updates"]) ? message["updates"] : []) as CrossmarkUpdate[];
 
     // Check if the work itself is a retraction notice
     if (message.type === "retraction" || message.subtype === "retraction") {

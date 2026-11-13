@@ -106,9 +106,9 @@ export default function CitationStylePicker({
         aria-expanded={open}
         aria-label={`Referencing style: ${current.name}`}
         title="Referencing style for answers and source lists"
-        className="inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 px-2.5 py-1 min-h-11 sm:min-h-0 rounded-lg text-xs font-medium bg-neutral-100 dark:bg-white/[0.06] border border-neutral-200/80 dark:border-white/10 text-neutral-700 dark:text-neutral-200 hover:text-neutral-900 dark:hover:text-white cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
+        className="inline-flex min-h-10 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-xs font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-500 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white sm:min-h-8"
       >
-        <BookOpen className="w-3.5 h-3.5 text-sky-500 shrink-0" aria-hidden="true" />
+        <BookOpen className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
         <span>{current.shortLabel}</span>
         <ChevronDown className="w-3 h-3 opacity-70" aria-hidden="true" />
       </button>

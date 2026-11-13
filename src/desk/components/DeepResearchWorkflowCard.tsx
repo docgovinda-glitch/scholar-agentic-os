@@ -67,7 +67,7 @@ export function buildProposedDeepResearchPlan(question: string): ProposedDeepRes
     disciplineLabel: classification.disciplineProfile.label,
     subQuestions,
     sourceTypes: classification.disciplineProfile.preferredSourceTypes,
-    budgetLabel: `${budget.candidatesMin}–${budget.candidatesMax} candidates retrieved · ${budget.targetCitedMin}–${budget.targetCitedMax}+ read & cited`,
+    budgetLabel: `${budget.minCandidates}–${budget.maxCandidates} candidates retrieved · ${budget.minCited}–${budget.maxCited}+ read & cited`,
   };
 }
 

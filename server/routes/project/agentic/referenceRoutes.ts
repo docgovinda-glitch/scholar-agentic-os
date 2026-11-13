@@ -7,34 +7,29 @@ import {
   sourceIdForDoi,
   type ReferenceRecord,
 } from "../../../../src/domain/journal/references.ts";
+import { fetchCrossrefMessage, fetchDataCiteAttributes } from "../../../../src/shared/retrieval/providers.ts";
 import { getProjectSafe } from "./helpers.ts";
 
 export const referenceRoutes = express.Router({ mergeParams: true });
 
-const UA = "ScholarCore/2.0 (https://scholar.gkshah.com.np; mailto:support@scholar-core.org)";
 const MAX_CHECK = 100;
 
 type Json = Record<string, unknown>;
+/** `notFound` separates "the registry has no such DOI" from "the registry could not be reached". */
 type Lookup = { ok: true; message: Json } | { ok: false; notFound: boolean };
 
-async function getJson(url: string, timeoutMs = 8000): Promise<Lookup> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+async function registry(fetchRecord: () => Promise<Json | undefined>): Promise<Lookup> {
   try {
-    const res = await fetch(url, { headers: { Accept: "application/json", "User-Agent": UA }, signal: controller.signal });
-    if (res.status === 404) return { ok: false, notFound: true };
-    if (!res.ok) return { ok: false, notFound: false };
-    return { ok: true, message: (await res.json()) as Json };
+    const record = await fetchRecord();
+    return record ? { ok: true, message: record } : { ok: false, notFound: true };
   } catch {
     return { ok: false, notFound: false };
-  } finally {
-    clearTimeout(timer);
   }
 }
 
-// Both hosts are fixed; the DOI is only ever a path segment, encoded.
-const crossref = (doi: string) => getJson(`https://api.crossref.org/works/${encodeURIComponent(doi)}`);
-const datacite = (doi: string) => getJson(`https://api.datacite.org/dois/${encodeURIComponent(doi)}`);
+// The shared provider layer owns the hosts and transport; the DOI is only ever a path segment.
+const crossref = (doi: string) => registry(() => fetchCrossrefMessage(doi, { timeoutMs: 8000 }));
+const datacite = (doi: string) => registry(() => fetchDataCiteAttributes(doi, { timeoutMs: 8000 }));
 
 /**
  * POST /api/projects/:id/agentic/references/lookup  { doi }
@@ -52,13 +47,13 @@ referenceRoutes.post("/references/lookup", async (req: express.Request<{ id: str
   const now = new Date().toISOString();
   const cr = await crossref(doi);
   if (cr.ok) {
-    const message = (cr.message.message ?? {}) as Json;
+    const message = cr.message;
     const record: ReferenceRecord = { ...recordFromCrossref(message, id, doi), integrity: integrityFromCrossref(message, now) };
     return res.json({ record, abstract: typeof message.abstract === "string" ? message.abstract.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() : "" });
   }
   const dc = await datacite(doi);
   if (dc.ok) {
-    const attrs = (((dc.message.data ?? {}) as Json).attributes ?? {}) as Json;
+    const attrs = dc.message;
     // DataCite does not carry retraction notices; say so rather than "clean".
     const record: ReferenceRecord = { ...recordFromDataCite(attrs, id, doi), integrity: { status: "unknown", checkedAt: now } };
     const desc = Array.isArray(attrs.descriptions) ? (attrs.descriptions as Json[])[0]?.description : undefined;
@@ -89,7 +84,7 @@ referenceRoutes.post("/references/check", async (req: express.Request<{ id: stri
     for (let doi = queue.shift(); doi; doi = queue.shift()) {
       const now = new Date().toISOString();
       const cr = await crossref(doi);
-      results[doi] = cr.ok ? integrityFromCrossref((cr.message.message ?? {}) as Json, now) : { status: "unknown", checkedAt: now };
+      results[doi] = cr.ok ? integrityFromCrossref(cr.message, now) : { status: "unknown", checkedAt: now };
     }
   };
   await Promise.all(Array.from({ length: Math.min(4, dois.length) }, worker));

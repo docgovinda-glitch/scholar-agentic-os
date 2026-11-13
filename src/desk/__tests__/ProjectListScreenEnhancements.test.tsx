@@ -131,8 +131,12 @@ describe("UI/UX Enhancements: Command Palette, Boot Project, Related Inquiries, 
     const inquiryChips = screen.getAllByRole("button", { name: /What is Knowledge Vault\?/i });
     fireEvent.click(inquiryChips[inquiryChips.length - 1]);
 
-    // Verify answer is rendered in the conversation
-    expect(await screen.findByText(/The Knowledge Vault is your secure, private academic repository/i)).toBeInTheDocument();
+    // The chip sends that question to the assistant like any typed question (no canned reply)
+    await waitFor(() => {
+      const viaLlm = executeAgenticLLM.mock.calls.some((c) => c[1] === "What is Knowledge Vault?");
+      const viaQuery = executeAgenticQuery.mock.calls.some((c) => (c[0] as { prompt?: string })?.prompt === "What is Knowledge Vault?");
+      expect(viaLlm || viaQuery).toBe(true);
+    });
   });
 
   it("boots an academic project workspace directly from research synthesis", async () => {

@@ -1,13 +1,5 @@
 import React, { useState } from "react";
-import {
-  BookOpen,
-  ChevronDown,
-  ChevronRight,
-  ExternalLink,
-  ShieldCheck,
-  AlertTriangle,
-  FileText,
-} from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import {
   formatAskScholarBibliography,
   getReferenceListHeading,
@@ -34,7 +26,6 @@ export function SourceTransparencyPanel({
   readCount,
   citedCount,
 }: SourceTransparencyPanelProps) {
-  const [sourcesUsedOpen, setSourcesUsedOpen] = useState(false);
   const [sourcesExcludedOpen, setSourcesExcludedOpen] = useState(false);
 
   const bibEntries = formatAskScholarBibliography(citations, citationStyle);
@@ -97,31 +88,29 @@ export function SourceTransparencyPanel({
 
   const currentYear = new Date().getFullYear();
 
+  /** A quiet note only where a reader should weigh the source: preprints and older work. */
+  const noteFor = (entry: (typeof bibEntries)[number]): string | undefined => {
+    const raw = entry.rawCitation;
+    const yr = entry.year ? parseInt(entry.year, 10) : undefined;
+    const isPreprint =
+      entry.credibilityLevel === "preprint - not peer-reviewed" || (entry.sourceTypeLabel || "").includes("preprint");
+    return raw.limitationNote || (isPreprint ? "Preprint, not peer-reviewed" : yr && currentYear - yr > 10 ? `Older study (${yr})` : undefined);
+  };
+
   return (
-    <div className="mt-4 pt-3 border-t border-neutral-200/80 dark:border-white/10 space-y-3 max-w-[75ch]">
-      {/* 1. Separated Reference List Section (Section 5, Section 6, Section 10) */}
+    <div className="mt-5 max-w-[75ch] space-y-2 border-t border-neutral-200/70 pt-3 dark:border-white/10">
       {bibEntries.length > 0 && (
-        <section
-          aria-label={heading}
-          data-testid="reference-list-section"
-          className="space-y-2"
-        >
-          <div className="flex items-center justify-between gap-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
-              <BookOpen className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-              <span>{heading}</span>
-            </h3>
-            <span
-              data-testid="search-read-cited-banner"
-              className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400"
-            >
+        <section aria-label={heading} data-testid="reference-list-section" className="space-y-2">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+            <h3 className="text-[13px] font-semibold text-neutral-900 dark:text-neutral-100">{heading}</h3>
+            <span data-testid="search-read-cited-banner" className="text-[11px] text-neutral-500 dark:text-neutral-400">
               Searched {effectiveSearched} · Read {effectiveRead} · Cited {effectiveCited}.
             </span>
           </div>
 
-          <ol className="space-y-2 text-[12.5px] leading-[1.6] text-neutral-800 dark:text-neutral-200">
+          <ol className="space-y-1.5 text-[13px] leading-[1.6] text-neutral-700 dark:text-neutral-300">
             {bibEntries.map((entry) => {
-              const mdText = entry.markdownText || entry.formattedText;
+              const note = noteFor(entry);
               return (
                 <li
                   key={`${messageId}-ref-${entry.displayIndex}`}
@@ -129,9 +118,18 @@ export function SourceTransparencyPanel({
                   data-ref-num={String(entry.originalIndex)}
                   data-ref-display-id={`ref-entry-${messageId}-${entry.displayIndex}`}
                   data-testid="reference-list-entry"
-                  className="pl-7 -indent-7 py-1 px-2 rounded-lg transition-all duration-300"
+                  className="-indent-6 rounded-lg py-0.5 pl-6 transition-colors duration-300"
                 >
-                  {renderReferenceNodes(mdText)}
+                  {renderReferenceNodes(entry.markdownText || entry.formattedText)}
+                  {entry.openAccessUrl && (
+                    <>
+                      {" "}
+                      <a href={entry.openAccessUrl} target="_blank" rel="noopener noreferrer" className="whitespace-nowrap text-neutral-500 underline-offset-2 hover:underline dark:text-neutral-400">
+                        Full text
+                      </a>
+                    </>
+                  )}
+                  {note && <span className="ml-1 text-[12px] text-amber-700 dark:text-amber-400">({note})</span>}
                 </li>
               );
             })}
@@ -139,146 +137,29 @@ export function SourceTransparencyPanel({
         </section>
       )}
 
-      {/* 2. Source Transparency Collapsible Panels (Section 14) */}
-      <div className="flex flex-wrap items-center gap-2 pt-1">
-        {bibEntries.length > 0 && (
-          <button
-            type="button"
-            data-testid="sources-used-toggle"
-            onClick={() => setSourcesUsedOpen((v) => !v)}
-            aria-expanded={sourcesUsedOpen}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-neutral-100 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200/70 dark:hover:bg-white/10 border border-neutral-200/80 dark:border-white/10 transition-colors cursor-pointer"
-          >
-            {sourcesUsedOpen ? (
-              <ChevronDown className="w-3 h-3" />
-            ) : (
-              <ChevronRight className="w-3 h-3" />
-            )}
-            <ShieldCheck className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-            <span>Sources used ({bibEntries.length})</span>
-          </button>
-        )}
-
-        {excludedSources.length > 0 && (
+      {excludedSources.length > 0 && (
+        <div>
           <button
             type="button"
             data-testid="sources-excluded-toggle"
             onClick={() => setSourcesExcludedOpen((v) => !v)}
             aria-expanded={sourcesExcludedOpen}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-amber-50/80 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 hover:bg-amber-100/80 dark:hover:bg-amber-950/50 border border-amber-200/70 dark:border-amber-800/40 transition-colors cursor-pointer"
+            className="inline-flex cursor-pointer items-center gap-1 text-xs text-neutral-500 transition-colors hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
           >
-            {sourcesExcludedOpen ? (
-              <ChevronDown className="w-3 h-3" />
-            ) : (
-              <ChevronRight className="w-3 h-3" />
-            )}
-            <AlertTriangle className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+            {sourcesExcludedOpen ? <ChevronDown className="h-3 w-3" aria-hidden="true" /> : <ChevronRight className="h-3 w-3" aria-hidden="true" />}
             <span>Sources excluded ({excludedSources.length})</span>
           </button>
-        )}
-      </div>
-
-      {/* Collapsible "Sources used" detail list */}
-      {sourcesUsedOpen && bibEntries.length > 0 && (
-        <div
-          data-testid="sources-used-list"
-          className="p-2.5 rounded-xl bg-neutral-50/90 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 space-y-2"
-        >
-          {bibEntries.map((entry) => {
-            const raw = entry.rawCitation;
-            const authorsStr =
-              raw.authors && raw.authors.length > 0
-                ? raw.authors.join(", ")
-                : raw.author || "";
-            const yrNum = entry.year ? parseInt(entry.year, 10) : undefined;
-            const isPreprint =
-              entry.credibilityLevel === "preprint - not peer-reviewed" ||
-              (entry.sourceTypeLabel || "").includes("preprint");
-            const limitation =
-              raw.limitationNote ||
-              (isPreprint
-                ? "preprint, not peer-reviewed"
-                : yrNum && currentYear - yrNum > 10
-                  ? `older study (${yrNum})`
-                  : undefined);
-
-            return (
-              <div
-                key={`used-${entry.displayIndex}`}
-                className="p-2 rounded-lg bg-white dark:bg-ink-800 border border-neutral-200/60 dark:border-white/10 text-xs space-y-1"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  {entry.url ? (
-                    <a
-                      href={entry.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-semibold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
-                    >
-                      <span>{raw.title}</span>
-                      <ExternalLink className="w-3 h-3 shrink-0" />
-                    </a>
-                  ) : (
-                    <span className="font-semibold text-neutral-900 dark:text-neutral-100">
-                      {raw.title}
-                    </span>
-                  )}
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-neutral-100 dark:bg-white/10 text-neutral-700 dark:text-neutral-300 shrink-0">
-                    {entry.sourceTypeLabel || "peer-reviewed article"} ·{" "}
-                    {entry.credibilityLevel || "high"}
-                  </span>
+          {sourcesExcludedOpen && (
+            <div data-testid="sources-excluded-list" className="mt-1.5 space-y-1 text-xs text-neutral-600 dark:text-neutral-400">
+              <p>These candidates failed metadata or retraction checks and were not cited.</p>
+              {excludedSources.map((ex, idx) => (
+                <div key={`ex-${idx}`} className="flex items-baseline justify-between gap-3">
+                  <span className="truncate">{ex.title}</span>
+                  <span className="shrink-0 text-amber-700 dark:text-amber-400">{ex.reason}</span>
                 </div>
-
-                <div className="text-[11px] text-neutral-600 dark:text-neutral-400 flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <span>
-                    {authorsStr} ({entry.year})
-                  </span>
-                  {entry.publisher && <span>· {entry.publisher}</span>}
-                  {entry.openAccessUrl && (
-                    <a
-                      href={entry.openAccessUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium hover:underline"
-                    >
-                      <FileText className="w-3 h-3" />
-                      <span>Open-access full text</span>
-                    </a>
-                  )}
-                  {limitation && (
-                    <span className="px-1.5 py-0.2 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/40 text-[10px]">
-                      Note: {limitation}
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Collapsible "Sources excluded" detail list */}
-      {sourcesExcludedOpen && excludedSources.length > 0 && (
-        <div
-          data-testid="sources-excluded-list"
-          className="p-2.5 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/70 dark:border-amber-800/40 space-y-1.5"
-        >
-          <p className="text-[11px] text-amber-800 dark:text-amber-300 font-medium">
-            The following candidate sources were excluded during metadata and retraction verification:
-          </p>
-          {excludedSources.map((ex, idx) => (
-            <div
-              key={`ex-${idx}`}
-              className="flex items-center justify-between gap-2 text-[11px] py-1 px-2 rounded bg-white/80 dark:bg-ink-800/80 border border-amber-200/50 dark:border-amber-800/30"
-            >
-              <span className="text-neutral-700 dark:text-neutral-300 truncate">
-                {ex.title}
-              </span>
-              <span className="px-1.5 py-0.5 rounded font-semibold bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 shrink-0">
-                {ex.reason}
-              </span>
+              ))}
             </div>
-          ))}
+          )}
         </div>
       )}
     </div>

@@ -115,8 +115,8 @@ Transformer architectures rely entirely on self-attention mechanisms to compute 
 
       // Scoped key matches userEmail
       const otherLoaded = loadLocalAskScholarThreads("other@scholar.org");
-      expect(otherLoaded).toHaveLength(1); // fallback to base storage when other scope is empty
-      expect(otherLoaded[0].id).toBe("thread-1");
+      // Another account on the same browser never sees these conversations
+      expect(otherLoaded).toHaveLength(0);
     });
 
     it("merges local and remote threads keeping the version with more messages or newer updatedAtIso", () => {

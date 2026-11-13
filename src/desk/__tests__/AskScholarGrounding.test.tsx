@@ -67,18 +67,23 @@ describe("Ask Scholar grounds every answer in a fresh search", () => {
   });
   afterEach(() => cleanup());
 
-  it("has no grounding switch, says Ready, and searches before answering with numbered sources", async () => {
+  it("has no grounding switch, stays silent when healthy, and searches before answering with numbered sources", async () => {
     executeLiveSearch.mockResolvedValue(SOURCES);
     open();
     expect(screen.queryByText(/Live Grounding/i)).toBeNull();
     expect(screen.queryByTestId("ask-scholar-live-grounding-toggle")).toBeNull();
-    expect(await screen.findByText("Ready")).toBeInTheDocument();
+    expect(screen.queryByText(/No AI is connected|offline/i)).toBeNull();
 
     await ask("Does social media increase political polarisation among young voters?");
     await waitFor(() => expect(executeAgenticQuery).toHaveBeenCalled());
-    expect(executeLiveSearch).toHaveBeenCalledWith("Does social media increase political polarisation among young voters?");
-    // The search results go to the AI with the question.
-    expect(executeAgenticQuery.mock.calls[0][0].systemPrompt).toContain('[1] "Social media and polarization: a review"');
+    expect(executeLiveSearch).toHaveBeenCalledWith(
+      "Does social media increase political polarisation among young voters?",
+      expect.objectContaining({ discipline: expect.any(String) })
+    );
+    // The search results go to the server once, as sources (the server numbers and cites them).
+    const sent = executeAgenticQuery.mock.calls[0][0];
+    expect(sent.systemPrompt).toBeUndefined();
+    expect(sent.preRetrievedSources[0].title).toBe("Social media and polarization: a review");
 
     expect(await screen.findByText(/Sources \(2\)/)).toBeInTheDocument();
     expect(screen.getByLabelText("Source 1")).toHaveTextContent("[1]");
@@ -95,7 +100,8 @@ describe("Ask Scholar grounds every answer in a fresh search", () => {
     await ask("What about in Nepal?");
     await waitFor(() => expect(executeAgenticQuery).toHaveBeenCalledTimes(2));
     expect(executeLiveSearch).toHaveBeenLastCalledWith(
-      "Does social media increase political polarisation among young voters? What about in Nepal?"
+      "Does social media increase political polarisation among young voters? What about in Nepal?",
+      expect.objectContaining({ discipline: expect.any(String) })
     );
     expect(await screen.findByTestId("no-live-sources")).toHaveTextContent("No recent sources were found");
   });

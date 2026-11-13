@@ -7,7 +7,6 @@ import {
   saveAskScholarSettings,
   type AcademicDiscipline,
   type AnswerLengthPreference,
-  type DefaultExportFormat,
   type AskScholarUserSettings,
 } from "../../config/askScholarConfig";
 import {
@@ -18,10 +17,7 @@ import {
 import { PHONE_SHEET_CLASSES, useIsPhoneSheet } from "./usePhoneSheet";
 
 export interface AskScholarSettingsPopoverProps {
-  citationStyle?: string;
-  onChangeCitationStyle?: (styleId: string) => void;
-  onImportReferencesToVault?: (items: CSLItem[], rawDois: string[]) => void;
-  onSettingsChanged?: (settings: AskScholarUserSettings) => void;
+  /** Controlled use: the parent owns and saves the settings. Omit to let the popover keep its own. */
   settings?: AskScholarUserSettings;
   onUpdateSettings?: (partial: Partial<AskScholarUserSettings>) => void;
   onImportReferences?: (items: CSLItem[], rawDois?: string[]) => void | Promise<unknown>;
@@ -29,10 +25,6 @@ export interface AskScholarSettingsPopoverProps {
 }
 
 export function AskScholarSettingsPopover({
-  citationStyle,
-  onChangeCitationStyle,
-  onImportReferencesToVault,
-  onSettingsChanged,
   settings: externalSettings,
   onUpdateSettings,
   onImportReferences,
@@ -65,13 +57,11 @@ export function AskScholarSettingsPopover({
     key: K,
     value: AskScholarUserSettings[K]
   ) => {
-    const updated = saveAskScholarSettings({ [key]: value });
-    setInternalSettings(updated);
-    onUpdateSettings?.({ [key]: value });
-    if (key === "preferredCitationStyle") {
-      onChangeCitationStyle?.(String(value));
+    if (onUpdateSettings) {
+      onUpdateSettings({ [key]: value });
+      return;
     }
-    onSettingsChanged?.(updated);
+    setInternalSettings(saveAskScholarSettings({ [key]: value }));
   };
 
   const handleImport = () => {
@@ -80,7 +70,6 @@ export function AskScholarSettingsPopover({
       setImportFeedback("No valid BibTeX, RIS, or DOI entries detected.");
       return;
     }
-    onImportReferencesToVault?.(parsed.imported, parsed.doisToResolve);
     void onImportReferences?.(parsed.imported, parsed.doisToResolve);
     setImportFeedback(
       `Imported ${parsed.imported.length} reference(s)${
@@ -126,7 +115,7 @@ export function AskScholarSettingsPopover({
         </label>
         <select
           id="pref-citation-style"
-          value={citationStyle || settings.preferredCitationStyle}
+          value={settings.preferredCitationStyle}
           onChange={(e) => updateSetting("preferredCitationStyle", e.target.value as AskScholarUserSettings["preferredCitationStyle"])}
           className="w-full px-2.5 py-1.5 rounded-lg bg-neutral-50 dark:bg-ink-900 border border-neutral-200 dark:border-white/15 text-neutral-900 dark:text-neutral-100 text-xs"
         >
@@ -166,9 +155,9 @@ export function AskScholarSettingsPopover({
               key={len}
               type="button"
               data-testid={`pref-length-${len}`}
-              onClick={() => updateSetting("answerLength", len)}
+              onClick={() => updateSetting("answerLengthPreference", len)}
               className={`py-1.5 rounded-lg text-[11px] font-semibold capitalize border transition-colors cursor-pointer ${
-                settings.answerLength === len
+                settings.answerLengthPreference === len
                   ? "bg-indigo-600 text-white border-indigo-600"
                   : "bg-neutral-50 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-white/10"
               }`}
@@ -177,24 +166,6 @@ export function AskScholarSettingsPopover({
             </button>
           ))}
         </div>
-      </div>
-
-      {/* 4. Default Export Format */}
-      <div className="space-y-1">
-        <label htmlFor="pref-export-format" className="block text-[11px] font-semibold text-neutral-600 dark:text-neutral-300">
-          Default Export Format
-        </label>
-        <select
-          id="pref-export-format"
-          value={settings.defaultExportFormat}
-          onChange={(e) => updateSetting("defaultExportFormat", e.target.value as DefaultExportFormat)}
-          className="w-full px-2.5 py-1.5 rounded-lg bg-neutral-50 dark:bg-ink-900 border border-neutral-200 dark:border-white/15 text-neutral-900 dark:text-neutral-100 text-xs"
-        >
-          <option value="docx">Word Document (.docx)</option>
-          <option value="bibtex">BibTeX (.bib)</option>
-          <option value="ris">RIS (.ris for Zotero / Mendeley / EndNote)</option>
-          <option value="pdf">PDF Report (.pdf)</option>
-        </select>
       </div>
 
       {/* 5. Knowledge Vault Reference Import (BibTeX, RIS, DOI List — Section 9) */}
@@ -236,10 +207,10 @@ export function AskScholarSettingsPopover({
         data-testid="ask-scholar-settings-btn"
         aria-label="AskScholar preferences and reference import"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center justify-center gap-1 px-2 py-1 min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 rounded-lg text-[11px] font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 bg-neutral-100 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200/70 dark:hover:bg-white/10 border border-neutral-200/80 dark:border-white/10 transition-colors cursor-pointer shrink-0"
+        className="inline-flex min-h-10 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-xs font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-500 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white sm:min-h-8 min-w-10 sm:min-w-8"
         title="Research preferences (Citation style, Discipline, Answer length, Export format & Reference import)"
       >
-        <Settings2 className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400" />
+        <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
         <span className="hidden sm:inline">Preferences</span>
       </button>
 

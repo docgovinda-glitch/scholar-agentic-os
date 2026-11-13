@@ -16,12 +16,16 @@ import {
   type ResearchStageTelemetry,
 } from "./api";
 import { addManualSource, addClaim, bindEvidence } from "./api/claimEvidenceApi";
+import { buildWorkspaceHandoff } from "../domain/handoff/workspaceHandoff";
 import {
   loadLocalAskScholarThreads,
   saveLocalAskScholarThreads,
   mergeAskScholarThreads,
   fetchAskScholarThreadsFromServer,
   syncAskScholarThreadsToServer,
+  deleteAskScholarThreadOnServer,
+  mergeThreadFiles,
+  type AskScholarAttachedFile,
   type AskScholarConversationThread,
 } from "../services/askScholarThreadSync";
 import {
@@ -111,13 +115,14 @@ import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import { useBackToClose } from "../hooks/useBackToClose";
 import { useDeviceClass } from "../hooks/useDeviceClass";
 import {
-  ASK_ANSWER_GUIDE,
-  buildStyleAwareAnswerGuide,
   askFailureMessage,
   liveSourcesAsCitations,
 } from "./dashboard/askScholarAnswer";
 import { loadUserAiSettings } from "../services/userAiSettings";
-import { PromptBarActionMenu, type PromptMode } from "./PromptBarActionMenu";
+import { type PromptMode } from "./PromptBarActionMenu";
+import { AskPromptBox } from "./ask/AskPromptBox";
+import { ASK_BASE_IDENTITY, buildAskGeneralPrompt } from "../shared/askPrompts";
+import { decideAskMode, isTimeSensitiveQuery } from "../shared/askRouting";
 import {
   ASK_SCHOLAR_CITATION_STYLES,
   getCitationStyleInfo,
@@ -137,8 +142,8 @@ import CitationStylePicker from "./components/CitationStylePicker";
 import LiveSourcesDrawer from "./components/LiveSourcesDrawer";
 import {
   classifyResearchPrompt,
-  loadAskScholarUserSettings,
-  saveAskScholarUserSettings,
+  loadAskScholarSettings,
+  saveAskScholarSettings,
   type AskScholarUserSettings,
 } from "../config/askScholarConfig";
 import {
@@ -165,12 +170,9 @@ import {
   STAGE_BREAKDOWNS,
   WEBSITE_ASSISTANT_FAQS,
   getFormatTileTheme,
-  getAssistantActionAndFollowUps,
   CodeBlockWithCopy,
   InlineCitationBadge,
   renderFormattedGuideText,
-  isPlatformQuery,
-  answerWebsiteQuestion,
   FormatIcon,
   ChooseOutputType,
   extractSeedClaimsFromSynthesis,
@@ -187,12 +189,9 @@ export {
   STAGE_BREAKDOWNS,
   WEBSITE_ASSISTANT_FAQS,
   getFormatTileTheme,
-  getAssistantActionAndFollowUps,
   CodeBlockWithCopy,
   InlineCitationBadge,
   renderFormattedGuideText,
-  isPlatformQuery,
-  answerWebsiteQuestion,
   FormatIcon,
   ChooseOutputType,
 };
@@ -774,7 +773,6 @@ export default function ProjectListScreen({
   const [mainAttachments, setMainAttachments] = useState<AgentAttachmentItem[]>([]);
   const [isMainUploadingAttachment, setIsMainUploadingAttachment] = useState<boolean>(false);
   const [mainAiMode, setMainAiMode] = useState<PromptMode>("auto");
-  const [isDragging, setIsDragging] = useState(false);
   const guideTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Sidebar Chat / Website Assistant State
@@ -783,18 +781,11 @@ export default function ProjectListScreen({
   const [isSidebarUploadingAttachment, setIsSidebarUploadingAttachment] = useState<boolean>(false);
   const [sidebarAiMode, setSidebarAiMode] = useState<PromptMode>("auto");
   const [askUserSettings, setAskUserSettings] = useState<AskScholarUserSettings>(() =>
-    loadAskScholarUserSettings()
+    loadAskScholarSettings()
   );
   const [askCitationStyle, setAskCitationStyle] = useState<AskCitationStyleId>(() => {
-    try {
-      const saved = localStorage.getItem("scholar_ask_citation_style");
-      if (saved && ASK_SCHOLAR_CITATION_STYLES.some((s) => s.id === saved)) {
-        return saved as AskCitationStyleId;
-      }
-    } catch {
-      // ignore
-    }
-    return "apa";
+    const saved = loadAskScholarSettings().preferredCitationStyle;
+    return ASK_SCHOLAR_CITATION_STYLES.some((st) => st.id === saved) ? (saved as AskCitationStyleId) : "apa";
   });
   const [storedToVaultMessageIds, setStoredToVaultMessageIds] = useState<Record<string, boolean>>({});
   const [guideMessages, setGuideMessages] = useState<WebsiteAssistantMessage[]>([]);
@@ -811,16 +802,20 @@ export default function ProjectListScreen({
 
   const handleUpdateCitationStyle = useCallback((newStyle: AskCitationStyleId) => {
     setAskCitationStyle(newStyle);
-    setAskUserSettings(saveAskScholarUserSettings({ preferredCitationStyle: newStyle }));
-    try {
-      localStorage.setItem("scholar_ask_citation_style", newStyle);
-    } catch {
-      // ignore
-    }
+    setAskUserSettings(saveAskScholarSettings({ preferredCitationStyle: newStyle }));
     setGuideMessages((prev) =>
       prev.map((m) => (m.sender === "assistant" ? { ...m, citationStyle: newStyle } : m))
     );
   }, []);
+  const handleAskSettingsUpdate = useCallback(
+    (partial: Partial<AskScholarUserSettings>) => {
+      setAskUserSettings(saveAskScholarSettings(partial));
+      if (partial.preferredCitationStyle && ASK_SCHOLAR_CITATION_STYLES.some((st) => st.id === partial.preferredCitationStyle)) {
+        handleUpdateCitationStyle(partial.preferredCitationStyle as AskCitationStyleId);
+      }
+    },
+    [handleUpdateCitationStyle]
+  );
   const isLandingPage = activeView === "projects" && !choosing;
   const hasStartedChatting = guideMessages.some((m) => m.sender === "user") || isGuideThinking;
   const [expandedPlanIds, setExpandedPlanIds] = useState<Record<string, boolean>>({});
@@ -830,9 +825,9 @@ export default function ProjectListScreen({
   const [editingUserMsgText, setEditingUserMsgText] = useState("");
   const [activeAskThreadId, setActiveAskThreadId] = useState<string>(() => `thread-${Date.now()}`);
   const [isAskHistoryOpen, setIsAskHistoryOpen] = useState(false);
-  const [askThreads, setAskThreads] = useState<
-    Array<{ id: string; title: string; updatedAt: string; messages: WebsiteAssistantMessage[] }>
-  >(() => loadLocalAskScholarThreads(userEmail));
+  // Documents attached anywhere in this conversation: kept for every follow-up and handed to workspaces.
+  const [askThreadFiles, setAskThreadFiles] = useState<AskScholarAttachedFile[]>([]);
+  const [askThreads, setAskThreads] = useState<AskScholarConversationThread[]>(() => loadLocalAskScholarThreads(userEmail));
   const [messageActiveTab, setMessageActiveTab] = useState<Record<string, "synthesis" | "matrix" | "graph" | "consensus">>({});
   const [selectedGraphNodeId, setSelectedGraphNodeId] = useState<string | null>(null);
   const [userVaultItems, setUserVaultItems] = useState<VaultItem[]>([]);
@@ -884,8 +879,7 @@ export default function ProjectListScreen({
     };
   }, [userEmail]);
 
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const guideInputRef = useRef<HTMLTextAreaElement | HTMLInputElement | null>(null);
+  const guideInputRef = useRef<HTMLTextAreaElement | null>(null);
   const sidebarFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Follow the answer only while the reader is at the bottom. If they scroll up to
@@ -908,25 +902,43 @@ export default function ProjectListScreen({
     else el.scrollTop = el.scrollHeight;
   }, []);
 
-  // Auto-scroll chat container to bottom as AskScholar streams tokens, thinks, or appends messages
+  // Reading position. A new question goes to the top of the view, an answer is read from its
+  // beginning (never thrown to its end), and while one is being written the view follows it only
+  // until its first line would leave the screen.
+  const lastScrolledCountRef = useRef(0);
+  const scrollMessageToTop = useCallback((selector: string, smooth: boolean) => {
+    const canvas = chatCanvasRef.current;
+    const target = canvas?.querySelector<HTMLElement>(selector);
+    if (!canvas || !target) return false;
+    const top = canvas.scrollTop + (target.getBoundingClientRect().top - canvas.getBoundingClientRect().top) - 12;
+    if (typeof canvas.scrollTo === "function") canvas.scrollTo({ top: Math.max(0, top), behavior: smooth ? "smooth" : "auto" });
+    else canvas.scrollTop = Math.max(0, top);
+    return true;
+  }, []);
   useEffect(() => {
-    // Sending a message always brings the reader back to the bottom.
-    if (guideMessages[guideMessages.length - 1]?.sender === "user") stickToBottomRef.current = true;
-    if (!stickToBottomRef.current) return;
-    if (chatCanvasRef.current) {
-      if (typeof chatCanvasRef.current.scrollTo === "function") {
-        chatCanvasRef.current.scrollTo({
-          top: chatCanvasRef.current.scrollHeight,
-          behavior: "smooth",
-        });
-      } else {
-        chatCanvasRef.current.scrollTop = chatCanvasRef.current.scrollHeight;
+    const canvas = chatCanvasRef.current;
+    if (!canvas) return;
+    const last = guideMessages[guideMessages.length - 1];
+    const countChanged = guideMessages.length !== lastScrolledCountRef.current;
+    lastScrolledCountRef.current = guideMessages.length;
+
+    if (countChanged && last) {
+      stickToBottomRef.current = last.sender === "user";
+      if (!scrollMessageToTop(`[data-message-id="${last.id}"]`, true)) {
+        canvas.scrollTop = canvas.scrollHeight;
       }
+      return;
     }
-    if (messagesEndRef.current && typeof messagesEndRef.current.scrollIntoView === "function") {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
-    }
-  }, [streamingGuideText, isGuideThinking, askPhase?.step, askPhase?.detail, guideMessages.length]);
+    if (!stickToBottomRef.current) return;
+    const bottom = canvas.scrollHeight - canvas.clientHeight;
+    const answer = canvas.querySelector<HTMLElement>("[data-streaming-answer]");
+    const answerTop = answer
+      ? canvas.scrollTop + (answer.getBoundingClientRect().top - canvas.getBoundingClientRect().top) - 12
+      : bottom;
+    const next = Math.max(0, Math.min(bottom, answerTop));
+    if (typeof canvas.scrollTo === "function") canvas.scrollTo({ top: next, behavior: "auto" });
+    else canvas.scrollTop = next;
+  }, [streamingGuideText, isGuideThinking, askPhase?.step, askPhase?.detail, guideMessages.length, scrollMessageToTop]);
 
   // Handle outside clicks to close the mobile academic workspace dropdown
   useEffect(() => {
@@ -962,16 +974,16 @@ export default function ProjectListScreen({
     setAskThreads((prev) => {
       const filtered = prev.filter((t) => t.id !== activeAskThreadId);
       const next: AskScholarConversationThread[] = [
-        { id: activeAskThreadId, title, updatedAt, updatedAtIso, messages: guideMessages },
+        { id: activeAskThreadId, title, updatedAt, updatedAtIso, messages: guideMessages, files: askThreadFiles },
         ...filtered,
-      ].slice(0, 15);
+      ].slice(0, 30);
       saveLocalAskScholarThreads(next, userEmail);
       if (userEmail) {
-        void syncAskScholarThreadsToServer(next, userEmail);
+        void syncAskScholarThreadsToServer([next[0]], userEmail);
       }
       return next;
     });
-  }, [guideMessages, activeAskThreadId, userEmail]);
+  }, [guideMessages, activeAskThreadId, userEmail, askThreadFiles]);
 
   // Step through Deep Research stages while Deep Research is actively running
   useEffect(() => {
@@ -1091,10 +1103,6 @@ export default function ProjectListScreen({
     setMainAttachments((prev) => prev.filter((a) => a.id !== id));
   };
 
-  const addMainFiles = (files: File[]) => {
-    handleMainFileSelect(files);
-  };
-
   const handleSidebarFileSelect = (files: FileList | File[] | null) => {
     return parseFilesToAttachments(files, setIsSidebarUploadingAttachment, setSidebarAttachments);
   };
@@ -1194,6 +1202,7 @@ export default function ProjectListScreen({
     setDeepResearchActiveStage(0);
     setEditingUserMsgId(null);
     setActiveAskThreadId(`thread-${Date.now()}`);
+    setAskThreadFiles([]);
     setGuideMessages([]);
     setIsAskHistoryOpen(false);
     // On a phone an empty full-screen chat is a second, different landing page. Go back to the real one.
@@ -1605,6 +1614,13 @@ export default function ProjectListScreen({
 
     const query = rawQuery || (currentAttachments.some((a) => a.isImage) ? "Describe and analyze this image." : "Summarize this document.");
 
+    // Documents stay with the conversation: new uploads join the ones already attached.
+    const threadFiles = mergeThreadFiles(
+      askThreadFiles,
+      currentAttachments.filter((a) => a.fileData).map((a) => a.fileData!)
+    );
+    if (threadFiles !== askThreadFiles) setAskThreadFiles(threadFiles);
+
     const userAttachmentsDisplay = currentAttachments.map((a) => ({
       name: a.name,
       isImage: a.isImage,
@@ -1634,26 +1650,12 @@ export default function ProjectListScreen({
     let sourcesFound: LiveSearchResult[] = [];
 
     try {
-      if (isPlatformQuery(query) && currentAttachments.length === 0) {
-        // Fast, deterministic platform answer
-        const answer = answerWebsiteQuestion(query);
-        const meta = getAssistantActionAndFollowUps(query);
-        const assistantMsg: WebsiteAssistantMessage = {
-          id: `assistant-${Date.now()}`,
-          sender: "assistant",
-          text: answer,
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          action: meta.action,
-          followUps: meta.followUps,
-          kind: "help",
-        };
-        setGuideMessages((prev) => [...prev, assistantMsg]);
-      } else if (!userEmail && !aiStatus?.connected) {
+      if (!userEmail && !aiStatus?.connected) {
         // Guest mode with no AI operational
         const assistantMsg: WebsiteAssistantMessage = {
           id: `assistant-${Date.now()}`,
           sender: "assistant",
-          text: "Open-ended scholarly inquiries require signing in to Scholar Core. Please log in and configure your AI provider in AI Access to ask general research questions.\n\nWhile browsing as a guest, Ask Scholar can assist with platform guidance, workspace formats, Knowledge Vault provenance, and AI configuration.",
+          text: "Open-ended scholarly inquiries require signing in to Scholar Core. Please log in and configure your AI provider in AI Access to use Ask Scholar.",
           timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
           action: { type: "auth", label: "Sign In / Register to Use AI ↗" },
           followUps: ["How do I set up AI?", "What is Knowledge Vault?", "How do I create a research project?"],
@@ -1672,23 +1674,25 @@ export default function ProjectListScreen({
 
         let agentResponse: (AgenticQueryResponse & { ok?: boolean }) | undefined;
         const styleInfo = getCitationStyleInfo(askCitationStyle);
-        const styleAwareGuide = buildStyleAwareAnswerGuide(askCitationStyle, askUserSettings.answerLength);
-        const systemPrompt = `You are AskScholar (Scholar Core AI Research Assistant), a scholarly research assistant for students, researchers, and professionals across STEM, management and business, social sciences, humanities, health, law, and education. Ground your answer in authentic scholarly and open-web sources, format every citation in ${styleInfo.name}, ignore any retrieved snippet that is off-topic to the user's question, and never fabricate sources, DOIs, or placeholder metadata ("Unknown Author", "n.d.").\n\n${styleAwareGuide}`;
+        const systemPrompt = buildAskGeneralPrompt({
+          base: ASK_BASE_IDENTITY,
+          style: askCitationStyle,
+          length: askUserSettings.answerLengthPreference,
+        });
 
         // Smart auto-grounding:
         // - Chat is the default entry point and automatically decides when to retrieve sources.
-        const isLiveCurrentEventsQuery =
-          /\b(?:latest|current|recent|today|yesterday|this week|this month|this year|202[5-7]|election|midterm|who won|breaking news|stock price|inflation rate|search the web)\b/i.test(
-            query
-          );
-        const isPureConversationalOrCoding =
-          /^(?:hi|hello|hey|good morning|good evening|thanks|thank you)\b/i.test(query.trim()) ||
-          /\b(?:write a python|write a javascript|write a typescript|fix this bug|debug this code|write a regex)\b/i.test(query);
+        // One policy (shared with the server) decides whether the question needs a search.
+        const autoMode = decideAskMode({
+          query,
+          hasFiles: currentAttachments.length > 0,
+          hasVaultSources: Boolean(isVaultGroundingActive && userEmail && userVaultItems.length > 0),
+        });
 
         let liveRetrievedSources: LiveSearchResult[] = [];
         const isExplicitChatOnly =
-          (sidebarAiMode === "chat" && modeToSend === undefined && !isLiveCurrentEventsQuery) ||
-          (sidebarAiMode === "auto" && modeToSend === undefined && isPureConversationalOrCoding);
+          modeToSend === undefined &&
+          (sidebarAiMode === "chat" ? !isTimeSensitiveQuery(query) : sidebarAiMode === "auto" && autoMode === "chat");
 
         const shouldRunClientPreSearch = !isExplicitChatOnly && targetMode === "normal";
 
@@ -1705,7 +1709,7 @@ export default function ProjectListScreen({
           });
           try {
             const previousQuestions = priorThreadMessages.filter((m) => m.sender === "user").map((m) => m.text);
-            liveRetrievedSources = await executeLiveSearch(buildRetrievalQuery(query, previousQuestions));
+            liveRetrievedSources = await executeLiveSearch(buildRetrievalQuery(query, previousQuestions), { discipline: askUserSettings.preferredDiscipline });
             sourcesFound = liveRetrievedSources;
           } catch {
             // The answer still comes, marked as not based on a search.
@@ -1751,9 +1755,9 @@ export default function ProjectListScreen({
           (targetMode !== "normal" ||
             query.toLowerCase().includes("deep research") ||
             query.toLowerCase().includes("search the web") ||
-            /\b(?:essay|paper|coursework|thesis|dissertation|proposal|review|analysis|history|nepal|congress|study|clinical)\b/i.test(query));
+            /\b(?:essay|paper|coursework|thesis|dissertation|proposal|review|analysis|history|study)\b/i.test(query));
 
-        if (currentAttachments.length === 0 && targetMode === "normal" && !isAcademicOrDeliverable) {
+        if (currentAttachments.length === 0 && threadFiles.length === 0 && targetMode === "normal" && !isAcademicOrDeliverable) {
           // Standard text generation — streams tokens live via executeAgenticLLM
           try {
             const txt = await executeAgenticLLM(effectiveSystemPrompt, query, "simple", (chunk) => {
@@ -1767,10 +1771,9 @@ export default function ProjectListScreen({
             // Server fallback
             agentResponse = await executeAgenticQuery({
               prompt: query,
-              systemPrompt: effectiveSystemPrompt,
               mode: targetMode,
               citationStyle: askCitationStyle,
-              answerLength: askUserSettings.answerLength,
+              answerLength: askUserSettings.answerLengthPreference,
               preRetrievedSources: liveRetrievedSources,
               history,
               vaultSources: selectedVaultSources,
@@ -1799,13 +1802,12 @@ export default function ProjectListScreen({
           try {
             agentResponse = await executeAgenticQuery({
               prompt: query,
-              systemPrompt: effectiveSystemPrompt,
               mode: targetMode,
               citationStyle: askCitationStyle,
-              answerLength: askUserSettings.answerLength,
+              answerLength: askUserSettings.answerLengthPreference,
               approvedSubQuestions: approvedSubQuestionsOverride,
               preRetrievedSources: liveRetrievedSources,
-              files: currentAttachments.filter((a) => a.fileData).map((a) => a.fileData!),
+              files: threadFiles,
               images: currentAttachments.filter((a) => a.imageData).map((a) => a.imageData!),
               history,
               vaultSources: selectedVaultSources,
@@ -1833,7 +1835,7 @@ export default function ProjectListScreen({
             if (!shouldRunClientPreSearch && !isExplicitChatOnly && liveRetrievedSources.length === 0) {
               try {
                 const previousQuestions = priorThreadMessages.filter((m) => m.sender === "user").map((m) => m.text);
-                liveRetrievedSources = await executeLiveSearch(buildRetrievalQuery(query, previousQuestions));
+                liveRetrievedSources = await executeLiveSearch(buildRetrievalQuery(query, previousQuestions), { discipline: askUserSettings.preferredDiscipline });
                 sourcesFound = liveRetrievedSources;
                 if (liveRetrievedSources.length > 0) {
                   effectiveSystemPrompt = injectLiveGroundingToSystemPrompt(systemPrompt, liveRetrievedSources);
@@ -1922,7 +1924,7 @@ export default function ProjectListScreen({
           const readCount = Math.max(candidateCitations.length, citedCount);
           const searchedCount =
             candidateCitations.length > 0
-              ? Math.max(classification.budget.candidatesMin, readCount + excludedRecords.length)
+              ? Math.max(classification.sourceBudget.minCandidates, readCount + excludedRecords.length)
               : 0;
           const isDeepMode =
             targetMode === "deep-research" || agentResponse.mode === "deep-research";
@@ -2038,60 +2040,27 @@ export default function ProjectListScreen({
 
       try {
         const currentIdx = guideMessages.findIndex((m) => m.id === researchMessage.id);
-        const priorUserMsg =
-          currentIdx > 0
-            ? guideMessages.slice(0, currentIdx).filter((m) => m.sender === "user").slice(-1)[0]
-            : undefined;
+        const conversation = (currentIdx >= 0 ? guideMessages.slice(0, currentIdx + 1) : guideMessages).filter(
+          (m) => m.id !== "init" && m.id !== "reset-assistant" && !m.error
+        );
+        const priorUserMsg = conversation.filter((m) => m.sender === "user").slice(-1)[0];
 
-        const topic =
-          handoff?.topic ||
-          priorUserMsg?.text ||
-          researchMessage.text.split("\n")[0].replace(/^#+\s*/, "").slice(0, 80) ||
-          "Synthesized Research Project";
-        const cleanTitle =
-          handoff?.suggestedTitle ||
-          (topic.length > 60 ? `${topic.slice(0, 57)}...` : topic);
+        const handoffPackage = buildWorkspaceHandoff({
+          targetFormatId,
+          messages: conversation.map((m) => ({ sender: m.sender, text: m.text })),
+          answerText: researchMessage.text,
+          question: handoff?.topic || researchMessage.originatingQuestion || priorUserMsg?.text,
+          files: askThreadFiles,
+          imageNames: conversation.flatMap((m) => (m.attachments ?? []).filter((a) => a.isImage).map((a) => a.name)),
+          sources: handoff?.retrievedSources || researchMessage.citations || liveSourcesAsCitations(researchMessage.liveSources) || [],
+          citationStyle: askCitationStyle,
+          suggestedTitle: handoff?.suggestedTitle,
+          wordCountTarget: handoff?.wordCountTarget,
+        });
+        const structuredSources = handoffPackage.sources;
+        const intake = handoffPackage.intake;
 
         const project = await createProject(targetFormatId);
-
-        const sourcesToAttach =
-          handoff?.retrievedSources ||
-          researchMessage.citations ||
-          liveSourcesAsCitations(researchMessage.liveSources) ||
-          [];
-        const structuredSources = sourcesToAttach.map((c: any, i: number) => ({
-          id: c.id || c.sourceId || `ask-src-${i + 1}`,
-          title: c.title || `Source ${i + 1}`,
-          authors: Array.isArray(c.authors) ? c.authors : c.author ? [String(c.author)] : [],
-          year: c.year,
-          venue: c.venue || c.journal || c.publisher || "",
-          doi: c.doi,
-          url: c.url,
-          snippet: c.snippet || c.evidenceSnippet || "",
-        }));
-        const citationNotes =
-          structuredSources.length > 0
-            ? structuredSources
-              .map(
-                (c, i) =>
-                  `[${i + 1}] ${c.title}${c.venue ? ` (${c.venue})` : ""}\nAuthors: ${c.authors.join(", ")}\nDOI: ${c.doi || "N/A"}\nURL: ${c.url || "N/A"}`
-              )
-              .join("\n\n")
-            : "";
-
-        const intake = {
-          title: cleanTitle,
-          working_title: cleanTitle,
-          researchQuestion: topic,
-          research_question: topic,
-          assignment_question: topic,
-          research_topic: topic,
-          citation_style: askCitationStyle,
-          targetWordCount: handoff?.wordCountTarget || 1500,
-          backgroundNotes: `Executive Scholarly Synthesis & Verified Literature Brief:\n\n${researchMessage.text}`,
-          preliminaryEvidence: citationNotes,
-          discovered_sources: JSON.stringify(structuredSources),
-        };
 
         await Promise.resolve(saveIntakeAnswers(project.projectId, intake)).catch(() => { });
 
@@ -2140,7 +2109,7 @@ export default function ProjectListScreen({
         setCreatingFormatId(null);
       }
     },
-    [userEmail, creating, openAuth, guideMessages, onOpen]
+    [userEmail, creating, openAuth, guideMessages, onOpen, askThreadFiles, askCitationStyle]
   );
 
   const handledNewFormatRef = useRef<string | null>(null);
@@ -2375,6 +2344,7 @@ export default function ProjectListScreen({
           title: askThreads[0].title,
           open: () => {
             setActiveAskThreadId(askThreads[0].id);
+            setAskThreadFiles(askThreads[0].files ?? []);
             setGuideMessages(askThreads[0].messages);
             setIsAiSidebarOpen(true);
           },
@@ -2425,178 +2395,40 @@ export default function ProjectListScreen({
     handleCreate(tile.id);
   };
 
-  // A tap on the box's padding (not on a control) should focus the input, as people expect.
-  const focusInputOnBackgroundTap = (ref: React.MutableRefObject<HTMLTextAreaElement | HTMLInputElement | null>) =>
-    (e: React.MouseEvent) => {
-      if ((e.target as HTMLElement).closest('button, a, input, select, textarea, [role="menu"], [role="listbox"], [role="dialog"]')) return;
-      ref.current?.focus();
-    };
-
   const mainPromptForm = (
-    <form
-      onClick={focusInputOnBackgroundTap(guideTextareaRef)}
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (mainPromptInput.trim() || mainAttachments.length > 0) {
-          handleSendMainPrompt();
-        }
-      }}
-      onDragOver={(e) => {
-        e.preventDefault();
-        setIsDragging(true);
-      }}
-      onDragLeave={(e) => {
-        if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-        setIsDragging(false);
-      }}
-      onDrop={(e) => {
-        e.preventDefault();
-        setIsDragging(false);
-        if (e.dataTransfer.files?.length) {
-          addMainFiles(Array.from(e.dataTransfer.files));
-        }
-      }}
-      className={`pointer-events-auto flex flex-col justify-between w-full rounded-2xl bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/10 shadow-sm focus-within:border-neutral-400 dark:focus-within:border-white/20 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[color:var(--accent)] p-3 transition-all duration-200 ${isDragging
-        ? "border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/10 dark:bg-blue-950/20"
-        : ""
-        }`}
+    <AskPromptBox
+      className="pointer-events-auto"
+      value={mainPromptInput}
+      onValueChange={setMainPromptInput}
+      onSend={handleSendMainPrompt}
+      attachments={mainAttachments}
+      onRemoveAttachment={removeMainAttachment}
+      onAttachFiles={handleMainFileSelect}
+      isUploading={isMainUploadingAttachment}
+      mode={mainAiMode}
+      onModeChange={setMainAiMode}
+      isThinking={isGuideThinking}
+      placeholder={isPhone ? "Ask a research question or paste your brief…" : "Ask a question, paste your brief, or drop files…"}
+      ariaLabel="Research instructions or assignment guidelines"
+      sendLabel="Send message"
+      inputId="main-research-instruction-input"
+      inputName="researchInstructions"
+      minRows={isPhone ? 2 : 1}
+      maxHeightPx={120}
+      inputRef={guideTextareaRef}
     >
-      {/* Pending Attachments Chips */}
-      {mainAttachments.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5 pb-1.5 border-b border-neutral-200/50 dark:border-white/5 mb-1.5 overflow-x-auto max-h-16">
-          {mainAttachments.map((att) => (
-            <div
-              key={att.id}
-              className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-white/10 text-xs text-neutral-800 dark:text-neutral-200 shadow-2xs"
-            >
-              {att.isImage ? (
-                att.previewUrl ? (
-                  <img src={att.previewUrl} alt={att.name} className="w-4 h-4 object-cover rounded" />
-                ) : (
-                  <Paperclip className="w-3 h-3 text-blue-500" />
-                )
-              ) : (
-                <FileText className="w-3 h-3 text-amber-500" />
-              )}
-              <span className="truncate max-w-[150px] font-medium text-[11px]">{att.name}</span>
-              <button
-                type="button"
-                onClick={() => removeMainAttachment(att.id)}
-                aria-label={`Remove ${att.name}`}
-                className="p-0.5 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors cursor-pointer"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </div>
-          ))}
-          {isMainUploadingAttachment && (
-            <span className="text-[11px] text-neutral-400 flex items-center gap-1 animate-pulse">
-              <Loader2 className="w-3 h-3 animate-spin text-blue-500" /> Parsing attachment...
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Top: Transparent flexible input */}
-      <div className="w-full flex items-center">
-        <textarea
-          ref={guideTextareaRef}
-          rows={isPhone ? 2 : 1}
-          value={mainPromptInput}
-          onChange={(e) => {
-            setMainPromptInput(e.target.value);
-            e.target.style.height = "auto";
-            e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
-          }}
-          onKeyDown={(e) => {
-            if (e.nativeEvent.isComposing || (e as unknown as { keyCode?: number }).keyCode === 229) return;
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              if (mainPromptInput.trim() || mainAttachments.length > 0) {
-                handleSendMainPrompt();
-              }
-            } else if (e.key === "Backspace" && mainPromptInput === "" && mainAttachments.length > 0) {
-              removeMainAttachment(mainAttachments[mainAttachments.length - 1].id);
-            }
-          }}
-          onPaste={(e) => {
-            const items = e.clipboardData?.items;
-            if (!items) return;
-            const newFiles: File[] = [];
-            for (let i = 0; i < items.length; i++) {
-              if (items[i].kind === "file") {
-                const file = items[i].getAsFile();
-                if (file) newFiles.push(file);
-              }
-            }
-            if (newFiles.length > 0) {
-              e.preventDefault();
-              addMainFiles(newFiles);
-            }
-          }}
-          id="main-research-instruction-input"
-          name="researchInstructions"
-          aria-label="Research instructions or assignment guidelines"
-          placeholder={isPhone ? "Ask a research question or paste your brief…" : "Paste text, drop files/images, or draft research instructions..."}
-          style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent", fieldSizing: "content", minHeight: isPhone ? 48 : undefined } as React.CSSProperties}
-          className="w-full flex-1 bg-transparent text-base sm:text-sm font-normal text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 border-none outline-none focus:outline-none focus:ring-0 min-w-0 shadow-none focus:shadow-none resize-none leading-relaxed prompt-bare-input max-h-28 overflow-y-auto scholar-scrollbar"
-        />
-      </div>
-
-      {/* Bottom Action Row: Attachments, Mode Selector, Citation Style & Preferences on left, Submit button on right */}
-      <div className="flex items-center justify-between gap-2 mt-1.5 pt-1.5 border-t border-neutral-200/50 dark:border-white/5 w-full flex-wrap">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <PromptBarActionMenu
-            currentMode={mainAiMode}
-            onSelectMode={setMainAiMode}
-            onAttachFiles={handleMainFileSelect}
+      {!isAiSidebarOpen && (
+        <>
+          <CitationStylePicker value={askCitationStyle} onChange={handleUpdateCitationStyle} direction="up" />
+          <AskScholarSettingsPopover
+            settings={askUserSettings}
+            direction="up"
+            onUpdateSettings={handleAskSettingsUpdate}
+            onImportReferences={handleImportVaultReferences}
           />
-          {!isAiSidebarOpen && (
-            <>
-              <CitationStylePicker
-                value={askCitationStyle}
-                onChange={handleUpdateCitationStyle}
-                direction="up"
-              />
-              <AskScholarSettingsPopover
-                settings={askUserSettings}
-                direction="up"
-                onUpdateSettings={(partial) => {
-                  const updated = saveAskScholarUserSettings(partial);
-                  setAskUserSettings(updated);
-                  if (
-                    partial.preferredCitationStyle &&
-                    ASK_SCHOLAR_CITATION_STYLES.some((s) => s.id === partial.preferredCitationStyle)
-                  ) {
-                    handleUpdateCitationStyle(partial.preferredCitationStyle as AskCitationStyleId);
-                  }
-                }}
-                onImportReferences={handleImportVaultReferences}
-              />
-            </>
-          )}
-        </div>
-
-        <div className="relative group">
-          <button
-            type="submit"
-            title="Send message (Enter)"
-            aria-label="Send message"
-            disabled={(!mainPromptInput.trim() && mainAttachments.length === 0) || isGuideThinking}
-            className="flex-shrink-0 w-11 h-11 sm:w-8 sm:h-8 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer bg-neutral-900 text-white hover:bg-neutral-800 active:scale-95 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100 shadow-sm disabled:bg-neutral-200/80 dark:disabled:bg-white/10 disabled:text-neutral-400 dark:disabled:text-neutral-500 disabled:shadow-none disabled:cursor-not-allowed"
-          >
-            {isGuideThinking ? (
-              <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <ArrowUp className="w-4 h-4 stroke-[2.25]" />
-            )}
-          </button>
-          <span className="hidden group-hover:block absolute bottom-full mb-2 right-0 px-2 py-1 text-[11px] bg-neutral-900 text-white dark:bg-neutral-800 rounded shadow-md whitespace-nowrap pointer-events-none z-30">
-            Send message (Enter)
-          </span>
-        </div>
-      </div>
-    </form>
+        </>
+      )}
+    </AskPromptBox>
   );
 
   return (
@@ -3678,16 +3510,7 @@ export default function ProjectListScreen({
                       <AskScholarSettingsPopover
                         settings={askUserSettings}
                         direction="down"
-                        onUpdateSettings={(partial) => {
-                          const updated = saveAskScholarUserSettings(partial);
-                          setAskUserSettings(updated);
-                          if (
-                            partial.preferredCitationStyle &&
-                            ASK_SCHOLAR_CITATION_STYLES.some((s) => s.id === partial.preferredCitationStyle)
-                          ) {
-                            handleUpdateCitationStyle(partial.preferredCitationStyle as AskCitationStyleId);
-                          }
-                        }}
+                        onUpdateSettings={handleAskSettingsUpdate}
                         onImportReferences={handleImportVaultReferences}
                       />
                     </>
@@ -3698,15 +3521,13 @@ export default function ProjectListScreen({
                       <button
                         type="button"
                         onClick={() => setIsAskHistoryOpen((prev) => !prev)}
-                        className="inline-flex items-center justify-center gap-1 px-2.5 py-1 min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white bg-neutral-100 dark:bg-white/[0.06] hover:bg-neutral-200 dark:hover:bg-white/10 border border-neutral-200/80 dark:border-white/10 transition-colors cursor-pointer"
+                        className="inline-flex min-h-10 min-w-10 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-xs font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-500 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white sm:min-h-8 sm:min-w-8"
                         title="Recent Ask Scholar conversations"
                         aria-label="Recent Chats"
                       >
                         <Clock className="w-3.5 h-3.5" />
                         <span className="hidden sm:inline">History</span>
-                        <span className="text-[10px] font-mono px-1 rounded bg-neutral-200/80 dark:bg-white/10">
-                          {askThreads.length}
-                        </span>
+                        <span className="text-[11px] tabular-nums opacity-70">{askThreads.length}</span>
                       </button>
 
                       {isAskHistoryOpen && (
@@ -3734,6 +3555,7 @@ export default function ProjectListScreen({
                                   type="button"
                                   onClick={() => {
                                     setActiveAskThreadId(t.id);
+                                    setAskThreadFiles(t.files ?? []);
                                     setGuideMessages(t.messages);
                                     setIsAskHistoryOpen(false);
                                   }}
@@ -3753,11 +3575,9 @@ export default function ProjectListScreen({
                                     setAskThreads((prev) => {
                                       const next = prev.filter((item) => item.id !== t.id);
                                       saveLocalAskScholarThreads(next, userEmail);
-                                      if (userEmail) {
-                                        void syncAskScholarThreadsToServer(next, userEmail);
-                                      }
                                       return next;
                                     });
+                                    void deleteAskScholarThreadOnServer(t.id, userEmail);
                                   }}
                                   className="p-1 rounded text-neutral-400 hover:text-red-500 hover:bg-neutral-200/60 dark:hover:bg-white/10 cursor-pointer shrink-0"
                                   title="Delete conversation"
@@ -3777,7 +3597,7 @@ export default function ProjectListScreen({
                     <button
                       type="button"
                       onClick={handleStartNewAskThread}
-                      className="inline-flex items-center justify-center gap-1 px-2.5 py-1 min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white bg-neutral-100 dark:bg-white/[0.06] hover:bg-neutral-200 dark:hover:bg-white/10 border border-neutral-200/80 dark:border-white/10 transition-colors cursor-pointer"
+                      className="inline-flex min-h-10 min-w-10 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-xs font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-500 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white sm:min-h-8 sm:min-w-8"
                       title="Start a new chat and show deliverable workspaces"
                       aria-label="New Chat"
                     >
@@ -3890,7 +3710,7 @@ export default function ProjectListScreen({
                         className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/10 text-xs font-semibold text-neutral-800 dark:text-neutral-200 shadow-2xs active:scale-95 transition-all"
                       >
                         <FolderOpen className="w-4 h-4 text-sky-500" />
-                        <span>Academic Workspaces ▾</span>
+                        <span>Academic workspaces</span>
                       </button>
                     </div>
                   </div>
@@ -3902,59 +3722,32 @@ export default function ProjectListScreen({
                     {guideMessages.map((msg) => (
                       <div
                         key={msg.id}
-                        className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}
+                        data-message-id={msg.id}
+                        data-message-sender={msg.sender}
+                        className={`group flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}
                       >
-                        <div className="flex items-center gap-1.5 mb-1 px-1 text-[11px] text-neutral-500">
-                          {msg.sender === "assistant" ? (
-                            <>
-                              <div className="w-4 h-4 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0">
-                                <ScholarCoreLogo size="sm" withText={false} className="scale-75 origin-center" />
-                              </div>
-                              <span className="font-semibold text-neutral-700 dark:text-neutral-300">Scholar Core</span>
-                              {msg.mode === "deep-research" && (
-                                <span className="px-1.5 py-0.5 rounded text-[9px] bg-purple-500/10 text-purple-600 dark:text-purple-300 border border-purple-500/20 font-medium">
-                                  🔬 Deep Research
-                                </span>
-                              )}
-                              {!msg.error && (
-                                <span className="hidden sm:inline px-1.5 py-0.5 rounded text-[9px] bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20 font-mono font-medium">
-                                  {msg.wordCount || msg.text.trim().split(/\s+/).filter(Boolean).length} words
-                                </span>
-                              )}
-                              {msg.provider && (
-                                <span className="hidden sm:inline px-1.5 py-0.5 rounded text-[9px] bg-neutral-500/10 text-neutral-700 dark:text-neutral-300 font-medium">
-                                  ⚡ {msg.provider}
-                                </span>
-                              )}
-
-                            </>
-                          ) : (
-                            <span>You</span>
-                          )}
-                          <span>•</span>
-                          <span>{msg.timestamp}</span>
-                          {msg.sender === "user" && !isGuideThinking && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingUserMsgId(msg.id);
-                                setEditingUserMsgText(msg.text);
-                              }}
-                              className="ml-1 inline-flex items-center gap-0.5 text-[10px] text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors cursor-pointer"
-                              title="Edit and resubmit message"
-                            >
-                              <Pencil className="w-2.5 h-2.5" />
-                              <span>Edit</span>
-                            </button>
-                          )}
-                        </div>
+                        {msg.sender === "user" && !isGuideThinking && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingUserMsgId(msg.id);
+                              setEditingUserMsgText(msg.text);
+                            }}
+                            className="mb-1 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-neutral-400 opacity-0 transition-opacity hover:text-neutral-700 focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100 dark:hover:text-neutral-200"
+                            title="Edit and resubmit message"
+                            aria-label="Edit message"
+                          >
+                            <Pencil className="h-2.5 w-2.5" aria-hidden="true" />
+                            <span>Edit</span>
+                          </button>
+                        )}
 
                         <div
-                          className={`rounded-2xl px-4 py-3 ${msg.sender === "user" ? "max-w-[88%]" : "max-w-full sm:max-w-[88%]"} leading-relaxed ${isPhone ? "text-[15px]" : ""} ${msg.sender === "user"
-                            ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-sm rounded-tr-xs"
+                          className={`leading-relaxed ${isPhone ? "text-[15px]" : "text-sm"} ${msg.sender === "user"
+                            ? "max-w-[88%] rounded-3xl rounded-br-lg bg-neutral-100 px-4 py-2.5 text-neutral-900 dark:bg-white/10 dark:text-neutral-100"
                             : msg.error
-                              ? "bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/40 text-neutral-900 dark:text-neutral-200 rounded-tl-xs shadow-2xs"
-                              : "bg-white dark:bg-white/[0.04] border border-neutral-200/80 dark:border-white/10 text-neutral-900 dark:text-neutral-100 rounded-tl-xs shadow-2xs"
+                              ? "w-full rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-neutral-900 dark:border-red-900/40 dark:bg-red-950/20 dark:text-neutral-200"
+                              : "w-full px-0.5 text-neutral-900 dark:text-neutral-100"
                             }`}
                         >
                           {/* User Attachments Display */}
@@ -3963,7 +3756,7 @@ export default function ProjectListScreen({
                               {msg.attachments.map((att, aIdx) => (
                                 <div
                                   key={aIdx}
-                                  className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-black/20 dark:bg-white/20 text-xs text-white"
+                                  className="flex items-center gap-1.5 rounded-lg bg-black/5 px-2 py-1 text-xs text-neutral-700 dark:bg-white/10 dark:text-neutral-200"
                                 >
                                   {att.isImage ? (
                                     att.previewUrl ? (
@@ -3980,85 +3773,37 @@ export default function ProjectListScreen({
                             </div>
                           )}
 
-                          {msg.sender === "assistant" && !msg.error && (
-                            <div className="flex items-center justify-between gap-2 mb-2.5 flex-wrap">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                {((msg.verifiedSourcesCount !== undefined && msg.verifiedSourcesCount > 0) || (msg.citations && msg.citations.length > 0)) && (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
-                                    <ShieldCheck className="w-3 h-3 text-emerald-500" />
-                                    <span>{msg.verifiedSourcesCount ?? msg.citations?.length ?? 0} Verified Sources</span>
-                                  </span>
-                                )}
-                                {msg.citations && msg.citations.some((c) => c.sourceType === "vault" || (c.authorityBadge || "").toLowerCase().includes("vault")) && (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-800 dark:text-amber-200 border border-amber-500/30">
-                                    <Database className="w-3 h-3 text-amber-500" />
-                                    <span>Knowledge Vault Grounded</span>
-                                  </span>
-                                )}
-                                {msg.model && (
-                                  <span className="text-[10px] text-neutral-400 font-mono">
-                                    {msg.model}
-                                  </span>
-                                )}
-                              </div>
-
+                          {msg.sender === "assistant" && !msg.error && ((msg.citations && msg.citations.length > 0) || (msg.liveSources && msg.liveSources.length > 0)) && (
+                            <div className="mb-3">
                               {/* Merged Single-Line Non-Wrapping View Switcher (Section 13) */}
                               {((msg.citations && msg.citations.length > 0) || (msg.liveSources && msg.liveSources.length > 0)) && (
                                 <div
                                   data-testid="response-primary-tabs"
-                                  className="flex items-center gap-1 flex-nowrap overflow-x-auto whitespace-nowrap no-scrollbar w-full bg-neutral-100 dark:bg-white/[0.06] p-0.5 rounded-lg border border-neutral-200/60 dark:border-white/10 text-[10.5px]"
+                                  className="no-scrollbar flex w-full flex-nowrap items-center gap-4 overflow-x-auto whitespace-nowrap border-b border-neutral-200/70 text-xs dark:border-white/10"
                                 >
-                                  <button
-                                    type="button"
-                                    onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "synthesis" }))}
-                                    className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0 whitespace-nowrap ${(messageActiveTab[msg.id] ?? "synthesis") === "synthesis"
-                                      ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
-                                      : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-                                      }`}
-                                    title="Synthesized prose response with inline citations"
-                                  >
-                                    <FileText className="w-3 h-3 text-sky-500 shrink-0" />
-                                    <span>Synthesis</span>
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "matrix" }))}
-                                    className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0 whitespace-nowrap ${messageActiveTab[msg.id] === "matrix"
-                                      ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
-                                      : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-                                      }`}
-                                    title="Structured Evidence Matrix & Forest Plot Synthesis"
-                                  >
-                                    <Table className="w-3 h-3 text-emerald-500 shrink-0" />
-                                    <span>Evidence Matrix ({(msg.citations || msg.liveSources || []).length})</span>
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "graph" }))}
-                                    className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0 whitespace-nowrap ${messageActiveTab[msg.id] === "graph"
-                                      ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
-                                      : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-                                      }`}
-                                    title="Interactive Citation Graph & Literature Discovery"
-                                  >
-                                    <Network className="w-3 h-3 text-indigo-500 shrink-0" />
-                                    <span>Citation Graph</span>
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "consensus" }))}
-                                    className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0 whitespace-nowrap ${messageActiveTab[msg.id] === "consensus"
-                                      ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
-                                      : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-                                      }`}
-                                    title="Peer Review & Methodological Rigor Audit"
-                                  >
-                                    <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0" />
-                                    <span>Peer Review & Rigor</span>
-                                  </button>
+                                  {([
+                                    { id: "synthesis", label: "Answer", title: "Synthesized prose response with inline citations" },
+                                    { id: "matrix", label: `Evidence Matrix (${(msg.citations || msg.liveSources || []).length})`, title: "Structured Evidence Matrix & Forest Plot Synthesis" },
+                                    { id: "graph", label: "Citation Graph", title: "Interactive Citation Graph & Literature Discovery" },
+                                    { id: "consensus", label: "Review", title: "Peer Review & Methodological Rigor Audit" },
+                                  ] as const).map(({ id, label, title }) => {
+                                    const active = (messageActiveTab[msg.id] ?? "synthesis") === id;
+                                    return (
+                                      <button
+                                        key={id}
+                                        type="button"
+                                        aria-pressed={active}
+                                        onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: id }))}
+                                        className={`-mb-px inline-flex shrink-0 cursor-pointer items-center whitespace-nowrap border-b-2 py-1.5 transition-colors ${active
+                                          ? "border-neutral-900 font-semibold text-neutral-900 dark:border-white dark:text-white"
+                                          : "border-transparent text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                                          }`}
+                                        title={title}
+                                      >
+                                        <span>{label}</span>
+                                      </button>
+                                    );
+                                  })}
 
                                   <button
                                     type="button"
@@ -4068,11 +3813,10 @@ export default function ProjectListScreen({
                                       );
                                       handleOpenResearchExport(items, msg.text?.slice(0, 100));
                                     }}
-                                    className="px-2 py-0.5 rounded-md font-medium text-neutral-600 dark:text-neutral-300 hover:bg-white dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0 whitespace-nowrap ml-auto"
+                                    className="-mb-px ml-auto inline-flex shrink-0 cursor-pointer items-center whitespace-nowrap py-1.5 text-neutral-500 transition-colors hover:text-neutral-900 dark:hover:text-white"
                                     title="Open Research Export Workspace (LaTeX & Overleaf Package)"
                                   >
-                                    <FileCode className="w-3 h-3 text-sky-500 shrink-0" />
-                                    <span>LaTeX / Overleaf</span>
+                                    <span>LaTeX</span>
                                   </button>
                                 </div>
                               )}
@@ -4768,7 +4512,7 @@ export default function ProjectListScreen({
                           )}
 
                           {/* Retrieved Live Sources Drawer */}
-                          {msg.liveSources && msg.liveSources.length > 0 && (
+                          {msg.liveSources && msg.liveSources.length > 0 && !(msg.citations && msg.citations.length > 0) && (
                             <LiveSourcesDrawer
                               sources={msg.liveSources}
                               searchedAt={msg.searchedAt}
@@ -4805,22 +4549,15 @@ export default function ProjectListScreen({
                             )}
 
                           {/* Recommended Workspace Handoff Callout when explicitly recommended by server */}
-                          {msg.sender === "assistant" && msg.recommendedWorkspaceHandoff && (
-                            <div className="mt-2.5 p-2.5 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/20 border border-emerald-200/80 dark:border-emerald-800/40 flex items-center justify-between gap-2 flex-wrap">
-                              <span className="text-[11px] font-medium text-emerald-900 dark:text-emerald-200">
-                                Recommended Workspace: {msg.recommendedWorkspaceHandoff.formatLabel}
-                              </span>
-                              <div className="flex items-center gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => void handleBootProjectFromResearch(msg, "OT-01")}
-                                  className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
-                                >
-                                  <span>Launch in 4-Phase Essay Engine (OT-01)</span>
-                                  <ArrowRight className="w-3 h-3" />
-                                </button>
-                              </div>
-                            </div>
+                          {msg.sender === "assistant" && !msg.error && msg.recommendedWorkspaceHandoff && (
+                            <button
+                              type="button"
+                              onClick={() => void handleBootProjectFromResearch(msg, msg.recommendedWorkspaceHandoff!.targetFormatId)}
+                              className="mt-3 inline-flex cursor-pointer items-center gap-1 text-[13px] font-medium text-neutral-900 underline-offset-4 hover:underline dark:text-neutral-100"
+                            >
+                              <span>Continue in {msg.recommendedWorkspaceHandoff.formatLabel}</span>
+                              <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                            </button>
                           )}
 
                           {/* Exact 6 Post-Response Actions in Single Non-Wrapping Row (Sections 8, 11, 13) */}
@@ -4876,6 +4613,18 @@ export default function ProjectListScreen({
                             />
                           )}
 
+                          {msg.sender === "assistant" && !msg.error && msg.kind !== "help" && msg.id !== "init" && msg.id !== "reset-assistant" && (
+                            <p className="mt-1.5 hidden px-1 text-[11px] text-neutral-400 sm:block">
+                              {[
+                                msg.mode === "deep-research" ? "Deep research" : null,
+                                `${msg.wordCount || msg.text.trim().split(/\s+/).filter(Boolean).length} words`,
+                                msg.provider || null,
+                              ]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </p>
+                          )}
+
                           {/* Quick Action Deep-Links */}
                           {msg.action && (
                             <div className="mt-3 pt-2.5 border-t border-neutral-200 dark:border-white/10">
@@ -4889,32 +4638,30 @@ export default function ProjectListScreen({
                             </div>
                           )}
 
-                          {/* Dynamic Follow-Up Questions ("Related Inquiries") */}
+                          {/* Related questions: plain tappable lines, no boxes */}
                           {msg.sender === "assistant" && !msg.error && msg.followUps && msg.followUps.length > 0 && (
-                            <div className="mt-3 pt-2.5 border-t border-neutral-200/60 dark:border-white/10 space-y-1.5">
-                              <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
-                                <Lightbulb className="w-3 h-3 text-amber-500" />
-                                <span>Related Inquiries</span>
-                              </div>
-                              <div className="flex flex-wrap gap-1.5">
+                            <div className="mt-4">
+                              <p className="mb-1 px-1 text-xs font-medium text-neutral-500 dark:text-neutral-400">Related Inquiries</p>
+                              <ul className="divide-y divide-neutral-200/70 dark:divide-white/10">
                                 {msg.followUps.map((fu, fuIdx) => (
-                                  <button
-                                    key={fuIdx}
-                                    type="button"
-                                    onClick={() =>
+                                  <li key={fuIdx}>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
                                       handleSendGuideMessage(
                                         fu,
                                         undefined,
                                         msg.mode === "deep-research" ? "deep-research" : msg.mode === "search" ? "search" : "normal"
                                       )
                                     }
-                                    className="text-xs sm:text-[11px] text-left px-3 sm:px-2.5 py-2 sm:py-1 min-h-9 sm:min-h-0 rounded-lg bg-neutral-100 dark:bg-white/[0.06] hover:bg-sky-50 dark:hover:bg-sky-950/40 hover:border-sky-300 dark:hover:border-sky-500/30 border border-neutral-200/60 dark:border-white/10 text-neutral-700 dark:text-neutral-300 hover:text-sky-600 dark:hover:text-sky-400 transition-colors cursor-pointer inline-flex items-center gap-1 group"
-                                  >
-                                    <span>{fu}</span>
-                                    <ArrowRight className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100 transition-opacity text-sky-500 shrink-0" />
-                                  </button>
+                                      className="group flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 px-1 py-2 text-left text-[14px] text-neutral-800 transition-colors hover:text-neutral-950 dark:text-neutral-200 dark:hover:text-white sm:min-h-9 sm:text-[13px]"
+                                    >
+                                      <span>{fu}</span>
+                                      <ArrowRight className="h-3.5 w-3.5 shrink-0 text-neutral-400 opacity-60 transition-opacity group-hover:opacity-100" aria-hidden="true" />
+                                    </button>
+                                  </li>
                                 ))}
-                              </div>
+                              </ul>
                             </div>
                           )}
                         </div>
@@ -4928,7 +4675,7 @@ export default function ProjectListScreen({
                             data-testid="mobile-ask-progress"
                             className="flex items-center gap-2 px-1 min-h-10 text-[13px] font-medium text-neutral-700 dark:text-neutral-200"
                           >
-                            <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin text-sky-500" aria-hidden="true" />
+                            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-neutral-400" aria-hidden="true" />
                             <span role="status" aria-live="polite" className="min-w-0 flex-1 truncate">
                               {askPhase?.step === "writing"
                                 ? "Writing your answer…"
@@ -4940,16 +4687,9 @@ export default function ProjectListScreen({
                               type="button"
                               onClick={() => setShowProgressDetails((v) => !v)}
                               aria-expanded={showProgressDetails}
-                              className="shrink-0 min-h-9 px-2.5 rounded-full text-xs text-sky-700 dark:text-sky-300 cursor-pointer focus-visible:outline-2 focus-visible:outline-sky-500"
+                              className="shrink-0 min-h-9 cursor-pointer rounded-full px-2.5 text-xs text-neutral-500 hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-sky-500 dark:hover:text-white"
                             >
                               {showProgressDetails ? "Hide details" : "Details"}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={handleStopGuideGeneration}
-                              className="shrink-0 min-h-9 px-3 rounded-full bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-xs font-semibold cursor-pointer active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
-                            >
-                              Stop
                             </button>
                           </div>
                         )}
@@ -4967,22 +4707,12 @@ export default function ProjectListScreen({
                         )}
                         {/* Live Token Streaming Bubble when tokens are arriving */}
                         {streamingGuideText && (
-                          <div className="flex flex-col items-start">
-                            <div className="flex items-center gap-1.5 mb-1 px-1 text-[10px] font-medium text-neutral-400">
-                              <ScholarCoreLogo size="sm" withText={false} className="scale-75 -mx-1" />
-                              <span>Scholar Core</span>
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9px] font-semibold bg-sky-500/10 text-sky-600 dark:text-sky-400">
-                                Streaming…
-                              </span>
-                            </div>
-                            <div className="rounded-2xl px-4 py-3 max-w-[88%] leading-relaxed bg-white dark:bg-white/[0.04] border border-neutral-200/80 dark:border-white/10 text-neutral-900 dark:text-neutral-100 rounded-tl-xs shadow-2xs">
-                              {renderFormattedGuideText(streamingGuideText, undefined, askCitationStyle)}
-                            </div>
+                          <div data-streaming-answer className="w-full px-0.5 leading-relaxed text-neutral-900 dark:text-neutral-100">
+                            {renderFormattedGuideText(streamingGuideText, undefined, askCitationStyle)}
                           </div>
                         )}
                       </div>
                     )}
-                    <div ref={messagesEndRef} />
                   </div>
                 )}
                 {showJumpToLatest && hasStartedChatting && (
@@ -4990,10 +4720,11 @@ export default function ProjectListScreen({
                     <button
                       type="button"
                       onClick={jumpToLatest}
-                      className="pointer-events-auto -translate-y-11 inline-flex items-center gap-1.5 min-h-10 px-4 rounded-full bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-xs font-semibold shadow-lg cursor-pointer active:scale-95 transition-transform focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
+                      aria-label="Jump to latest"
+                      title="Jump to latest"
+                      className="pointer-events-auto -translate-y-11 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-neutral-200 bg-white/95 text-neutral-700 shadow-md backdrop-blur transition-transform active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:border-white/15 dark:bg-ink-800/95 dark:text-neutral-100"
                     >
-                      <ArrowDown className="w-3.5 h-3.5" aria-hidden="true" />
-                      {isGuideThinking ? "Jump to latest" : "Latest"}
+                      <ArrowDown className="h-4 w-4" aria-hidden="true" />
                     </button>
                   </div>
                 )}
@@ -5002,163 +4733,39 @@ export default function ProjectListScreen({
               {/* Pinned Floating Input Component (Module 3.4) */}
               <div className="p-3 sm:p-4 pb-[max(0.875rem,env(safe-area-inset-bottom))] bg-white/95 dark:bg-ink-800/95 backdrop-blur-md border-t border-neutral-200/80 dark:border-white/10 shrink-0">
                 <div className={isLandingPage ? "w-full max-w-4xl mx-auto" : "w-full"}>
-                  {/* Status & Reset Bar. On phones the header already shows the title and AI dot, and New Chat replaces Reset, so only a disconnected AI is worth the space. */}
-                  <div className={`${isPhone && isOnline && (!aiStatus || aiStatus.connected) ? "hidden" : "flex"} [@media(max-height:500px)]:hidden items-center justify-between px-1 mb-2`}>
-                    <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 dark:text-neutral-400">
-                      <Lightbulb className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400 shrink-0" aria-hidden="true" />
-                      <span className="font-medium text-neutral-700 dark:text-neutral-300">Ask Scholar</span>
-                      {!isOnline ? (
-                        <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400 font-medium" role="status">
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" aria-hidden="true" />
-                          <span>You're offline</span>
-                        </span>
-                      ) : aiStatus ? (
-                        aiStatus.connected ? (
-                          <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold" title={`Operational provider: ${aiStatus.provider || "Operational"}`}>
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            <span>{aiStatus.statusText}</span>
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={onOpenAiAccess}
-                            className="text-neutral-600 dark:text-neutral-400 font-medium hover:underline cursor-pointer flex items-center gap-1"
-                            title="No operational AI providers. Click to configure AI Access."
-                          >
-                            <span className="w-1.5 h-1.5 rounded-full bg-neutral-400" />
-                            <span>AI Disconnected</span>
-                            <span className="text-[9px] underline">Configure ↗</span>
-                          </button>
-                        )
-                      ) : (
-                        <span className="text-neutral-400 text-[10px] animate-pulse">• Checking AI...</span>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        aria-label="Reset Chat"
-                        onClick={() => {
-                          handleStartNewAskThread();
-                        }}
-                        className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                        title="Reset conversation"
-                      >
-                        <RotateCcw className="w-3 h-3" />
-                        <span>Reset</span>
+                  {/* A notice appears only when something needs attention; a healthy connection is silent. */}
+                  {!isOnline ? (
+                    <p role="status" className="mb-2 flex items-center gap-1.5 px-1 text-[11px] font-medium text-amber-700 dark:text-amber-400">
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true" />
+                      You're offline. Questions will send when you reconnect.
+                    </p>
+                  ) : aiStatus && !aiStatus.connected ? (
+                    <p className="mb-2 flex items-center gap-1.5 px-1 text-[11px] text-neutral-600 dark:text-neutral-400">
+                      <span className="h-1.5 w-1.5 rounded-full bg-neutral-400" aria-hidden="true" />
+                      <span>No AI is connected.</span>
+                      <button type="button" onClick={onOpenAiAccess} className="cursor-pointer font-medium text-neutral-900 underline underline-offset-2 hover:opacity-80 dark:text-neutral-100">
+                        Set up AI Access
                       </button>
-                    </div>
-                  </div>
+                    </p>
+                  ) : null}
 
-                  {/* Pending Attachments Chips in Sidebar */}
-                  {sidebarAttachments.length > 0 && (
-                    <div className="flex flex-wrap items-center gap-1.5 mb-2 px-1">
-                      {sidebarAttachments.map((att) => (
-                        <div
-                          key={att.id}
-                          className="flex items-center gap-1.5 px-2 py-0.5 rounded-xl bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-white/10 text-xs text-neutral-800 dark:text-neutral-200 shadow-2xs animate-in fade-in"
-                        >
-                          {att.isImage ? (
-                            att.previewUrl ? (
-                              <img src={att.previewUrl} alt={att.name} className="w-4 h-4 object-cover rounded" />
-                            ) : (
-                              <Paperclip className="w-3.5 h-3.5 text-blue-500" />
-                            )
-                          ) : (
-                            <FileText className="w-3.5 h-3.5 text-amber-500" />
-                          )}
-                          <span className="truncate max-w-[140px] font-medium text-[11px]">{att.name}</span>
-                          <button
-                            type="button"
-                            onClick={() => removeSidebarAttachment(att.id)}
-                            className="text-neutral-400 hover:text-red-500 p-0.5 rounded-full hover:bg-neutral-200 dark:hover:bg-white/10 cursor-pointer transition-colors"
-                            title="Remove attachment"
-                            aria-label="Remove attachment"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      ))}
-                      {isSidebarUploadingAttachment && (
-                        <span className="text-[11px] text-neutral-400 flex items-center gap-1.5 animate-pulse">
-                          <Loader2 className="w-3 h-3 animate-spin text-blue-500" /> Parsing attachment...
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Input Wrapper Pill */}
-                  <form
-                    onClick={focusInputOnBackgroundTap(guideInputRef)}
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      if (guideInput.trim() || sidebarAttachments.length > 0) {
-                        handleSendGuideMessage();
-                      }
-                    }}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      if (e.dataTransfer.files?.length) {
-                        handleSidebarFileSelect(Array.from(e.dataTransfer.files));
-                      }
-                    }}
-                    className="relative flex flex-col rounded-2xl bg-white dark:bg-ink-750 p-3 shadow-sm border border-neutral-200/90 dark:border-white/10 focus-within:border-neutral-400 dark:focus-within:border-white/25 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[color:var(--accent)] focus-within:shadow-md transition-all duration-200"
+                  <AskPromptBox
+                    value={guideInput}
+                    onValueChange={setGuideInput}
+                    onSend={() => handleSendGuideMessage()}
+                    attachments={sidebarAttachments}
+                    onRemoveAttachment={removeSidebarAttachment}
+                    onAttachFiles={handleSidebarFileSelect}
+                    isUploading={isSidebarUploadingAttachment}
+                    mode={sidebarAiMode}
+                    onModeChange={setSidebarAiMode}
+                    isThinking={isGuideThinking}
+                    onStop={handleStopGuideGeneration}
+                    placeholder="Ask a research question…"
+                    ariaLabel="Ask Scholar question input"
+                    sendLabel="Send question"
+                    inputRef={guideInputRef}
                   >
-                    <div className="w-full px-1">
-                      <textarea
-                        ref={guideInputRef as any}
-                        rows={1}
-                        value={guideInput}
-                        onChange={(e) => {
-                          setGuideInput(e.target.value);
-                          e.target.style.height = "auto";
-                          e.target.style.height = `${Math.min(e.target.scrollHeight, 130)}px`;
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.nativeEvent.isComposing || (e as unknown as { keyCode?: number }).keyCode === 229) return;
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            if (guideInput.trim() || sidebarAttachments.length > 0) {
-                              handleSendGuideMessage();
-                            }
-                          } else if (e.key === "Backspace" && guideInput === "" && sidebarAttachments.length > 0) {
-                            removeSidebarAttachment(sidebarAttachments[sidebarAttachments.length - 1].id);
-                          }
-                        }}
-                        onPaste={(e) => {
-                          const items = e.clipboardData?.items;
-                          if (!items) return;
-                          const newFiles: File[] = [];
-                          for (let i = 0; i < items.length; i++) {
-                            if (items[i].kind === "file") {
-                              const file = items[i].getAsFile();
-                              if (file) newFiles.push(file);
-                            }
-                          }
-                          if (newFiles.length > 0) {
-                            e.preventDefault();
-                            handleSidebarFileSelect(newFiles);
-                          }
-                        }}
-                        aria-label="Ask Scholar question input"
-                        placeholder="Ask a research question…"
-                        style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent", fieldSizing: "content" } as React.CSSProperties}
-                        className="w-full bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-base sm:text-sm text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 shadow-none focus:shadow-none resize-none prompt-bare-input max-h-32 min-h-[36px] overflow-y-auto scholar-scrollbar leading-relaxed"
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between gap-2 pt-1.5 mt-1 border-t border-neutral-200/50 dark:border-white/5 sm:flex-wrap">
-                      <div className="flex items-center gap-1 sm:gap-1.5 min-w-0 flex-wrap sm:flex-wrap">
-                        <PromptBarActionMenu
-                          currentMode={sidebarAiMode}
-                          onSelectMode={setSidebarAiMode}
-                          onAttachFiles={handleSidebarFileSelect}
-                        />
-
                         {/* Phones: style and preferences live here, next to the box, not crowding the header */}
                         {isPhone && (
                           <>
@@ -5170,16 +4777,7 @@ export default function ProjectListScreen({
                             <AskScholarSettingsPopover
                               settings={askUserSettings}
                               direction="up"
-                              onUpdateSettings={(partial) => {
-                                const updated = saveAskScholarUserSettings(partial);
-                                setAskUserSettings(updated);
-                                if (
-                                  partial.preferredCitationStyle &&
-                                  ASK_SCHOLAR_CITATION_STYLES.some((s) => s.id === partial.preferredCitationStyle)
-                                ) {
-                                  handleUpdateCitationStyle(partial.preferredCitationStyle as AskCitationStyleId);
-                                }
-                              }}
+                              onUpdateSettings={handleAskSettingsUpdate}
                               onImportReferences={handleImportVaultReferences}
                             />
                           </>
@@ -5211,9 +4809,9 @@ export default function ProjectListScreen({
                           }}
                           aria-pressed={Boolean(isVaultGroundingActive && userEmail)}
                           aria-label="Vault Grounding"
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 min-h-11 sm:min-h-0 rounded-full text-[11px] font-medium border transition-all cursor-pointer ${isVaultGroundingActive && userEmail
-                            ? "bg-amber-500/10 text-amber-800 dark:text-amber-200 border-amber-500/30 shadow-2xs font-semibold"
-                            : "bg-transparent text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 border-neutral-200/60 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20"
+                          className={`${"inline-flex min-h-10 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-500 sm:min-h-8"} ${isVaultGroundingActive && userEmail
+                            ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
+                            : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white"
                             }`}
                           title={
                             userEmail
@@ -5223,16 +4821,16 @@ export default function ProjectListScreen({
                               : "Sign in to ground answers in your personal Knowledge Vault"
                           }
                         >
-                          <Database className={`w-3 h-3 ${isVaultGroundingActive && userEmail ? "text-amber-500" : ""}`} />
+                          <Database className="h-3.5 w-3.5" aria-hidden="true" />
                           <span className="hidden sm:inline">Vault Grounding</span>
-                          {userEmail && (
-                            <span className={`text-[9px] font-mono px-1 rounded-full ${isVaultGroundingActive ? "bg-amber-500/20 text-amber-800 dark:text-amber-200" : "bg-neutral-200/60 dark:bg-white/10 text-neutral-500"}`}>
+                          {userEmail && userVaultItems.length > 0 && (
+                            <span className="text-[11px] tabular-nums opacity-70">
                               {userVaultItems.length}
                             </span>
                           )}
                         </button>
 
-                        {sidebarAiMode === "deep_research" && (
+                    {sidebarAiMode === "deep_research" && (
                           <button
                             type="button"
                             data-testid="propose-deep-research-plan-btn"
@@ -5245,39 +4843,7 @@ export default function ProjectListScreen({
                             <span>Propose Plan</span>
                           </button>
                         )}
-                      </div>
-
-                      <div className="relative group shrink-0">
-                        {isGuideThinking ? (
-                          <button
-                            type="button"
-                            onClick={handleStopGuideGeneration}
-                            className="w-11 h-11 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:opacity-90 shadow-xs active:scale-95"
-                            title="Stop generating"
-                            aria-label="Stop generating"
-                          >
-                            <Square className="w-3.5 h-3.5 fill-current" />
-                          </button>
-                        ) : (
-                          <button
-                            type="submit"
-                            disabled={!guideInput.trim() && sidebarAttachments.length === 0}
-                            className={`w-11 h-11 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer ${guideInput.trim() || sidebarAttachments.length > 0
-                              ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 shadow-xs active:scale-95"
-                              : "bg-neutral-200/80 dark:bg-white/10 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
-                              }`}
-                            title="Send question (Enter)"
-                            aria-label="Send question"
-                          >
-                            <ArrowUp className="w-4 h-4 stroke-[2.25]" />
-                          </button>
-                        )}
-                        <span className="hidden group-hover:block absolute bottom-full mb-2 right-0 px-2 py-1 text-[11px] bg-neutral-900 text-white dark:bg-neutral-800 rounded shadow-md whitespace-nowrap pointer-events-none z-30">
-                          {isGuideThinking ? "Stop generating" : "Send question (Enter)"}
-                        </span>
-                      </div>
-                    </div>
-                  </form>
+                  </AskPromptBox>
                 </div>
               </div>
             </div>

@@ -12,6 +12,8 @@
  * 5. Deterministic Mark-Weighted Word Allocator: Proportional allocation across assignment questions.
  */
 
+import { searchEuropePmc } from "../../../src/shared/retrieval/providers.ts";
+import { buildAskGeneralPrompt, buildAskSearchPrompt } from "../../../src/shared/askPrompts.ts";
 import { NoAiConnectedError, routedText, RouterHandoffError, toRouterTask } from "../ai/routerBridge.ts";
 import { BrowserAiRequiredError, LocalModelUnreachableError, NoClientAiProviderError } from "../ai/aiRouteErrors.ts";
 import {
@@ -169,46 +171,18 @@ export interface UnifiedCitationScrubResult extends ScrubResult {
  * Fetches biomedical and life sciences evidence from Europe PMC / PubMed.
  */
 async function discoverEuropePmcSources(query: string, maxResults = 10): Promise<DiscoveredSourceDraft[]> {
-  try {
-    const url = `https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=${encodeURIComponent(
-      query
-    )}&format=json&pageSize=${Math.min(maxResults, 25)}`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
-    if (!res.ok) return [];
-
-    interface EuropePmcItem {
-      id?: string;
-      title?: string;
-      authorString?: string;
-      pubYear?: string;
-      journalTitle?: string;
-      doi?: string;
-    }
-    const data = (await res.json()) as { resultList?: { result?: EuropePmcItem[] } };
-    const items = data.resultList?.result ?? [];
-
-    return items
-      .filter((item): item is EuropePmcItem & { title: string } => Boolean(item.title))
-      .map((item) => {
-        const authors = item.authorString
-          ? item.authorString.split(",").map((a) => a.trim()).filter(Boolean)
-          : [];
-        const year = item.pubYear ? parseInt(item.pubYear, 10) : undefined;
-        return {
-          title: item.title,
-          authors,
-          year: !isNaN(Number(year)) ? year : undefined,
-          doi: item.doi,
-          url: item.doi ? `https://doi.org/${item.doi}` : undefined,
-          venue: item.journalTitle,
-          discoveredVia: "europepmc" as const,
-          sourceType: "scholarly" as const,
-          authorityTier: "A" as const,
-        };
-      });
-  } catch {
-    return [];
-  }
+  const { items } = await searchEuropePmc(query, Math.min(maxResults, 25), { timeoutMs: 5000 });
+  return items.map((item) => ({
+    title: item.title as string,
+    authors: Array.isArray(item.authors) ? (item.authors as unknown[]).filter((a): a is string => typeof a === "string") : [],
+    year: typeof item.year === "number" ? item.year : Number(item.year) || undefined,
+    doi: item.doi,
+    url: item.url || undefined,
+    venue: item.venue,
+    discoveredVia: "europepmc" as const,
+    sourceType: "scholarly" as const,
+    authorityTier: "A" as const,
+  }));
 }
 
 /**
@@ -338,6 +312,13 @@ export function getArchetypeModelWeights(): ArchetypeModelWeights {
  * Canonical scholarBrain Orchestrator Object
  */
 export const scholarBrain = {
+  /** System prompt for AskScholar answers (search-grounded or general). One owner for the text, every surface shares it. */
+  askSystemPrompt(opts: { kind: "search"; style: string; length: string } | { kind: "general"; base: string; style: string; length: string }): string {
+    return opts.kind === "search"
+      ? buildAskSearchPrompt({ style: opts.style, length: opts.length })
+      : buildAskGeneralPrompt({ base: opts.base, style: opts.style, length: opts.length });
+  },
+
   callJSON: (...args: Parameters<typeof callOpenRouterJSON>) => callOpenRouterJSON(...args),
   callText: (...args: Parameters<typeof callOpenRouterText>) => callOpenRouterText(...args),
   streamJSON: (...args: Parameters<typeof streamOpenRouterJSON>) => streamOpenRouterJSON(...args),

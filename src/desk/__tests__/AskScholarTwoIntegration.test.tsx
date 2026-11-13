@@ -127,7 +127,7 @@ describe("Ask Scholar 2.0 Multi-Layer Integration", () => {
     // 2. Verify merged single-row primary tabs appear without duplicate row-2 buttons (Section 13)
     const matrixTabBtn = await screen.findByRole("button", { name: /Evidence Matrix \(2\)/i });
     const citationGraphTabBtn = await screen.findByRole("button", { name: /^Citation Graph$/i });
-    const exportBtn = await screen.findByRole("button", { name: /LaTeX \/ Overleaf/i });
+    const exportBtn = await screen.findByRole("button", { name: /^LaTeX$/i });
 
     expect(matrixTabBtn).toBeInTheDocument();
     expect(citationGraphTabBtn).toBeInTheDocument();
