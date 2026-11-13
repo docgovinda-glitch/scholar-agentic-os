@@ -24,8 +24,18 @@ export default defineConfig({
     { name: "setup", testMatch: /auth\.setup\.ts/ },
     {
       name: "chromium",
+      testIgnore: /zz-sign-out\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], viewport: { width: 1400, height: 900 } },
       dependencies: ["setup"],
+    },
+    // Signing out revokes every session of account A, including the saved one the
+    // other signed-in specs share. With more than one worker, file order alone does
+    // not keep it last, so it runs as its own project after all the others.
+    {
+      name: "sign-out",
+      testMatch: /zz-sign-out\.spec\.ts/,
+      use: { ...devices["Desktop Chrome"], viewport: { width: 1400, height: 900 } },
+      dependencies: ["chromium"],
     },
   ],
   outputDir: "artifacts/e2e-results",

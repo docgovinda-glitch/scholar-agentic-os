@@ -465,7 +465,7 @@ The following ${sources.length} sources have been retrieved from verified academ
 ${sources
   .map(
     (s, idx) =>
-      `${idx + 1}. [${s.id}]: ${s.inTextCitation} — "${s.title}" by ${s.authors.join(", ") || "Unknown Author"} (${s.year || "n.d."}). DOI: ${s.doi || "N/A"}. URL: ${s.url || "N/A"}`
+      `${idx + 1}. [${s.id}]: ${s.inTextCitation} — "${s.title}" by ${s.authors.join(", ") || "(author not recorded)"} (${s.year || "year not recorded"}). DOI: ${s.doi || "N/A"}. URL: ${s.url || "N/A"}`
   )
   .join("\n")}
 

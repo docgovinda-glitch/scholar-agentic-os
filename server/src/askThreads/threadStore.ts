@@ -134,8 +134,3 @@ export async function deleteThread(userId: string, threadId: string): Promise<vo
   }
   await t.delete(`user_id=eq.${encodeURIComponent(userId)}&id=eq.${encodeURIComponent(threadId)}`);
 }
-
-/** Test helper: clears the in-process fallback store. */
-export function __resetThreadMemory(): void {
-  memory.clear();
-}

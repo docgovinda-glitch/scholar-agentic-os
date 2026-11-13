@@ -1,5 +1,4 @@
-import { AiModelSwitcher } from "./ai/AiModelSwitcher";
-import React, { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   createProject,
@@ -37,13 +36,12 @@ import {
   matchesProjectSearch,
   deduplicateProjectList,
 } from "./projectNaming";
-import { getSupabaseClient } from "../services/supabaseClient";
 import { hasVaultPassphraseOnThisDevice, currentUserId } from "../services/userVault";
 import { addVaultItem, setSessionUnlocked, listVaultItems, searchVaultItems, type VaultItem } from "../services/vaultContents";
 import { syncActiveSessionToRegistry } from "../services/auth/multiAccountService";
 import type { OutputTypeSummary, ProjectView } from "./types";
 import ScholarCoreLogo from "../components/ScholarCoreLogo";
-import { showAppToast, requestAppConfirm } from "../components/ui/FeedbackSystem";
+import { showAppToast } from "../components/ui/FeedbackSystem";
 import UserAccountMenu from "./components/UserAccountMenu";
 import EmbeddedAuthModal from "./auth/EmbeddedAuthModal";
 // Heavy screens that are not part of the first paint of the landing page.
@@ -54,17 +52,14 @@ import { CommandPalette } from "./components/CommandPalette";
 import {
   Plus,
   FolderOpen,
-  ArrowUp,
   ArrowRight,
   ArrowDown,
   ChevronLeft,
   X,
-  RotateCcw,
   Lightbulb,
   Search,
   Database,
   Sliders,
-  MessageSquare,
   MoreVertical,
   Share2,
   Pin,
@@ -75,30 +70,20 @@ import {
   Sun,
   Moon,
   Paperclip,
-  Globe,
-  Compass,
-  ExternalLink,
   Loader2,
   Sparkles,
   ShieldCheck,
   Copy,
   Check,
   ChevronDown,
-  ChevronUp,
-  Zap,
   Scale,
-  Info,
-  BookOpen,
-  BookmarkCheck,
   BookmarkPlus,
   Clock,
-  Square,
   Download,
   Table,
   Network,
   AlertTriangle,
   BarChart3,
-  FileCode,
 } from "lucide-react";
 import LiteratureDiscoveryWorkspace from "./discovery/LiteratureDiscoveryWorkspace";
 import EvidenceSynthesisWorkspace from "./evidence/EvidenceSynthesisWorkspace";
@@ -125,8 +110,6 @@ import { ASK_BASE_IDENTITY, buildAskGeneralPrompt } from "../shared/askPrompts";
 import { decideAskMode, isTimeSensitiveQuery } from "../shared/askRouting";
 import {
   ASK_SCHOLAR_CITATION_STYLES,
-  getCitationStyleInfo,
-  formatAskScholarInText,
   formatAskScholarBibliography,
   stripRawReferencesSection,
   type AskCitationStyleId,
@@ -792,7 +775,6 @@ export default function ProjectListScreen({
   const [isGuideThinking, setIsGuideThinking] = useState(false);
   const [streamingGuideText, setStreamingGuideText] = useState("");
   const askAbortRef = useRef<boolean>(false);
-  const [deepResearchActiveStage, setDeepResearchActiveStage] = useState(0);
   const [activeResearchStage, setActiveResearchStage] = useState<ResearchStageTelemetry | null>(null);
   const [isMobileWorkspaceMenuOpen, setIsMobileWorkspaceMenuOpen] = useState(false);
   const mobileWorkspaceMenuRef = useRef<HTMLDivElement>(null);
@@ -818,13 +800,31 @@ export default function ProjectListScreen({
   );
   const isLandingPage = activeView === "projects" && !choosing;
   const hasStartedChatting = guideMessages.some((m) => m.sender === "user") || isGuideThinking;
-  const [expandedPlanIds, setExpandedPlanIds] = useState<Record<string, boolean>>({});
-  const [expandedBibIds, setExpandedBibIds] = useState<Record<string, boolean>>({});
+  const [expandedPlanIds] = useState<Record<string, boolean>>({});
   const [savedVaultSourceUrls, setSavedVaultSourceUrls] = useState<Record<string, boolean>>({});
   const [editingUserMsgId, setEditingUserMsgId] = useState<string | null>(null);
   const [editingUserMsgText, setEditingUserMsgText] = useState("");
   const [activeAskThreadId, setActiveAskThreadId] = useState<string>(() => `thread-${Date.now()}`);
   const [isAskHistoryOpen, setIsAskHistoryOpen] = useState(false);
+  const askHistoryRef = useRef<HTMLDivElement | null>(null);
+  // History closes like every other popover: Escape, or a tap/click outside it.
+  useEffect(() => {
+    if (!isAskHistoryOpen) return;
+    const onPointer = (e: Event) => {
+      if (askHistoryRef.current && !askHistoryRef.current.contains(e.target as Node)) setIsAskHistoryOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsAskHistoryOpen(false);
+    };
+    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("touchstart", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("touchstart", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [isAskHistoryOpen]);
   // Documents attached anywhere in this conversation: kept for every follow-up and handed to workspaces.
   const [askThreadFiles, setAskThreadFiles] = useState<AskScholarAttachedFile[]>([]);
   const [askThreads, setAskThreads] = useState<AskScholarConversationThread[]>(() => loadLocalAskScholarThreads(userEmail));
@@ -880,7 +880,6 @@ export default function ProjectListScreen({
   }, [userEmail]);
 
   const guideInputRef = useRef<HTMLTextAreaElement | null>(null);
-  const sidebarFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Follow the answer only while the reader is at the bottom. If they scroll up to
   // read, leave them there and offer a "Jump to latest" button instead.
@@ -984,18 +983,6 @@ export default function ProjectListScreen({
       return next;
     });
   }, [guideMessages, activeAskThreadId, userEmail, askThreadFiles]);
-
-  // Step through Deep Research stages while Deep Research is actively running
-  useEffect(() => {
-    if (!isGuideThinking) {
-      setDeepResearchActiveStage(0);
-      return;
-    }
-    const timer = window.setInterval(() => {
-      setDeepResearchActiveStage((prev) => (prev < 5 ? prev + 1 : prev));
-    }, 2600);
-    return () => window.clearInterval(timer);
-  }, [isGuideThinking]);
 
   const [aiStatus, setAiStatus] = useState<AiOperationalStatus | null>(null);
   const isOnline = useOnlineStatus();
@@ -1111,13 +1098,6 @@ export default function ProjectListScreen({
     setSidebarAttachments((prev) => prev.filter((a) => a.id !== id));
   };
 
-  const scrollToAssistant = useCallback(() => {
-    setMobileMenuOpen(false);
-    setIsAiSidebarOpen(true);
-    setTimeout(() => {
-      guideInputRef.current?.focus();
-    }, 250);
-  }, []);
 
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
@@ -1132,8 +1112,6 @@ export default function ProjectListScreen({
       // Ignore clipboard write issues
     }
   }
-
-  const handleCopyResponse = handleCopyMessage;
 
   function scrollToProjects() {
     const el = document.getElementById("projects-section");
@@ -1199,7 +1177,6 @@ export default function ProjectListScreen({
     setIsGuideThinking(false);
     setAskPhase(null);
     setActiveResearchStage(null);
-    setDeepResearchActiveStage(0);
     setEditingUserMsgId(null);
     setActiveAskThreadId(`thread-${Date.now()}`);
     setAskThreadFiles([]);
@@ -1262,22 +1239,6 @@ export default function ProjectListScreen({
     [userEmail, openAuth]
   );
 
-  const handleDownloadMarkdown = useCallback((msg: WebsiteAssistantMessage) => {
-    try {
-      const blob = new Blob([msg.text], { type: "text/markdown;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `ask-scholar-${msg.mode || "response"}-${new Date().toISOString().slice(0, 10)}.md`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      showAppToast("Downloaded response as Markdown (.md)", "success", 2500);
-    } catch {
-      // ignore
-    }
-  }, []);
 
   interface NormalizedCitationSource {
     title?: string;
@@ -1354,34 +1315,6 @@ export default function ProjectListScreen({
     []
   );
 
-  const handleCopyBibTeX = useCallback((msg: WebsiteAssistantMessage) => {
-    const rawSources = getNormalizedMsgSources(msg).filter(
-      (c) => Array.isArray(c.authors) && c.authors.length > 0 && Boolean(c.year)
-    );
-
-    if (rawSources.length === 0) {
-      showAppToast("No verified citations available to export as BibTeX.", "warning", 3000);
-      return;
-    }
-
-    const bibtexEntries = rawSources
-      .map((c, idx) => {
-        const citeKey = (
-          (Array.isArray(c.authors) && c.authors[0] ? c.authors[0].split(" ").pop()?.toLowerCase() : "ref") +
-          (c.year ? `_${c.year}` : `_${idx + 1}`)
-        ).replace(/[^a-z0-9_]/gi, "");
-
-        const authorStr = Array.isArray(c.authors) ? c.authors.join(" and ") : "";
-
-        return `@article{${citeKey},\n  title = {${c.title || "Untitled"}},\n  author = {${authorStr}},\n  year = {${c.year}},\n  journal = {${c.venue || c.publisher || "Scholarly Resource"}}${c.url ? `,\n  url = {${c.url}}` : ""}${c.doi ? `,\n  doi = {${c.doi}}` : ""}\n}`;
-      })
-      .join("\n\n");
-
-    navigator.clipboard.writeText(bibtexEntries);
-    setCopiedMessageId(`bibtex-${msg.id}`);
-    setTimeout(() => setCopiedMessageId(null), 2000);
-    showAppToast(`Copied ${rawSources.length} BibTeX entries to clipboard!`, "success", 2500);
-  }, [getNormalizedMsgSources]);
 
   const handleDownloadMatrixCsv = useCallback((msg: WebsiteAssistantMessage) => {
     const rawSources = getNormalizedMsgSources(msg);
@@ -1645,7 +1578,6 @@ export default function ProjectListScreen({
     setStreamingGuideText("");
     setIsGuideThinking(true);
     setActiveResearchStage(null);
-    setDeepResearchActiveStage(0);
     // Sources found for this question, kept so a failed answer still shows them.
     let sourcesFound: LiveSearchResult[] = [];
 
@@ -1673,7 +1605,6 @@ export default function ProjectListScreen({
           }));
 
         let agentResponse: (AgenticQueryResponse & { ok?: boolean }) | undefined;
-        const styleInfo = getCitationStyleInfo(askCitationStyle);
         const systemPrompt = buildAskGeneralPrompt({
           base: ASK_BASE_IDENTITY,
           style: askCitationStyle,
@@ -1784,9 +1715,6 @@ export default function ProjectListScreen({
                   }
                   if (update?.stage) {
                     setActiveResearchStage(update.stage);
-                    if (typeof update.stage.stageNumber === "number") {
-                      setDeepResearchActiveStage(Math.max(0, update.stage.stageNumber - 1));
-                    }
                   }
                 }
               },
@@ -1818,9 +1746,6 @@ export default function ProjectListScreen({
                   }
                   if (update?.stage) {
                     setActiveResearchStage(update.stage);
-                    if (typeof update.stage.stageNumber === "number") {
-                      setDeepResearchActiveStage(Math.max(0, update.stage.stageNumber - 1));
-                    }
                   }
                 }
               },
@@ -1922,10 +1847,8 @@ export default function ProjectListScreen({
 
           const citedCount = verifiedCslItems.length;
           const readCount = Math.max(candidateCitations.length, citedCount);
-          const searchedCount =
-            candidateCitations.length > 0
-              ? Math.max(classification.sourceBudget.minCandidates, readCount + excludedRecords.length)
-              : 0;
+          // Only what actually happened: sources read plus those excluded. No budget-sized figure.
+          const searchedCount = readCount + excludedRecords.length;
           const isDeepMode =
             targetMode === "deep-research" || agentResponse.mode === "deep-research";
 
@@ -1958,10 +1881,7 @@ export default function ProjectListScreen({
             deepResearchState: isDeepMode
               ? {
                 phase: "report_ready",
-                subQuestions:
-                  agentResponse.plan && agentResponse.plan.length > 0
-                    ? agentResponse.plan
-                    : generateInitialDeepResearchPlan(query),
+                subQuestions: agentResponse.plan ?? [],
                 searchedCount,
                 readCount,
                 citedCount,
@@ -1970,19 +1890,8 @@ export default function ProjectListScreen({
             peerReviewAudit: agentResponse.peerReviewAudit,
             burstinessMetrics: agentResponse.burstinessMetrics,
             recommendedWorkspaceHandoff: agentResponse.recommendedWorkspaceHandoff,
-            followUps:
-              agentResponse.followUps ||
-              (isDeepMode || (agentResponse.citations && agentResponse.citations.length > 0)
-                ? [
-                  "What are the leading methodological counter-arguments?",
-                  "Compare contradictory findings in recent literature",
-                  "How can I translate this into an academic paper outline?",
-                ]
-                : [
-                  "How do I create a research project?",
-                  "What is Knowledge Vault?",
-                  "How do I set up AI?",
-                ]),
+            // Follow-up questions only when the answer came with real ones.
+            followUps: agentResponse.followUps,
           };
           setStreamingGuideText("");
           setGuideMessages((prev) => [...prev, assistantMsg]);
@@ -2125,7 +2034,6 @@ export default function ProjectListScreen({
   }, [location.search, userEmail, creating, navigate, handleCreate]);
 
   const [projectToDelete, setProjectToDelete] = useState<ProjectView | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const [activeRecentMenuId, setActiveRecentMenuId] = useState<string | null>(null);
   const recentMenuRef = useRef<HTMLDivElement>(null);
@@ -2302,13 +2210,13 @@ export default function ProjectListScreen({
   useEffect(() => {
     if (!projectToDelete) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !deletingId) {
+      if (e.key === "Escape") {
         setProjectToDelete(null);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [projectToDelete, deletingId]);
+  }, [projectToDelete]);
 
   function getProjectTitle(p: ProjectView | null): string {
     if (!p) return "Project";
@@ -2322,16 +2230,6 @@ export default function ProjectListScreen({
     );
   }
 
-  async function handleSignOut() {
-    const confirmed = await requestAppConfirm({
-      title: "Sign Out",
-      message: "Sign out of Scholar Core?",
-      confirmLabel: "Sign Out",
-      variant: "danger",
-    });
-    if (!confirmed) return;
-    getSupabaseClient().auth.signOut();
-  }
 
   // "Resume chat": the conversation in progress, or after a reload the most recent saved one.
   const resumeTarget = hasStartedChatting
@@ -2864,8 +2762,7 @@ export default function ProjectListScreen({
 
           {/* Top Bar Right: AI Assistant Toggle & Active Provider Status */}
           <div className="flex items-center gap-2.5">
-            {/* Active AI Status Pill */}
-            {userEmail && <AiModelSwitcher workspace="ask-scholar" className="hidden sm:block" />}
+            {/* One AI status: the server-verified connection. Models are chosen in AI Access. */}
             {userEmail ? (
               <button
                 type="button"
@@ -2879,19 +2776,13 @@ export default function ProjectListScreen({
                     : "border-neutral-200 dark:border-white/10 bg-neutral-100/80 dark:bg-white/5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200/70 dark:hover:bg-white/10"
                   }`}
                 title="AI Access • Click to configure"
+                aria-label={`AI status: ${aiPillLabel}`}
                 data-testid="active-ai-pill"
               >
                 {/* Only an AI that is actually connected is shown as active; a saved
                     preference with no key behind it is not. */}
                 <span className={`w-1.5 h-1.5 rounded-full ${aiStatus?.connected ? "bg-emerald-500 animate-pulse" : "bg-neutral-400"}`} />
-                <span>
-                  {aiStatus?.connected
-                    ? `AI: ${aiStatus.providers?.[0]?.name || aiStatus.provider || activeProviderLabel}`
-                    : aiStatus
-                      ? "Connect an AI"
-                      : "Checking AI…"}
-                </span>
-                <span className="text-[10px] opacity-70">↗</span>
+                <span>{aiPillLabel}</span>
               </button>
             ) : (
               <button
@@ -3517,7 +3408,7 @@ export default function ProjectListScreen({
                   )}
 
                   {askThreads.length > 0 && (
-                    <div className="relative">
+                    <div ref={askHistoryRef} className="relative">
                       <button
                         type="button"
                         onClick={() => setIsAskHistoryOpen((prev) => !prev)}
@@ -4858,7 +4749,7 @@ export default function ProjectListScreen({
           aria-modal="true"
           aria-labelledby="delete-modal-title"
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-150"
-          onClick={() => !deletingId && setProjectToDelete(null)}
+          onClick={() => setProjectToDelete(null)}
         >
           <div
             className="w-full max-w-md rounded-3xl bg-white dark:bg-ink-750 border border-neutral-200 dark:border-white/10 p-7 shadow-2xl relative text-left animate-in zoom-in-95 duration-150"
@@ -4878,27 +4769,17 @@ export default function ProjectListScreen({
             <div className="flex items-center justify-end gap-3 pt-1 font-sans">
               <button
                 type="button"
-                disabled={deletingId !== null}
                 onClick={() => setProjectToDelete(null)}
                 className="px-5 py-2.5 rounded-full text-sm font-medium text-neutral-700 dark:text-neutral-300 bg-neutral-100 dark:bg-white/5 hover:bg-neutral-200 dark:hover:bg-white/10 border border-neutral-200 dark:border-white/10 transition-all cursor-pointer disabled:opacity-50 font-sans"
               >
                 Cancel
               </button>
-              {/* Delete text option in iconic Pinterest Red (#E60023) */}
               <button
                 type="button"
-                disabled={deletingId !== null}
                 onClick={handleConfirmDelete}
                 className="px-5 py-2.5 rounded-full text-sm font-bold text-danger hover:text-danger-strong bg-danger/15 hover:bg-danger/25 transition-all cursor-pointer disabled:opacity-50 font-sans flex items-center justify-center"
               >
-                {deletingId ? (
-                  <>
-                    <span className="w-3.5 h-3.5 border-2 border-danger border-t-transparent rounded-full animate-spin mr-2" />
-                    <span>Deleting...</span>
-                  </>
-                ) : (
-                  <span>Delete</span>
-                )}
+                <span>Delete</span>
               </button>
             </div>
           </div>

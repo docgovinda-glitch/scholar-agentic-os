@@ -9,7 +9,7 @@
  * Strictly forbids placeholder authors or dates ("Contributors", "Unknown", "Anonymous", "n.d.").
  */
 
-import type { CanonicalReference, ReferenceAuthor, ReferenceKind } from "../citation_compliance/model/reference";
+import type { ReferenceAuthor, ReferenceKind } from "../citation_compliance/model/reference";
 import {
   verifyAndConvertToCSL,
   verifyAndDeduplicateSources,
@@ -273,51 +273,6 @@ export function citationItemToCSL(item: WebsiteCitationItem, index = 0): CSLItem
     index
   );
   return res.ok ? res.item : null;
-}
-
-/**
- * Converts a verified WebsiteCitationItem into a CanonicalReference.
- */
-export function citationItemToCanonicalReference(
-  item: WebsiteCitationItem,
-  index = 0
-): CanonicalReference {
-  const csl = citationItemToCSL(item, index);
-  const kind = inferReferenceKind(item);
-  const doi = csl?.DOI || extractDoi(item.doi) || extractDoi(item.url);
-
-  const authors: ReferenceAuthor[] = csl
-    ? csl.author.map((a, i) => ({
-        firstName: a.given || "",
-        lastName: a.family || a.literal || "",
-        order: i + 1,
-      }))
-    : (item.authors || [])
-        .map((a, i) => splitAuthorName(a, i + 1))
-        .filter((a) => Boolean(a.lastName));
-
-  const yearNum = csl?.issued?.["date-parts"]?.[0]?.[0];
-  const yearStr = yearNum ? String(yearNum) : item.year ? String(item.year) : undefined;
-  const cleanTitle = (csl?.title || item.title || "").trim();
-  const venue = csl?.["container-title"] || item.journal || item.venue || item.publisher || undefined;
-
-  return {
-    kind,
-    title: cleanTitle,
-    authors,
-    source: venue || cleanTitle,
-    journal: kind === "JournalArticle" || kind === "Preprint" ? venue : undefined,
-    volume: csl?.volume || item.volume,
-    issue: csl?.issue || item.issue,
-    pages: csl?.page || item.pages,
-    publisher: csl?.publisher || item.publisher || undefined,
-    year: yearStr,
-    publicationDate: yearStr ? `${yearStr}-01-01` : undefined,
-    doi: doi ? (doi.startsWith("http") ? doi : `https://doi.org/${doi}`) : undefined,
-    url: csl?.URL || item.url || undefined,
-    _position: index + 1,
-    _meta: { sourceRecordId: item.url || `source-${index + 1}` },
-  };
 }
 
 /**

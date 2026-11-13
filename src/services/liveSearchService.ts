@@ -83,9 +83,6 @@ export interface LiveSearchProgressUpdate {
   excludedCount?: number;
 }
 
-const LIVE_SEARCH_GROUNDING_KEY = "scholar_live_search_grounding";
-let memoryFallbackGrounding = false;
-let lastSearchTelemetry: LiveSearchTelemetryResult | null = null;
 const progressListeners = new Set<(update: LiveSearchProgressUpdate) => void>();
 
 export function onLiveSearchProgress(
@@ -107,58 +104,6 @@ function emitLiveSearchProgress(update: LiveSearchProgressUpdate): void {
   }
 }
 
-export function getLastLiveSearchTelemetry(): LiveSearchTelemetryResult | null {
-  return lastSearchTelemetry;
-}
-
-export function getLiveSearchGroundingEnabled(): boolean {
-  if (typeof window !== "undefined" && typeof window.localStorage !== "undefined") {
-    try {
-      const val = window.localStorage.getItem(LIVE_SEARCH_GROUNDING_KEY);
-      if (val !== null) return val === "true";
-    } catch {
-      // fallback to memory
-    }
-  } else if (typeof localStorage !== "undefined") {
-    try {
-      const val = localStorage.getItem(LIVE_SEARCH_GROUNDING_KEY);
-      if (val !== null) return val === "true";
-    } catch {
-      // fallback to memory
-    }
-  }
-  return memoryFallbackGrounding;
-}
-
-export function setLiveSearchGroundingEnabled(enabled: boolean): void {
-  memoryFallbackGrounding = enabled;
-  if (typeof window !== "undefined" && typeof window.localStorage !== "undefined") {
-    try {
-      window.localStorage.setItem(LIVE_SEARCH_GROUNDING_KEY, enabled ? "true" : "false");
-      window.dispatchEvent(new CustomEvent("scholar:live-search-grounding-toggled", { detail: { enabled } }));
-    } catch {
-      // Non-blocking storage failover
-    }
-  } else if (typeof localStorage !== "undefined") {
-    try {
-      localStorage.setItem(LIVE_SEARCH_GROUNDING_KEY, enabled ? "true" : "false");
-    } catch {
-      // Non-blocking storage failover
-    }
-  }
-}
-
-export function onLiveSearchGroundingChange(callback: (enabled: boolean) => void): () => void {
-  if (typeof window === "undefined") return () => {};
-  const handler = (e: Event) => {
-    const custom = e as CustomEvent<{ enabled: boolean }>;
-    if (typeof custom.detail?.enabled === "boolean") {
-      callback(custom.detail.enabled);
-    }
-  };
-  window.addEventListener("scholar:live-search-grounding-toggled", handler);
-  return () => window.removeEventListener("scholar:live-search-grounding-toggled", handler);
-}
 
 /**
  * Runs one live search through the server RetrievalService (`/api/search/live`), then verifies
@@ -286,7 +231,6 @@ export async function executeLiveSearchWithTelemetry(
     ...baseTelemetry,
     queriesExecuted: data.queriesExecuted ?? [],
   };
-  lastSearchTelemetry = telemetry;
   return telemetry;
 }
 

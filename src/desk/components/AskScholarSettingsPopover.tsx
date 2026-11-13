@@ -10,7 +10,6 @@ import {
   type AskScholarUserSettings,
 } from "../../config/askScholarConfig";
 import {
-  ASK_SCHOLAR_CITATION_STYLES,
   parseReferenceImportText,
   type CSLItem,
 } from "../scholarCitationEngine";
@@ -108,24 +107,6 @@ export function AskScholarSettingsPopover({
         </button>
       </div>
 
-      {/* 1. Preferred Citation Style (default: APA 7th) */}
-      <div className="space-y-1">
-        <label htmlFor="pref-citation-style" className="block text-[11px] font-semibold text-neutral-600 dark:text-neutral-300">
-          Preferred Citation Style
-        </label>
-        <select
-          id="pref-citation-style"
-          value={settings.preferredCitationStyle}
-          onChange={(e) => updateSetting("preferredCitationStyle", e.target.value as AskScholarUserSettings["preferredCitationStyle"])}
-          className="w-full px-2.5 py-1.5 rounded-lg bg-neutral-50 dark:bg-ink-900 border border-neutral-200 dark:border-white/15 text-neutral-900 dark:text-neutral-100 text-xs"
-        >
-          {ASK_SCHOLAR_CITATION_STYLES.map((st) => (
-            <option key={st.id} value={st.id}>
-              {st.name}
-            </option>
-          ))}
-        </select>
-      </div>
 
       {/* 2. Preferred Academic Discipline */}
       <div className="space-y-1">
@@ -158,7 +139,7 @@ export function AskScholarSettingsPopover({
               onClick={() => updateSetting("answerLengthPreference", len)}
               className={`py-1.5 rounded-lg text-[11px] font-semibold capitalize border transition-colors cursor-pointer ${
                 settings.answerLengthPreference === len
-                  ? "bg-indigo-600 text-white border-indigo-600"
+                  ? "bg-neutral-900 text-white border-neutral-900 dark:bg-white dark:text-neutral-900 dark:border-white"
                   : "bg-neutral-50 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-white/10"
               }`}
             >
@@ -185,7 +166,7 @@ export function AskScholarSettingsPopover({
           type="button"
           data-testid="import-references-btn"
           onClick={handleImport}
-          className="w-full inline-flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors cursor-pointer"
+          className="w-full inline-flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold bg-neutral-900 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200 transition-colors cursor-pointer"
         >
           <Upload className="w-3.5 h-3.5" />
           <span>Import to Knowledge Vault</span>
@@ -208,7 +189,7 @@ export function AskScholarSettingsPopover({
         aria-label="AskScholar preferences and reference import"
         onClick={() => setOpen((v) => !v)}
         className="inline-flex min-h-10 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-xs font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-500 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white sm:min-h-8 min-w-10 sm:min-w-8"
-        title="Research preferences (Citation style, Discipline, Answer length, Export format & Reference import)"
+        title="Research preferences: discipline, answer length and reference import"
       >
         <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
         <span className="hidden sm:inline">Preferences</span>

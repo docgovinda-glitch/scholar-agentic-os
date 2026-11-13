@@ -1,9 +1,9 @@
 import { test, expect, type Page, type Browser } from "@playwright/test";
 import { AUTH_FILES } from "./authFiles";
 
-// Runs LAST (files run in name order, one worker): signing out revokes every
-// session of account A, including the saved session the other signed-in
-// specs (signed-in, workspaces) use.
+// Runs LAST as its own Playwright project ("sign-out", which depends on every other
+// project): signing out revokes every session of account A, including the saved
+// session the other signed-in specs (signed-in, workspaces) use.
 const A = { email: process.env.E2E_A_EMAIL, password: process.env.E2E_A_PASSWORD };
 test.skip(!A.email || !A.password, "E2E_A_* test account not configured");
 
