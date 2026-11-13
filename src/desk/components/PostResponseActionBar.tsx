@@ -34,26 +34,26 @@ export interface ContinueWorkspaceOption {
 export const CONTINUE_WORKSPACE_OPTIONS: ContinueWorkspaceOption[] = [
   {
     id: "OT-01",
-    label: "Assignment",
-    description: "Essays, literature reviews, case studies & problem sets",
+    label: "Coursework & Essays",
+    description: "Brief, sub-questions, sources and section-by-section drafting",
     icon: GraduationCap,
   },
   {
     id: "OT-10",
     label: "Journal Article",
-    description: "IMRaD empirical & theoretical manuscripts with peer review",
+    description: "IMRaD manuscript with literature synthesis and peer-review readiness",
     icon: BookOpen,
   },
   {
     id: "OT-15",
     label: "Research Proposal",
-    description: "Grant proposals, thesis proposals & methodology protocols",
+    description: "Question, gap analysis, framework and methodology",
     icon: FileSearch,
   },
   {
     id: "OT-22",
-    label: "Presentation",
-    description: "Academic slide decks with speaker notes & cited slides",
+    label: "Slides & Keynotes",
+    description: "Outline, design, edit and deliver a slide deck",
     icon: Presentation,
   },
 ];
@@ -257,7 +257,7 @@ export function PostResponseActionBar({
           }}
           aria-expanded={continueOpen}
           className="inline-flex min-h-10 min-w-10 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-500 disabled:opacity-50 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white sm:min-h-8 sm:min-w-8"
-          title="Continue in an academic workspace (Assignment, Journal Article, Research Proposal, or Presentation)"
+          title="Continue in a workspace (Coursework & Essays, Journal Article, Research Proposal, or Slides & Keynotes)"
         >
           <ArrowRightCircle className="w-3.5 h-3.5" />
           <span className="hidden sm:inline">Continue</span>

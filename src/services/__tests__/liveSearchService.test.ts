@@ -6,9 +6,6 @@ import {
   formatLiveSearchGroundingContext,
   injectLiveGrounding,
   injectLiveGroundingToSystemPrompt,
-  getLiveSearchGroundingEnabled,
-  setLiveSearchGroundingEnabled,
-  onLiveSearchGroundingChange,
   executeLiveSearch,
   executeLiveSearchWithTelemetry,
   type LiveSearchResult,
@@ -125,27 +122,6 @@ describe("Live Web & Scholarly Search Service (Multi-Provider & CSL-JSON Verifie
       const updated = injectLiveGroundingToSystemPrompt(original, mockResults, "2026-10-23");
       expect(updated.startsWith("You are a research copilot.\n\n[Live Web Grounding Context")).toBe(true);
       expect(updated).toContain("[Grounding Instructions]: Ground your response exclusively");
-    });
-  });
-
-  describe("User Toggle State & Sync", () => {
-    it("defaults to false when unconfigured", () => {
-      expect(getLiveSearchGroundingEnabled()).toBe(false);
-    });
-
-    it("persists toggle state and dispatches change events", () => {
-      const listener = vi.fn();
-      const unsubscribe = onLiveSearchGroundingChange(listener);
-
-      setLiveSearchGroundingEnabled(true);
-      expect(getLiveSearchGroundingEnabled()).toBe(true);
-      expect(listener).toHaveBeenCalledWith(true);
-
-      setLiveSearchGroundingEnabled(false);
-      expect(getLiveSearchGroundingEnabled()).toBe(false);
-      expect(listener).toHaveBeenCalledWith(false);
-
-      unsubscribe();
     });
   });
 

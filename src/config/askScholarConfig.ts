@@ -327,24 +327,6 @@ export const DISCIPLINE_PROFILES: Record<AskScholarDisciplineId, DisciplineProfi
   },
 };
 
-/**
- * Priority Hierarchy of Source Types (Section 7).
- */
-export const SOURCE_TYPE_PRIORITY_WEIGHTS: Record<string, number> = {
-  "systematic review": 100,
-  "clinical guideline": 98,
-  "peer-reviewed article": 95,
-  "academic monograph": 93,
-  "primary legal source": 93,
-  "government report": 90,
-  "conference paper": 86,
-  "institutional report": 84,
-  "book chapter": 82,
-  "working paper": 75,
-  "official web source": 72,
-  "preprint": 62,
-};
-
 export interface PromptClassification {
   discipline: AskScholarDisciplineId;
   disciplineProfile: DisciplineProfile;

@@ -1,4 +1,3 @@
-import { AiModelSwitcher } from "./ai/AiModelSwitcher";
 import React, { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
@@ -2864,8 +2863,7 @@ export default function ProjectListScreen({
 
           {/* Top Bar Right: AI Assistant Toggle & Active Provider Status */}
           <div className="flex items-center gap-2.5">
-            {/* Active AI Status Pill */}
-            {userEmail && <AiModelSwitcher workspace="ask-scholar" className="hidden sm:block" />}
+            {/* One AI status: the server-verified connection. Models are chosen in AI Access. */}
             {userEmail ? (
               <button
                 type="button"
@@ -2879,19 +2877,13 @@ export default function ProjectListScreen({
                     : "border-neutral-200 dark:border-white/10 bg-neutral-100/80 dark:bg-white/5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200/70 dark:hover:bg-white/10"
                   }`}
                 title="AI Access • Click to configure"
+                aria-label={`AI status: ${aiPillLabel}`}
                 data-testid="active-ai-pill"
               >
                 {/* Only an AI that is actually connected is shown as active; a saved
                     preference with no key behind it is not. */}
                 <span className={`w-1.5 h-1.5 rounded-full ${aiStatus?.connected ? "bg-emerald-500 animate-pulse" : "bg-neutral-400"}`} />
-                <span>
-                  {aiStatus?.connected
-                    ? `AI: ${aiStatus.providers?.[0]?.name || aiStatus.provider || activeProviderLabel}`
-                    : aiStatus
-                      ? "Connect an AI"
-                      : "Checking AI…"}
-                </span>
-                <span className="text-[10px] opacity-70">↗</span>
+                <span>{aiPillLabel}</span>
               </button>
             ) : (
               <button
