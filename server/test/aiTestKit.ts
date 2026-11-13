@@ -2,8 +2,16 @@ import { configureRouterBridge } from "../src/ai/routerBridge.ts";
 import { CircuitBreaker, MemoryBreakerStore } from "../../src/platform/router/circuitBreaker.ts";
 import type { AdapterChunk, ProviderAdapter } from "../../src/platform/router/types.ts";
 
+const ROUTER_ID: Record<string, string> = { gemini: "google", claude: "anthropic" };
+
+/** The `x-ai-keyring` header a client sends for one connected AI. */
+export function keyringHeader(provider: string, model = "test-model", apiKey?: string, baseUrl?: string): Record<string, string> {
+  const entry = { provider: ROUTER_ID[provider] ?? provider, model, ...(apiKey ? { apiKey } : {}), ...(baseUrl ? { baseUrl } : {}) };
+  return { "x-ai-keyring": Buffer.from(JSON.stringify([entry])).toString("base64url") };
+}
+
 /** One connected cloud AI, as a request carries it. */
-export const AI_HEADERS = { "x-ai-provider": "openai", "x-ai-api-key": "sk-test", "x-ai-model": "test-model" } as const;
+export const AI_HEADERS = keyringHeader("openai", "test-model", "sk-test");
 
 /**
  * Provider adapter that answers from `global.fetch`, so a route test can keep

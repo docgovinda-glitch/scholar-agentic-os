@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { keyringHeader } from "../../test/aiTestKit.ts";
 
 export const TEST_USER_ID = "11111111-1111-4111-8111-111111111111";
 vi.mock("../../src/middleware/auth.ts", () => ({
@@ -15,7 +16,7 @@ import { __resetRateLimitStore } from "../../src/middleware/rateLimit.ts";
 import { __setEnabledOutputTypesForTests } from "../outputTypeAccess.ts";
 import { scholarBrain } from "../../src/services/scholarBrain.ts";
 
-const AI = { "x-ai-provider": "openai", "x-ai-api-key": "sk-test-not-real" };
+const AI = keyringHeader("openai", "test-model", "sk-test-not-real");
 
 function mockBrain(parsedJson: unknown) {
   return vi.spyOn(scholarBrain, "complete").mockResolvedValue({

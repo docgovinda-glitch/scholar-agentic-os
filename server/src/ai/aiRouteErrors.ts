@@ -4,7 +4,7 @@ import type { Response } from "express";
 export class NoClientAiProviderError extends Error {
   constructor() {
     super(
-      "Client-Owned AI Routing Required: No active transient AI credentials detected in request headers (x-ai-provider, x-ai-api-key, or local base URL). Server-side fallback keys are strictly prohibited."
+      "Client-Owned AI Routing Required: no AI connection (x-ai-keyring) was sent with this request. Server-side fallback keys are strictly prohibited."
     );
     this.name = "NoClientAiProviderError";
   }

@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
+import { keyringHeader } from "../../test/aiTestKit.ts";
 
 const TEST_USER_ID = "44444444-4444-4444-8444-444444444444";
 vi.mock("../../src/middleware/auth.ts", () => ({
@@ -28,7 +29,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const LOCAL = { "x-ai-provider": "ollama", "x-ai-base-url": "http://localhost:11434" };
+const LOCAL = keyringHeader("ollama", "test-model", undefined, "http://localhost:11434");
 
 describe("local models are never called from a deployed server", () => {
   it("is reachable in development and tests, not in production", () => {

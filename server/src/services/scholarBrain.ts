@@ -2,8 +2,7 @@
  * Central scholarBrain Orchestrator
  *
  * Core engine unifying all 5 Scholar OS workspaces:
- * 1. Unified Client-Owned AI Execution: Resolves transient client headers (x-ai-provider,
- *    x-ai-model, x-ai-api-key, x-ai-base-url) with zero hardcoded models and zero server keys.
+ * 1. Unified Client-Owned AI Execution: Resolves the request's x-ai-keyring header with zero hardcoded models and zero server keys.
  * 2. Unified Live Scholarly & Vault Discovery: Queries OpenAlex, Crossref, EuropePMC/PubMed,
  *    arXiv, and project Knowledge Vault + uploaded primary user datasets ([CITE:src_id] / [CITE:user_data_id]).
  * 3. Unified Citation Lock & Chronological Scrubber: Strips hallucinated (Author, Year) strings

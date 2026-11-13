@@ -33,3 +33,6 @@ drop table if exists public.provider_health cascade;
 
 -- A connection is Local or BYOK. "free" folded into BYOK: a free-tier key is still the user's own key.
 update public.user_ai_connections set tier = 'byok' where tier = 'free';
+
+alter table public.user_ai_connections drop constraint if exists user_ai_connections_tier_check;
+alter table public.user_ai_connections add constraint user_ai_connections_tier_check check (tier in ('local', 'byok'));

@@ -56,11 +56,6 @@ describe("existing AI steps through the router", () => {
     expect(JSON.stringify(res.body)).not.toContain(SECRET);
   });
 
-  it("legacy single-provider headers still work (gemini → google)", async () => {
-    const res = await request(app()).post("/step").set({ "x-ai-provider": "gemini", "x-ai-model": "flash-x", "x-ai-api-key": SECRET }).send({});
-    expect(res.body.text).toBe("ok from flash-x");
-    expect(calls).toEqual(["google:flash-x"]);
-  });
 
   it("no AI connected keeps the browser hand-off (426 with a signed challenge)", async () => {
     const res = await request(app()).post("/step").send({});
@@ -72,7 +67,7 @@ describe("existing AI steps through the router", () => {
   it("a provider failure is never silently handed to the browser: all keys failing is an error", async () => {
     const res = await request(app()).post("/step").set("x-ai-keyring", ring([{ provider: "openai", model: "bad-only", apiKey: SECRET }])).send({});
     expect(res.status).toBe(502);
-    expect(res.body.error).toMatch(/All models failed.*Overloaded/);
+    expect(res.body.error).toMatch(/All connected AI models failed.*Overloaded/);
   });
 
   it("on a deployed server, a local model next in line is handed to the browser", async () => {
@@ -91,7 +86,7 @@ describe("existing AI steps through the router", () => {
     process.env.ALLOW_SERVER_LOCAL_AI = "true";
     configureRouterBridge({ adapters: { openai: fake, lmstudio: fake } });
     try {
-      const res = await request(app()).post("/step").set({ "x-ai-provider": "lmstudio", "x-ai-model": "stub" }).send({});
+      const res = await request(app()).post("/step").set("x-ai-keyring", ring([{ provider: "lmstudio", model: "stub" }])).send({});
       expect(res.status).toBe(200);
       expect(res.body.text).toBe("ok from stub");
       expect(res.body.aiRoute.answeredBy.lane).toBe("local");
@@ -109,14 +104,6 @@ describe("existing AI steps through the router", () => {
     expect(text).toContain('"text":"ok from good-1"');
   });
 
-  it("puts the legacy primary provider first unless the keyring already has it", () => {
-    const ring = Buffer.from(JSON.stringify([{ provider: "anthropic", model: "a1", apiKey: "k1" }])).toString("base64url");
-    const merged = keyringFromRequest({ headers: { "x-ai-keyring": ring, "x-ai-provider": "openrouter", "x-ai-model": "r1", "x-ai-api-key": "k2", "x-ai-base-url": "https://openrouter.example/api/v1" } });
-    expect(merged.map((e) => `${e.provider}:${e.model}`)).toEqual(["custom:r1", "anthropic:a1"]);
-
-    const same = keyringFromRequest({ headers: { "x-ai-keyring": ring, "x-ai-provider": "anthropic", "x-ai-model": "a1", "x-ai-api-key": "k1" } });
-    expect(same).toHaveLength(1);
-  });
 
   it("a custom local-runner address is used, not the default (P1-13)", async () => {
     const saved = process.env.ALLOW_SERVER_LOCAL_AI;
@@ -131,7 +118,7 @@ describe("existing AI steps through the router", () => {
     };
     configureRouterBridge({ adapters: { ollama: recorder } });
     try {
-      const res = await request(app()).post("/step").set({ "x-ai-provider": "ollama", "x-ai-model": "llama", "x-ai-base-url": "http://10.0.0.7:11500" }).send({});
+      const res = await request(app()).post("/step").set("x-ai-keyring", ring([{ provider: "ollama", model: "llama", baseUrl: "http://10.0.0.7:11500" }])).send({});
       expect(res.status).toBe(200);
       expect(seen).toEqual(["http://10.0.0.7:11500"]);
     } finally {

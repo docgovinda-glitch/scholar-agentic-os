@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { keyringHeader } from "../../test/aiTestKit.ts";
 import type { Response } from "express";
 
 export const TEST_USER_ID = "22222222-2222-4222-8222-222222222222";
@@ -449,8 +450,7 @@ describe("Batch 2: Multi-Chapter Gating in Thesis Workspace (Fix 2.5)", () => {
     const auditRes = await request(app)
       .post(`/api/projects/${projectId}/thesis/chapter-audit`)
       .set("Authorization", "Bearer valid-token")
-      .set("x-ai-provider", "openai")
-      .set("x-ai-api-key", "sk-test-not-real")
+      .set(keyringHeader("openai", "test-model", "sk-test-not-real"))
       .send({
         chapters: [
           { chapterNumber: 1, title: "Introduction", wordCount: 4000, targetWordCount: 5000, status: "drafting" },

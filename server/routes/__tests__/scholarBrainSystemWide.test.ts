@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { keyringHeader } from "../../test/aiTestKit.ts";
 
 export const TEST_USER_ID = "11111111-1111-4111-8111-111111111111";
 
@@ -269,9 +270,7 @@ describe("Architectural Unification Step 2: System-Wide scholarBrain Integration
       const res = await request(app)
         .post("/api/ai/agent")
         // A real provider name: the router reads only providers it can route to.
-        .set("x-ai-provider", "openai")
-        .set("x-ai-model", "mock-model")
-        .set("x-ai-api-key", "test-key")
+        .set(keyringHeader("openai", "mock-model", "test-key"))
         .send({
           prompt: "What are the latest advances in non-Markovian quantum error mitigation?",
           vaultSources: [
@@ -303,9 +302,7 @@ describe("Architectural Unification Step 2: System-Wide scholarBrain Integration
       const completeSpy = vi.spyOn(scholarBrain, "complete").mockRejectedValue(new Error("provider 500"));
       const res = await request(app)
         .post("/api/ai/agent")
-        .set("x-ai-provider", "openai")
-        .set("x-ai-model", "mock-model")
-        .set("x-ai-api-key", "test-key")
+        .set(keyringHeader("openai", "mock-model", "test-key"))
         .send({ prompt: "Explain conformal prediction briefly.", mode: "chat" });
       expect(res.status).toBe(502);
       expect(res.body.code).toBe("ai_unavailable");
@@ -322,9 +319,6 @@ describe("Architectural Unification Step 2: System-Wide scholarBrain Integration
     it("attaches 1-click deliverable handoff payload for academic format launching", async () => {
       const res = await request(app)
         .post("/api/ai/agent")
-        .set("x-ai-provider", "mock-provider")
-        .set("x-ai-model", "mock-model")
-        .set("x-ai-api-key", "test-key")
         .send({
           prompt: "Draft an undergraduate research essay on corporate financial risk management under fluctuating interest rates.",
           mode: "chat",
@@ -355,9 +349,7 @@ describe("Architectural Unification Step 2: System-Wide scholarBrain Integration
 
       const res = await request(app)
         .post(`/api/projects/${projectId}/presentation/generate-deck`)
-        .set("x-ai-provider", "mock-provider")
-        .set("x-ai-model", "mock-model")
-        .set("x-ai-api-key", "test-key")
+        .set(keyringHeader("openai", "mock-model", "test-key"))
         .send({
           aspectRatio: "16:9",
           presentationType: "conference",
@@ -448,7 +440,7 @@ describe("Architectural Unification Step 2: System-Wide scholarBrain Integration
       burstinessMetrics: { averageLength: 18, variance: 6, burstinessScore: 0.3, isSufficientlyBurst: true },
     });
   }
-  const aiHeaders = { "x-ai-provider": "openai", "x-ai-model": "mock-model", "x-ai-api-key": "test-key" };
+  const aiHeaders = keyringHeader("openai", "mock-model", "test-key");
 
   describe("Arm 3: Research Proposal OT-19 (/study-section-simulate, /aims-audit & /draft-section)", () => {
     it("POST /study-section-simulate returns the AI panel's scores for the stored proposal", async () => {

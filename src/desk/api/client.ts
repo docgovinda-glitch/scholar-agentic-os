@@ -144,11 +144,7 @@ function sanitizeHttpHeaderValue(value: unknown): string {
 function sanitizeHttpHeaderRecord(raw: Record<string, string>): Record<string, string> {
   const clean: Record<string, string> = {};
   for (const [k, v] of Object.entries(raw)) {
-    const rawVal =
-      typeof v === "string" && k.toLowerCase() === "x-ai-model"
-        ? v.split(/\s*(?:—|–|\u2014|\u2013|--)\s*/)[0]
-        : v;
-    const cleanVal = sanitizeHttpHeaderValue(rawVal);
+    const cleanVal = sanitizeHttpHeaderValue(v);
     if (cleanVal) {
       clean[k] = cleanVal;
     }

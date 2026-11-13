@@ -51,38 +51,9 @@ interface BridgeDeps { adapters: Partial<Record<ProviderId, ProviderAdapter>>; b
 let deps: BridgeDeps = { adapters: serverAdapters(), breaker: new CircuitBreaker(new MemoryBreakerStore()) };
 export function configureRouterBridge(next: Partial<BridgeDeps>): void { deps = { ...deps, ...next }; }
 
-const PROVIDER_ALIAS: Record<string, ProviderId> = { custom: "custom", gemini: "google", google: "google", openai: "openai", anthropic: "anthropic", claude: "anthropic", groq: "groq", deepseek: "deepseek", mistral: "mistral", ollama: "ollama", lmstudio: "lmstudio" };
-
-/**
- * The user's AI connections for this request: the keyring, with the legacy
- * single-provider headers (the user's primary choice) first when the keyring
- * does not already hold that provider and model.
- */
+/** The user's AI connections for this request: the `x-ai-keyring` header, in the user's order. */
 export function keyringFromRequest(req: { headers?: Request["headers"] }): KeyringEntry[] {
-  const headers = req.headers ?? {};
-  const ring = parseKeyring(headers["x-ai-keyring"]);
-  const legacy = legacyEntry(headers);
-  if (!legacy) return ring;
-  if (ring.some((e) => e.provider === legacy.provider && e.model === legacy.model)) return ring;
-  return [legacy, ...ring].slice(0, 8);
-}
-
-function legacyEntry(headers: Request["headers"]): KeyringEntry | undefined {
-  const h = (n: string) => {
-    const v = headers[n];
-    if (typeof v !== "string" || !v) return undefined;
-    const clean = v.replace(/[^\x20-\x7E]/g, "").trim();
-    return clean || undefined;
-  };
-  const named = h("x-ai-provider");
-  // Any other provider name with an endpoint is read as an OpenAI-compatible endpoint.
-  const provider = PROVIDER_ALIAS[named ?? ""] ?? (named && h("x-ai-base-url") ? "custom" : undefined);
-  // A local runner may arrive without a model: the browser picks one on hand-off.
-  const rawModel = h("x-ai-model")?.split(/\s*(?:—|–|\u2014|\u2013)\s*/)[0]?.trim();
-  // A local runner may arrive without a model: "auto" lets the browser pick one on hand-off.
-  const model = (rawModel && !/\s/.test(rawModel) ? rawModel : undefined) ?? (provider === "ollama" || provider === "lmstudio" ? "auto" : undefined);
-  if (!provider || !model) return undefined;
-  return { provider, model, apiKey: h("x-ai-api-key"), baseUrl: h("x-ai-base-url") };
+  return parseKeyring(req.headers?.["x-ai-keyring"]);
 }
 
 type Scoped = Request & { user?: { id: string }; aiRoute?: AiRouteSummary };

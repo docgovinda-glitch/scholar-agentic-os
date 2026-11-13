@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { keyringHeader } from "../../test/aiTestKit.ts";
 import request from "supertest";
 import {
   getCandidates,
@@ -40,9 +41,7 @@ describe("Strict Client-Owned BYOK Architecture Tests", () => {
     it("GET /api/ai/status reports BYOK tier and active model if provided via headers", async () => {
       const res = await request(app)
         .get("/api/ai/status")
-        .set("x-ai-provider", "anthropic")
-        .set("x-ai-model", "claude-3-7-sonnet-20250219")
-        .set("x-ai-api-key", "sk-ant-test-key-1234");
+        .set(keyringHeader("anthropic", "claude-3-7-sonnet-20250219", "sk-ant-test-key-1234"));
 
       expect(res.status).toBe(200);
       expect(res.body.tier).toBe("byok");

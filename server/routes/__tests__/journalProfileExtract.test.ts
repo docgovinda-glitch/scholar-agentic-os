@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { keyringHeader } from "../../test/aiTestKit.ts";
 
 const TEST_USER_ID = "11111111-1111-4111-8111-111111111111";
 vi.mock("../../src/middleware/auth.ts", () => ({
@@ -26,7 +27,7 @@ import { app } from "../../../server.ts";
 import { __resetProjectStoreForTests } from "../../../src/app/conductor/projectStore.ts";
 import { getProjectStore, type ProjectRecord } from "../../../src/services/store/projectStore.ts";
 
-const AI_HEADERS = { "x-ai-provider": "openai", "x-ai-model": "gpt-4o-mini", "x-ai-api-key": "test-key" };
+const AI_HEADERS = keyringHeader("openai", "gpt-4o-mini", "test-key");
 const GUIDELINES = `Journal of Quantum Systems guide for authors. Research Articles should not exceed 6,000 words, excluding references and figure legends.
 Manuscripts are organised as Introduction, Methods, Results and Discussion. References follow the IEEE numbered style.
 All submissions must include a Data Availability statement and a declaration of competing interests before review can begin.`;
