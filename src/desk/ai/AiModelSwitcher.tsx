@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, RefreshCw } from "lucide-react";
+import { connectionsNeedingModel } from "./keyring";
 import { activeConnection, clearModelCache, fetchLiveModels, recommendFor, selectModel, type ProviderModels, type WorkspaceId } from "./modelChoices";
 import type { KeyringEntry } from "./keyring";
 
@@ -14,10 +15,12 @@ export function AiModelSwitcher({ workspace, className = "" }: { workspace: Work
   const [providers, setProviders] = useState<ProviderModels[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [needsModel, setNeedsModel] = useState<string[]>([]);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     activeConnection().then(setActive).catch(() => setActive(undefined));
+    connectionsNeedingModel().then(setNeedsModel).catch(() => setNeedsModel([]));
   }, []);
 
   useEffect(() => {
@@ -44,10 +47,11 @@ export function AiModelSwitcher({ workspace, className = "" }: { workspace: Work
     const r = await selectModel(provider, model);
     if (!r.ok) { setError(r.error ?? "Could not save your choice."); return; }
     setActive(await activeConnection());
+    setNeedsModel(await connectionsNeedingModel().catch(() => []));
     setOpen(false);
   }
 
-  const label = active ? `${active.model}` : "No AI connected";
+  const label = active ? `${active.model}` : needsModel.length ? "Choose a model" : "No AI connected";
 
   return (
     <div className={`relative ${className}`} ref={ref}>
@@ -71,6 +75,11 @@ export function AiModelSwitcher({ workspace, className = "" }: { workspace: Work
               <RefreshCw className={`w-3 h-3 ${loading ? "animate-spin" : ""}`} aria-hidden="true" />
             </button>
           </div>
+          {needsModel.length > 0 && (
+            <p role="status" className="text-xs text-[color:var(--state-warning)]">
+              {needsModel.join(", ")} {needsModel.length === 1 ? "is" : "are"} connected but not used yet: pick a model below.
+            </p>
+          )}
           {error && <p role="alert" className="text-xs text-[color:var(--state-danger)]">{error}</p>}
           {loading && !providers && <p className="text-xs text-[color:var(--text-muted)]" role="status">Loading the models your providers offer…</p>}
           {providers && providers.length === 0 && <p className="text-xs text-[color:var(--text-muted)]">No cloud provider is connected. Local models are chosen in AI Access.</p>}

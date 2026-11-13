@@ -3,6 +3,8 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
+// The test scripts the server's answers in order; an account key sync would consume one of them.
+vi.mock('../../../../desk/aiAccess/accountKeys', () => ({ syncKeysWithAccount: vi.fn(async () => null) }));
 import Step01Understand from '../Step01Understand';
 import type { SlideDeck } from '../../types/slides';
 import { getCardContent } from '../../gamma/content';
