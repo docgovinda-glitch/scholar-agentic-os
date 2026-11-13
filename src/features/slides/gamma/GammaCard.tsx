@@ -2,7 +2,8 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import type { SlideCard } from '../types/slides';
 import { getCardContent, resolveLayout } from './content';
 import { CANVAS_H, CANVAS_W, computeCardGeometry, type CardElement, type CardGeometry, type TextEl } from './geometry';
-import { WEB_FONTS, type DeckTheme } from './theme';
+import { WEB_FONTS, cardShadowCss, deckThemeCssVars, type DeckTheme } from './theme';
+import { slideIcon } from './icons';
 import { resetMeasureCache } from './measure';
 
 /* ------------------------------------------------------------------------ */
@@ -91,7 +92,9 @@ function TextBox({ el, editable, accent, onEdit }: EditableProps) {
     left: el.x,
     top: el.y,
     width: el.w,
-    minHeight: el.h,
+    minHeight: el.clipped ? undefined : el.h,
+    height: el.clipped ? el.h : undefined,
+    overflow: el.clipped ? 'hidden' : undefined,
     fontFamily: WEB_FONTS[el.font],
     fontSize: el.size,
     fontWeight: el.weight,
@@ -154,8 +157,23 @@ function TextBox({ el, editable, accent, onEdit }: EditableProps) {
   );
 }
 
-function ElementView({ el, editable, accent, onEdit }: { el: CardElement; editable: boolean; accent: string; onEdit?: (p: string, v: string) => void }) {
+function IconView({ el }: { el: Extract<CardElement, { kind: 'icon' }> }) {
+  const Icon = slideIcon(el.name);
+  return (
+    <Icon
+      aria-hidden
+      size={el.size}
+      color={el.color}
+      strokeWidth={el.strokeWidth}
+      style={{ position: 'absolute', left: el.x, top: el.y, width: el.size, height: el.size }}
+    />
+  );
+}
+
+function ElementView({ el, editable, accent, shadow, onEdit }: { el: CardElement; editable: boolean; accent: string; shadow?: string; onEdit?: (p: string, v: string) => void }) {
   switch (el.kind) {
+    case 'icon':
+      return <IconView el={el} />;
     case 'text':
       return <TextBox el={el} editable={editable} accent={accent} onEdit={onEdit} />;
     case 'rect':
@@ -164,7 +182,8 @@ function ElementView({ el, editable, accent, onEdit }: { el: CardElement; editab
           aria-hidden
           style={{
             position: 'absolute', left: el.x, top: el.y, width: el.w, height: el.h, background: el.fill ?? 'transparent',
-            borderRadius: el.radius, boxShadow: el.stroke ? `inset 0 0 0 ${el.strokeWidth ?? 1}px ${el.stroke}` : undefined,
+            borderRadius: el.radius,
+            boxShadow: [el.stroke ? `inset 0 0 0 ${el.strokeWidth ?? 1}px ${el.stroke}` : '', el.shadow && shadow ? shadow : ''].filter(Boolean).join(', ') || undefined,
           }}
         />
       );
@@ -224,6 +243,7 @@ export interface GammaCardProps {
 
 export function GammaCard({ geometry, theme, editable = false, onEdit, scale: fixedScale, className, rounded = true, shadow = false, ...rest }: GammaCardProps) {
   const { ref, scale } = useStageScale(fixedScale);
+  const cardShadow = cardShadowCss(theme);
   return (
     <div
       ref={ref}
@@ -231,6 +251,7 @@ export function GammaCard({ geometry, theme, editable = false, onEdit, scale: fi
       data-testid={rest['data-testid']}
       data-layout={geometry.layout}
       style={{
+        ...(deckThemeCssVars(theme) as React.CSSProperties),
         position: 'relative',
         width: fixedScale !== undefined ? CANVAS_W * fixedScale : '100%',
         aspectRatio: '16 / 9',
@@ -261,9 +282,21 @@ export function GammaCard({ geometry, theme, editable = false, onEdit, scale: fi
         {geometry.elements.map((el, i) => (
           // Text is part of the key so an edited contentEditable box remounts
           // with React-owned DOM instead of the user-mutated nodes.
-          <ElementView key={`${i}-${el.kind}-${el.kind === 'text' ? `${el.path ?? ''}:${el.text}` : ''}`} el={el} editable={editable} accent={theme.accent} onEdit={onEdit} />
+          <ElementView key={`${i}-${el.kind}-${el.kind === 'text' ? `${el.path ?? ''}:${el.text}` : ''}`} el={el} editable={editable} accent={theme.accent} shadow={cardShadow} onEdit={onEdit} />
         ))}
       </div>
+      {editable && geometry.overflow && (
+        <div
+          role="status"
+          data-testid="gamma-overflow-hint"
+          style={{
+            position: 'absolute', right: 10, bottom: 10, padding: '4px 10px', borderRadius: 999, fontSize: 12, fontWeight: 600,
+            fontFamily: WEB_FONTS.sans, background: theme.text, color: theme.bg, pointerEvents: 'none',
+          }}
+        >
+          Too much text for this layout: shorten it or switch layout
+        </div>
+      )}
     </div>
   );
 }

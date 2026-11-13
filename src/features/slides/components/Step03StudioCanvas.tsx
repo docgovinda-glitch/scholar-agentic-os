@@ -8,6 +8,7 @@
  * PowerPoint show.
  */
 import { SlideLayoutSwitcher, AddBlockMenu } from './StudioBlockTools';
+import { LAYOUT_UNIT_LIMIT } from '../../../domain/presentation/slideSchema';
 import { addBlock, contentContext, BLOCK_SPECS, type BlockKind, type BlockFill } from '../gamma/blocks';
 import { authedJsonFetch } from '../../../desk/api';
 import { imageFileToDataUrl } from '../gamma/imageFile';
@@ -20,7 +21,6 @@ import type { CardContent, GammaLayout, SlideCard, SlideDeck } from '../types/sl
 import InSlidePromptCopilot from './InSlidePromptCopilot';
 import { GammaSlide } from '../gamma/GammaCard';
 import {
-  GAMMA_LAYOUTS,
   createBlankCard,
   editSlideContent,
   getCardContent,
@@ -62,7 +62,7 @@ function adjustContent(content: CardContent, layout: GammaLayout, delta: 1 | -1)
     else stats.pop();
     return { ...c, stats };
   }
-  if (layout === 'comparison' && c.columns) {
+  if ((layout === 'comparison' || layout === 'problem-solution' || layout === 'table') && c.columns) {
     const [l, r] = c.columns;
     const left = { ...l, points: [...l.points] };
     const right = { ...r, points: [...r.points] };
@@ -76,7 +76,7 @@ function adjustContent(content: CardContent, layout: GammaLayout, delta: 1 | -1)
     return { ...c, columns: [left, right] };
   }
   const items = [...c.items];
-  if (delta > 0) items.push({ title: 'New point', body: layout === 'list' || layout === 'bento' || layout === 'timeline' ? 'Add a supporting detail' : undefined });
+  if (delta > 0) items.push({ title: 'New point', body: layout === 'list' || layout === 'bento' || layout === 'timeline' || layout === 'grid3' || layout === 'grid4' || layout === 'takeaways' ? 'Add a supporting detail' : undefined });
   else items.pop();
   return { ...c, items };
 }
@@ -84,12 +84,12 @@ function adjustContent(content: CardContent, layout: GammaLayout, delta: 1 | -1)
 function unitCount(content: CardContent, layout: GammaLayout): number {
   const c = reflowContent(content, layout);
   if (layout === 'stats') return c.stats.length;
-  if (layout === 'comparison') return Math.max(c.columns?.[0].points.length ?? 0, c.columns?.[1].points.length ?? 0);
+  if (layout === 'comparison' || layout === 'problem-solution' || layout === 'table') return Math.max(c.columns?.[0].points.length ?? 0, c.columns?.[1].points.length ?? 0);
   return c.items.length;
 }
 
 
-const UNIT_LIMIT: Partial<Record<GammaLayout, number>> = { bento: 6, stats: 4, timeline: 5, comparison: 6, list: 6, split: 4 };
+const UNIT_LIMIT = LAYOUT_UNIT_LIMIT;
 
 interface ThumbProps {
   slide: SlideCard;

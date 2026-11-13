@@ -4,6 +4,7 @@
  * and may be filled by "Write with AI".
  */
 import type { CardContent, GammaLayout } from '../types/slides';
+import { SLIDE_LAYOUTS } from '../../../domain/presentation/slideSchema';
 
 export type BlockKind = 'insight' | 'column' | 'diagram' | 'evidence' | 'media' | 'metric';
 
@@ -82,16 +83,8 @@ export function addBlock(content: CardContent, layout: GammaLayout, kind: BlockK
   }
 }
 
-/** The seven named layouts offered above the active slide. */
-export const LAYOUT_SWITCHER: Array<{ id: GammaLayout; label: string }> = [
-  { id: 'title', label: 'Hero / Title' },
-  { id: 'comparison', label: '2-Column Comparison' },
-  { id: 'bento', label: '3-Card Feature Grid' },
-  { id: 'timeline', label: 'Process / Stepper Flow' },
-  { id: 'split', label: 'Split Visual + Key Insights' },
-  { id: 'table', label: 'Comparison Table' },
-  { id: 'list', label: 'Summary & Takeaways' },
-];
+/** Every layout, offered above the active slide (order and labels from the shared schema). */
+export const LAYOUT_SWITCHER: Array<{ id: GammaLayout; label: string }> = SLIDE_LAYOUTS.map(({ id, label }) => ({ id, label }));
 
 /** All visible text of a card, as context for the AI. */
 export function contentContext(c: CardContent): string {

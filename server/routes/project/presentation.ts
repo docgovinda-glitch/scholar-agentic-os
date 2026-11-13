@@ -34,6 +34,7 @@ import {
   PresentationDeckRow,
 } from "../presentations.ts";
 import { parseGammaCard, GAMMA_LAYOUT_IDS, type GammaCardPayload } from "./presentationCards.ts";
+import { copyLimitsPromptGuide, layoutPromptGuide } from "../../../src/domain/presentation/slideSchema.ts";
 
 const router = Router({ mergeParams: true });
 
@@ -512,19 +513,14 @@ Write a ${requestedSlides}-card deck for the given topic and material.
 Narrative: open with a title card, establish the problem or question, explain the key ideas and how they work, present the evidence, compare perspectives or options where relevant, and close with implications or a single takeaway.
 
 For every card choose the layout that fits its content and vary layouts across the deck:
-- "title": the opening card.
-- "bento": 3-6 parallel ideas (items with a short title and one-line body).
-- "stats": 1-4 headline figures (stats with value, label, optional detail). ONLY use figures that appear in the provided material. Never invent numbers, percentages, p-values or sample sizes.
-- "timeline": 3-5 ordered steps or phases (items).
-- "comparison": two sides, options or perspectives (columns: exactly 2, each with title and 2-5 points).
-- "list": 2-5 key points beside the headline (items).
-- "quote": a real quotation from the material (quote.text, quote.attribution). Never invent quotations.
-- "split": a case or example with 2-4 items.
-- "statement": one idea, centred (headline + optional lede).
+${layoutPromptGuide()}
+Never invent numbers, percentages, p-values, sample sizes or quotations.
 
 Writing rules (assertion-evidence design):
 - Headline: one clear academic assertion in at most 12 words that states the point of the card, or a structured title for the opening card. Never a question copied from the brief and never an institution banner or module code.
-- Body blocks: crisp, scannable cards. Item titles max 8 words; each body 15-30 words, concrete and specific. No filler, no clichés ("delve", "tapestry", "testament", "underscores", "pivotal"), no raw prompt text.
+- Body blocks: crisp, scannable cards, concrete and specific. No filler, no clichés ("delve", "tapestry", "testament", "underscores", "pivotal"), no raw prompt text.
+- Copy limits (hard: text over them is cut):
+${copyLimitsPromptGuide()}
 - Cite only sources present in the material. If the material lacks evidence, write the card as a clear prompt for the author instead of inventing it.
 - Speaker notes: 60-120 words of natural spoken delivery in the first person plural or singular, with a brief transition to the next card. Not a re-read of the slide.
 - When an outline is given, write exactly one card per outline entry, in order, using the suggested visual type to choose the layout.
@@ -546,8 +542,8 @@ Output strict JSON only:
         "layout": "${GAMMA_LAYOUT_IDS.join('" | "')}",
         "eyebrow": "2-3 word section label",
         "lede": "string or null",
-        "items": [{ "title": "string", "body": "string" }],
-        "stats": [{ "value": "string", "label": "string", "detail": "source or context" }],
+        "items": [{ "title": "string", "body": "string", "icon": "icon name or null" }],
+        "stats": [{ "value": "string", "label": "string", "detail": "source or context", "trend": "up" | "down" | "neutral" | null }],
         "columns": [{ "title": "string", "points": ["string"] }, { "title": "string", "points": ["string"] }],
         "quote": { "text": "string", "attribution": "string" },
         "takeaway": "string or null"

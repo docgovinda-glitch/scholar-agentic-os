@@ -20,19 +20,9 @@ import type {
   SlideCard,
   SlideLayoutType,
 } from '../types/slides';
+import { SLIDE_LAYOUTS, STAT_TRENDS, type StatTrend } from '../../../domain/presentation/slideSchema';
 
-export const GAMMA_LAYOUTS: Array<{ id: GammaLayout; label: string; hint: string }> = [
-  { id: 'title', label: 'Title', hint: 'Cover card with a big headline' },
-  { id: 'bento', label: 'Bento grid', hint: 'Feature card plus supporting tiles' },
-  { id: 'stats', label: 'Big numbers', hint: 'Metric callouts' },
-  { id: 'timeline', label: 'Timeline', hint: 'Process or phases in order' },
-  { id: 'comparison', label: 'Comparison', hint: 'Two sides, side by side' },
-  { id: 'table', label: 'Table', hint: 'Rows compared across two columns' },
-  { id: 'list', label: 'Key points', hint: 'Numbered rows beside the headline' },
-  { id: 'split', label: 'Image + text', hint: 'Visual panel beside the story' },
-  { id: 'quote', label: 'Quote', hint: 'Evidence or a citation, large' },
-  { id: 'statement', label: 'Statement', hint: 'One idea, centred' },
-];
+export const GAMMA_LAYOUTS: Array<{ id: GammaLayout; label: string; hint: string }> = SLIDE_LAYOUTS.map(({ id, label, hint }) => ({ id, label, hint }));
 
 const GAMMA_SET = new Set<string>(GAMMA_LAYOUTS.map((l) => l.id));
 
@@ -71,6 +61,10 @@ function toList(value: unknown): string[] {
       .filter(Boolean);
   }
   return [];
+}
+
+function toTrend(value: unknown): StatTrend | undefined {
+  return typeof value === 'string' && (STAT_TRENDS as readonly string[]).includes(value) ? (value as StatTrend) : undefined;
 }
 
 /** Very cheap stable hash for change detection. */
@@ -120,7 +114,7 @@ function deriveFromBlocks(slide: SlideCard): CardContent {
         break;
       case 'metric-callout': {
         const value = clean(block.metric) || clean(block.value);
-        if (value) stats.push({ value, label: clean(block.label) || 'Key figure', detail: clean(block.context) || undefined });
+        if (value) stats.push({ value, label: clean(block.label) || 'Key figure', detail: clean(block.context) || undefined, trend: toTrend(block.trend) });
         break;
       }
       case 'two-column': {
@@ -180,10 +174,10 @@ function sanitizeContent(raw: CardContent): CardContent {
     headline: clean(raw.headline) || 'Untitled card',
     lede: clean(raw.lede) || undefined,
     items: (Array.isArray(raw.items) ? raw.items : [])
-      .map((i) => ({ title: clean(i?.title), body: clean(i?.body) || undefined }))
+      .map((i) => ({ title: clean(i?.title), body: clean(i?.body) || undefined, icon: clean(i?.icon) || undefined }))
       .filter((i) => i.title || i.body),
     stats: (Array.isArray(raw.stats) ? raw.stats : [])
-      .map((s) => ({ value: clean(s?.value), label: clean(s?.label), detail: clean(s?.detail) || undefined }))
+      .map((s) => ({ value: clean(s?.value), label: clean(s?.label), detail: clean(s?.detail) || undefined, trend: toTrend(s?.trend) }))
       .filter((s) => s.value || s.label),
     columns:
       Array.isArray(raw.columns) && raw.columns.length === 2
@@ -274,7 +268,11 @@ export function reflowContent(content: CardContent, layout: GammaLayout): CardCo
 
   switch (layout) {
     case 'bento':
+    case 'grid3':
+    case 'grid4':
     case 'timeline':
+    case 'pyramid':
+    case 'takeaways':
     case 'list':
       next.items = itemsFrom(content);
       break;
@@ -292,6 +290,7 @@ export function reflowContent(content: CardContent, layout: GammaLayout): CardCo
       }
       break;
     case 'comparison':
+    case 'problem-solution':
     case 'table':
       if (!next.columns) {
         const items = itemsFrom(content);
@@ -324,7 +323,7 @@ export function contentToBlocks(content: CardContent): SlideBlock[] {
   ];
   if (content.stats.length) {
     for (const s of content.stats) {
-      blocks.push({ type: 'metric-callout', metric: s.value, value: s.value, label: s.label, context: s.detail });
+      blocks.push({ type: 'metric-callout', metric: s.value, value: s.value, label: s.label, context: s.detail, trend: s.trend });
     }
   }
   if (content.items.length) {

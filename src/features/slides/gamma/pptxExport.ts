@@ -12,6 +12,13 @@ import type { SlideDeck } from '../types/slides';
 import { getCardContent, resolveLayout } from './content';
 import { CANVAS_W, computeCardGeometry, type CardElement } from './geometry';
 import { PPTX_FONTS, resolveDeckTheme, type DeckTheme } from './theme';
+import { iconDataUrl } from './icons';
+
+/** PowerPoint outer shadow matching each theme shadow style. */
+const PPTX_SHADOW = {
+  soft: { type: 'outer', blur: 8, offset: 2, angle: 90, color: '171717', opacity: 0.12 },
+  lifted: { type: 'outer', blur: 16, offset: 6, angle: 90, color: '171717', opacity: 0.2 },
+} as const;
 
 const PX_PER_IN = 96; // 1280 px canvas ↔ 13.333 in LAYOUT_WIDE
 const PT_PER_PX = 0.75;
@@ -47,9 +54,13 @@ async function drawElement(pptx: PptxGenJS, slide: PptxSlide, el: CardElement, t
         fill: el.fill ? { color: hex(el.fill) } : { type: 'none' } as PptxGenJS.ShapeFillProps,
         line: el.stroke ? { color: hex(el.stroke), width: (el.strokeWidth ?? 1) * PT_PER_PX } : { type: 'none' },
         rectRadius: radius > 0 ? inch(radius) : undefined,
+        shadow: el.shadow && el.shadow !== 'none' ? { ...PPTX_SHADOW[el.shadow] } : undefined,
       });
       return;
     }
+    case 'icon':
+      slide.addImage({ data: iconDataUrl(el.name, el.color, el.strokeWidth), x: inch(el.x), y: inch(el.y), w: inch(el.size), h: inch(el.size) });
+      return;
     case 'ellipse':
       slide.addShape(pptx.ShapeType.ellipse, {
         x: inch(el.x), y: inch(el.y), w: inch(el.w), h: inch(el.h),
@@ -98,7 +109,8 @@ async function drawElement(pptx: PptxGenJS, slide: PptxSlide, el: CardElement, t
         charSpacing: el.letterSpacing ? Math.round(el.letterSpacing * PT_PER_PX * 10) / 10 : undefined,
         margin: 0,
         wrap: true,
-        fit: 'none',
+        // Text cut at the canvas edge on the web shrinks to fit in PowerPoint instead.
+        fit: el.clipped ? 'shrink' : 'none',
         paraSpaceBefore: 0,
         paraSpaceAfter: 0,
       });
