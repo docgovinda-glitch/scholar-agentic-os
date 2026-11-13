@@ -1,4 +1,9 @@
 import express from "express";
+import { exportDocument } from "../../../../src/app/export/export.ts";
+import {
+  AssignmentPdfRequestSchema,
+  buildAssignmentCanonicalDocument,
+} from "../../../../src/desk/assignment/services/assignmentDocument.ts";
 import { parseDocument } from "../../../../src/document_intelligence/index.ts";
 import {
   buildScholarlyVoiceSystemPrompt,
@@ -71,6 +76,39 @@ import {
 const router = express.Router({ mergeParams: true });
 
 // 13. POST /api/projects/:id/assignment/audit-export
+/**
+ * Stage 5 PDF: the submission rendered by the shared export pipeline
+ * (same renderer as the other workspaces), returned as a real .pdf file.
+ */
+router.post("/export-pdf", async (req: express.Request<{ id: string }>, res) => {
+  const project = await getProjectSafe(req, res);
+  if (!project) return;
+  const parsed = AssignmentPdfRequestSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Invalid export request", details: parsed.error.issues.slice(0, 5) });
+  }
+  if (!parsed.data.sections.some((s) => s.draftContent.trim())) {
+    return res.status(422).json({ error: "Nothing to export yet: draft at least one section first." });
+  }
+  try {
+    const document = buildAssignmentCanonicalDocument(parsed.data, project.projectId);
+    const result = await exportDocument({
+      document,
+      format: "pdf",
+      title: parsed.data.title,
+      author: parsed.data.studentName || undefined,
+    });
+    const safeName = parsed.data.title.replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "").slice(0, 80) || "Assignment";
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${safeName}_Submission.pdf"`);
+    res.setHeader("Cache-Control", "no-store");
+    return res.send(result.data);
+  } catch (err) {
+    console.error("Assignment PDF export failed:", err);
+    return res.status(500).json({ error: "PDF export failed. Try the Word export or the print view." });
+  }
+});
+
 router.post("/audit-export", async (req: express.Request<{ id: string }>, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;

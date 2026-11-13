@@ -39,6 +39,7 @@ import {
 } from "./referenceListGenerator";
 import { isTutorialOrShortQABrief } from "../../../utils/briefExtractor";
 import { splitProseIntoParagraphs } from "../../../shared/proseParagraphs";
+import { authedFetch } from "../../api";
 
 const ACADEMIC_LEVEL_NAMES: Record<string, string> = {
   high_school: "High school",
@@ -121,18 +122,15 @@ export function downloadBlob(blob: Blob, filename: string): void {
  * Generates an academic DOCX document compliant with university submission standards.
  */
 export async function generateAssignmentDocx(params: AssignmentExportParams): Promise<Blob> {
-  const {
-    title,
-    // Cover details are the student's own; a missing one is shown as missing, never invented.
-    studentName = "—",
-    studentId = "—",
-    institution = "",
-    courseName = params.brief.courseDetails?.courseName || "",
-    brief,
-    sections,
-    sources,
-    actualWordCount,
-  } = params;
+  const { brief, sections, sources, actualWordCount } = params;
+  // Everything interpolated into the print window is escaped (titles and cover
+  // details can come from an uploaded brief).
+  const title = escapeHtmlText(params.title);
+  // Cover details are the student's own; a missing one is shown as missing, never invented.
+  const studentName = escapeHtmlText(params.studentName || "—");
+  const studentId = escapeHtmlText(params.studentId || "—");
+  const institution = escapeHtmlText(params.institution || "");
+  const courseName = escapeHtmlText(params.courseName || params.brief.courseDetails?.courseName || "");
 
   const computedWordCount = actualWordCount ??
     sections.reduce((acc, s) => {
@@ -160,7 +158,7 @@ export async function generateAssignmentDocx(params: AssignmentExportParams): Pr
   const isTutorialOrShortQA =
     computedWordCount <= 600 ||
     (brief.targetWordCount !== undefined && brief.targetWordCount <= 600) ||
-    isTutorialOrShortQABrief(brief.rawPrompt || brief.instructions || title, computedWordCount);
+    isTutorialOrShortQABrief(brief.rawPrompt || brief.instructions || params.title, computedWordCount);
 
   if (isTutorialOrShortQA) {
     const qnaChildren: Paragraph[] = [
@@ -550,21 +548,51 @@ export async function exportAssignmentToDocx(params: AssignmentExportParams): Pr
 /**
  * Triggers academic PDF export using a styled printable academic layout window.
  */
+const escapeHtmlText = (t: unknown) =>
+  String(t ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+
+/**
+ * Downloads the submission as a real .pdf, rendered on the server by the shared
+ * export pipeline. Throws on failure so the caller can offer the print view.
+ */
+export async function downloadAssignmentPdf(projectId: string, params: AssignmentExportParams): Promise<void> {
+  const res = await authedFetch(`/api/projects/${encodeURIComponent(projectId)}/assignment/export-pdf`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      title: params.title,
+      studentName: params.studentName || undefined,
+      studentId: params.studentId || undefined,
+      institution: params.institution || undefined,
+      courseName: params.courseName || params.brief.courseDetails?.courseName || undefined,
+      citationStyle: params.brief.citationStyle || "harvard",
+      targetWordCount: params.brief.targetWordCount || undefined,
+      sections: params.sections.map((s) => ({ title: s.title, draftContent: s.draftContent || "" })),
+      sources: params.sources,
+    }),
+  });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({} as { error?: string }));
+    throw new Error(detail?.error || `PDF export failed (${res.status}).`);
+  }
+  const blob = await res.blob();
+  const cleanTitle = params.title.replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "").slice(0, 80) || "Assignment";
+  downloadBlob(blob, `${cleanTitle}_Submission.pdf`);
+}
+
+/** Printable HTML view (fallback when the PDF service is unreachable). */
 export function exportAssignmentToPdf(params: AssignmentExportParams): void {
   if (typeof window === "undefined" || !window.document) return;
 
-  const {
-    title,
-    // Cover details are the student's own; a missing one is shown as missing, never invented.
-    studentName = "—",
-    studentId = "—",
-    institution = "",
-    courseName = params.brief.courseDetails?.courseName || "",
-    brief,
-    sections,
-    sources,
-    actualWordCount,
-  } = params;
+  const { brief, sections, sources, actualWordCount } = params;
+  // Everything interpolated into the print window is escaped (titles and cover
+  // details can come from an uploaded brief).
+  const title = escapeHtmlText(params.title);
+  // Cover details are the student's own; a missing one is shown as missing, never invented.
+  const studentName = escapeHtmlText(params.studentName || "—");
+  const studentId = escapeHtmlText(params.studentId || "—");
+  const institution = escapeHtmlText(params.institution || "");
+  const courseName = escapeHtmlText(params.courseName || params.brief.courseDetails?.courseName || "");
 
   const computedWordCount = actualWordCount ??
     sections.reduce((acc, s) => {
@@ -594,14 +622,14 @@ export function exportAssignmentToPdf(params: AssignmentExportParams): void {
   const isTutorialOrShortQA =
     computedWordCount <= 600 ||
     (brief.targetWordCount !== undefined && brief.targetWordCount <= 600) ||
-    isTutorialOrShortQABrief(brief.rawPrompt || brief.instructions || title, computedWordCount);
+    isTutorialOrShortQABrief(brief.rawPrompt || brief.instructions || params.title, computedWordCount);
 
   const sectionsHtml = sections
     .map((s) => {
       const paras = splitProseIntoParagraphs(s.draftContent || "")
         .map((p) => `<p>${inlineMarkdownToHtml(p.replace(/^#+\s*/, ""))}</p>`)
         .join("");
-      return `<section class="academic-section"><h2>${s.title}</h2>${paras || "<p><em>[Not drafted yet]</em></p>"}</section>`;
+      return `<section class="academic-section"><h2>${escapeHtmlText(s.title)}</h2>${paras || "<p><em>[Not drafted yet]</em></p>"}</section>`;
     })
     .join("\n");
 

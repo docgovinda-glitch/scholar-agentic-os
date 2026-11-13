@@ -4,6 +4,9 @@
  */
 import type { DiscoveredSource } from "../types";
 import { parsePersonName } from "./referenceListGenerator";
+import { cleanEscapes } from "../../../shared/inlineMarkdown";
+
+export { cleanEscapes, inlineMarkdownRuns, type StyledRun } from "../../../shared/inlineMarkdown";
 
 const norm = (t: string) => (t || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 
@@ -43,43 +46,10 @@ export function selectCitedSources(sources: DiscoveredSource[], bodyText: string
 
 const escapeHtml = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-/** Strip LaTeX/Markdown escapes the model leaves in prose ("\$3\$-noisy" -> "3-noisy", "\_" -> "_"). */
-export function cleanEscapes(text: string): string {
-  return (text || "")
-    .replace(/\\\$([^$]*?)\\\$/g, "$1")
-    .replace(/\$([^$\n]{1,40})\$/g, "$1")
-    .replace(/\\([$_*#%&{}])/g, "$1")
-    .replace(/\[Unverified Claim[^\]]*\]/gi, "")
-    .replace(/[ \t]{2,}/g, " ");
-}
-
 /** Inline Markdown (*italic*, **bold**) to safe HTML. */
 export function inlineMarkdownToHtml(text: string): string {
   return escapeHtml(cleanEscapes(text))
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/(^|[^*\w])\*([^*\n]+)\*(?!\w)/g, "$1<em>$2</em>")
     .replace(/(^|[^_\w])_([^_\n]+)_(?!\w)/g, "$1<em>$2</em>");
-}
-
-export interface StyledRun {
-  text: string;
-  italics?: boolean;
-  bold?: boolean;
-}
-
-/** Inline Markdown as styled runs (for .docx): never prints literal asterisks. */
-export function inlineMarkdownRuns(text: string): StyledRun[] {
-  const clean = cleanEscapes(text);
-  const runs: StyledRun[] = [];
-  const re = /\*\*([^*]+)\*\*|\*([^*\n]+)\*/g;
-  let last = 0;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(clean))) {
-    if (m.index > last) runs.push({ text: clean.slice(last, m.index) });
-    if (m[1] !== undefined) runs.push({ text: m[1], bold: true });
-    else runs.push({ text: m[2], italics: true });
-    last = m.index + m[0].length;
-  }
-  if (last < clean.length) runs.push({ text: clean.slice(last) });
-  return runs.length ? runs : [{ text: clean }];
 }
