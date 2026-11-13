@@ -28,7 +28,13 @@ Tables, storage and state shapes. The authority is the SQL in `supabase/` (`sche
 | Table | Columns | Used |
 | :--- | :--- | :--- |
 | `projects` | `project_id` (text PK), `owner_id` (uuid, no FK to `auth.users` by design), `output_type_id`, `answers`, `gates`, `document`, `rubric_report`, `claim_graph`, `waivers`, `authors`, `submissions`, `journal_requirements`, `evidence_ledger`, `generation_job`, `peer_review_history`, `cover_letter`, `anonymization_report`, `anonymized_document`, `source_count_override`, `assignment_state`, `version`, `created_at`, `updated_at` (JSONB columns except ids, counts and timestamps) | Yes |
-| `assignment_projects` | `project_id`, `current_phase` (check: `understand`, `sources`, `drafting`, `submission`), `brief`, `sources`, `drafting`, `submission`, `created_at`, `updated_at` | Schema only |
+| `assignment_projects` | `project_id`, `current_phase` (check: `extract`, `understand`, `sources`, `drafting`, `submission`), `title`, `brief_text`, `target_word_count`, `citation_style`, `writing_style`, `stage_status` (per-stage `not_started` / `in_progress` / `complete`), `preferences`, legacy `brief`/`sources`/`drafting`/`submission`, timestamps | Yes (mirror) |
+| `assignment_files` | (`project_id`, `file_id`) PK, `role` (`brief` or `source`), `file_name`, `mime_type`, `size_bytes`, `storage_path`, `parsed_text`, `processing_status` | Yes (mirror) |
+| `assignment_outline_sections` | (`project_id`, `section_id`) PK, `parent_section_id`, `position`, `level`, `title`, `guidance`, `target_word_count`, `key_points` | Yes (mirror) |
+| `assignment_draft_revisions` | `id`, `project_id`, `section_id`, `content_hash` (unique per section), `content`, `word_count`, `cited_source_ids`, `created_at` | Yes (mirror, append-only) |
+| `assignment_submission_checks` | `id`, `project_id`, `report_hash` (unique), `passed`, `report`, `created_at` | Yes (mirror) |
+
+The `assignment_*` tables (migration `20261113180000_coursework_relational_state.sql`) are written by the server after every OT-01 save (`onProjectSaved` → `server/src/assignmentRelational.ts`, mapping in `src/domain/assignment/assignmentRelational.ts`); `projects.answers` stays the source the app reads. Owners can select their own rows; writes are service-role only.
 | `project_answers` | `project_id`, `key`, `value` | Schema only |
 | `project_uploaded_sources` | `id`, `project_id`, `document_id`, `filename`, `status`, `created_at`, `updated_at` | Schema only |
 | `project_activity` | `id`, `project_id`, `event_type`, `description`, `metadata`, `created_at` | Yes |
@@ -40,7 +46,7 @@ Tables, storage and state shapes. The authority is the SQL in `supabase/` (`sche
 
 | Table | Columns | Used |
 | :--- | :--- | :--- |
-| `project_sources` | `id`, `project_id`, `source_id`, `title`, `authors`, `year`, `abstract`, `url`, `doi`, `status`, `is_excluded`, `metadata`, `relevance_score`, `themes`, `created_at`, `updated_at` | Yes |
+| `project_sources` | `id`, `project_id`, `source_id`, `title`, `authors`, `year`, `abstract`, `url`, `doi`, `status`, `is_excluded`, `metadata`, `relevance_score`, `themes`, `origin` (`live`, `vault`, `upload`, `prescribed`), `is_approved`, `created_at`, `updated_at` | Yes |
 | `project_evidence` | `id`, `project_id`, `evidence_id`, `source_id`, `text`, `status`, `metadata`, `embedding` (vector 768), `created_at`, `updated_at` | Yes |
 | `project_evidence_items` | `id`, `project_id`, `evidence_id`, `source_id`, `state`, `quote`, `locator`, `proposed_claim_id`, `history`, `created_at`, `updated_at` | Yes |
 | `project_claims` | `id`, `project_id`, `claim_id`, `text`, `draft_span_id`, `status`, `unsupported_reason`, `unsupported_actor`, `created_at`, `updated_at` | Yes |

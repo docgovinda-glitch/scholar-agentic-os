@@ -71,7 +71,6 @@ interface SupabaseProjectSourceRecord extends Record<string, unknown> {
   year?: number;
   doi?: string;
   venue?: string;
-  journal?: string;
   url?: string;
   source_type: string;
   authority_tier: string;
@@ -103,7 +102,6 @@ export async function persistSourcesToSupabase(projectId: string, sources: Disco
       year: yearNum,
       doi: src.doi,
       venue,
-      journal: venue,
       url: src.url,
       source_type: typeof src.type === "string" ? src.type : "scholarly",
       authority_tier: ((src as unknown as Record<string, unknown>).authorityTier as string) || "A",
