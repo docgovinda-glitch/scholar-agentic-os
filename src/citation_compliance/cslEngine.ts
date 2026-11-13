@@ -102,6 +102,8 @@ export interface RawSourceInput {
   crossrefUpdateTo?: Array<{ type?: string; label?: string }>;
   citedByCount?: number;
   themes?: string[];
+  issn?: string;
+  venueId?: string;
   isOpenAccess?: boolean;
   snippet?: string;
   domain?: string;

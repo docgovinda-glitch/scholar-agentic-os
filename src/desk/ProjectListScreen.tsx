@@ -122,6 +122,7 @@ import { loadUserAiSettings } from "../services/userAiSettings";
 import { type PromptMode } from "./PromptBarActionMenu";
 import { AskPromptBox } from "./ask/AskPromptBox";
 import { ASK_BASE_IDENTITY, buildAskGeneralPrompt } from "../shared/askPrompts";
+import { decideAskMode, isTimeSensitiveQuery } from "../shared/askRouting";
 import {
   ASK_SCHOLAR_CITATION_STYLES,
   getCitationStyleInfo,
@@ -1657,19 +1658,17 @@ export default function ProjectListScreen({
 
         // Smart auto-grounding:
         // - Chat is the default entry point and automatically decides when to retrieve sources.
-        const thisYear = new Date().getFullYear();
-        const isLiveCurrentEventsQuery = new RegExp(
-          `\\b(?:latest|current|recent|today|yesterday|this week|this month|this year|${thisYear - 1}|${thisYear}|${thisYear + 1}|election|midterm|who won|breaking news|stock price|inflation rate|search the web)\\b`,
-          "i"
-        ).test(query);
-        const isPureConversationalOrCoding =
-          /^(?:hi|hello|hey|good morning|good evening|thanks|thank you)\b/i.test(query.trim()) ||
-          /\b(?:write a python|write a javascript|write a typescript|fix this bug|debug this code|write a regex)\b/i.test(query);
+        // One policy (shared with the server) decides whether the question needs a search.
+        const autoMode = decideAskMode({
+          query,
+          hasFiles: currentAttachments.length > 0,
+          hasVaultSources: Boolean(isVaultGroundingActive && userEmail && userVaultItems.length > 0),
+        });
 
         let liveRetrievedSources: LiveSearchResult[] = [];
         const isExplicitChatOnly =
-          (sidebarAiMode === "chat" && modeToSend === undefined && !isLiveCurrentEventsQuery) ||
-          (sidebarAiMode === "auto" && modeToSend === undefined && isPureConversationalOrCoding);
+          modeToSend === undefined &&
+          (sidebarAiMode === "chat" ? !isTimeSensitiveQuery(query) : sidebarAiMode === "auto" && autoMode === "chat");
 
         const shouldRunClientPreSearch = !isExplicitChatOnly && targetMode === "normal";
 
@@ -3807,57 +3806,30 @@ export default function ProjectListScreen({
                                   data-testid="response-primary-tabs"
                                   className="flex items-center gap-1 flex-nowrap overflow-x-auto whitespace-nowrap no-scrollbar w-full bg-neutral-100 dark:bg-white/[0.06] p-0.5 rounded-lg border border-neutral-200/60 dark:border-white/10 text-[10.5px]"
                                 >
-                                  <button
-                                    type="button"
-                                    onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "synthesis" }))}
-                                    className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0 whitespace-nowrap ${(messageActiveTab[msg.id] ?? "synthesis") === "synthesis"
-                                      ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
-                                      : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-                                      }`}
-                                    title="Synthesized prose response with inline citations"
-                                  >
-                                    <FileText className="w-3 h-3 text-sky-500 shrink-0" />
-                                    <span>Synthesis</span>
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "matrix" }))}
-                                    className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0 whitespace-nowrap ${messageActiveTab[msg.id] === "matrix"
-                                      ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
-                                      : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-                                      }`}
-                                    title="Structured Evidence Matrix & Forest Plot Synthesis"
-                                  >
-                                    <Table className="w-3 h-3 text-emerald-500 shrink-0" />
-                                    <span>Evidence Matrix ({(msg.citations || msg.liveSources || []).length})</span>
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "graph" }))}
-                                    className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0 whitespace-nowrap ${messageActiveTab[msg.id] === "graph"
-                                      ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
-                                      : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-                                      }`}
-                                    title="Interactive Citation Graph & Literature Discovery"
-                                  >
-                                    <Network className="w-3 h-3 text-indigo-500 shrink-0" />
-                                    <span>Citation Graph</span>
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "consensus" }))}
-                                    className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0 whitespace-nowrap ${messageActiveTab[msg.id] === "consensus"
-                                      ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
-                                      : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-                                      }`}
-                                    title="Peer Review & Methodological Rigor Audit"
-                                  >
-                                    <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0" />
-                                    <span>Peer Review & Rigor</span>
-                                  </button>
+                                  {([
+                                    { id: "synthesis", label: "Synthesis", title: "Synthesized prose response with inline citations", Icon: FileText, tone: "text-sky-500" },
+                                    { id: "matrix", label: `Evidence Matrix (${(msg.citations || msg.liveSources || []).length})`, title: "Structured Evidence Matrix & Forest Plot Synthesis", Icon: Table, tone: "text-emerald-500" },
+                                    { id: "graph", label: "Citation Graph", title: "Interactive Citation Graph & Literature Discovery", Icon: Network, tone: "text-indigo-500" },
+                                    { id: "consensus", label: "Peer Review & Rigor", title: "Peer Review & Methodological Rigor Audit", Icon: AlertTriangle, tone: "text-amber-500" },
+                                  ] as const).map(({ id, label, title, Icon, tone }) => {
+                                    const active = (messageActiveTab[msg.id] ?? "synthesis") === id;
+                                    return (
+                                      <button
+                                        key={id}
+                                        type="button"
+                                        aria-pressed={active}
+                                        onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: id }))}
+                                        className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0 whitespace-nowrap ${active
+                                          ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                                          : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                                          }`}
+                                        title={title}
+                                      >
+                                        <Icon className={`w-3 h-3 ${tone} shrink-0`} aria-hidden="true" />
+                                        <span>{label}</span>
+                                      </button>
+                                    );
+                                  })}
 
                                   <button
                                     type="button"

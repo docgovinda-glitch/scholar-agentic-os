@@ -28,6 +28,7 @@ import type { VerifiedSourceItem } from "../src/utils/citationLockScrubber.ts";
 import { countExactWords } from "../src/utils/wordBudgetAllocator.ts";
 import { evaluateBurstiness } from "../src/utils/scholarlyVoiceGuard.ts";
 import { chunkAndRerankEvidence } from "../src/services/semanticRagEngine.ts";
+import { decideAskMode } from "../../src/shared/askRouting.ts";
 import { ASK_BASE_IDENTITY, askStyleDescription } from "../../src/shared/askPrompts.ts";
 import { deleteThread, listThreads, parseThreads, saveThreads } from "../src/askThreads/threadStore.ts";
 
@@ -194,104 +195,10 @@ function determineExecutionMode(
   prompt: string,
   explicitMode?: string,
   hasFiles?: boolean,
-  hasImages?: boolean
+  hasImages?: boolean,
+  hasVaultSources?: boolean
 ): "chat" | "search" | "deep-research" {
-  if (explicitMode === "deep-research") return "deep-research";
-  if (explicitMode === "search") return "search";
-  if (explicitMode === "chat" || explicitMode === "normal") return "chat";
-
-  const lower = prompt.toLowerCase();
-
-  // If user uploaded files or images, do NOT accidentally hijack into generic web search
-  // unless user explicitly requested external web search or online literature review
-  if (hasFiles || hasImages) {
-    if (
-      lower.includes("search the web") ||
-      lower.includes("search online") ||
-      lower.includes("lookup online") ||
-      lower.includes("external sources") ||
-      lower.includes("verify online") ||
-      lower.includes("fact check")
-    ) {
-      return "search";
-    }
-    if (lower.includes("deep research") || lower.includes("systematic literature review")) {
-      return "deep-research";
-    }
-    return "chat";
-  }
-
-  // Deep research triggers: complex, comparative, multi-step scholarly inquiries
-  const deepResearchTriggers = [
-    "deep research",
-    "comprehensive research",
-    "conduct detailed research",
-    "investigate thoroughly",
-    "systematic literature review",
-    "detailed analysis of all sources",
-    "cross-check claims",
-    "multi-source research",
-    "comparative study",
-    "meta-analysis",
-    "conflicting evidence",
-  ];
-  if (deepResearchTriggers.some((t) => lower.includes(t))) {
-    return "deep-research";
-  }
-
-  // Web search triggers: academic literature, current events, temporal queries, facts, people, orgs, policies, statistics
-  const currentYear = new Date().getFullYear();
-  const searchTriggers = [
-    "search the web",
-    "latest developments",
-    "current events",
-    "recent news",
-    "current status",
-    "who is currently",
-    "today",
-    "yesterday",
-    "this week",
-    "this month",
-    "this year",
-    "now",
-    "recent studies",
-    "lookup online",
-    "web search",
-    "prime minister",
-    "president",
-    "stock price",
-    "market cap",
-    "inflation rate",
-    "gdp",
-    "election",
-    "guidelines",
-    "regulations",
-    "what happened to",
-    "who won",
-    "current price",
-    "study",
-    "studies",
-    "paper",
-    "papers",
-    "research",
-    "literature",
-    "clinical",
-    "trial",
-    "findings",
-    "evidence",
-    "citation",
-    "citations",
-    "reference",
-    "references",
-    "bibliography",
-    String(currentYear),
-    String(currentYear - 1),
-  ];
-  if (searchTriggers.some((t) => lower.includes(t))) {
-    return "search";
-  }
-
-  return "chat";
+  return decideAskMode({ query: prompt, requestedMode: explicitMode, hasFiles, hasImages, hasVaultSources });
 }
 
 export function registerAIRoutes(
@@ -573,7 +480,13 @@ export function registerAIRoutes(
 
       const deliverableIntent = detectDeliverableIntent(effectivePrompt);
       const isSubstantive = isSubstantiveAcademicQuery(effectivePrompt) || deliverableIntent !== null;
-      const mode = determineExecutionMode(effectivePrompt, requestedMode, files.length > 0, normalizedImages.length > 0);
+      const mode = determineExecutionMode(
+        effectivePrompt,
+        requestedMode,
+        files.length > 0,
+        normalizedImages.length > 0,
+        Array.isArray(req.body?.vaultSources) && req.body.vaultSources.length > 0
+      );
       const cleanStyle = (citationStyle || "apa").toLowerCase();
 
       const vaultSources = Array.isArray(req.body?.vaultSources) ? req.body.vaultSources : [];

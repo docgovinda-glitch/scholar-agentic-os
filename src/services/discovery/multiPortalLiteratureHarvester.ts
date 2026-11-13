@@ -16,7 +16,7 @@
  */
 
 import type { RawSourceInput } from "../../citation_compliance/cslEngine";
-import { searchCrossref, searchEuropePmc, searchOpenAlex, stripMarkup } from "../../shared/retrieval/providers";
+import { searchArxiv, searchCrossref, searchDataCite, searchDoaj, searchEuropePmc, searchOpenAlex, stripMarkup } from "../../shared/retrieval/providers";
 import { type LiteratureItem } from "../../desk/workspace/agentPrompts/literaturePrompts";
 import { normalizeDoi, normalizeTitle, calculateTokenSimilarity } from "../vault/duplicateDetection";
 export { normalizeDoi, normalizeTitle, calculateTokenSimilarity };
@@ -159,160 +159,24 @@ export async function harvestFromCrossref(query: string, limit = 30): Promise<Po
  * Harvester 3: arXiv (Preprint repository across CS / AI / Physics / Math)
  */
 export async function harvestFromArxiv(query: string, limit = 25): Promise<PortalHarvestItem[]> {
-  try {
-    const url = `https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(query)}&start=0&max_results=${limit}`;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeoutId);
-
-    if (!res.ok) return [];
-    const xml = await res.text();
-    if (!xml || !xml.includes("<entry>")) return [];
-
-    // Parse XML entries using regex for universal browser & Node support
-    const entryRegex = /<entry>([\s\S]*?)<\/entry>/g;
-    const items: PortalHarvestItem[] = [];
-    let match: RegExpExecArray | null;
-
-    while ((match = entryRegex.exec(xml)) !== null && items.length < limit) {
-      const entryXml = match[1];
-      const titleMatch = entryXml.match(/<title>([\s\S]*?)<\/title>/);
-      const summaryMatch = entryXml.match(/<summary>([\s\S]*?)<\/summary>/);
-      const publishedMatch = entryXml.match(/<published>([\s\S]*?)<\/published>/);
-      const idMatch = entryXml.match(/<id>([\s\S]*?)<\/id>/);
-      const doiMatch = entryXml.match(/<arxiv:doi>([\s\S]*?)<\/arxiv:doi>/);
-
-      const authorRegex = /<author>\s*<name>([\s\S]*?)<\/name>/g;
-      const authors: string[] = [];
-      let authorMatch: RegExpExecArray | null;
-      while ((authorMatch = authorRegex.exec(entryXml)) !== null) {
-        authors.push(authorMatch[1].trim());
-      }
-
-      const year = publishedMatch ? new Date(publishedMatch[1].trim()).getFullYear() : undefined;
-      const rawTitle = titleMatch ? stripMarkup(titleMatch[1]) : "Untitled";
-      const rawAbstract = summaryMatch ? stripMarkup(summaryMatch[1]) : "";
-      const rawId = idMatch ? idMatch[1].trim() : "";
-      const arxivDoi = doiMatch ? normalizeDoi(doiMatch[1].trim()) || undefined : undefined;
-
-      items.push({
-        id: `arxiv-${rawId.split("/").pop()?.replace(/[^\w-]/g, "_") || items.length}`,
-        portal: "arxiv" as OpenPortal,
-        doi: arxivDoi,
-        title: rawTitle,
-        authors,
-        year: Number(year) || undefined,
-        journal: "arXiv",
-        source: "external" as const,
-        relevanceScore: 0,
-        themes: ["preprint"],
-        abstract: rawAbstract,
-        isLandmark: false,
-        url: rawId || (arxivDoi ? `https://doi.org/${arxivDoi}` : undefined),
-        isOpenAccess: true,
-        openAccessPdfUrl: rawId ? rawId.replace("/abs/", "/pdf/") + ".pdf" : undefined,
-      });
-    }
-
-    return items;
-  } catch {
-    return [];
-  }
+  const { items } = await searchArxiv(query, limit, { timeoutMs: 8000 });
+  return items.map((r, idx) => toHarvestItem(r, "arxiv", idx, Infinity));
 }
 
 /**
  * Harvester 4: DOAJ (Directory of Open Access Journals)
  */
 export async function harvestFromDoaj(query: string, limit = 25): Promise<PortalHarvestItem[]> {
-  try {
-    const url = `https://doaj.org/api/search/articles/${encodeURIComponent(query)}?pageSize=${limit}`;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeoutId);
-
-    if (!res.ok) return [];
-    const data = await res.json();
-    if (!data || !Array.isArray(data.results)) return [];
-
-    return data.results.map((item: any, idx: number) => {
-      const bib = item.bibjson || {};
-      const doiObj = Array.isArray(bib.identifier) ? bib.identifier.find((i: any) => i.type === "doi") : undefined;
-      const cleanDoi = doiObj?.id ? normalizeDoi(doiObj.id) || undefined : undefined;
-      const authors = Array.isArray(bib.author) ? bib.author.map((a: any) => a.name).filter(Boolean) : [];
-      const venue = bib.journal?.title || "";
-      const fullTextLink = Array.isArray(bib.link) ? bib.link.find((l: any) => l.type === "fulltext")?.url : undefined;
-
-      return {
-        id: `doaj-${item.id || idx}`,
-        portal: "doaj" as OpenPortal,
-        doi: cleanDoi,
-        title: stripMarkup(bib.title || "Untitled"),
-        authors,
-        year: Number(bib.year) || undefined,
-        journal: venue,
-        source: "external" as const,
-        relevanceScore: 0,
-        themes: ["open-access"],
-        abstract: stripMarkup(bib.abstract) || "",
-        isLandmark: false,
-        url: fullTextLink || (cleanDoi ? `https://doi.org/${cleanDoi}` : undefined),
-        isOpenAccess: true,
-        openAccessPdfUrl: fullTextLink,
-      };
-    });
-  } catch {
-    return [];
-  }
+  const { items } = await searchDoaj(query, limit, { timeoutMs: 8000 });
+  return items.map((r, idx) => toHarvestItem(r, "doaj", idx, Infinity));
 }
 
 /**
  * Harvester 5: DataCite (Open research datasets, software, preprints, reports)
  */
 export async function harvestFromDataCite(query: string, limit = 25): Promise<PortalHarvestItem[]> {
-  try {
-    const url = `https://api.datacite.org/dois?query=${encodeURIComponent(query)}&page[size]=${limit}`;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeoutId);
-
-    if (!res.ok) return [];
-    const data = await res.json();
-    if (!data || !Array.isArray(data.data)) return [];
-
-    return data.data.map((item: any, idx: number) => {
-      const attrs = item.attributes || {};
-      const doi = attrs.doi ? normalizeDoi(attrs.doi) || undefined : undefined;
-      const titleObj = Array.isArray(attrs.titles) ? attrs.titles[0]?.title : "DataCite Scholarly Resource";
-      const authors = Array.isArray(attrs.creators) ? attrs.creators.map((c: any) => c.name).filter(Boolean) : [];
-      const venue = attrs.publisher || "";
-      const descObj = Array.isArray(attrs.descriptions) ? attrs.descriptions[0]?.description : "";
-
-      return {
-        id: `datacite-${item.id?.replace(/[^\w-]/g, "_") || idx}`,
-        portal: "datacite" as OpenPortal,
-        doi,
-        title: stripMarkup(titleObj),
-        authors,
-        year: Number(attrs.publicationYear) || undefined,
-        journal: venue,
-        source: "external" as const,
-        relevanceScore: 0,
-        themes: ["datacite"],
-        abstract: stripMarkup(descObj) || "",
-        isLandmark: false,
-        url: doi ? `https://doi.org/${doi}` : undefined,
-        isOpenAccess: true,
-      };
-    });
-  } catch {
-    return [];
-  }
+  const { items } = await searchDataCite(query, limit, { timeoutMs: 8000 });
+  return items.map((r, idx) => toHarvestItem(r, "datacite", idx, Infinity));
 }
 
 /**

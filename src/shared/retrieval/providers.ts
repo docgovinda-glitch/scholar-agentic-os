@@ -36,6 +36,9 @@ export type ProviderId =
   | "semantic_scholar"
   | "europe_pmc"
   | "eric"
+  | "doaj"
+  | "datacite"
+  | "arxiv"
   | "repository";
 
 export const CROSSREF_USER_AGENT = "ScholarCore/2.0 (https://scholar.gkshah.com.np; mailto:support@scholar-core.org)";
@@ -164,7 +167,7 @@ interface OpenAlexWork {
     landing_page_url?: string;
     pdf_url?: string;
     is_oa?: boolean;
-    source?: { display_name?: string; type?: string };
+    source?: { id?: string; display_name?: string; type?: string; issn_l?: string; host_organization_name?: string };
   };
 }
 
@@ -203,6 +206,9 @@ function mapOpenAlex(works: OpenAlexWork[], sourceType?: string): RawSourceInput
       isRetracted: w.is_retracted === true,
       sourceType: sourceType ?? (w.type === "preprint" ? "preprint" : journalArticle ? "peer-reviewed article" : "scholarly work"),
       citedByCount: w.cited_by_count ?? 0,
+      issn: w.primary_location?.source?.issn_l,
+      venueId: w.primary_location?.source?.id?.replace("https://openalex.org/", ""),
+      publisher: w.primary_location?.source?.host_organization_name,
       themes: (w.concepts ?? []).slice(0, 4).map((c) => (c.display_name ?? "").toLowerCase().replace(/\s+/g, "-")).filter(Boolean),
       isOpenAccess: Boolean(w.open_access?.is_oa || w.primary_location?.is_oa),
     } as RawSourceInput;
@@ -218,7 +224,7 @@ export async function searchOpenAlex(
   try {
     const params = openAlexParams(options, {
       search: cleanSearchTopic(query),
-      "per-page": String(Math.min(50, Math.max(perPage, 5))),
+      "per-page": String(Math.min(200, Math.max(perPage, 5))),
       page: String(Math.max(1, page)),
     });
     const data = await getJson<{ results?: OpenAlexWork[] }>(`https://api.openalex.org/works?${params.toString()}`, options, "OpenAlex");
@@ -258,6 +264,7 @@ interface CrossrefItem {
   "is-referenced-by-count"?: number;
   subject?: string[];
   license?: unknown[];
+  ISSN?: string[];
   "update-to"?: Array<{ type?: string; label?: string }>;
   published?: { "date-parts"?: number[][] };
   "published-print"?: { "date-parts"?: number[][] };
@@ -304,7 +311,7 @@ export async function searchCrossref(
   options: ProviderOptions = {}
 ): Promise<ProviderResult> {
   try {
-    const effectiveRows = Math.min(50, Math.max(rows, 5));
+    const effectiveRows = Math.min(100, Math.max(rows, 5));
     const offset = Math.max(0, (page - 1) * effectiveRows);
     const params = new URLSearchParams({
       query: cleanSearchTopic(query),
@@ -557,4 +564,185 @@ export async function fetchCrossrefMessage(doi: string, options: ProviderOptions
 export async function lookupCrossrefByDoi(doi: string, options: ProviderOptions = {}): Promise<RawSourceInput | undefined> {
   const message = await fetchCrossrefMessage(doi, options);
   return message ? mapCrossrefItem(message) : undefined;
+}
+
+export async function searchDoaj(query: string, pageSize = 25, options: ProviderOptions = {}): Promise<ProviderResult> {
+  try {
+    const data = await getJson<{
+      results?: Array<{
+        id?: string;
+        bibjson?: {
+          title?: string;
+          abstract?: string;
+          year?: string | number;
+          author?: Array<{ name?: string }>;
+          identifier?: Array<{ type?: string; id?: string }>;
+          journal?: { title?: string };
+          link?: Array<{ type?: string; url?: string }>;
+        };
+      }>;
+    }>(`https://doaj.org/api/search/articles/${encodeURIComponent(query)}?pageSize=${Math.min(100, Math.max(pageSize, 5))}`, options, "DOAJ");
+    const items = (data.results ?? []).map((item): RawSourceInput => {
+      const bib = item.bibjson ?? {};
+      const doi = bareDoi(bib.identifier?.find((i) => i.type === "doi")?.id);
+      const fullText = bib.link?.find((l) => l.type === "fulltext")?.url;
+      return {
+        id: item.id,
+        title: stripMarkup(bib.title || ""),
+        url: fullText || (doi ? `https://doi.org/${doi}` : ""),
+        doi,
+        snippet: bib.abstract ? stripMarkup(bib.abstract).slice(0, 1800) : "",
+        year: bib.year,
+        authors: (bib.author ?? []).map((a) => a.name).filter((n): n is string => Boolean(n)),
+        venue: bib.journal?.title,
+        journal: bib.journal?.title,
+        openAccessUrl: fullText,
+        isOpenAccess: true,
+        themes: ["open-access"],
+        sourceType: "peer-reviewed article",
+      } as RawSourceInput;
+    });
+    return { provider: "doaj", items: items.filter((i) => i.title) };
+  } catch (err) {
+    return failure("doaj", err);
+  }
+}
+
+interface DataCiteAttributes {
+  doi?: string;
+  titles?: Array<{ title?: string }>;
+  creators?: Array<{ name?: string; givenName?: string; familyName?: string }>;
+  publisher?: string;
+  publicationYear?: number | string;
+  container?: { title?: string };
+  descriptions?: Array<{ description?: string }>;
+  dates?: Array<{ dateType?: string; date?: string }>;
+}
+
+function mapDataCite(attrs: DataCiteAttributes, id?: string): RawSourceInput {
+  const doi = bareDoi(attrs.doi);
+  const year =
+    attrs.publicationYear ||
+    attrs.dates?.find((d) => d.dateType === "Issued" || d.dateType === "Created" || d.dateType === "Submitted")?.date?.slice(0, 4);
+  const venue = attrs.container?.title || attrs.publisher;
+  return {
+    id,
+    title: stripMarkup(attrs.titles?.[0]?.title || ""),
+    url: doi ? `https://doi.org/${doi}` : "",
+    doi,
+    snippet: attrs.descriptions?.[0]?.description ? stripMarkup(attrs.descriptions[0].description).slice(0, 1800) : "",
+    year,
+    authors: (attrs.creators ?? [])
+      .map((c) => c.name || [c.givenName, c.familyName].filter(Boolean).join(" "))
+      .filter(Boolean),
+    venue,
+    journal: venue,
+    publisher: attrs.publisher,
+    isOpenAccess: true,
+    themes: ["datacite"],
+    sourceType: "scholarly work",
+  } as RawSourceInput;
+}
+
+export async function searchDataCite(query: string, pageSize = 25, options: ProviderOptions = {}): Promise<ProviderResult> {
+  try {
+    const data = await getJson<{ data?: Array<{ id?: string; attributes?: DataCiteAttributes }> }>(
+      `https://api.datacite.org/dois?query=${encodeURIComponent(query)}&page[size]=${Math.min(100, Math.max(pageSize, 5))}`,
+      options,
+      "DataCite"
+    );
+    const items = (data.data ?? []).map((d) => mapDataCite(d.attributes ?? {}, d.id)).filter((i) => i.title);
+    return { provider: "datacite", items };
+  } catch (err) {
+    return failure("datacite", err);
+  }
+}
+
+/** The raw DataCite attributes for a DOI (arXiv, Zenodo, Figshare, repositories). `undefined` on 404. */
+export async function fetchDataCiteAttributes(doi: string, options: ProviderOptions = {}): Promise<(DataCiteAttributes & Record<string, unknown>) | undefined> {
+  const clean = bareDoi(doi);
+  if (!clean) return undefined;
+  try {
+    const data = await getJson<{ data?: { attributes?: DataCiteAttributes & Record<string, unknown> } }>(
+      `https://api.datacite.org/dois/${encodeURIComponent(clean)}`,
+      options,
+      "DataCite"
+    );
+    return data.data?.attributes;
+  } catch (err) {
+    if (err instanceof Error && /\b404\b/.test(err.message)) return undefined;
+    throw err;
+  }
+}
+
+export async function lookupDataCiteByDoi(doi: string, options: ProviderOptions = {}): Promise<RawSourceInput | undefined> {
+  const attrs = await fetchDataCiteAttributes(doi, options);
+  return attrs ? mapDataCite(attrs) : undefined;
+}
+
+export interface OpenAlexSourceDetail {
+  id: string;
+  homepage?: string;
+  isOpenAccess?: boolean;
+  publisher?: string;
+}
+
+/** Homepage and open-access status of journals (OpenAlex "sources") by id. */
+export async function fetchOpenAlexSourceDetails(ids: string[], options: ProviderOptions = {}): Promise<OpenAlexSourceDetail[]> {
+  if (ids.length === 0) return [];
+  const params = openAlexParams(options, { filter: `openalex_id:${ids.join("|")}`, select: "id,homepage_url,is_oa,host_organization_name" });
+  const data = await getJson<{ results?: Array<{ id?: string; homepage_url?: string; is_oa?: boolean; host_organization_name?: string }> }>(
+    `https://api.openalex.org/sources?${params.toString()}`,
+    options,
+    "OpenAlex"
+  );
+  return (data.results ?? []).map((s) => ({
+    id: String(s.id).replace("https://openalex.org/", ""),
+    homepage: typeof s.homepage_url === "string" ? s.homepage_url : undefined,
+    isOpenAccess: typeof s.is_oa === "boolean" ? s.is_oa : undefined,
+    publisher: typeof s.host_organization_name === "string" ? s.host_organization_name : undefined,
+  }));
+}
+
+/** arXiv preprints through the public Atom API (no key). */
+export async function searchArxiv(query: string, maxResults = 25, options: ProviderOptions = {}): Promise<ProviderResult> {
+  try {
+    const res = await (options.fetchImpl ?? fetch)(
+      `https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(cleanSearchTopic(query))}&start=0&max_results=${Math.min(100, Math.max(maxResults, 5))}`,
+      { signal: withTimeout(options) }
+    );
+    if (!res.ok) throw new Error(`arXiv ${res.status}`);
+    const xml = await res.text();
+    const items: RawSourceInput[] = [];
+    const entryRegex = /<entry>([\s\S]*?)<\/entry>/g;
+    let match: RegExpExecArray | null;
+    while ((match = entryRegex.exec(xml)) !== null && items.length < maxResults) {
+      const entry = match[1];
+      const pick = (tag: string) => entry.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`))?.[1];
+      const id = pick("id")?.trim() ?? "";
+      const published = pick("published")?.trim();
+      const doi = bareDoi(pick("arxiv:doi")?.trim());
+      const authors = [...entry.matchAll(/<author>\s*<name>([\s\S]*?)<\/name>/g)].map((m) => m[1].trim());
+      const title = stripMarkup(pick("title") ?? "");
+      if (!title) continue;
+      items.push({
+        id: id.split("/").pop(),
+        title,
+        url: id || (doi ? `https://doi.org/${doi}` : ""),
+        doi,
+        snippet: stripMarkup(pick("summary") ?? "").slice(0, 1800),
+        year: published ? new Date(published).getFullYear() : undefined,
+        publicationDate: published?.slice(0, 10),
+        authors,
+        venue: "arXiv",
+        openAccessUrl: id ? `${id.replace("/abs/", "/pdf/")}.pdf` : undefined,
+        isOpenAccess: true,
+        themes: ["preprint"],
+        sourceType: "preprint",
+      } as RawSourceInput);
+    }
+    return { provider: "arxiv", items };
+  } catch (err) {
+    return failure("arxiv", err);
+  }
 }

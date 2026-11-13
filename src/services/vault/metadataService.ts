@@ -9,7 +9,7 @@
  * Never fabricates data. Returns confidence indicators ("verified" vs "needs_review").
  */
 
-import { lookupCrossrefByDoi, lookupOpenAlexByDoi } from "../../shared/retrieval/providers";
+import { lookupCrossrefByDoi, lookupDataCiteByDoi, lookupOpenAlexByDoi } from "../../shared/retrieval/providers";
 import { authedJsonFetch } from "../../desk/api";
 import type { SourceMetadata } from "./sourceTypes";
 import { normalizeDoi } from "./duplicateDetection";
@@ -179,55 +179,23 @@ export async function resolveDoiMetadata(rawDoi: string): Promise<ResolvedMetada
     }
   }
 
-  // 4. DataCite API (CORS enabled, covers arXiv, Zenodo, Figshare, institutional repos)
+  // 3. DataCite (arXiv, Zenodo, Figshare, institutional repositories)
   try {
-    const dataCiteUrl = `https://api.datacite.org/dois/${clean}`;
-    const res = await fetch(dataCiteUrl, {
-      headers: { Accept: "application/json" },
-    });
-
-    if (res.ok) {
-      const dcData = await res.json();
-      const attr = dcData.data?.attributes;
-      if (attr) {
-        const title = attr.titles?.[0]?.title || "";
-        const authors: string[] = (attr.creators || [])
-          .map((c: any) => c.name || `${c.givenName || ""} ${c.familyName || ""}`.trim())
-          .filter(Boolean);
-        const year = String(
-          attr.publicationYear ||
-            attr.dates?.find(
-              (d: any) => d.dateType === "Issued" || d.dateType === "Created" || d.dateType === "Submitted"
-            )?.date?.slice(0, 4) ||
-            ""
-        );
-        const journal = attr.container?.title || attr.publisher || "";
-
-        const citation = generateAPA7Citation({
-          authors,
-          year,
-          title,
-          journal,
-          doi: clean,
-        });
-
-        return {
-          success: true,
-          metadata: {
-            title,
-            authors,
-            year,
-            journal,
-            doi: clean,
-            url: `https://doi.org/${clean}`,
-            type: "paper",
-          },
-          citation,
-          confidence: "verified",
-        };
-      }
+    const found = await lookupDataCiteByDoi(clean, { timeoutMs: 8000 });
+    if (found && found.title) {
+      const authors = Array.isArray(found.authors) ? (found.authors as string[]) : [];
+      const year = found.year ? String(found.year) : "";
+      const journal = found.venue || "";
+      return {
+        success: true,
+        metadata: { title: found.title, authors, year, journal, doi: clean, url: `https://doi.org/${clean}`, type: "paper" },
+        citation: generateAPA7Citation({ authors, year, title: found.title, journal, doi: clean }),
+        confidence: "verified",
+      };
     }
-  } catch {}
+  } catch {
+    // unresolved: fall through to the manual-entry message
+  }
 
   return {
     success: false,

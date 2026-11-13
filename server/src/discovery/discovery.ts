@@ -19,6 +19,8 @@ import type { AuthorityTier, DiscoveredSource, SourceType } from "../../../src/d
 import type { RawSourceInput } from "../../../src/citation_compliance/cslEngine";
 import {
   searchCrossref,
+  searchDataCite,
+  searchDoaj,
   searchOpenAlex,
   searchSemanticScholar,
   type ProviderResult,
@@ -155,72 +157,13 @@ export async function discoverSemanticScholarSources(query: string, maxResults =
 }
 
 export async function discoverDoajSources(query: string, maxResults = 25): Promise<DiscoveredSourceDraft[]> {
-  let res: Response;
-  try {
-    res = await fetch(`https://doaj.org/api/search/articles/${encodeURIComponent(query)}?pageSize=${maxResults}`, {
-      signal: AbortSignal.timeout(15_000),
-    });
-  } catch (err) {
-    throw new Error(`DOAJ request failed: ${err instanceof Error ? err.message : String(err)}`);
-  }
-  if (!res.ok) {
-    throw new Error(`DOAJ ${res.status}: ${(await res.text().catch(() => "")).slice(0, 300)}`);
-  }
-  const parsed = (await res.json()) as { results?: any[] };
-  return (parsed.results ?? []).map((item) => {
-    const bib = item.bibjson || {};
-    const doiObj = Array.isArray(bib.identifier) ? bib.identifier.find((i: any) => i.type === "doi") : undefined;
-    const doi = doiObj?.id ? doiObj.id.replace(/^https?:\/\/doi\.org\//, "") : undefined;
-    const authors = Array.isArray(bib.author) ? bib.author.map((a: any) => a.name).filter(Boolean) : [];
-    const venue = bib.journal?.title;
-    const link = Array.isArray(bib.link) ? bib.link.find((l: any) => l.type === "fulltext")?.url : undefined;
-
-    return {
-      title: bib.title || "Untitled Open Access Work",
-      authors,
-      url: link || (doi ? `https://doi.org/${doi}` : undefined),
-      ...(doi ? { doi } : {}),
-      ...(venue ? { venue } : {}),
-      ...(bib.year ? { year: Number(bib.year) } : {}),
-      discoveredVia: "doaj" as const,
-      sourceType: "scholarly" as const,
-      authorityTier: "A" as const,
-    };
-  });
+  const items = unwrapProvider(await searchDoaj(query, maxResults));
+  return items.map((r) => rawToDraft(r, "doaj", "A"));
 }
 
 export async function discoverDataCiteSources(query: string, maxResults = 25): Promise<DiscoveredSourceDraft[]> {
-  let res: Response;
-  try {
-    res = await fetch(`https://api.datacite.org/dois?query=${encodeURIComponent(query)}&page[size]=${maxResults}`, {
-      signal: AbortSignal.timeout(15_000),
-    });
-  } catch (err) {
-    throw new Error(`DataCite request failed: ${err instanceof Error ? err.message : String(err)}`);
-  }
-  if (!res.ok) {
-    throw new Error(`DataCite ${res.status}: ${(await res.text().catch(() => "")).slice(0, 300)}`);
-  }
-  const parsed = (await res.json()) as { data?: any[] };
-  return (parsed.data ?? []).map((item) => {
-    const attrs = item.attributes || {};
-    const doi = attrs.doi ? attrs.doi.replace(/^https?:\/\/doi\.org\//, "") : undefined;
-    const title = Array.isArray(attrs.titles) ? attrs.titles[0]?.title : "DataCite Resource";
-    const authors = Array.isArray(attrs.creators) ? attrs.creators.map((c: any) => c.name).filter(Boolean) : [];
-    const venue = attrs.publisher;
-
-    return {
-      title,
-      authors,
-      url: doi ? `https://doi.org/${doi}` : undefined,
-      ...(doi ? { doi } : {}),
-      ...(venue ? { venue } : {}),
-      ...(attrs.publicationYear ? { year: Number(attrs.publicationYear) } : {}),
-      discoveredVia: "datacite" as const,
-      sourceType: "scholarly" as const,
-      authorityTier: "B" as const,
-    };
-  });
+  const items = unwrapProvider(await searchDataCite(query, maxResults));
+  return items.map((r) => rawToDraft(r, "datacite", "B"));
 }
 
 export async function discoverMultiPortalSources(query: string, maxResults = 50): Promise<DiscoveredSourceDraft[]> {
