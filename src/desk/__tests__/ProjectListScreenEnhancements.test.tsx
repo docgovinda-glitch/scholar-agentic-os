@@ -107,10 +107,13 @@ describe("UI/UX Enhancements: Command Palette, Boot Project, Related Inquiries, 
     expect(resizeHandle.className).toContain("cursor-col-resize");
   });
 
-  it("renders Dynamic Follow-Up Questions ('Related Inquiries') and executes inquiry on click", async () => {
-    executeAgenticLLM.mockResolvedValueOnce(
-      "Neural-symbolic architectures combine neural networks with formal symbolic reasoning."
-    );
+  it("renders the answer's own follow-up questions ('Related Inquiries') and asks one on click", async () => {
+    executeAgenticQuery.mockResolvedValueOnce({
+      ok: true,
+      text: "Neural-symbolic architectures combine neural networks with formal symbolic reasoning.",
+      mode: "chat",
+      followUps: ["What is Knowledge Vault?"],
+    });
 
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
@@ -121,7 +124,7 @@ describe("UI/UX Enhancements: Command Palette, Boot Project, Related Inquiries, 
 
     // Ask a question in assistant drawer
     const input = screen.getByPlaceholderText("Ask a research question…");
-    fireEvent.change(input, { target: { value: "Explain neural-symbolic systems" } });
+    fireEvent.change(input, { target: { value: "Explain neural-symbolic systems for my essay" } });
     fireEvent.click(screen.getByRole("button", { name: "Send question" }));
 
     // Wait for assistant response and Related Inquiries

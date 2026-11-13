@@ -14,9 +14,7 @@ import type { CanonicalReference } from "../../src/citation_compliance/model/ref
 import {
   detectDeliverableIntent,
   isSubstantiveAcademicQuery,
-  retrieveCanonicalSourcesForPrompt,
   buildGroundedAskScholarSystemPrompt,
-  sanitizeAndLockScholarResponse,
   type GroundedScholarSource,
 } from "../src/research/scholarlyRetrievalPipeline.ts";
 import {
