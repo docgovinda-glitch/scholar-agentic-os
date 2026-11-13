@@ -6,6 +6,7 @@
  * used: near-black is #171717, the Scholar OS ink colour.
  */
 import { resolveSlideTheme, type CustomTheme } from '../types/themes';
+import type { ShadowStyle, ThemeTokens } from '../../../domain/presentation/slideSchema';
 
 export type DeckFont = 'sans' | 'serif';
 
@@ -32,6 +33,31 @@ export interface DeckTheme {
   border: string;
   headingFont: DeckFont;
   bodyFont: DeckFont;
+  /** Card corner radius in canvas px (0, 8, 16 or 24). Default 24. */
+  radius?: number;
+  /** Shadow under raised cards. Default none. */
+  shadow?: ShadowStyle;
+  /** Card outline width in canvas px (0 or 1). Default 1. */
+  borderWidth?: 0 | 1;
+  /** Headline weight. Default 700. */
+  headingWeight?: 600 | 700;
+}
+
+export interface DeckShape {
+  radius: number;
+  shadow: ShadowStyle;
+  borderWidth: 0 | 1;
+  headingWeight: 600 | 700;
+}
+
+/** Shape tokens with defaults filled in (older themes carry none). */
+export function deckShape(theme: DeckTheme): DeckShape {
+  return {
+    radius: theme.radius ?? 24,
+    shadow: theme.shadow ?? 'none',
+    borderWidth: theme.borderWidth ?? 1,
+    headingWeight: theme.headingWeight ?? 700,
+  };
 }
 
 /** Curated Gamma-style themes, in gallery order. The first is the default. */
@@ -164,6 +190,126 @@ export const DECK_THEMES: DeckTheme[] = [
     headingFont: 'serif',
     bodyFont: 'sans',
   },
+  {
+    id: 'obsidian-minimal',
+    name: 'Obsidian Minimal',
+    description: 'Elevated dark: graphite canvas, raised charcoal cards, hairline borders.',
+    mode: 'dark',
+    bg: '#171717',
+    surface: '#222222',
+    surfaceAlt: '#1D1D1D',
+    text: '#F5F5F5',
+    muted: '#A3A3A3',
+    accent: '#A5B4FC',
+    onAccent: '#171717',
+    border: '#343434',
+    headingFont: 'sans',
+    bodyFont: 'sans',
+    radius: 16,
+    shadow: 'none',
+    borderWidth: 1,
+    headingWeight: 600,
+  },
+  {
+    id: 'cupertino-daylight',
+    name: 'Daylight',
+    description: 'Bright and quiet: white cards floating on soft grey, one blue signal.',
+    mode: 'light',
+    bg: '#FAFAFA',
+    surface: '#FFFFFF',
+    surfaceAlt: '#F2F2F4',
+    text: '#1D1D1F',
+    muted: '#5F5F64',
+    accent: '#0066CC',
+    onAccent: '#FFFFFF',
+    border: '#E5E5EA',
+    headingFont: 'sans',
+    bodyFont: 'sans',
+    radius: 16,
+    shadow: 'soft',
+    borderWidth: 0,
+    headingWeight: 600,
+  },
+  {
+    id: 'terracotta-editorial',
+    name: 'Warm Editorial',
+    description: 'Magazine warmth: serif headlines, cream paper and a terracotta accent.',
+    mode: 'light',
+    bg: '#FBF8F4',
+    surface: '#FFFFFF',
+    surfaceAlt: '#F4EEE7',
+    text: '#222222',
+    muted: '#675F57',
+    accent: '#B9472F',
+    onAccent: '#FFFFFF',
+    border: '#EAE2D8',
+    headingFont: 'serif',
+    bodyFont: 'sans',
+    radius: 24,
+    shadow: 'soft',
+    borderWidth: 1,
+    headingWeight: 700,
+  },
+  {
+    id: 'swiss-mono',
+    name: 'Swiss Grid',
+    description: 'Strict grid, square corners, black-on-white type and one red signal.',
+    mode: 'light',
+    bg: '#F5F5F5',
+    surface: '#FFFFFF',
+    surfaceAlt: '#EBEBEB',
+    text: '#141414',
+    muted: '#555555',
+    accent: '#D0021B',
+    onAccent: '#FFFFFF',
+    border: '#D4D4D4',
+    headingFont: 'sans',
+    bodyFont: 'sans',
+    radius: 0,
+    shadow: 'none',
+    borderWidth: 1,
+    headingWeight: 700,
+  },
+  {
+    id: 'emerald-executive',
+    name: 'Emerald Executive',
+    description: 'Boardroom calm: soft green-grey canvas and a deep emerald signal.',
+    mode: 'light',
+    bg: '#F4F7F5',
+    surface: '#FFFFFF',
+    surfaceAlt: '#E8F0EB',
+    text: '#13201A',
+    muted: '#4D5E55',
+    accent: '#0F6B4C',
+    onAccent: '#FFFFFF',
+    border: '#DCE5DF',
+    headingFont: 'sans',
+    bodyFont: 'sans',
+    radius: 16,
+    shadow: 'lifted',
+    borderWidth: 0,
+    headingWeight: 700,
+  },
+  {
+    id: 'midnight-cobalt',
+    name: 'Midnight Cobalt',
+    description: 'Deep navy night mode with luminous cobalt highlights.',
+    mode: 'dark',
+    bg: '#0B1220',
+    surface: '#131C2E',
+    surfaceAlt: '#0F1726',
+    text: '#EEF2FA',
+    muted: '#9AA6BD',
+    accent: '#6B9BFF',
+    onAccent: '#0B1220',
+    border: '#24304A',
+    headingFont: 'sans',
+    bodyFont: 'sans',
+    radius: 24,
+    shadow: 'none',
+    borderWidth: 1,
+    headingWeight: 700,
+  },
 ];
 
 export const DEFAULT_DECK_THEME_ID = 'scholar-paper';
@@ -292,6 +438,106 @@ export function resolveDeckTheme(themeId?: string | null, customTheme?: CustomTh
     border: mixHex(surface, safeText, mode === 'dark' ? 0.14 : 0.1),
     headingFont: legacy.fontFamily === 'serif' ? 'serif' : 'sans',
     bodyFont: 'sans',
+  };
+}
+
+/* ------------------------------------------------------------------------ */
+/* CSS variables and portable tokens                                         */
+/* ------------------------------------------------------------------------ */
+
+const SHADOW_CSS: Record<ShadowStyle, { light: string; dark: string }> = {
+  none: { light: 'none', dark: 'none' },
+  soft: { light: '0 1px 2px rgba(23,23,23,0.05), 0 8px 24px -12px rgba(23,23,23,0.12)', dark: '0 1px 0 rgba(255,255,255,0.04) inset, 0 12px 28px -14px rgba(0,0,0,0.6)' },
+  lifted: { light: '0 2px 4px rgba(23,23,23,0.06), 0 18px 40px -18px rgba(23,23,23,0.22)', dark: '0 1px 0 rgba(255,255,255,0.05) inset, 0 20px 44px -18px rgba(0,0,0,0.7)' },
+};
+
+/** CSS box-shadow for a raised card in this theme. */
+export function cardShadowCss(theme: DeckTheme): string | undefined {
+  const s = deckShape(theme).shadow;
+  return s === 'none' ? undefined : SHADOW_CSS[s][theme.mode];
+}
+
+/**
+ * The theme as scoped --slide-* custom properties. Set on every slide stage
+ * so chrome around the canvas (toolbars, thumbnails, overlays) can match the
+ * deck without reading the tokens itself.
+ */
+export function deckThemeCssVars(theme: DeckTheme): Record<string, string> {
+  const shape = deckShape(theme);
+  return {
+    '--slide-bg': theme.bg,
+    '--slide-card': theme.surface,
+    '--slide-card-alt': theme.surfaceAlt,
+    '--slide-text': theme.text,
+    '--slide-muted': theme.muted,
+    '--slide-accent': theme.accent,
+    '--slide-on-accent': theme.onAccent,
+    '--slide-border': theme.border,
+    '--slide-radius': `${shape.radius}px`,
+    '--slide-border-width': `${shape.borderWidth}px`,
+    '--slide-shadow': cardShadowCss(theme) ?? 'none',
+    '--slide-font-heading': WEB_FONTS[theme.headingFont],
+    '--slide-font-body': WEB_FONTS[theme.bodyFont],
+  };
+}
+
+const RADIUS_TOKENS = [0, 8, 16, 24] as const;
+
+function nearestRadius(px: number): (typeof RADIUS_TOKENS)[number] {
+  return RADIUS_TOKENS.reduce((best, r) => (Math.abs(r - px) < Math.abs(best - px) ? r : best), 24 as (typeof RADIUS_TOKENS)[number]);
+}
+
+/** Portable ThemeTokens (schema in src/domain/presentation) for a deck theme. */
+export function deckThemeToTokens(theme: DeckTheme): ThemeTokens {
+  const shape = deckShape(theme);
+  return {
+    id: theme.id,
+    name: theme.name,
+    mode: theme.mode,
+    colors: {
+      bgPrimary: theme.bg,
+      bgCard: theme.surface,
+      bgAccentMuted: theme.surfaceAlt,
+      textPrimary: theme.text,
+      textSecondary: theme.muted,
+      accentPrimary: theme.accent,
+      borderSubtle: theme.border,
+    },
+    typography: { fontHeading: theme.headingFont, fontBody: theme.bodyFont, headingWeight: shape.headingWeight },
+    shape: { radiusCard: `${nearestRadius(shape.radius)}px`, shadowStyle: shape.shadow, cardBorderWidth: shape.borderWidth },
+  };
+}
+
+/**
+ * Deck theme from ThemeTokens (an extracted screenshot or .pptx theme).
+ * Text that would not reach WCAG AA on the card surface is replaced with the
+ * better of the two Scholar inks, so an extracted palette is always readable.
+ */
+export function tokensToDeckTheme(tokens: ThemeTokens, description = 'Extracted theme'): DeckTheme {
+  const c = tokens.colors;
+  const surface = softenBlack(c.bgCard);
+  const text = contrast(c.textPrimary, surface) >= 4.5 ? softenBlack(c.textPrimary) : bestInk(surface);
+  const muted = contrast(c.textSecondary, surface) >= 3 ? c.textSecondary : mixHex(text, surface, 0.38);
+  const accent = softenBlack(c.accentPrimary);
+  return {
+    id: tokens.id,
+    name: tokens.name,
+    description,
+    mode: tokens.mode,
+    bg: softenBlack(c.bgPrimary),
+    surface,
+    surfaceAlt: softenBlack(c.bgAccentMuted),
+    text,
+    muted,
+    accent,
+    onAccent: bestInk(accent),
+    border: c.borderSubtle,
+    headingFont: tokens.typography.fontHeading,
+    bodyFont: tokens.typography.fontBody,
+    radius: Number.parseInt(tokens.shape.radiusCard, 10),
+    shadow: tokens.shape.shadowStyle,
+    borderWidth: tokens.shape.cardBorderWidth,
+    headingWeight: tokens.typography.headingWeight,
   };
 }
 

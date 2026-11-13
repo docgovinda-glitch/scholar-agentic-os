@@ -7,44 +7,28 @@
  * cannot point to in the user's topic, notes or project data is dropped
  * rather than shown as evidence.
  */
-import { z } from "zod";
+import {
+  ITEM_LAYOUTS,
+  SLIDE_LAYOUT_IDS,
+  slideCardSchema,
+  type SlideLayoutId,
+  type StatTrend,
+} from "../../../src/domain/presentation/slideSchema.ts";
 
-export const GAMMA_LAYOUT_IDS = ["title", "bento", "stats", "timeline", "comparison", "list", "quote", "split", "statement", "table"] as const;
-export type GammaLayoutId = (typeof GAMMA_LAYOUT_IDS)[number];
+/** Layout ids the model may choose (shared with the client renderer). */
+export const GAMMA_LAYOUT_IDS = SLIDE_LAYOUT_IDS;
+export type GammaLayoutId = SlideLayoutId;
 
-const text = (max: number) => z.string().trim().max(max * 4).transform((s) => s.replace(/\s+/g, " ").slice(0, max));
-const optionalText = (max: number) => text(max).nullish().transform((v) => (v ? v : undefined));
-
-export const gammaCardSchema = z.object({
-  layout: z.enum(GAMMA_LAYOUT_IDS).nullish().catch(undefined),
-  eyebrow: optionalText(60),
-  lede: optionalText(260),
-  items: z
-    .array(z.object({ title: text(140), body: optionalText(260) }))
-    .nullish()
-    .transform((v) => (v ?? []).filter((i) => i.title).slice(0, 6)),
-  stats: z
-    .array(z.object({ value: text(18), label: text(90), detail: optionalText(220) }))
-    .nullish()
-    .transform((v) => (v ?? []).filter((s) => s.value && s.label).slice(0, 4)),
-  columns: z
-    .array(z.object({ title: text(80), points: z.array(text(160)).max(8).transform((p) => p.filter(Boolean).slice(0, 6)) }))
-    .nullish()
-    .transform((v) => (v && v.length >= 2 ? [v[0], v[1]] : undefined)),
-  quote: z
-    .object({ text: text(320), attribution: optionalText(120) })
-    .nullish()
-    .transform((v) => (v && v.text ? v : undefined)),
-  takeaway: optionalText(160),
-});
+/** The card schema lives in src/domain/presentation/slideSchema.ts. */
+export const gammaCardSchema = slideCardSchema;
 
 /** Card content carried on each generated slide (mirrors CardContent on the client). */
 export interface GammaCardPayload {
   layout?: GammaLayoutId;
   eyebrow?: string;
   lede?: string;
-  items: Array<{ title: string; body?: string }>;
-  stats: Array<{ value: string; label: string; detail?: string }>;
+  items: Array<{ title: string; body?: string; icon?: string }>;
+  stats: Array<{ value: string; label: string; detail?: string; trend?: StatTrend }>;
   columns?: Array<{ title: string; points: string[] }>;
   quote?: { text: string; attribution?: string };
   takeaway?: string;
@@ -72,7 +56,14 @@ export function parseGammaCard(raw: unknown, sourceCorpus: string): GammaCardPay
   let items = card.items;
   if (layout === "stats" && grounded.length === 0) {
     layout = items.length >= 4 ? "bento" : "list";
-    items = items.length ? items : dropped.map((s) => ({ title: s.label, body: s.detail }));
+    items = items.length ? items : dropped.map((s) => ({ title: s.label, body: s.detail, icon: undefined }));
+  }
+  // A layout built from items (or two columns) with nothing to draw falls back to one that can render.
+  if (layout && ITEM_LAYOUTS.has(layout) && items.length === 0) {
+    layout = card.columns ? "comparison" : "statement";
+  }
+  if (layout === "problem-solution" && !card.columns && items.length < 2) {
+    layout = items.length ? "list" : "statement";
   }
   return {
     layout,
@@ -80,7 +71,7 @@ export function parseGammaCard(raw: unknown, sourceCorpus: string): GammaCardPay
     lede: card.lede,
     items,
     stats: grounded,
-    columns: card.columns,
+    columns: card.columns ? [card.columns[0], card.columns[1]] : undefined,
     quote: card.quote,
     takeaway: card.takeaway,
   };

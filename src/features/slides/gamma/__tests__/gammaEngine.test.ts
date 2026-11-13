@@ -144,10 +144,12 @@ describe('geometry', () => {
       expect(g.elements.length).toBeGreaterThan(2);
       for (const el of g.elements) {
         if (el.kind === 'line') continue;
+        const w = el.kind === 'icon' ? el.size : el.w;
+        const h = el.kind === 'icon' ? el.size : el.h;
         expect(el.x).toBeGreaterThanOrEqual(0);
         expect(el.y).toBeGreaterThanOrEqual(0);
-        expect(el.x + el.w).toBeLessThanOrEqual(CANVAS_W + 0.5);
-        expect(el.y + el.h).toBeLessThanOrEqual(CANVAS_H + 0.5);
+        expect(el.x + w).toBeLessThanOrEqual(CANVAS_W + 0.5);
+        expect(el.y + h).toBeLessThanOrEqual(CANVAS_H + 0.5);
       }
       expect(g.elements.some((e) => e.kind === 'text' && e.path === 'headline' || e.kind === 'text' && e.path === 'quote.text')).toBe(true);
     }

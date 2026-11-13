@@ -3,8 +3,9 @@ import { Loader2, Plus, Sparkles } from 'lucide-react';
 import type { GammaLayout } from '../types/slides';
 import { BLOCK_SPECS, LAYOUT_SWITCHER, type BlockKind } from '../gamma/blocks';
 import { LayoutGlyph } from '../gamma/StudioControls';
+import { SLIDE_LAYOUTS } from '../../../domain/presentation/slideSchema';
 
-/** One-click switch between the seven named slide layouts. */
+/** One-click switch between the slide layouts. */
 export function SlideLayoutSwitcher({ layout, onChange }: { layout: GammaLayout; onChange: (l: GammaLayout) => void }) {
   return (
     <div role="radiogroup" aria-label="Slide layout" data-testid="studio-layout-switcher" className="flex flex-wrap gap-1.5">
@@ -17,6 +18,7 @@ export function SlideLayoutSwitcher({ layout, onChange }: { layout: GammaLayout;
             role="radio"
             aria-checked={active}
             data-testid={`layout-option-${opt.id}`}
+            title={SLIDE_LAYOUTS.find((l) => l.id === opt.id)?.hint}
             onClick={() => onChange(opt.id)}
             className={`h-8 pl-2 pr-3 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
               active

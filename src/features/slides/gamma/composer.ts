@@ -362,7 +362,7 @@ export const VISUAL_TYPE_LAYOUT: Record<string, GammaLayout> = {
   'Process / Timeline': 'timeline',
   'Architecture Diagram': 'split',
   'Evidence & Metrics': 'list',
-  'Key Takeaways': 'list',
+  'Key Takeaways': 'takeaways',
 };
 
 /**
@@ -378,7 +378,10 @@ export function composeDeckFromOutline(
   const framework = opts.framework || 'Standard-Narrative';
   const title = clean(stripCourseCodes(opts.title)) || 'Untitled presentation';
   const slides = outline.map((card, i) => {
-    const layout = VISUAL_TYPE_LAYOUT[card.visualType || ''] ?? (i === 0 ? 'title' : 'bento');
+    const mapped = VISUAL_TYPE_LAYOUT[card.visualType || ''] ?? (i === 0 ? 'title' : 'bento');
+    // Exactly three points read best as three equal cards; other counts keep the bento grid.
+    const filled = card.bullets.filter((b) => clean(b)).length;
+    const layout: GammaLayout = mapped === 'bento' && card.visualType === '3-Card Grid' && filled === 3 ? 'grid3' : mapped;
     const bullets = card.bullets.map((b) => clean(stripCourseCodes(b))).filter(Boolean);
     const items: CardItem[] = bullets.map((b) => sentenceToItem(b));
     let content: CardContent;
