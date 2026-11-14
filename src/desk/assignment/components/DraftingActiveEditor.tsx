@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import SectionTextEditor, { type SectionEditorHandle } from "../../editor/SectionTextEditor";
+import { inlineMarkdownRuns } from "../../../shared/inlineMarkdown";
 import { showAppToast } from "../../../components/ui/FeedbackSystem";
 import type { AssignmentDraftingSection, DiscoveredSource } from "../types";
 import { splitProseIntoParagraphs } from "../../../shared/proseParagraphs";
@@ -107,7 +108,14 @@ function renderAcademicProseWithCitations(
               </span>
             );
           }
-          return <span key={i}>{part}</span>;
+          // Stored light Markdown shows as real formatting, never as asterisks.
+          return (
+            <span key={i}>
+              {inlineMarkdownRuns(part).map((r, j) =>
+                r.bold ? <strong key={j}>{r.text}</strong> : r.italics ? <em key={j}>{r.text}</em> : <React.Fragment key={j}>{r.text}</React.Fragment>
+              )}
+            </span>
+          );
         })}
       </p>
     );

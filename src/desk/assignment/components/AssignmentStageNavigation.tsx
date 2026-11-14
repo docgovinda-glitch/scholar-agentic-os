@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import {
   FileText,
   Brain,
@@ -63,6 +63,15 @@ export default function AssignmentStageNavigation({
     };
   }, [structure, question, approvedSourceIds.length, wordCountPercentage, submissionReport]);
 
+  // On narrow screens the stepper scrolls sideways: keep the current stage in view.
+  const activeStepRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const el = activeStepRef.current;
+    if (el && typeof el.scrollIntoView === "function") {
+      el.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
+    }
+  }, [currentPhase]);
+
   const renderIcon = (iconKey: string, isActive: boolean) => {
     const iconProps = { className: "w-3.5 h-3.5 shrink-0" };
     switch (iconKey) {
@@ -113,7 +122,8 @@ export default function AssignmentStageNavigation({
                   onSelectPhase?.(phase.id);
                   onSelectStage?.();
                 }}
-                aria-label={`Phase ${phase.number}: ${phase.shortLabel}${phase.id === "extract" ? " · Phase 1: Understand" : ""}${phase.id === "sources" ? " · Phase 2: Sources" : ""}${phase.id === "drafting" ? " · Phase 3: Drafting" : ""}${phase.id === "submission" ? " · Phase 4: Submission" : ""}`}
+                aria-label={`Phase ${phase.number}: ${phase.shortLabel}`}
+                ref={isActive ? activeStepRef : undefined}
                 aria-current={isActive ? "step" : undefined}
                 className={`group flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all shrink-0 cursor-pointer ${
                   isActive

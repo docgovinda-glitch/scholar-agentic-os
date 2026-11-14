@@ -442,7 +442,7 @@ export function AssignmentSubmissionStage({
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wide uppercase bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                Phase 04 · Submission & Review
+                Phase 05 · Submission & Review
               </span>
               <span className="text-xs text-neutral-400 dark:text-neutral-500 font-mono">
                 Before you submit
