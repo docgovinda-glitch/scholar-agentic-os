@@ -3,7 +3,8 @@ import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import { Node, mergeAttributes } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
-import { Bold, Heading4, Italic, List, ListOrdered, Redo2, Undo2 } from "lucide-react";
+import { TableKit } from "@tiptap/extension-table";
+import { Bold, Columns3, Heading4, Italic, List, ListOrdered, Quote, Redo2, Rows3, Table2, Trash2, Underline as UnderlineIcon, Undo2 } from "lucide-react";
 import { docToText, normalizeSectionText, textToDoc, type PMNode } from "./sectionDoc";
 import type React from "react";
 
@@ -54,7 +55,7 @@ const Button = ({ on, label, icon, onClick }: { on: boolean; label: string; icon
   </button>
 );
 
-function Toolbar({ editor, extra }: { editor: Editor; extra?: React.ReactNode }) {
+function Toolbar({ editor, extra, richBlocks }: { editor: Editor; extra?: React.ReactNode; richBlocks?: boolean }) {
   return (
     <div role="toolbar" aria-label="Text formatting" className="flex flex-wrap items-center gap-0.5 px-2 py-1 border-b border-[color:var(--border-subtle)]">
       <Button on={false} label="Undo" icon={<Undo2 className="w-3.5 h-3.5" />} onClick={() => editor.chain().focus().undo().run()} />
@@ -62,9 +63,34 @@ function Toolbar({ editor, extra }: { editor: Editor; extra?: React.ReactNode })
       <span aria-hidden="true" className="mx-1 h-4 w-px bg-[color:var(--border-subtle)]" />
       <Button on={editor.isActive("bold")} label="Bold" icon={<Bold className="w-3.5 h-3.5" />} onClick={() => editor.chain().focus().toggleBold().run()} />
       <Button on={editor.isActive("italic")} label="Italic" icon={<Italic className="w-3.5 h-3.5" />} onClick={() => editor.chain().focus().toggleItalic().run()} />
+      {richBlocks && (
+        <Button on={editor.isActive("underline")} label="Underline" icon={<UnderlineIcon className="w-3.5 h-3.5" />} onClick={() => editor.chain().focus().toggleUnderline().run()} />
+      )}
       <Button on={editor.isActive("heading", { level: 4 })} label="Sub-heading" icon={<Heading4 className="w-3.5 h-3.5" />} onClick={() => editor.chain().focus().toggleHeading({ level: 4 }).run()} />
       <Button on={editor.isActive("bulletList")} label="Bulleted list" icon={<List className="w-3.5 h-3.5" />} onClick={() => editor.chain().focus().toggleBulletList().run()} />
       <Button on={editor.isActive("orderedList")} label="Numbered list" icon={<ListOrdered className="w-3.5 h-3.5" />} onClick={() => editor.chain().focus().toggleOrderedList().run()} />
+      {richBlocks && (
+        <>
+          <Button on={editor.isActive("blockquote")} label="Block quote" icon={<Quote className="w-3.5 h-3.5" />} onClick={() => editor.chain().focus().toggleBlockquote().run()} />
+          <Button
+            on={false}
+            label="Insert table"
+            icon={<Table2 className="w-3.5 h-3.5" />}
+            onClick={() => {
+              // A table cannot be stored inside a block quote, so step out of one first.
+              const chain = editor.chain().focus();
+              (editor.isActive("blockquote") ? chain.lift("blockquote") : chain).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+            }}
+          />
+          {editor.isActive("table") && (
+            <>
+              <Button on={false} label="Add row" icon={<Rows3 className="w-3.5 h-3.5" />} onClick={() => editor.chain().focus().addRowAfter().run()} />
+              <Button on={false} label="Add column" icon={<Columns3 className="w-3.5 h-3.5" />} onClick={() => editor.chain().focus().addColumnAfter().run()} />
+              <Button on={false} label="Delete table" icon={<Trash2 className="w-3.5 h-3.5" />} onClick={() => editor.chain().focus().deleteTable().run()} />
+            </>
+          )}
+        </>
+      )}
       {extra ? <div className="ml-auto flex items-center gap-1">{extra}</div> : null}
     </div>
   );
@@ -86,18 +112,28 @@ const SectionTextEditor = forwardRef<SectionEditorHandle, {
   /** Extra classes for the editable area (size, typography). */
   contentClassName?: string;
   autoFocus?: boolean;
-}>(function SectionTextEditor({ value, onChange, ariaLabel, placeholder, citationLabel, toolbarExtra, contentClassName, autoFocus }, ref) {
+  /** Underline, block quotes and tables (stored as <u>, "> " and pipe tables); off where exports do not read them. */
+  richBlocks?: boolean;
+}>(function SectionTextEditor({ value, onChange, ariaLabel, placeholder, citationLabel, toolbarExtra, contentClassName, autoFocus, richBlocks = false }, ref) {
   const lastEmitted = useRef(normalizeSectionText(value));
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
   const editor = useEditor({
     extensions: [
-      StarterKit.configure({ heading: { levels: [4] }, code: false, codeBlock: false, strike: false, horizontalRule: false, blockquote: false }),
+      StarterKit.configure({
+        heading: { levels: [4] },
+        code: false,
+        codeBlock: false,
+        strike: false,
+        horizontalRule: false,
+        ...(richBlocks ? {} : { blockquote: false as const, underline: false as const }),
+      }),
+      ...(richBlocks ? [TableKit.configure({ table: { resizable: false } })] : []),
       Placeholder.configure({ placeholder: placeholder ?? "" }),
       citationNode(citationLabel),
     ],
-    content: textToDoc(value) as unknown as Record<string, unknown>,
+    content: textToDoc(value, { richBlocks }) as unknown as Record<string, unknown>,
     autofocus: autoFocus ? "end" : false,
     onUpdate: ({ editor: ed }) => {
       const text = docToText(ed.getJSON() as unknown as PMNode);
@@ -120,9 +156,9 @@ const SectionTextEditor = forwardRef<SectionEditorHandle, {
     const next = normalizeSectionText(value);
     if (next !== lastEmitted.current) {
       lastEmitted.current = next;
-      editor.commands.setContent(textToDoc(value) as unknown as Record<string, unknown>, { emitUpdate: false });
+      editor.commands.setContent(textToDoc(value, { richBlocks }) as unknown as Record<string, unknown>, { emitUpdate: false });
     }
-  }, [editor, value]);
+  }, [editor, value, richBlocks]);
 
   useImperativeHandle(
     ref,
@@ -156,7 +192,7 @@ const SectionTextEditor = forwardRef<SectionEditorHandle, {
   if (!editor) return null;
   return (
     <div className="rounded-2xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] focus-within:border-[color:var(--accent-border)]">
-      <Toolbar editor={editor} extra={toolbarExtra} />
+      <Toolbar editor={editor} extra={toolbarExtra} richBlocks={richBlocks} />
       <EditorContent editor={editor} />
     </div>
   );

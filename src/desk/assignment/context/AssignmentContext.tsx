@@ -1,3 +1,4 @@
+import { countProseWords } from "../../../shared/proseBlocks";
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode, useMemo, useRef } from "react";
 import { purgeLegacyTemplateText } from "../../../domain/assignment/legacyPurge";
 import type { CanonicalDocument, OutputTypeSpec, ProjectView, RubricReport } from "../../types";
@@ -875,7 +876,7 @@ export function AssignmentProvider({
           id: sec.id,
           title: sec.title,
           targetWordCount: sec.targetWordCount,
-          currentWordCount: sec.currentWordCount ?? (sec.draftContent ? sec.draftContent.trim().split(/\s+/).filter(Boolean).length : 0),
+          currentWordCount: sec.currentWordCount ?? countProseWords(sec.draftContent || ""),
           guidance: sec.guidance || "",
           draftContent: sec.draftContent || "",
           status: sec.draftContent?.trim() ? "completed" : sec.status || "pending",
@@ -1168,7 +1169,7 @@ export function AssignmentProvider({
 
   const updateSectionContent = useCallback(
     async (sectionId: string, content: string) => {
-      const words = content.trim() ? content.trim().split(/\s+/).filter(Boolean).length : 0;
+      const words = countProseWords(content);
       const baseSections = latestSections();
       const updated = baseSections.map((s) =>
         s.id === sectionId
@@ -1289,7 +1290,7 @@ export function AssignmentProvider({
   const recalculateWordCounts = useCallback(async () => {
     const baseSections = latestSections();
     const updated = baseSections.map((sec) => {
-      const words = sec.draftContent?.trim() ? sec.draftContent.trim().split(/\s+/).filter(Boolean).length : 0;
+      const words = countProseWords(sec.draftContent || "");
       return {
         ...sec,
         currentWordCount: words,

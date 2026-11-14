@@ -39,3 +39,28 @@ describe("section text ⇄ editor document", () => {
     expect(docToText(textToDoc(""))).toBe("");
   });
 });
+
+describe("rich blocks (Coursework editor)", () => {
+  const text = [
+    "Plain <u>underlined</u> and <u>**both**</u> text.",
+    "> A quoted line\n> and its second line",
+    "| A | B |\n| --- | --- |\n| 1 | *two* |",
+  ].join("\n\n");
+
+  it("round-trips underline, block quotes and tables exactly", () => {
+    const doc = textToDoc(text, { richBlocks: true });
+    expect(doc.content?.map((b) => b.type)).toEqual(["paragraph", "blockquote", "table"]);
+    expect(docToText(doc)).toBe(normalizeSectionText(text));
+  });
+
+  it("leaves quotes and tables as text when rich blocks are off (Journal)", () => {
+    const doc = textToDoc(text);
+    expect(doc.content?.map((b) => b.type)).toEqual(["paragraph", "paragraph", "paragraph"]);
+    expect(docToText(doc)).toBe(normalizeSectionText(text));
+  });
+});
+
+it("reads underline and bold in either nesting order", () => {
+  const p = textToDoc("**<u>x</u>**", { richBlocks: true }).content?.[0];
+  expect(p?.content?.[0].marks?.map((m) => m.type).sort()).toEqual(["bold", "underline"]);
+});

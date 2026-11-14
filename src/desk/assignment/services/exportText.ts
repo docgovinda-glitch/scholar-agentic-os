@@ -5,6 +5,7 @@
 import type { DiscoveredSource } from "../types";
 import { parsePersonName } from "./referenceListGenerator";
 import { cleanEscapes } from "../../../shared/inlineMarkdown";
+import { parseProseBlocks } from "../../../shared/proseBlocks";
 
 export { cleanEscapes, inlineMarkdownRuns, type StyledRun } from "../../../shared/inlineMarkdown";
 
@@ -51,5 +52,28 @@ export function inlineMarkdownToHtml(text: string): string {
   return escapeHtml(cleanEscapes(text))
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/(^|[^*\w])\*([^*\n]+)\*(?!\w)/g, "$1<em>$2</em>")
-    .replace(/(^|[^_\w])_([^_\n]+)_(?!\w)/g, "$1<em>$2</em>");
+    .replace(/(^|[^_\w])_([^_\n]+)_(?!\w)/g, "$1<em>$2</em>")
+    .replace(/&lt;u&gt;([\s\S]+?)&lt;\/u&gt;/g, "<u>$1</u>");
+}
+
+/** A section's stored text as safe HTML blocks (paragraphs, sub-headings, quotes, lists, tables). */
+export function proseToHtml(text: string): string {
+  return parseProseBlocks(text)
+    .map((b) => {
+      if (b.kind === "paragraph") return `<p>${inlineMarkdownToHtml(b.text)}</p>`;
+      if (b.kind === "heading") return `<h3>${inlineMarkdownToHtml(b.text)}</h3>`;
+      if (b.kind === "quote") return `<blockquote>${b.text.split("\n").map((l) => `<p>${inlineMarkdownToHtml(l)}</p>`).join("")}</blockquote>`;
+      if (b.kind === "bullets" || b.kind === "numbered") {
+        const tag = b.kind === "bullets" ? "ul" : "ol";
+        return `<${tag}>${b.items.map((i) => `<li>${inlineMarkdownToHtml(i)}</li>`).join("")}</${tag}>`;
+      }
+      const rows = b.rows
+        .map((r, ri) => {
+          const cell = b.header && ri === 0 ? "th" : "td";
+          return `<tr>${r.map((c) => `<${cell}>${inlineMarkdownToHtml(c)}</${cell}>`).join("")}</tr>`;
+        })
+        .join("");
+      return `<table>${rows}</table>`;
+    })
+    .join("");
 }

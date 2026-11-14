@@ -46,3 +46,17 @@ describe("buildAssignmentCanonicalDocument", () => {
     expect(AssignmentPdfRequestSchema.safeParse({ title: "x", sections: "nope" }).success).toBe(false);
   });
 });
+
+describe("rich blocks in the PDF document", () => {
+  it("turns quotes, lists and tables into document blocks and still renders a PDF", async () => {
+    const req = AssignmentPdfRequestSchema.parse({
+      title: "Rich",
+      sections: [{ title: "S", draftContent: "Intro.\n\n> Quoted.\n\n- a\n- b\n\n| X | Y |\n| --- | --- |\n| 1 | 2 |" }],
+    });
+    const doc = buildAssignmentCanonicalDocument(req);
+    expect(doc.blocks.map((b) => b.kind)).toEqual(["paragraph", "heading1", "paragraph", "quote", "list-item", "list-item", "table"]);
+    expect(doc.blocks.at(-1)?.rows).toEqual([["X", "Y"], ["1", "2"]]);
+    const result = await exportDocument({ document: doc, format: "pdf", title: "Rich" });
+    expect(result.data.subarray(0, 4).toString()).toBe("%PDF");
+  }, 30_000);
+});

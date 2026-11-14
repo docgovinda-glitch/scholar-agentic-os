@@ -72,6 +72,19 @@ function blockToContent(block: Block): Content {
       return { text, style: "heading3" };
     case "quote":
       return { text: runs(text), style: "quote" } as Content;
+    case "table": {
+      const rows = block.rows?.length ? block.rows : [[text]];
+      const width = Math.max(...rows.map((r) => r.length), 1);
+      return {
+        table: {
+          headerRows: 1,
+          widths: Array.from({ length: width }, () => "*"),
+          body: rows.map((r, ri) => Array.from({ length: width }, (_, ci) => ({ text: runs(r[ci] ?? ""), bold: ri === 0 }))),
+        },
+        layout: "lightHorizontalLines",
+        margin: [0, 4, 0, 8],
+      } as Content;
+    }
     case "list-item":
       return { ul: [{ text: runs(text) } as Content], style: "listItem" };
     default:

@@ -8,7 +8,7 @@ import type { Block, CanonicalDocument } from "../../types";
 import type { DiscoveredSource } from "../types";
 import { selectCitedSources } from "./exportText";
 import { generateReferenceList, getReferenceListHeading } from "./referenceListGenerator";
-import { splitProseIntoParagraphs } from "../../../shared/proseParagraphs";
+import { parseProseBlocks } from "../../../shared/proseBlocks";
 
 const MAX_TEXT = 400_000;
 
@@ -61,8 +61,14 @@ export function buildAssignmentCanonicalDocument(input: AssignmentPdfRequest, id
 
   for (const s of input.sections) {
     push("heading1", s.title || "Untitled section");
-    const paras = splitProseIntoParagraphs(s.draftContent || "").map((p) => p.replace(/^#+\s*/, "").trim()).filter(Boolean);
-    for (const p of paras) push("paragraph", p);
+    for (const b of parseProseBlocks(s.draftContent || "")) {
+      if (b.kind === "paragraph") push("paragraph", b.text);
+      else if (b.kind === "heading") push("heading2", b.text);
+      else if (b.kind === "quote") push("quote", b.text);
+      else if (b.kind === "bullets") b.items.forEach((i) => push("list-item", i));
+      else if (b.kind === "numbered") b.items.forEach((i, n) => push("paragraph", `${n + 1}. ${i}`));
+      else blocks.push({ id: `${id}-b${++n}`, kind: "table", text: b.rows.map((r) => r.join(" | ")).join("\n"), rows: b.rows });
+    }
   }
 
   const style = input.citationStyle || "harvard";

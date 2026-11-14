@@ -40,12 +40,15 @@ export interface ProjectView {
   gates: GateSummary[];
 }
 
-export type BlockKind = "paragraph" | "heading1" | "heading2" | "heading3" | "quote" | "list-item";
+export type BlockKind = "paragraph" | "heading1" | "heading2" | "heading3" | "quote" | "list-item" | "table";
 
 export interface Block {
   id: string;
   kind: BlockKind;
+  /** For a table, a plain-text rendering ("a | b" per row) so writers without table support still print it. */
   text: string;
+  /** Table cells, first row the header (only for kind "table"). */
+  rows?: string[][];
 }
 
 export interface CanonicalDocument {

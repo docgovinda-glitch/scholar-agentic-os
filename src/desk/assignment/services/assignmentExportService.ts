@@ -8,7 +8,8 @@
  * - Formatted Bibliography: Auto-generated reference list formatted to citationStyle (Harvard, APA 7, IEEE, MHRA) with hanging indent
  */
 
-import { selectCitedSources, inlineMarkdownRuns, inlineMarkdownToHtml } from "./exportText";
+import { selectCitedSources, inlineMarkdownRuns, inlineMarkdownToHtml, proseToHtml, type StyledRun } from "./exportText";
+import { parseProseBlocks } from "../../../shared/proseBlocks";
 import {
   Document,
   Packer,
@@ -79,6 +80,74 @@ export function formatBibliographyEntry(source: DiscoveredSource, style: string,
  */
 export function buildFormattedBibliography(sources: DiscoveredSource[], style: string): string[] {
   return generateReferenceList(sources, style);
+}
+
+/** A styled run as a .docx TextRun (underline needs docx's own option shape). */
+function docxRun(r: StyledRun, size = 24): TextRun {
+  return new TextRun({
+    text: r.text,
+    bold: r.bold,
+    italics: r.italics,
+    underline: r.underline ? {} : undefined,
+    font: "Times New Roman",
+    size,
+  });
+}
+
+/**
+ * One section's stored text as .docx blocks: paragraphs, sub-headings, block
+ * quotes (indented), bulleted/numbered lists and real tables.
+ */
+export function proseToDocxBlocks(text: string, line: number, after: number): Array<Paragraph | Table> {
+  const out: Array<Paragraph | Table> = [];
+  for (const b of parseProseBlocks(text)) {
+    if (b.kind === "paragraph") {
+      out.push(new Paragraph({ spacing: { line, after }, children: inlineMarkdownRuns(b.text).map((r) => docxRun(r)) }));
+    } else if (b.kind === "heading") {
+      out.push(new Paragraph({ spacing: { before: 120, after: 80 }, children: inlineMarkdownRuns(b.text).map((r) => docxRun({ ...r, bold: true })) }));
+    } else if (b.kind === "quote") {
+      for (const q of b.text.split("\n")) {
+        out.push(new Paragraph({ indent: { left: 720, right: 720 }, spacing: { line, after }, children: inlineMarkdownRuns(q).map((r) => docxRun(r)) }));
+      }
+    } else if (b.kind === "bullets" || b.kind === "numbered") {
+      b.items.forEach((item, i) => {
+        const marker = b.kind === "bullets" ? "\u2022\t" : `${i + 1}.\t`;
+        out.push(
+          new Paragraph({
+            indent: { left: 720, hanging: 360 },
+            spacing: { line, after: 60 },
+            children: [docxRun({ text: marker }), ...inlineMarkdownRuns(item).map((r) => docxRun(r))],
+          })
+        );
+      });
+    } else if (b.kind === "table") {
+      const width = Math.max(...b.rows.map((r) => r.length), 1);
+      out.push(
+        new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          rows: b.rows.map(
+            (row, ri) =>
+              new TableRow({
+                tableHeader: b.header && ri === 0,
+                children: Array.from(
+                  { length: width },
+                  (_, ci) =>
+                    new TableCell({
+                      children: [
+                        new Paragraph({
+                          children: inlineMarkdownRuns(row[ci] ?? "").map((r) => docxRun({ ...r, bold: r.bold || (b.header && ri === 0) }, 22)),
+                        }),
+                      ],
+                    })
+                ),
+              })
+          ),
+        })
+      );
+      out.push(new Paragraph({ spacing: { after } }));
+    }
+  }
+  return out;
 }
 
 /**
@@ -161,7 +230,7 @@ export async function generateAssignmentDocx(params: AssignmentExportParams): Pr
     isTutorialOrShortQABrief(brief.rawPrompt || brief.instructions || params.title, computedWordCount);
 
   if (isTutorialOrShortQA) {
-    const qnaChildren: Paragraph[] = [
+    const qnaChildren: Array<Paragraph | Table> = [
       new Paragraph({
         alignment: AlignmentType.CENTER,
         spacing: { before: 200, after: 400 },
@@ -192,17 +261,7 @@ export async function generateAssignmentDocx(params: AssignmentExportParams): Pr
         })
       );
 
-      const paragraphs = splitProseIntoParagraphs(sec.draftContent || "")
-
-      paragraphs.forEach((pText) => {
-        const cleanP = pText.replace(/^#+\s*/, "");
-        qnaChildren.push(
-          new Paragraph({
-            spacing: { line: 320, after: 140 },
-            children: inlineMarkdownRuns(cleanP).map((r) => new TextRun({ ...r, font: "Times New Roman", size: 24 })),
-          })
-        );
-      });
+      qnaChildren.push(...proseToDocxBlocks(sec.draftContent || "", 320, 140));
     });
 
     const doc = new Document({
@@ -374,10 +433,10 @@ export async function generateAssignmentDocx(params: AssignmentExportParams): Pr
       })
     );
 
-    // Split content into clean paragraphs
-    const paragraphs = splitProseIntoParagraphs(sec.draftContent || "")
+    const sectionBlocks = proseToDocxBlocks(sec.draftContent || "", 360, 160);
 
-    if (paragraphs.length === 0) {
+
+    if (sectionBlocks.length === 0) {
       bodyChildren.push(
         new Paragraph({
           spacing: { line: 360, after: 140 },
@@ -393,16 +452,7 @@ export async function generateAssignmentDocx(params: AssignmentExportParams): Pr
         })
       );
     } else {
-      paragraphs.forEach((pText) => {
-        // Strip markdown header symbols if present
-        const cleanP = pText.replace(/^#+\s*/, "");
-        bodyChildren.push(
-          new Paragraph({
-            spacing: { line: 360, after: 160 }, // 1.5 line spacing (360 dxa)
-            children: inlineMarkdownRuns(cleanP).map((r) => new TextRun({ ...r, font: "Times New Roman", size: 24 })),
-          })
-        );
-      });
+      bodyChildren.push(...sectionBlocks);
     }
   });
 
@@ -453,7 +503,7 @@ export async function generateAssignmentDocx(params: AssignmentExportParams): Pr
           // Hanging indent standard for academic bibliographies (720 dxa = 0.5 in)
           indent: { left: 720, hanging: 720 },
           spacing: { line: 360, after: 140 },
-          children: inlineMarkdownRuns(refText).map((r) => new TextRun({ ...r, font: "Times New Roman", size: 24 })),
+          children: inlineMarkdownRuns(refText).map((r) => docxRun(r)),
         })
       );
     });
@@ -626,9 +676,7 @@ export function exportAssignmentToPdf(params: AssignmentExportParams): void {
 
   const sectionsHtml = sections
     .map((s) => {
-      const paras = splitProseIntoParagraphs(s.draftContent || "")
-        .map((p) => `<p>${inlineMarkdownToHtml(p.replace(/^#+\s*/, ""))}</p>`)
-        .join("");
+      const paras = proseToHtml(s.draftContent || "");
       return `<section class="academic-section"><h2>${escapeHtmlText(s.title)}</h2>${paras || "<p><em>[Not drafted yet]</em></p>"}</section>`;
     })
     .join("\n");
@@ -656,6 +704,8 @@ export function exportAssignmentToPdf(params: AssignmentExportParams): void {
     h1 { font-size: 20pt; font-weight: bold; margin-bottom: 2rem; text-align: center; }
     h2 { font-size: 14pt; font-weight: bold; margin-top: 1.5rem; margin-bottom: 0.8rem; }
     p { margin: 0 0 1.2rem; text-align: justify; }
+    blockquote { margin: 0 2.5em 1.2rem; }
+    table { border-collapse: collapse; width: 100%; margin: 0 0 1.2rem; font-size: 11pt; } th, td { border: 1px solid #999; padding: 4px 8px; text-align: left; vertical-align: top; }
     .print-btn-bar { position: fixed; top: 16px; right: 16px; background: #fff; border: 1px solid #ccc; border-radius: 8px; padding: 8px 12px; }
     .print-btn { background: #111; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; }
   </style>
@@ -733,6 +783,8 @@ export function exportAssignmentToPdf(params: AssignmentExportParams): void {
     .meta-table td.label { font-weight: bold; color: #333; }
     h2 { font-size: 15pt; font-weight: bold; margin-top: 2rem; margin-bottom: 1rem; border-bottom: 1px solid #eee; padding-bottom: 4px; }
     p { margin: 0 0 1.2rem; text-align: justify; text-justify: inter-word; text-indent: 1.5em; }
+    blockquote { margin: 0 2.5em 1.2rem; } blockquote p, li p, td p { text-indent: 0; }
+    table { border-collapse: collapse; width: 100%; margin: 0 0 1.2rem; font-size: 11pt; } th, td { border: 1px solid #999; padding: 4px 8px; text-align: left; vertical-align: top; }
     p.no-indent { text-indent: 0; }
     .bib-section { page-break-before: always; margin-top: 3rem; }
     .bib-entry { text-indent: -2.5em; padding-left: 2.5em; margin-bottom: 0.8rem; text-align: left; font-size: 11pt; }

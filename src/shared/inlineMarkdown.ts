@@ -18,21 +18,29 @@ export interface StyledRun {
   text: string;
   italics?: boolean;
   bold?: boolean;
+  underline?: boolean;
 }
 
-/** Inline Markdown as styled runs: never prints literal asterisks. */
+/**
+ * Inline Markdown as styled runs: **bold**, *italic* and <u>underline</u>
+ * (nested in any order). Never prints literal asterisks or tags.
+ */
 export function inlineMarkdownRuns(text: string): StyledRun[] {
-  const clean = cleanEscapes(text);
   const runs: StyledRun[] = [];
-  const re = /\*\*([^*]+)\*\*|\*([^*\n]+)\*/g;
-  let last = 0;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(clean))) {
-    if (m.index > last) runs.push({ text: clean.slice(last, m.index) });
-    if (m[1] !== undefined) runs.push({ text: m[1], bold: true });
-    else runs.push({ text: m[2], italics: true });
-    last = m.index + m[0].length;
-  }
-  if (last < clean.length) runs.push({ text: clean.slice(last) });
+  const walk = (src: string, style: Omit<StyledRun, "text">) => {
+    const re = /<u>([\s\S]+?)<\/u>|\*\*([^*]+)\*\*|\*([^*\n]+)\*/g;
+    let last = 0;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(src))) {
+      if (m.index > last) runs.push({ text: src.slice(last, m.index), ...style });
+      if (m[1] !== undefined) walk(m[1], { ...style, underline: true });
+      else if (m[2] !== undefined) walk(m[2], { ...style, bold: true });
+      else walk(m[3], { ...style, italics: true });
+      last = m.index + m[0].length;
+    }
+    if (last < src.length) runs.push({ text: src.slice(last), ...style });
+  };
+  const clean = cleanEscapes(text);
+  walk(clean, {});
   return runs.length ? runs : [{ text: clean }];
 }
