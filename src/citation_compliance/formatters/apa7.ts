@@ -4,6 +4,7 @@
  * Formats citations and references according to APA 7th edition style.
  */
 
+import { pageRange } from "./bibParts";
 import type { CitationStyle, InTextOptions } from "../formattingEngine";
 import { authorDateYear, type CanonicalReference, type ReferenceAuthor } from "../model/reference";
 
@@ -66,7 +67,7 @@ export class APA7Formatter implements CitationStyle {
         let container = `*${journal}*`;
         if (reference.volume) container += `, *${reference.volume}*${reference.issue ? `(${reference.issue})` : ""}`;
         else if (reference.issue) container += `, (${reference.issue})`;
-        if (reference.pages) container += `, ${reference.pages}`;
+        if (reference.pages) container += `, ${pageRange(reference.pages)}`;
         parts.push(endSentence(container));
       }
     } else {

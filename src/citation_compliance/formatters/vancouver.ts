@@ -2,6 +2,7 @@
  * Vancouver Citation Formatter
  */
 
+import { bareDoi, endSentence, familyBareInitials, journalOf, publisherOf, sortedAuthors } from "./bibParts";
 import type { CitationStyle, InTextOptions } from "../formattingEngine";
 import type { CanonicalReference } from "../model/reference";
 
@@ -15,43 +16,36 @@ export class VancouverFormatter implements CitationStyle {
     return "[" + position + "]";
   }
 
+  /**
+   * Vancouver (ICMJE/NLM): "Smith JA, Lopez M, Berg K. Title. Journal.
+   * 2021;12(3):45-67. doi:10.1000/xyz" Up to six authors, then "et al.".
+   */
   formatBibliography(reference: CanonicalReference): string {
+    const all = sortedAuthors(reference).map(familyBareInitials);
+    const authors = all.length > 6 ? `${all.slice(0, 6).join(", ")}, et al.` : all.length ? `${all.join(", ")}.` : "";
+    const year = reference.year || reference.publicationDate?.slice(0, 4) || "";
+    const doi = bareDoi(reference);
     const parts: string[] = [];
-
-    // Authors (surname first)
-    if (reference.authors && reference.authors.length > 0) {
-      const authorNames = reference.authors.map((a) => a.lastName + " " + a.firstName.charAt(0));
-      if (authorNames.length > 6) {
-        parts.push(authorNames.slice(0, 6).join(", ") + ", et al.");
-      } else {
-        parts.push(authorNames.join(", ") + ".");
-      }
+    if (authors) parts.push(authors);
+    parts.push(endSentence(reference.title));
+    if (reference.kind === "Book") {
+      const pub = publisherOf(reference);
+      const tail = [pub, year].filter(Boolean).join("; ");
+      if (tail) parts.push(`${tail}.`);
+    } else {
+      const journal = journalOf(reference);
+      if (journal) parts.push(endSentence(journal));
+      let cite = year;
+      if (reference.volume) cite += `;${reference.volume}`;
+      if (reference.issue) cite += `(${reference.issue})`;
+      if (reference.pages) cite += `:${(reference.pages ?? "").replace(/\s*[–—]\s*/g, "-")}`;
+      if (cite) parts.push(`${cite}.`);
     }
-
-    // Title
-    parts.push(reference.title + ".");
-
-    // Source
-    if (reference.kind === "JournalArticle" && reference.journal) {
-      parts.push(reference.journal);
-      if (reference.publicationDate) {
-        parts.push(";" + reference.publicationDate.substring(0, 4));
-      }
-      if (reference.pages) {
-        parts.push(":" + reference.pages);
-      }
-    }
-
-    // DOI
-    if (reference.doi) {
-      const normalizedDoi = reference.doi.startsWith("http") ? reference.doi : "https://doi.org/" + reference.doi;
-      parts.push(normalizedDoi);
-    }
-
+    if (doi) parts.push(`doi:${doi}`);
+    else if (reference.url) parts.push(`Available from: ${reference.url}`);
     return parts.join(" ");
   }
-
   formatReferenceList(references: CanonicalReference[]): string {
-    return references.map((ref) => this.formatBibliography(ref)).join("\n");
+    return references.map((ref, i) => `${i + 1}. ${this.formatBibliography(ref)}`).join("\n");
   }
 }

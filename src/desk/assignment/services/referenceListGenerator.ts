@@ -324,16 +324,37 @@ export function formatReference(
 
   const norm = normalizeCitationStyle(style);
 
-  if (norm.includes("apa") || norm === "apa7") {
-    // APA 7 comes from the shared citation_compliance engine (one formatter for every workspace).
+  // Every style the shared citation_compliance engine has comes from it (one
+  // formatter for every workspace); MHRA, which it does not cover, stays local.
+  const sharedStyle = norm.includes("apa")
+    ? "apa7"
+    : norm.includes("ieee")
+    ? "ieee"
+    : norm.includes("chicago")
+    ? "chicago"
+    : norm.includes("vancouver")
+    ? "vancouver"
+    : norm.includes("mla")
+    ? "mla9"
+    : norm.includes("mhra")
+    ? null
+    : "harvard";
+  // A source whose author list was already cut short ("et al.") cannot be
+  // listed in full; the local formatter keeps "Family, I. et al." for it.
+  const truncatedAuthors = (source.authors || []).some((a) => parsePersonName(String(a)).etAl);
+  if (sharedStyle && !truncatedAuthors) {
     try {
-      const entry = CitationFormatterFactory.formatBibliography("apa7", source.canonicalReference || discoveredSourceToCanonical(source));
-      if (entry && entry.trim()) return entry.trim();
+      const entry = CitationFormatterFactory.formatBibliography(sharedStyle, source.canonicalReference || discoveredSourceToCanonical(source));
+      if (entry && entry.trim()) {
+        if (sharedStyle === "ieee") return `[${index + 1}] ${entry.trim()}`;
+        if (sharedStyle === "vancouver") return `${index + 1}. ${entry.trim()}`;
+        return entry.trim();
+      }
     } catch {
       /* fall through to the local formatter */
     }
-    return formatReferenceAPA7(source);
   }
+  if (norm.includes("apa")) return formatReferenceAPA7(source);
   if (norm.includes("ieee")) return formatReferenceIEEE(source, index);
   if (norm.includes("chicago")) return formatReferenceChicago(source);
   if (norm.includes("mhra")) return formatReferenceMHRA(source);
