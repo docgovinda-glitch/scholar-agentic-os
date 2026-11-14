@@ -329,10 +329,10 @@ export async function deriveSemanticAcademicTitle(
 
   try {
     if (req && process.env.NODE_ENV !== "test" && !process.env.VITEST) {
-      const prompt = `Generate a concise, academic title (3 to 7 words, e.g. "Quantum Computing Cryptographic Architectures", "Algorithmic Bias in Healthcare") based on this assignment brief. Output ONLY the plain text title, with NO punctuation, NO quotes, NO explanation:\n\n${briefText.slice(0, 1500)}`;
+      const prompt = scholarBrain.courseworkPrompts.academicTitlePrompt({ briefText });
       const text = await routedCompletion(req, {
         task: "fast",
-        systemPrompt: "You are an expert academic research registrar. Craft a concise, formal academic title (3-7 words).",
+        systemPrompt: scholarBrain.courseworkPrompts.ROLES.titleRegistrar,
         userPrompt: prompt,
         maxOutputTokens: 64,
       });

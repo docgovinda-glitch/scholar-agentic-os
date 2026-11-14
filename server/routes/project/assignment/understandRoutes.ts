@@ -101,54 +101,14 @@ router.post("/plan", async (req: express.Request<{ id: string }>, res) => {
     : "";
 
   try {
-    const prompt = `You are the Scholar Core Assignment Research Planning Agent.
-Develop an actionable research plan for this university assignment:
-
-Question: "${question}"
-Type: ${assignmentType}
-Level: ${academicLevel}
-Analysis Context: ${typeof analysis === "string" ? analysis : JSON.stringify(analysis || {})}
-${sectionGuidanceNotes ? `Student Section-Specific Guidance Notes: ${sectionGuidanceNotes}\n` : ""}
-
-Formulate:
-1. 3 to 5 dialectical Core Research Questions (id, question, rationale, category).
-2. 4 to 6 Recommended Search Strategies (id, database, searchQuery with Boolean operators, relevanceTarget).
-3. Main theoretical and empirical concepts.
-4. Key scholarly debates or points of contention.
-5. Specific evidence types needed (peer-reviewed articles, institutional data, case studies).
-6. Clear out-of-scope topics that the student should NOT spend time researching.
-
-Return ONLY valid JSON matching:
-{
-  "coreQuestions": [
-    {
-      "id": "q-1",
-      "question": "...",
-      "rationale": "...",
-      "category": "Theoretical Foundation"
-    }
-  ],
-  "mainConcepts": ["...", "..."],
-  "keyDebates": ["...", "..."],
-  "evidenceTypesNeeded": ["...", "..."],
-  "searchStrategies": [
-    {
-      "id": "strat-1",
-      "database": "Google Scholar",
-      "searchQuery": "\\"...\\" AND \\"...\\"",
-      "relevanceTarget": "..."
-    }
-  ],
-  "outOfScopeTopics": ["...", "..."],
-  "approvedByUser": false
-}`;
+    const prompt = scholarBrain.courseworkPrompts.planPrompt({ question, assignmentType, academicLevel, analysis, sectionGuidanceNotes });
 
     let plan: any = null;
     try {
       plan = await callOpenRouterJSON(
         req,
         res,
-        "You are the Scholar Core Assignment Research Planning Agent.",
+        scholarBrain.courseworkPrompts.ROLES.researchPlanner,
         prompt,
         undefined,
         "planning"
@@ -203,49 +163,12 @@ router.post("/think", async (req: express.Request<{ id: string }>, res) => {
   } = req.body || {};
 
   try {
-    const prompt = `You are the Scholar Core Academic Thinking & Critique Agent.
-Synthesize the scholarly landscape and help the student construct their critical argument and thesis.
-
-Question: "${question}"
-Assignment Type: ${assignmentType}
-Academic Level: ${academicLevel}
-Approved Sources/Evidence: ${JSON.stringify(evidence)}
-
-Identify:
-1. 2-4 distinct scholarly perspectives / schools of thought on this question. For each, identify their core argument, strengths, weaknesses, and underlying assumptions.
-2. Key points of consensus and major points of theoretical/empirical disagreement.
-3. 3 distinct, academically rigorous Thesis Statement options (from moderate to bold/critical), with explanations of how they defend against counterarguments.
-
-Return ONLY valid JSON matching:
-{
-  "perspectives": [
-    {
-      "id": "persp-1",
-      "schoolOfThought": "...",
-      "keyProponents": ["..."],
-      "coreArgument": "...",
-      "strengths": ["..."],
-      "weaknesses": ["..."],
-      "underlyingAssumptions": ["..."]
-    }
-  ],
-  "agreements": ["...", "..."],
-  "disagreements": ["...", "..."],
-  "contradictions": ["...", "..."],
-  "thesisOptions": [
-    {
-      "id": "thesis-1",
-      "statement": "...",
-      "rationale": "...",
-      "counterargumentHandling": "..."
-    }
-  ]
-}`;
+    const prompt = scholarBrain.courseworkPrompts.thinkPrompt({ question, assignmentType, academicLevel, evidence });
 
     const data = await callOpenRouterJSON(
       req,
       res,
-      "You are the Scholar Core Academic Thinking & Critique Agent.",
+      scholarBrain.courseworkPrompts.ROLES.thinkingCritique,
       prompt,
       undefined,
       "reasoning"
@@ -626,89 +549,12 @@ router.post("/estimate-rubric", async (req: express.Request<{ id: string }>, res
     : fullText;
 
   try {
-    const prompt = `You are the Scholar Core Senior Examiner & Rubric Grading Estimator.
-Grade and estimate marks for this university submission draft based on rigorous UK / International university grading standards:
-- First Class (1st): 70-100%
-- Upper Second Class (2:1): 60-69%
-- Lower Second Class (2:2): 50-59%
-- Third Class (3rd): 40-49%
-- Fail: <40%
-
-Assignment Details:
-Question: "${question}"
-Type: ${assignmentType}
-Level: ${academicLevel}
-Target Word Count: ${targetWordCount}
-
-Draft Content:
-${targetText}
-
-Assess all 4 primary dimensions:
-1. Critical Argumentation & Thesis Depth
-2. Evidence Grounding & Source Synthesis
-3. Structure, Academic Style & Coherence
-4. Command of Theoretical Frameworks & Originality
-
-Return ONLY valid JSON matching:
-{
-  "overallScore": 72,
-  "overallBand": "1st_class",
-  "bandLabel": "First Class (1st) — 72%",
-  "summary": "...",
-  "criteria": [
-    {
-      "id": "crit-1",
-      "criterion": "Critical Argumentation & Thesis Depth",
-      "weightPercent": 30,
-      "currentBand": "1st_class",
-      "score": 72,
-      "maxScore": 100,
-      "critique": "...",
-      "howToReachNextBand": "..."
-    },
-    {
-      "id": "crit-2",
-      "criterion": "Evidence Grounding & Source Synthesis",
-      "weightPercent": 30,
-      "currentBand": "2_1_upper_second",
-      "score": 68,
-      "maxScore": 100,
-      "critique": "...",
-      "howToReachNextBand": "..."
-    },
-    {
-      "id": "crit-3",
-      "criterion": "Structure, Academic Style & Coherence",
-      "weightPercent": 20,
-      "currentBand": "1st_class",
-      "score": 74,
-      "maxScore": 100,
-      "critique": "...",
-      "howToReachNextBand": "..."
-    },
-    {
-      "id": "crit-4",
-      "criterion": "Theoretical Rigour & Academic Level",
-      "weightPercent": 20,
-      "currentBand": "1st_class",
-      "score": 70,
-      "maxScore": 100,
-      "critique": "...",
-      "howToReachNextBand": "..."
-    }
-  ],
-  "keyStrengths": ["...", "..."],
-  "keyRecommendations": ["...", "..."],
-  "targetBandRoadmap": {
-    "targetBand": "High First Class (80%+)",
-    "actionableSteps": ["...", "..."]
-  }
-}`;
+    const prompt = scholarBrain.courseworkPrompts.estimateRubricPrompt({ question, assignmentType, academicLevel, targetWordCount, targetText });
 
     const data = await callOpenRouterJSON(
       req,
       res,
-      "You are the Scholar Core Senior Examiner & Rubric Grading Estimator.",
+      scholarBrain.courseworkPrompts.ROLES.rubricEstimator,
       prompt,
       undefined,
       "verification"
@@ -750,117 +596,12 @@ router.post("/thesis-budget", async (req: express.Request<{ id: string }>, res) 
     const theme2Words = Math.round(bodyTotal / 3);
     const theme3Words = Math.max(0, bodyTotal - theme1Words - theme2Words);
 
-    const prompt = `You are the Scholar Core Thesis Formulation & Word Budgeting Agent.
-For this academic assignment:
-Question: "${question}"
-Type: ${assignmentType}
-Academic Level: ${academicLevel} (${academicLevel === "postgraduate" ? "Demonstrate high theoretical sophistication, critical synthesis, and defensible stance" : "Ensure clarity, logical structure, and strong evidence"})
-Target Word Count: ${totalWords} words
-Deconstruction Context: ${JSON.stringify(deconstruction || {})}
-
-TASKS:
-1. Formulate 3 distinct argumentative, defensible thesis statements:
-   - Stance A (Dialectical Synthesis): Bridges and synthesizes opposing theories/evidence.
-   - Stance B (Critical Challenge): Directly challenges common assumptions or mainstream discourse.
-   - Stance C (Nuanced Contextual / Empirical): Emphasizes situational constraints, empirical boundary conditions, or structural determinants.
-   For each, provide a clear academic rationale and explain how it defends against major counterarguments.
-
-2. Propose 3 focused, dialectical body themes that systematically prove this thesis.
-
-3. Allocate word budget mathematically:
-   - Introduction: ${introWords} words
-   - Body Theme 1: ${theme1Words} words
-   - Body Theme 2: ${theme2Words} words
-   - Body Theme 3: ${theme3Words} words
-   - Conclusion: ${conclusionWords} words
-   Sum: ${totalWords} words (Tolerance: ±10%).
-
-Return ONLY valid JSON matching:
-{
-  "selectedThesis": "...",
-  "thesisRationale": "...",
-  "counterargumentHandling": "...",
-  "alternativeTheses": [
-    {
-      "id": "thesis-synthesis",
-      "statement": "...",
-      "stance": "Dialectical Synthesis",
-      "rationale": "..."
-    },
-    {
-      "id": "thesis-challenge",
-      "statement": "...",
-      "stance": "Critical Challenge",
-      "rationale": "..."
-    },
-    {
-      "id": "thesis-empirical",
-      "statement": "...",
-      "stance": "Nuanced Empirical",
-      "rationale": "..."
-    }
-  ],
-  "totalTargetWords": ${totalWords},
-  "tolerancePercent": 10,
-  "sections": [
-    {
-      "id": "sec-intro",
-      "title": "Introduction & Thesis Statement",
-      "type": "introduction",
-      "targetWordCount": ${introWords},
-      "currentWordCount": 0,
-      "targetPercent": 10,
-      "guidance": "Hook the reader, provide contextual background, articulate central thesis, and define scope.",
-      "keyPoints": ["Historical/theoretical context", "Explicit thesis statement", "Scope and roadmap"]
-    },
-    {
-      "id": "sec-theme-1",
-      "title": "Theme 1: ...",
-      "type": "body_theme",
-      "targetWordCount": ${theme1Words},
-      "currentWordCount": 0,
-      "targetPercent": 25,
-      "guidance": "Examine foundational theoretical premises and initial empirical evidence.",
-      "keyPoints": ["...", "..."]
-    },
-    {
-      "id": "sec-theme-2",
-      "title": "Theme 2: ...",
-      "type": "body_theme",
-      "targetWordCount": ${theme2Words},
-      "currentWordCount": 0,
-      "targetPercent": 25,
-      "guidance": "Evaluate core empirical mechanisms, contradictions, and dialectical tensions.",
-      "keyPoints": ["...", "..."]
-    },
-    {
-      "id": "sec-theme-3",
-      "title": "Theme 3: ...",
-      "type": "body_theme",
-      "targetWordCount": ${theme3Words},
-      "currentWordCount": 0,
-      "targetPercent": 25,
-      "guidance": "Analyze systemic counterarguments, policy/practical implications, and syntheses.",
-      "keyPoints": ["...", "..."]
-    },
-    {
-      "id": "sec-conclusion",
-      "title": "Conclusion & Synthesis",
-      "type": "conclusion",
-      "targetWordCount": ${conclusionWords},
-      "currentWordCount": 0,
-      "targetPercent": 15,
-      "guidance": "Synthesize body findings, reaffirm thesis without mere repetition, state broader scholarly implications.",
-      "keyPoints": ["Synthesis of findings", "Reaffirmation of thesis", "Broader scholarly implications"]
-    }
-  ],
-  "approvedByUser": false
-}`;
+    const prompt = scholarBrain.courseworkPrompts.thesisBudgetPrompt({ question, assignmentType, academicLevel, totalWords, deconstruction, introWords, theme1Words, theme2Words, theme3Words, conclusionWords });
 
     const data = await callOpenRouterJSON(
       req,
       res,
-      "You are the Scholar Core Thesis Formulation & Word Budgeting Agent.",
+      scholarBrain.courseworkPrompts.ROLES.thesisBudget,
       prompt,
       undefined,
       "reasoning"

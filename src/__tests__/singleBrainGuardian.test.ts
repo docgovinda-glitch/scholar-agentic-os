@@ -101,6 +101,16 @@ describe("Single-Brain Architecture lock", () => {
     expect(offenders).toEqual([]);
   });
 
+  it("Coursework routes hold no prompt text: prompts live in scholarBrain.courseworkPrompts", () => {
+    const offenders: string[] = [];
+    for (const rel of productionFiles(["server/routes/project/assignment"])) {
+      const text = fs.readFileSync(path.join(ROOT, rel), "utf8");
+      if (/You are (the|a|an) /.test(text) || /Return ONLY valid JSON/.test(text)) offenders.push(rel);
+    }
+    expect(offenders).toEqual([]);
+    expect(fs.readFileSync(path.join(ROOT, "server/src/services/scholarBrain.ts"), "utf8")).toMatch(/courseworkPrompts/);
+  });
+
   it("OT-22 (Presentation Studio) runs its AI only through scholarBrain", () => {
     for (const rel of ["server/routes/project/presentation.ts", "server/routes/presentations.ts"]) {
       const text = fs.readFileSync(path.join(ROOT, rel), "utf8");

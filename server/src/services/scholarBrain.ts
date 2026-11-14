@@ -12,6 +12,7 @@
  * 5. Deterministic Mark-Weighted Word Allocator: Proportional allocation across assignment questions.
  */
 
+import * as courseworkPrompts from "./prompts/courseworkPrompts.ts";
 import { searchEuropePmc } from "../../../src/shared/retrieval/providers.ts";
 import { buildAskGeneralPrompt, buildAskSearchPrompt } from "../../../src/shared/askPrompts.ts";
 import { NoAiConnectedError, routedText, RouterHandoffError, toRouterTask } from "../ai/routerBridge.ts";
@@ -444,6 +445,9 @@ Return ONLY valid JSON matching:
 }
 
 export const scholarBrain = {
+  /** Coursework (OT-01) prompt text: routes read prompts from here, never write their own. */
+  courseworkPrompts,
+
   /** System prompt for AskScholar answers (search-grounded or general). One owner for the text, every surface shares it. */
   askSystemPrompt(opts: { kind: "search"; style: string; length: string } | { kind: "general"; base: string; style: string; length: string }): string {
     return opts.kind === "search"
