@@ -34,7 +34,7 @@ Tables, storage and state shapes. The authority is the SQL in `supabase/` (`sche
 | `assignment_draft_revisions` | `id`, `project_id`, `section_id`, `content_hash` (unique per section), `content`, `word_count`, `cited_source_ids`, `created_at` | Yes (mirror, append-only) |
 | `assignment_submission_checks` | `id`, `project_id`, `report_hash` (unique), `passed`, `report`, `created_at` | Yes (mirror) |
 
-The `assignment_*` tables (migration `20261113180000_coursework_relational_state.sql`) are written by the server after every OT-01 save (`onProjectSaved` → `server/src/assignmentRelational.ts`, mapping in `src/domain/assignment/assignmentRelational.ts`); `projects.answers` stays the source the app reads. Owners can select their own rows; writes are service-role only.
+The `assignment_*` tables (migration `20261113180000_coursework_relational_state.sql`) are written by the server after every OT-01 save (`onProjectSaved` → `server/src/assignmentRelational.ts`, mapping in `src/domain/assignment/assignmentRelational.ts`); `projects.answers` stays the source the app reads. Owners can select their own rows (policies use `public.owns_project(project_id)`, a security-definer check, because `projects` itself grants the browser roles no SELECT; migrations `20261114090000`, `20261114093000`); writes are service-role only.
 | `project_answers` | `project_id`, `key`, `value` | Schema only |
 | `project_uploaded_sources` | `id`, `project_id`, `document_id`, `filename`, `status`, `created_at`, `updated_at` | Schema only |
 | `project_activity` | `id`, `project_id`, `event_type`, `description`, `metadata`, `created_at` | Yes |
