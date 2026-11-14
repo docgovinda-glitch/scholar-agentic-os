@@ -562,6 +562,7 @@ export function AssignmentDraftingStage({
             streamingChunk={activeStreamingSectionId === activeSection?.id ? streamingChunk : ""}
             boundSources={approvedSources.filter((s) => activeSection?.boundSourceIds?.includes(s.id))}
             allApprovedSources={approvedSources}
+            citationStyle={citationStyle || "harvard"}
             hasPrevious={hasPrevious}
             hasNext={hasNext}
             onNavigatePrevious={() => {

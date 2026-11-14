@@ -46,9 +46,15 @@ export async function writeAssignmentSnapshot(
       : pid
   );
 
-  // Revisions are append-only: an unchanged section maps to the same hash and is a no-op.
+  // Revisions are append-only, one row per distinct text. Each save stamps the rows
+  // holding the current text, so returning to earlier text (undo) makes that row
+  // the latest again instead of leaving the discarded text on top.
   if (snap.drafts.length) {
-    await table("assignment_draft_revisions").upsert(snap.drafts as unknown as Row[], "project_id,section_id,content_hash");
+    const currentAt = new Date().toISOString();
+    await table("assignment_draft_revisions").upsert(
+      snap.drafts.map((d) => ({ ...d, last_current_at: currentAt })) as unknown as Row[],
+      "project_id,section_id,content_hash"
+    );
   }
   if (snap.submission) {
     await table("assignment_submission_checks").upsert(snap.submission as unknown as Row, "project_id,report_hash");

@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import SectionTextEditor, { type SectionEditorHandle } from "../../editor/SectionTextEditor";
 import { inlineMarkdownRuns } from "../../../shared/inlineMarkdown";
+import { formatSourceInTextCitation } from "../services/citationFormatService";
+import { parsePersonName } from "../services/personName";
 import { countProseWords, parseProseBlocks } from "../../../shared/proseBlocks";
 import { showAppToast } from "../../../components/ui/FeedbackSystem";
 import type { AssignmentDraftingSection, DiscoveredSource } from "../types";
@@ -37,6 +39,8 @@ export interface DraftingActiveEditorProps {
   streamingChunk?: string;
   boundSources?: DiscoveredSource[];
   allApprovedSources?: DiscoveredSource[];
+  /** The project's citation style: inserted citations use it (shared citation engine). */
+  citationStyle?: string;
   onNavigatePrevious?: () => void;
   onNavigateNext?: () => void;
   hasPrevious?: boolean;
@@ -158,6 +162,7 @@ export function DraftingActiveEditor({
   streamingChunk = "",
   boundSources = [],
   allApprovedSources = [],
+  citationStyle = "harvard",
   onNavigatePrevious,
   onNavigateNext,
   hasPrevious = false,
@@ -320,13 +325,13 @@ export function DraftingActiveEditor({
   };
 
   // Insert citation into manual editor textarea
+  // In-text citation in the project's style from the shared citation engine
+  // (family name parsed properly: "Haryo Kuncoro" cites as "Kuncoro").
+  const citeLabel = (source: DiscoveredSource) =>
+    formatSourceInTextCitation(source, citationStyle, Math.max(1, availableSources.findIndex((s) => s.id === source.id) + 1));
+
   const handleInsertCitation = (source: DiscoveredSource) => {
-    const author =
-      source.authors && source.authors[0]
-        ? source.authors[0].split(",")[0].trim()
-        : "Scholar";
-    const year = source.year || "n.d.";
-    const citationString = ` (${author}, ${year})`;
+    const citationString = ` ${citeLabel(source)}`;
 
     if (editorRef.current) {
       editorRef.current.insertText(citationString);
@@ -345,9 +350,10 @@ export function DraftingActiveEditor({
     const cleanCit = citationText.replace(/[()[\]]/g, "").toLowerCase();
 
     for (const src of availableSources) {
-      const authorMatch = src.authors?.some((a) =>
-        cleanCit.includes(a.split(",")[0].toLowerCase().trim())
-      );
+      const authorMatch = src.authors?.some((a) => {
+        const family = parsePersonName(String(a)).family.toLowerCase();
+        return family.length > 1 && cleanCit.includes(family);
+      });
       const yearMatch = src.year && cleanCit.includes(String(src.year));
       if (authorMatch || yearMatch) {
         matchedSource = src;
@@ -591,7 +597,7 @@ export function DraftingActiveEditor({
                 className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-neutral-100 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 border border-neutral-200/60 dark:border-white/5"
                 title={s.title}
               >
-                {s.authors?.[0]?.split(",")[0] || "Source"} ({s.year || "n.d."})
+                {citeLabel(s)}
               </span>
             ))}
           </div>
@@ -812,11 +818,6 @@ export function DraftingActiveEditor({
                     </div>
                     {availableSources.length > 0 ? (
                       availableSources.map((s) => {
-                        const author =
-                          s.authors && s.authors[0]
-                            ? s.authors[0].split(",")[0].trim()
-                            : "Scholar";
-                        const year = s.year || "n.d.";
                         return (
                           <button
                             key={s.id}
@@ -825,7 +826,7 @@ export function DraftingActiveEditor({
                             className="w-full text-left p-2 rounded-lg text-xs hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer group"
                           >
                             <div className="font-medium text-neutral-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400">
-                              ({author}, {year})
+                              {citeLabel(s)}
                             </div>
                             <div className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate">
                               {s.title}

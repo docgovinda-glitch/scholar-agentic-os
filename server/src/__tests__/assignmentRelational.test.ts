@@ -40,5 +40,9 @@ describe("Coursework relational mirror", () => {
     const prune = calls.find((c) => c.method === "DELETE" && c.url.includes("assignment_outline_sections"))!;
     expect(decodeURIComponent(prune.url)).toContain('project_id=eq.p1&section_id=not.in.("h1")');
     expect(calls.find((c) => c.url.includes("project_sources"))!.body).toEqual({ origin: "live", is_approved: true });
+    // Current text is stamped on every save, so undo back to earlier text makes that row current again.
+    const revisions = calls.find((c) => c.url.includes("assignment_draft_revisions"))!.body as Array<Record<string, unknown>>;
+    expect(revisions.length).toBeGreaterThan(0);
+    for (const r of revisions) expect(Number.isNaN(Date.parse(String(r.last_current_at)))).toBe(false);
   });
 });
