@@ -354,7 +354,9 @@ export interface DiscoveredSource {
   // Canonical Source Registry Fields (Production Spec §3.3)
   verificationStatus?: SourceVerificationStatus;
   isActive?: boolean;               // true = eligible for retrieval; false = excluded
-  retrievalSource?: string;         // e.g. "openalex", "crossref", "doaj", "arxiv", "datacite", "user_upload"
+  retrievalSource?: string;         // e.g. "openalex", "crossref", "doaj", "arxiv", "datacite", "user_upload", "vault"
+  /** Id of the Knowledge Vault item this source was pulled from (vault channel). */
+  vaultItemId?: string;
   retrievedAt?: string;             // ISO timestamp of discovery
   peerReviewed?: boolean | null;    // null = unknown
   volume?: string;

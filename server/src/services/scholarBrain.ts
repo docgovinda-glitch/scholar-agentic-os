@@ -12,6 +12,7 @@
  * 5. Deterministic Mark-Weighted Word Allocator: Proportional allocation across assignment questions.
  */
 
+import * as courseworkPrompts from "./prompts/courseworkPrompts.ts";
 import { searchEuropePmc } from "../../../src/shared/retrieval/providers.ts";
 import { buildAskGeneralPrompt, buildAskSearchPrompt } from "../../../src/shared/askPrompts.ts";
 import { NoAiConnectedError, routedText, RouterHandoffError, toRouterTask } from "../ai/routerBridge.ts";
@@ -311,7 +312,142 @@ export function getArchetypeModelWeights(): ArchetypeModelWeights {
 /**
  * Canonical scholarBrain Orchestrator Object
  */
+
+/** Data for the Coursework outline prompt (all of it from the student's brief and settings). */
+export interface AssignmentOutlineInput {
+  question: string;
+  assignmentType: string;
+  academicLevel: string;
+  targetWordCount: number | string;
+  thesis: string;
+  inquiryType: string;
+  centralProblem: string;
+  inquiriesSummary: string;
+  isCourseworkWorkspace: boolean;
+  subjectLens: string;
+  customAllocationPrompt: string;
+}
+
+export function buildAssignmentOutlinePrompt(input: AssignmentOutlineInput): string {
+  const { question, assignmentType, academicLevel, targetWordCount, thesis, inquiryType, centralProblem, inquiriesSummary, isCourseworkWorkspace, subjectLens, customAllocationPrompt } = input;
+  return `You are the Scholar Core AskScholar Research Architect & Thesis Supervisor.
+Your role is to think through the assignment instructions, interrogate the core analytical questions, conduct targeted scholarly research, and build an assignment-specific RESEARCH BLUEPRINT.
+
+CORE ARCHITECTURAL RULES:
+1. STRICT BAN ON GENERIC ACADEMIC TEMPLATES: Do NOT generate generic templates like "Introduction -> Literature Review -> Methodology -> Analysis -> Conclusion". Headings must emerge directly from the intellectual problem of the assignment (${inquiryType}).
+2. EXPLICIT ASSIGNMENT-QUESTION MAPPING: Every major section MUST exist because it is directly required to answer a specific assignment inquiry:
+   Assignment Question -> Analytical Objective -> Research Needed -> Key Arguments/Issues -> Relevant Sources -> Proposed Section
+3. RESEARCH BLUEPRINT DEPTH:
+   For every main section and subsection, provide:
+   - title: substantive, content-driven domain title
+   - purpose: exact purpose and what this section demonstrates
+   - assignmentQuestionAddressed: which specific assignment inquiry it answers
+   - analyticalObjective: analytical goal (explain, compare, evaluate, analyse, or argue)
+   - keyTheories: analytical models or frameworks applied
+   - keyArguments: 3 concrete analytical issues or arguments (also put in keyPoints)
+   - evidenceRequired: specific empirical data, observational cases, or literature needed
+   - counterarguments: rival schools of thought or competing interpretations
+   - expectedContribution: how this section drives towards defending the central thesis
+   - scholarlySources: leave empty; sources are attached later from live discovery or the student's vault
+4. WORKSPACE ADAPTATION:
+   ${
+     isCourseworkWorkspace
+       ? `COURSEWORK WORKSPACE: Align with rubric criteria, module learning outcomes, diagnostic problem decomposition, applied analytical frameworks, empirical evaluation, and actionable strategic recommendations.`
+       : `ESSAY WORKSPACE: Formulate an original intellectual architecture specifically tailored to this assignment inquiry (whether comparative, causal, theoretical, policy, or case-driven). Ground every section title directly in the substantive problem and core concepts.`
+   }
+5. WORD ALLOCATIONS:
+   The sum of all subheading targetWordCounts MUST equal approximately ${targetWordCount}.
+
+${subjectLens}
+
+ASSIGNMENT INTAKE:
+- Question: "${question}"
+- Assignment Type: ${assignmentType}
+- Academic Level: ${academicLevel}
+- Target Word Count: ${targetWordCount} words
+- Central Thesis: "${thesis || centralProblem}"
+- Central Intellectual Problem: "${centralProblem}"
+- Core Analytical Inquiries:
+${inquiriesSummary}
+
+${customAllocationPrompt}
+
+Return ONLY valid JSON matching:
+{
+  "thesis_statement": "Working thesis answering the prompt",
+  "target_frameworks": ["Framework 1", "Framework 2"],
+  "structure": {
+    "version": 1,
+    "isConfirmed": false,
+    "targetWordCount": ${targetWordCount},
+    "totalAllocated": ${targetWordCount},
+    "rationale": "Why this research blueprint addresses the assignment inquiries",
+    "headings": [
+      {
+        "id": "heading-1",
+        "number": 1,
+        "title": "Substantive Domain H1 Title",
+        "purpose": "Purpose of section answering assignment question",
+        "assignmentQuestionAddressed": "Assignment inquiry addressed",
+        "analyticalObjective": "Analytical objective",
+        "keyTheories": ["Theory A"],
+        "keyArguments": ["Argument 1", "Argument 2", "Argument 3"],
+        "evidenceRequired": "Evidence required",
+        "counterarguments": ["Rival perspective"],
+        "expectedContribution": "Contribution to thesis",
+        "notes": "Guidance notes",
+        "targetWordCount": 700,
+        "subheadings": [
+          {
+            "id": "sub-1-1",
+            "headingId": "heading-1",
+            "numberStr": "1.1",
+            "title": "Substantive Analytical H2 Title",
+            "purpose": "Purpose of subsection",
+            "assignmentQuestionAddressed": "Assignment inquiry addressed",
+            "analyticalObjective": "Analytical objective",
+            "keyTheories": ["Theory A"],
+            "keyArguments": ["Argument 1", "Argument 2", "Argument 3"],
+            "evidenceRequired": "Evidence required",
+            "counterarguments": ["Rival perspective"],
+            "expectedContribution": "Contribution to thesis",
+            "targetWordCount": 350,
+            "currentWordCount": 0,
+            "notes": "",
+            "guidance": "Detailed analytical guidance",
+            "keyPoints": ["Argument 1", "Argument 2", "Argument 3"],
+            "researchStatus": "sufficient"
+          }
+        ]
+      }
+    ]
+  },
+  "sections": [
+    {
+      "level": "h1",
+      "title": "Substantive Domain H1 Title",
+      "guidance": "Guidance notes",
+      "children": [
+        {
+          "level": "h2",
+          "title": "Substantive Analytical H2 Title",
+          "guidance": "Detailed analytical guidance",
+          "children": [
+            { "level": "h3", "title": "Evidence Descriptor 1" },
+            { "level": "h3", "title": "Evidence Descriptor 2" },
+            { "level": "h3", "title": "Evidence Descriptor 3" }
+          ]
+        }
+      ]
+    }
+  ]
+}`;
+}
+
 export const scholarBrain = {
+  /** Coursework (OT-01) prompt text: routes read prompts from here, never write their own. */
+  courseworkPrompts,
+
   /** System prompt for AskScholar answers (search-grounded or general). One owner for the text, every surface shares it. */
   askSystemPrompt(opts: { kind: "search"; style: string; length: string } | { kind: "general"; base: string; style: string; length: string }): string {
     return opts.kind === "search"
@@ -877,6 +1013,26 @@ Output strict JSON only: {"title":"...","slides":[{"title":"...","visualType":".
       .join("\n\n");
     const res = await scholarBrain.complete({ req: options.req, browserFallback: true, taskClass: "verification", systemPrompt, userPrompt, responseFormat: "json" });
     return res.parsedJson ?? (res.text ? parseAndRepairLLMJson(res.text) : null);
+  },
+
+  /**
+   * Coursework (OT-01) Understand: the research-blueprint outline for a brief.
+   * The prompt lives here (single brain); the route passes only the brief's data
+   * and validates/budgets the JSON it gets back.
+   */
+  async assignmentOutline(
+    req: Parameters<typeof callOpenRouterJSON>[0],
+    res: Parameters<typeof callOpenRouterJSON>[1],
+    input: AssignmentOutlineInput
+  ): Promise<unknown> {
+    return callOpenRouterJSON(
+      req,
+      res,
+      "You are the Scholar Core AskScholar Research Architect & Thesis Supervisor.",
+      buildAssignmentOutlinePrompt(input),
+      undefined,
+      "planning"
+    );
   },
 
   /** Write one block of a slide (Presentation Studio "Write with AI"). */

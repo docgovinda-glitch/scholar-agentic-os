@@ -8,7 +8,8 @@
  * - Formatted Bibliography: Auto-generated reference list formatted to citationStyle (Harvard, APA 7, IEEE, MHRA) with hanging indent
  */
 
-import { selectCitedSources, inlineMarkdownRuns, inlineMarkdownToHtml } from "./exportText";
+import { selectCitedSources, inlineMarkdownRuns, inlineMarkdownToHtml, proseToHtml, type StyledRun } from "./exportText";
+import { parseProseBlocks, type ProseAlign } from "../../../shared/proseBlocks";
 import {
   Document,
   Packer,
@@ -39,6 +40,7 @@ import {
 } from "./referenceListGenerator";
 import { isTutorialOrShortQABrief } from "../../../utils/briefExtractor";
 import { splitProseIntoParagraphs } from "../../../shared/proseParagraphs";
+import { authedFetch } from "../../api";
 
 const ACADEMIC_LEVEL_NAMES: Record<string, string> = {
   high_school: "High school",
@@ -78,6 +80,79 @@ export function formatBibliographyEntry(source: DiscoveredSource, style: string,
  */
 export function buildFormattedBibliography(sources: DiscoveredSource[], style: string): string[] {
   return generateReferenceList(sources, style);
+}
+
+/** A styled run as a .docx TextRun (underline needs docx's own option shape). */
+function docxRun(r: StyledRun, size = 24): TextRun {
+  return new TextRun({
+    text: r.text,
+    bold: r.bold,
+    italics: r.italics,
+    underline: r.underline ? {} : undefined,
+    font: "Times New Roman",
+    size,
+  });
+}
+
+/** A block's stored alignment as the .docx paragraph alignment (none = the document default). */
+function docxAlign(align: ProseAlign | undefined) {
+  return align === "center" ? AlignmentType.CENTER : align === "right" ? AlignmentType.RIGHT : align === "justify" ? AlignmentType.JUSTIFIED : undefined;
+}
+
+/**
+ * One section's stored text as .docx blocks: paragraphs, sub-headings, block
+ * quotes (indented), bulleted/numbered lists and real tables.
+ */
+export function proseToDocxBlocks(text: string, line: number, after: number): Array<Paragraph | Table> {
+  const out: Array<Paragraph | Table> = [];
+  for (const b of parseProseBlocks(text)) {
+    if (b.kind === "paragraph") {
+      out.push(new Paragraph({ alignment: docxAlign(b.align), spacing: { line, after }, children: inlineMarkdownRuns(b.text).map((r) => docxRun(r)) }));
+    } else if (b.kind === "heading") {
+      out.push(new Paragraph({ alignment: docxAlign(b.align), spacing: { before: 120, after: 80 }, children: inlineMarkdownRuns(b.text).map((r) => docxRun({ ...r, bold: true })) }));
+    } else if (b.kind === "quote") {
+      for (const q of b.text.split("\n")) {
+        out.push(new Paragraph({ indent: { left: 720, right: 720 }, spacing: { line, after }, children: inlineMarkdownRuns(q).map((r) => docxRun(r)) }));
+      }
+    } else if (b.kind === "bullets" || b.kind === "numbered") {
+      b.items.forEach((item, i) => {
+        const marker = b.kind === "bullets" ? "\u2022\t" : `${i + 1}.\t`;
+        out.push(
+          new Paragraph({
+            indent: { left: 720, hanging: 360 },
+            spacing: { line, after: 60 },
+            children: [docxRun({ text: marker }), ...inlineMarkdownRuns(item).map((r) => docxRun(r))],
+          })
+        );
+      });
+    } else if (b.kind === "table") {
+      const width = Math.max(...b.rows.map((r) => r.length), 1);
+      out.push(
+        new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          rows: b.rows.map(
+            (row, ri) =>
+              new TableRow({
+                tableHeader: b.header && ri === 0,
+                children: Array.from(
+                  { length: width },
+                  (_, ci) =>
+                    new TableCell({
+                      children: [
+                        new Paragraph({
+                          children: inlineMarkdownRuns(row[ci] ?? "").map((r) => docxRun({ ...r, bold: r.bold || (b.header && ri === 0) }, 22)),
+                        }),
+                      ],
+                    })
+                ),
+              })
+          ),
+        })
+      );
+      out.push(new Paragraph({ spacing: { after } }));
+    }
+  }
+  return out;
 }
 
 /**
@@ -121,18 +196,15 @@ export function downloadBlob(blob: Blob, filename: string): void {
  * Generates an academic DOCX document compliant with university submission standards.
  */
 export async function generateAssignmentDocx(params: AssignmentExportParams): Promise<Blob> {
-  const {
-    title,
-    // Cover details are the student's own; a missing one is shown as missing, never invented.
-    studentName = "—",
-    studentId = "—",
-    institution = "",
-    courseName = params.brief.courseDetails?.courseName || "",
-    brief,
-    sections,
-    sources,
-    actualWordCount,
-  } = params;
+  const { brief, sections, sources, actualWordCount } = params;
+  // Everything interpolated into the print window is escaped (titles and cover
+  // details can come from an uploaded brief).
+  const title = escapeHtmlText(params.title);
+  // Cover details are the student's own; a missing one is shown as missing, never invented.
+  const studentName = escapeHtmlText(params.studentName || "—");
+  const studentId = escapeHtmlText(params.studentId || "—");
+  const institution = escapeHtmlText(params.institution || "");
+  const courseName = escapeHtmlText(params.courseName || params.brief.courseDetails?.courseName || "");
 
   const computedWordCount = actualWordCount ??
     sections.reduce((acc, s) => {
@@ -160,10 +232,10 @@ export async function generateAssignmentDocx(params: AssignmentExportParams): Pr
   const isTutorialOrShortQA =
     computedWordCount <= 600 ||
     (brief.targetWordCount !== undefined && brief.targetWordCount <= 600) ||
-    isTutorialOrShortQABrief(brief.rawPrompt || brief.instructions || title, computedWordCount);
+    isTutorialOrShortQABrief(brief.rawPrompt || brief.instructions || params.title, computedWordCount);
 
   if (isTutorialOrShortQA) {
-    const qnaChildren: Paragraph[] = [
+    const qnaChildren: Array<Paragraph | Table> = [
       new Paragraph({
         alignment: AlignmentType.CENTER,
         spacing: { before: 200, after: 400 },
@@ -194,17 +266,7 @@ export async function generateAssignmentDocx(params: AssignmentExportParams): Pr
         })
       );
 
-      const paragraphs = splitProseIntoParagraphs(sec.draftContent || "")
-
-      paragraphs.forEach((pText) => {
-        const cleanP = pText.replace(/^#+\s*/, "");
-        qnaChildren.push(
-          new Paragraph({
-            spacing: { line: 320, after: 140 },
-            children: inlineMarkdownRuns(cleanP).map((r) => new TextRun({ ...r, font: "Times New Roman", size: 24 })),
-          })
-        );
-      });
+      qnaChildren.push(...proseToDocxBlocks(sec.draftContent || "", 320, 140));
     });
 
     const doc = new Document({
@@ -376,10 +438,10 @@ export async function generateAssignmentDocx(params: AssignmentExportParams): Pr
       })
     );
 
-    // Split content into clean paragraphs
-    const paragraphs = splitProseIntoParagraphs(sec.draftContent || "")
+    const sectionBlocks = proseToDocxBlocks(sec.draftContent || "", 360, 160);
 
-    if (paragraphs.length === 0) {
+
+    if (sectionBlocks.length === 0) {
       bodyChildren.push(
         new Paragraph({
           spacing: { line: 360, after: 140 },
@@ -395,16 +457,7 @@ export async function generateAssignmentDocx(params: AssignmentExportParams): Pr
         })
       );
     } else {
-      paragraphs.forEach((pText) => {
-        // Strip markdown header symbols if present
-        const cleanP = pText.replace(/^#+\s*/, "");
-        bodyChildren.push(
-          new Paragraph({
-            spacing: { line: 360, after: 160 }, // 1.5 line spacing (360 dxa)
-            children: inlineMarkdownRuns(cleanP).map((r) => new TextRun({ ...r, font: "Times New Roman", size: 24 })),
-          })
-        );
-      });
+      bodyChildren.push(...sectionBlocks);
     }
   });
 
@@ -455,7 +508,7 @@ export async function generateAssignmentDocx(params: AssignmentExportParams): Pr
           // Hanging indent standard for academic bibliographies (720 dxa = 0.5 in)
           indent: { left: 720, hanging: 720 },
           spacing: { line: 360, after: 140 },
-          children: inlineMarkdownRuns(refText).map((r) => new TextRun({ ...r, font: "Times New Roman", size: 24 })),
+          children: inlineMarkdownRuns(refText).map((r) => docxRun(r)),
         })
       );
     });
@@ -550,21 +603,51 @@ export async function exportAssignmentToDocx(params: AssignmentExportParams): Pr
 /**
  * Triggers academic PDF export using a styled printable academic layout window.
  */
+const escapeHtmlText = (t: unknown) =>
+  String(t ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+
+/**
+ * Downloads the submission as a real .pdf, rendered on the server by the shared
+ * export pipeline. Throws on failure so the caller can offer the print view.
+ */
+export async function downloadAssignmentPdf(projectId: string, params: AssignmentExportParams): Promise<void> {
+  const res = await authedFetch(`/api/projects/${encodeURIComponent(projectId)}/assignment/export-pdf`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      title: params.title,
+      studentName: params.studentName || undefined,
+      studentId: params.studentId || undefined,
+      institution: params.institution || undefined,
+      courseName: params.courseName || params.brief.courseDetails?.courseName || undefined,
+      citationStyle: params.brief.citationStyle || "harvard",
+      targetWordCount: params.brief.targetWordCount || undefined,
+      sections: params.sections.map((s) => ({ title: s.title, draftContent: s.draftContent || "" })),
+      sources: params.sources,
+    }),
+  });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({} as { error?: string }));
+    throw new Error(detail?.error || `PDF export failed (${res.status}).`);
+  }
+  const blob = await res.blob();
+  const cleanTitle = params.title.replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "").slice(0, 80) || "Assignment";
+  downloadBlob(blob, `${cleanTitle}_Submission.pdf`);
+}
+
+/** Printable HTML view (fallback when the PDF service is unreachable). */
 export function exportAssignmentToPdf(params: AssignmentExportParams): void {
   if (typeof window === "undefined" || !window.document) return;
 
-  const {
-    title,
-    // Cover details are the student's own; a missing one is shown as missing, never invented.
-    studentName = "—",
-    studentId = "—",
-    institution = "",
-    courseName = params.brief.courseDetails?.courseName || "",
-    brief,
-    sections,
-    sources,
-    actualWordCount,
-  } = params;
+  const { brief, sections, sources, actualWordCount } = params;
+  // Everything interpolated into the print window is escaped (titles and cover
+  // details can come from an uploaded brief).
+  const title = escapeHtmlText(params.title);
+  // Cover details are the student's own; a missing one is shown as missing, never invented.
+  const studentName = escapeHtmlText(params.studentName || "—");
+  const studentId = escapeHtmlText(params.studentId || "—");
+  const institution = escapeHtmlText(params.institution || "");
+  const courseName = escapeHtmlText(params.courseName || params.brief.courseDetails?.courseName || "");
 
   const computedWordCount = actualWordCount ??
     sections.reduce((acc, s) => {
@@ -594,14 +677,12 @@ export function exportAssignmentToPdf(params: AssignmentExportParams): void {
   const isTutorialOrShortQA =
     computedWordCount <= 600 ||
     (brief.targetWordCount !== undefined && brief.targetWordCount <= 600) ||
-    isTutorialOrShortQABrief(brief.rawPrompt || brief.instructions || title, computedWordCount);
+    isTutorialOrShortQABrief(brief.rawPrompt || brief.instructions || params.title, computedWordCount);
 
   const sectionsHtml = sections
     .map((s) => {
-      const paras = splitProseIntoParagraphs(s.draftContent || "")
-        .map((p) => `<p>${inlineMarkdownToHtml(p.replace(/^#+\s*/, ""))}</p>`)
-        .join("");
-      return `<section class="academic-section"><h2>${s.title}</h2>${paras || "<p><em>[Not drafted yet]</em></p>"}</section>`;
+      const paras = proseToHtml(s.draftContent || "");
+      return `<section class="academic-section"><h2>${escapeHtmlText(s.title)}</h2>${paras || "<p><em>[Not drafted yet]</em></p>"}</section>`;
     })
     .join("\n");
 
@@ -628,6 +709,8 @@ export function exportAssignmentToPdf(params: AssignmentExportParams): void {
     h1 { font-size: 20pt; font-weight: bold; margin-bottom: 2rem; text-align: center; }
     h2 { font-size: 14pt; font-weight: bold; margin-top: 1.5rem; margin-bottom: 0.8rem; }
     p { margin: 0 0 1.2rem; text-align: justify; }
+    blockquote { margin: 0 2.5em 1.2rem; }
+    table { border-collapse: collapse; width: 100%; margin: 0 0 1.2rem; font-size: 11pt; } th, td { border: 1px solid #999; padding: 4px 8px; text-align: left; vertical-align: top; }
     .print-btn-bar { position: fixed; top: 16px; right: 16px; background: #fff; border: 1px solid #ccc; border-radius: 8px; padding: 8px 12px; }
     .print-btn { background: #111; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; }
   </style>
@@ -705,6 +788,8 @@ export function exportAssignmentToPdf(params: AssignmentExportParams): void {
     .meta-table td.label { font-weight: bold; color: #333; }
     h2 { font-size: 15pt; font-weight: bold; margin-top: 2rem; margin-bottom: 1rem; border-bottom: 1px solid #eee; padding-bottom: 4px; }
     p { margin: 0 0 1.2rem; text-align: justify; text-justify: inter-word; text-indent: 1.5em; }
+    blockquote { margin: 0 2.5em 1.2rem; } blockquote p, li p, td p { text-indent: 0; }
+    table { border-collapse: collapse; width: 100%; margin: 0 0 1.2rem; font-size: 11pt; } th, td { border: 1px solid #999; padding: 4px 8px; text-align: left; vertical-align: top; }
     p.no-indent { text-indent: 0; }
     .bib-section { page-break-before: always; margin-top: 3rem; }
     .bib-entry { text-indent: -2.5em; padding-left: 2.5em; margin-bottom: 0.8rem; text-align: left; font-size: 11pt; }

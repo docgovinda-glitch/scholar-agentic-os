@@ -5,73 +5,12 @@
  */
 
 import { CitationFormatterFactory } from "../../../citation_compliance/formattingEngine";
-import type { CanonicalReference, ReferenceAuthor, ReferenceKind } from "../../../citation_compliance/model/reference";
 import type { DiscoveredSource } from "../types";
+import { formatReference } from "./referenceListGenerator";
+import { parsePersonName } from "./personName";
 
-/**
- * Normalizes author strings (e.g. "Kennedy, P.", "Paul Kennedy", "Morgenthau, H.") into ReferenceAuthor objects.
- */
-export function parseAuthorStringToCanonical(authorStr: string, order: number): ReferenceAuthor {
-  const trimmed = authorStr.trim();
-  if (!trimmed) {
-    return { firstName: "", lastName: "Scholar", order };
-  }
-
-  if (trimmed.includes(",")) {
-    const parts = trimmed.split(",").map((p) => p.trim());
-    return {
-      lastName: parts[0] || "Scholar",
-      firstName: parts[1] || "",
-      order,
-    };
-  }
-
-  const parts = trimmed.split(/\s+/);
-  if (parts.length === 1) {
-    return { firstName: "", lastName: parts[0], order };
-  }
-  const lastName = parts[parts.length - 1];
-  const firstName = parts.slice(0, parts.length - 1).join(" ");
-  return { firstName, lastName, order };
-}
-
-/**
- * Maps DiscoveredSource or partial source data to CanonicalReference
- */
-export function discoveredSourceToCanonical(source: Partial<DiscoveredSource>): CanonicalReference {
-  const rawAuthors = (source as any).authors;
-  const authorStrings: string[] = Array.isArray(rawAuthors)
-    ? rawAuthors
-    : typeof rawAuthors === "string" && rawAuthors.trim()
-    ? [rawAuthors.trim()]
-    : [];
-
-  const authors: ReferenceAuthor[] =
-    authorStrings.length > 0
-      ? authorStrings.map((a, idx) => parseAuthorStringToCanonical(a, idx + 1))
-      : [{ firstName: "", lastName: source.isUserUploaded ? "Course Materials" : "[Author unknown]", order: 1 }];
-
-  let kind: ReferenceKind = "JournalArticle";
-  if (source.type === "book") kind = "Book";
-  else if (source.type === "conference") kind = "ConferencePaper";
-  else if (source.type === "institutional" || source.type === "report") kind = "TechnicalReport";
-  else if (source.type === "web") kind = "Website";
-
-  // A missing venue stays missing; it is never given a made-up name.
-  const containerSource = source.journal || source.publisher || "";
-
-  return {
-    kind,
-    title: source.title || "Untitled Scholarly Work",
-    authors,
-    source: containerSource,
-    publisher: source.publisher,
-    journal: source.journal,
-    year: source.year || "n.d.",
-    doi: source.doi,
-    url: source.url,
-  };
-}
+export { parseAuthorStringToCanonical, discoveredSourceToCanonical } from "./sourceCanonical";
+import { discoveredSourceToCanonical } from "./sourceCanonical";
 
 /**
  * Formats an in-text citation for a source using the active citation style.
@@ -115,25 +54,20 @@ export function formatSourceInTextCitation(
     return `(${shortTitle}, ${year})`;
   }
 
-  const getLastName = (authorStr: string) => {
-    const t = authorStr.trim();
-    if (t.includes(",")) return t.split(",")[0].trim();
-    const parts = t.split(/\s+/);
-    return parts[parts.length - 1];
-  };
+  const getLastName = (authorStr: string) => parsePersonName(authorStr).family || authorStr.trim();
 
   const firstAuthor = getLastName(authorList[0]);
 
   if (authorList.length === 1) {
-    if (styleNorm.includes("mla")) return `(${firstAuthor} 42)`;
+    if (styleNorm.includes("mla")) return `(${firstAuthor})`;
     return `(${firstAuthor}, ${year})`;
   }
   if (authorList.length === 2) {
     const secondAuthor = getLastName(authorList[1]);
-    if (styleNorm.includes("mla")) return `(${firstAuthor} and ${secondAuthor} 42)`;
+    if (styleNorm.includes("mla")) return `(${firstAuthor} and ${secondAuthor})`;
     return `(${firstAuthor} & ${secondAuthor}, ${year})`;
   }
-  if (styleNorm.includes("mla")) return `(${firstAuthor} et al. 42)`;
+  if (styleNorm.includes("mla")) return `(${firstAuthor} et al.)`;
   return `(${firstAuthor} et al., ${year})`;
 }
 
@@ -154,19 +88,6 @@ export function formatSourceBibliography(
     console.warn("Citation compliance engine fallback for bibliography:", err);
   }
 
-  // Deterministic fallback (Harvard/APA)
-  const rawAuthors = (source as any).authors;
-  const authorsStr = Array.isArray(rawAuthors) && rawAuthors.length > 0
-    ? rawAuthors.join(", ")
-    : typeof rawAuthors === "string" && rawAuthors.trim()
-    ? rawAuthors.trim()
-    : "[Author unknown]";
-  const yearStr = source.year || "n.d.";
-  const titleStr = source.title ? `'${source.title}'` : "Untitled";
-  const venue = source.journal || source.publisher || "";
-  const venueStr = venue ? `, ${venue}` : "";
-  const volStr = source.volumeIssue ? `, ${source.volumeIssue}` : "";
-  const doiStr = source.doi ? `. doi: ${source.doi}` : source.url ? `. Available at: ${source.url}` : "";
-
-  return `${authorsStr} (${yearStr}) ${titleStr}${venueStr}${volStr}${doiStr}.`;
+  // Fallback: the workspace reference-list formatter (same metadata rules, never invents fields).
+  return formatReference(source as DiscoveredSource, styleId);
 }

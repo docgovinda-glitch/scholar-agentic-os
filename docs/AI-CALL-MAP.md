@@ -21,7 +21,7 @@ A user's own key reaches the server only on AI routes (`routeUsesClientAi` in `s
 | :--- | :--- |
 | `server/routes/aiRun.ts` | Router directly (`/api/ai/run`, `/api/ai/models`, `/api/ai/verify`) with `x-ai-keyring` |
 | `server/routes/ai.ts` (Ask Scholar, search, deep research) | scholarBrain, `routedCompletion` |
-| `server/routes/drafting.ts`, `server/routes/project/agentic/*`, `server/routes/project/assignment/*`, `thesis.ts`, `proposal.ts`, `presentation.ts` | scholarBrain wrappers and `scholarBrain.*`, `routedCompletion` |
+| `server/routes/drafting.ts`, `server/routes/project/agentic/*`, `server/routes/project/assignment/*`, `thesis.ts`, `proposal.ts`, `presentation.ts` | scholarBrain wrappers and `scholarBrain.*`, `routedCompletion` (Coursework prompt text: `scholarBrain.courseworkPrompts`, `server/src/services/prompts/courseworkPrompts.ts`) |
 | `server/routes/project/core/manuscriptAndGateRoutes.ts`, `server/routes/project.ts`, `server/routes/studio.ts` | `requestCompleter` (`browserHandoff.ts`) |
 | `server/src/research/deepResearchEngine.ts`, `server/src/aiEngine/opportunityAgent.ts` | `routedCompletion` / router bridge |
 | `server/services/briefScannerGraph.ts` | LangGraph workflow |

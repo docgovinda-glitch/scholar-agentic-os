@@ -156,3 +156,23 @@ export function scoreSourceRelevance(
   const domainShare = domainTerms.length ? Math.min(1, domainHits / Math.min(2, domainTerms.length)) : 1;
   return Math.round(100 * (0.45 * domainShare + 0.55 * best));
 }
+
+/**
+ * Whether a saved source list still fits the brief, so the Sources stage can
+ * flag a list left over from an earlier brief. Uses the same subject words and
+ * search phrases as live discovery; prescribed-in-brief sources always fit.
+ */
+export function areSourcesRelevantToBrief(
+  sources: Array<{ title: string; journal?: string; abstract?: string; prescribedInBrief?: boolean }>,
+  briefOrQuestion: string
+): boolean {
+  if (!sources.length || !briefOrQuestion || briefOrQuestion.trim().length < 4) return true;
+  const domainTerms = briefDomainTerms(briefOrQuestion);
+  const queries = buildSourceSearchQueries(briefOrQuestion);
+  if (!domainTerms.length && !queries.length) return true;
+  const sample = sources.slice(0, 10);
+  const fitting = sample.filter(
+    (s) => s.prescribedInBrief || scoreSourceRelevance({ title: s.title, venue: s.journal, abstract: s.abstract }, domainTerms, queries) >= 30
+  ).length;
+  return fitting / sample.length >= 0.5;
+}

@@ -46,7 +46,6 @@ import {
   assignmentStructureToOutlineTree,
   outlineTreeToAssignmentStructure,
 } from "../../../../src/desk/assignment/services/outlineService.ts";
-import { conductAskScholarResearchForOutline } from "../../../../src/desk/assignment/services/scholarlyDiscoveryService.ts";
 import { sanitizeBrief } from "../../../../src/features/understand/services/briefSanitizer.ts";
 import { classifyScopeBoundaries, stripLineTags } from "../../../../src/features/understand/services/scopeClassifier.ts";
 import {
@@ -158,17 +157,7 @@ router.post("/draft-section", async (req: express.Request<{ id: string }>, res) 
       : "No external evidence provided. Write conceptually and indicate where citations are needed.";
 
     const genreGuidance =
-      assignmentType === "reflection"
-        ? "Format: Reflective academic analysis. First-person reflective voice is appropriate where recounting personal or professional experience, tightly integrated with third-person analytical frameworks and literature (e.g. Gibbs' Reflective Cycle)."
-        : assignmentType === "case_study"
-        ? "Format: Strategic case study analysis. Use clear analytical headings, direct evaluation of organizational problems, and evidence-grounded strategic recommendations."
-        : assignmentType === "report" || assignmentType === "business_assignment"
-        ? "Format: Formal report prose. Use structured numbered subheadings, concise analytical paragraphs, and evidence-based recommendations."
-        : assignmentType === "lab_report"
-        ? "Format: Scientific laboratory report. Use objective, empirical scientific terminology with precision."
-        : assignmentType === "policy_analysis"
-        ? "Format: Policy analysis briefing paper. Frame policy options with criteria-based evaluation (feasibility, cost, equity) and concrete recommendations."
-        : "Format: Academic essay. Maintain rigorous paragraph structure (Topic sentence → Evidence & Explanation → Critical Analysis → Transition).";
+      scholarBrain.courseworkPrompts.draftSectionGenreGuidance({ assignmentType });
 
     const briefRaw = [
       project.answers["assignment_brief_text"],
@@ -178,38 +167,9 @@ router.post("/draft-section", async (req: express.Request<{ id: string }>, res) 
     ].filter(Boolean).join(" ");
     const isShortQA = isTutorialOrShortQABrief(briefRaw, targetWordCount) || targetWordCount <= 200;
 
-    const tutorialOrPeelRules = isShortQA
-      ? `CRITICAL TUTORIAL Q&A GUIDELINES:
-1. Directly answer the question in concise, conversational, and analytically grounded prose (~100-150 words).
-2. Do NOT write generic dissertation introductions, conclusion filler, artificial section summaries, or meta-commentary.
-3. STRICT CITATION CONVENTION: You are strictly PROHIBITED from formatting in-text citations yourself (do NOT write "(Author, Year)" or author names with years) and strictly PROHIBITED from outputting a "References" or "Bibliography" section. When citing approved evidence, insert ONLY bracket tokens [1], [2], or token IDs like [${mappedCitationItems[0]?.id || "ev-id"}]. The citation interceptor will compile all citations deterministically.
-4. Adhere strictly to any custom section guidance provided by the student above.
-5. Provide ONLY the section draft text.`
-      : `CRITICAL RULES:
-1. ONLY cite from the approved evidence provided above. Do NOT fabricate citations, authors, or statistics.
-2. STRICT CITATION CONVENTION: You are strictly PROHIBITED from formatting in-text citations yourself (do NOT write "(Author, Year)", "(Author Year)", or author names with years) and strictly PROHIBITED from outputting any "References", "Bibliography", or "Works Cited" section at the end.
-3. When referencing approved evidence, you MUST insert ONLY bracket tokens like [1], [2], or bracket IDs like [${mappedCitationItems[0]?.id || "ev-id"}]. The deterministic Scholar Citation Interceptor will convert all bracket tokens into certified ${citationStyle} in-text citations and append references.
-4. Maintain rigorous paragraph structure and academic tone.
-5. Adhere strictly to any custom section guidance provided by the student above.
-6. Provide ONLY the section draft text.`;
+    const tutorialOrPeelRules = scholarBrain.courseworkPrompts.draftSectionRules({ isShortQA, mappedCitationItems, citationStyle });
 
-    const prompt = `You are the Scholar Core Grounded Academic Drafting Agent.
-Write the draft for section: "${sectionTitle}".
-
-Assignment Type: ${assignmentType}
-${genreGuidance}
-
-Section Guidance: ${sectionGuidance}
-${userSpecificGuidance ? `\n${userSpecificGuidance}\n` : ""}
-Target Word Count: Approximately ${targetWordCount} words
-Academic Level: ${academicLevel} (${academicLevel === "postgraduate" ? "Write with advanced theoretical synthesis, nuanced evaluation, and sophisticated academic prose." : "Write with clear, coherent argumentation, conceptual accuracy, and formal academic tone."})
-Citation Style: ${citationStyle}
-Central Thesis / Stance: "${thesis}"
-Key Points to cover: ${keyPoints.join(", ")}
-
-${evidenceContext}
-
-${tutorialOrPeelRules}`;
+    const prompt = scholarBrain.courseworkPrompts.draftSectionPrompt({ sectionTitle, assignmentType, genreGuidance, sectionGuidance, userSpecificGuidance, targetWordCount, academicLevel, citationStyle, thesis, keyPoints, evidenceContext, tutorialOrPeelRules });
 
     const scholarlyDirectives = buildScholarlyVoiceSystemPrompt({
       discipline: "Academic Coursework",
@@ -222,7 +182,7 @@ ${tutorialOrPeelRules}`;
       try {
         const brainResult = await scholarBrain.complete({
           req,
-          systemPrompt: `You are the Scholar Core Grounded Academic Drafting Agent.\n\n${scholarlyDirectives}`,
+          systemPrompt: scholarBrain.courseworkPrompts.streamSectionSystemPrompt({ scholarlyDirectives }),
           userPrompt: prompt,
           taskClass: "drafting",
           dialect: "en-GB",
@@ -241,7 +201,7 @@ ${tutorialOrPeelRules}`;
       const draft = await callOpenRouterText(
         req,
         res,
-        `You are the Scholar Core Grounded Academic Drafting Agent.\n\n${scholarlyDirectives}`,
+        scholarBrain.courseworkPrompts.streamSectionSystemPrompt({ scholarlyDirectives }),
         prompt,
         undefined,
         "drafting"
@@ -354,21 +314,7 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
           .map((s, i) => `[${i + 1}] (Token ID: [${s.id}]) Title: ${s.title} | Author(s): ${(s.authors || []).join(", ")} (${s.year || "n.d."}) | Venue: ${s.journal || "Scholarly"} | Rationale: ${s.suggestedUse || s.mainFinding || ""}`)
           .join("\n");
 
-    const revisionInstruction = revisionPrompt === "deepen"
-      ? "REVISION FOCUS: Deepen analytical critique. Minimize passive descriptive text and amplify dialectical interrogation of theoretical assumptions (target 70% analysis / 30% description)."
-      : revisionPrompt === "expand"
-      ? "REVISION FOCUS: Expand scholarly elaboration. Introduce detailed comparative nuances while maintaining empirical citation grounding."
-      : revisionPrompt === "condense"
-      ? "REVISION FOCUS: Condense prose. Tighten argumentation and eliminate redundancies to fit the exact target word count."
-      : revisionPrompt === "citations"
-      ? "REVISION FOCUS: Reinforce citation grounding. Seamlessly integrate in-text citations from the bound sources to substantiate claims and strengthen academic credibility."
-      : revisionPrompt === "tone"
-      ? "REVISION FOCUS: Refine the academic tone and register. Keep every claim, citation and the word count; improve precision, formality and flow."
-      : revisionPrompt === "smooth"
-      ? "REVISION FOCUS: Enhance academic transitions and cohesion. Craft seamless transitional linkages between paragraphs and ensure strong analytical flow."
-      : revisionPrompt
-      ? `REVISION FOCUS: ${revisionPrompt}`
-      : "";
+    const revisionInstruction = scholarBrain.courseworkPrompts.streamSectionRevisionInstruction({ revisionPrompt });
 
     const existingBlock = (existingContent && revisionPrompt)
       ? `EXISTING DRAFT CONTENT TO REVISE:\n"""\n${existingContent}\n"""\nPlease revise and upgrade this draft following the revision focus above while preserving accurate empirical citations.\n`
@@ -382,17 +328,7 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
     ].filter(Boolean).join(" ");
     const isShortQA = isTutorialOrShortQABrief(briefRaw, targetWordCount) || targetWordCount <= 200;
 
-    const frameworkGuidelines = isShortQA
-      ? `TUTORIAL & CASE STUDY Q&A GUIDELINES:
-- Directly answer the question in concise, conversational, and analytically grounded prose (~100-150 words).
-- Do NOT generate generic dissertation introductions, conclusion filler, artificial section summaries, or meta-commentary.
-- STRICT CITATION CONVENTION: You are strictly PROHIBITED from formatting in-text citations as (Author, Year) or outputting a "References" section. Use ONLY bracket tokens like [1], [2], or token IDs like [${mappedSources[0]?.id || "ev-uuid"}].`
-      : `MANDATORY PEEL PARAGRAPH FRAMEWORK:
-- Point: Distinct topic sentence advancing the central thesis.
-- Evidence: Grounded empirical citations referenced SOLELY via bracket tokens like [1], [2], or token IDs like [${mappedSources[0]?.id || "ev-uuid"}].
-- STRICT CITATION CONVENTION: Do NOT format author-year in-text citations or include a "References" section. All citations will be compiled deterministically by the Citation Interceptor according to ${citationStyle}.
-- Explanation: 70% critical analysis & evaluation / 30% descriptive exposition.
-- Link: Clear concluding transition linking back to the primary assessment prompt.`;
+    const frameworkGuidelines = scholarBrain.courseworkPrompts.streamSectionFrameworkGuidelines({ isShortQA, mappedSources, citationStyle });
 
     // What the agent learned in earlier stages: the plan, the brief's
     // requirements, and evidence quoted from each linked source's abstract.
@@ -415,42 +351,14 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
       .filter(Boolean)
       .join("\n\n");
 
-    const prompt = `You are the Scholar Core Grounded Academic Drafting Agent.
-Write the section prose for: "${sectionTitle}".
-Academic Function: ${academicFunction}
-WORD BUDGET: ${targetWordCount} words (acceptable range ${budgetRange.min}-${budgetRange.max}). Write a complete, cohesive, well-cited section that lands inside that range and ends on a finished sentence; never stop mid-sentence and never pad.
-Academic Level: ${academicLevel}
-Citation Style: ${citationStyle}
-Central Thesis: "${thesis || String(project.answers["assignment_thesis"] || project.answers["thesis_statement"] || "")}"
-Assignment Topic: "${assignmentTopic}"
-
-${revisionInstruction}
-${existingBlock}
-${evidencePackPrompt ? evidenceBlock : `BOUND EVIDENCE (Use these sources for in-text citations; do NOT fabricate external sources):\n${evidenceBlock || "Use standard scholarly reasoning."}`}
-${agentBlock}
-
-${buildSectionContract({
-  prompt: String(sectionGuidance || ""),
-  sectionIndex: Number.isFinite(Number(sectionIndex)) ? Number(sectionIndex) : undefined,
-  sectionCount: Number.isFinite(Number(sectionCount)) ? Number(sectionCount) : undefined,
-  outlineTitles: Array.isArray(outlineTitles) ? outlineTitles.map(String).slice(0, 12) : undefined,
-  previousTail: typeof previousTail === "string" ? previousTail : undefined,
-  sources: mappedSources,
-  writingStyle: writingStyle && typeof writingStyle === "object" ? (writingStyle as { preset?: string; customSampleText?: string }) : undefined,
-})}
-
-${frameworkGuidelines}
-
-PARAGRAPH STRUCTURE (mandatory): ${isShortQA ? "write 1-2 paragraphs" : `write ${paragraphRange(targetWordCount)} distinct academic paragraphs`} separated by ONE BLANK LINE (two newline characters). Each paragraph opens with a topic sentence, then explains the technical point, then brings cited evidence, then ends on a transition into the next idea. Never return one long unbroken block and never a single fragment.
-
-Output ONLY the section text in clean academic Markdown prose. Do not print a heading for the section.`;
+    const prompt = scholarBrain.courseworkPrompts.streamSectionPrompt({ sectionTitle, academicFunction, targetWordCount, budgetRange, academicLevel, citationStyle, thesis, project, assignmentTopic, revisionInstruction, existingBlock, evidencePackPrompt, evidenceBlock, agentBlock, sectionGuidance, sectionIndex, sectionCount, outlineTitles, previousTail, mappedSources, writingStyle, frameworkGuidelines, isShortQA });
 
     const scholarlyDirectives = buildScholarlyVoiceSystemPrompt({
       discipline: "Academic Coursework",
       dialect: "en-GB",
       requireVaultEvidence: true,
     });
-    const systemPrompt = `You are the Scholar Core Grounded Academic Drafting Agent.\n\n${scholarlyDirectives}`;
+    const systemPrompt = scholarBrain.courseworkPrompts.streamSectionSystemPrompt({ scholarlyDirectives });
 
     // No server-side model (or the user's local model goes first): hand off with
     // a 426 now, while a status can still be sent.
@@ -569,51 +477,12 @@ router.post("/review", async (req: express.Request<{ id: string }>, res) => {
     .join("\n\n");
 
   try {
-    const prompt = `You are the Scholar Core Senior Academic Reviewer.
-Conduct a rigorous submission check on this assignment draft across the 10 university assessment dimensions:
-
-Question: "${question}"
-Type: ${assignmentType}
-Level: ${academicLevel}
-Target Word Count: ${targetWordCount} words
-Citation Style: ${citationStyle}
-
-Draft Document:
-${fullText}
-
-Evaluate each of the 10 criteria strictly:
-1. question_addressed (Does it fully answer the prompt?)
-2. argument_logic (Is there a clear, reasoned response?)
-3. evidence_sufficiency (Are claims substantiated?)
-4. critical_thinking (Does it analyse rather than merely describe?)
-5. structure_coherence (Does every section contribute?)
-6. rubric_alignment (Satisfies university expectations?)
-7. academic_level (Depth appropriate for ${academicLevel}?)
-8. word_count (Within required limit?)
-9. citation_accuracy (Consistent in ${citationStyle}?)
-10. originality (Academic integrity & authentic argumentation?)
-
-Return ONLY valid JSON matching:
-{
-  "overallScore": 88,
-  "readyForSubmission": true,
-  "criteriaResults": [
-    {
-      "category": "question_addressed",
-      "label": "Question Addressed",
-      "status": "pass",
-      "summary": "...",
-      "feedback": "..."
-    }
-  ],
-  "strengths": ["...", "..."],
-  "priorityFixes": ["..."]
-}`;
+    const prompt = scholarBrain.courseworkPrompts.reviewPrompt({ question, assignmentType, academicLevel, targetWordCount, citationStyle, fullText });
 
     const report = await callOpenRouterJSON(
       req,
       res,
-      "You are the Scholar Core Senior Academic Reviewer.",
+      scholarBrain.courseworkPrompts.ROLES.reviewer,
       prompt,
       undefined,
       "verification"
@@ -771,150 +640,16 @@ router.post("/tutor-chat", async (req: express.Request<{ id: string }>, res) => 
           .join("\n")
       : "";
 
-    let modeInstruction = "";
-    if (mode === "socratic") {
-      modeInstruction = `
-ROLE & SOCRATIC METHOD:
-- You are a Classical Socratic Academic Advisor.
-- Do NOT simply provide finished answers or write the essay for the student.
-- Instead, formulate 2-3 deep, dialectical, thought-provoking questions that challenge underlying premises, identify logical gaps, prompt synthesis across theoretical traditions, or expose unexamined assumptions.
-- Provide "socraticQuestions" array where each object has: { id, question, targetConcept, challengeType ("probe_assumptions" | "request_evidence" | "explore_implications" | "counter_perspective" | "clarify_concepts"), rationale }.`;
-    } else if (mode === "rubric") {
-      modeInstruction = `
-ROLE & RUBRIC GRADING ESTIMATOR:
-- Evaluate the student's current work against standard University Marking Criteria (First Class 70%+, 2:1 Upper Second 60-69%, 2:2 Lower Second 50-59%, 3rd 40-49%, Fail <40%).
-- Provide a rigorous, realistic assessment.
-- Populate "rubricEstimation" with:
-  {
-    "overallScore": number (0-100),
-    "overallBand": "1st_class" | "2_1_upper_second" | "2_2_lower_second" | "3rd_class" | "fail",
-    "bandLabel": "First Class (1st) — 74%" (or appropriate),
-    "summary": "...",
-    "criteria": [
-      {
-        "id": "crit-1",
-        "criterion": "Critical Argumentation & Thesis",
-        "weightPercent": 30,
-        "currentBand": "2_1_upper_second",
-        "score": 67,
-        "maxScore": 100,
-        "critique": "...",
-        "howToReachNextBand": "..."
-      },
-      {
-        "id": "crit-2",
-        "criterion": "Evidence Grounding & Source Synthesis",
-        "weightPercent": 30,
-        "currentBand": "1st_class",
-        "score": 75,
-        "maxScore": 100,
-        "critique": "...",
-        "howToReachNextBand": "..."
-      },
-      {
-        "id": "crit-3",
-        "criterion": "Structure, Academic Style & Clarity",
-        "weightPercent": 20,
-        "currentBand": "2_1_upper_second",
-        "score": 68,
-        "maxScore": 100,
-        "critique": "...",
-        "howToReachNextBand": "..."
-      },
-      {
-        "id": "crit-4",
-        "criterion": "Command of Theoretical Frameworks",
-        "weightPercent": 20,
-        "currentBand": "2_1_upper_second",
-        "score": 64,
-        "maxScore": 100,
-        "critique": "...",
-        "howToReachNextBand": "..."
-      }
-    ],
-    "keyStrengths": ["...", "..."],
-    "keyRecommendations": ["...", "..."],
-    "targetBandRoadmap": {
-      "targetBand": "First Class (1st)",
-      "actionableSteps": ["...", "..."]
-    }
-  }`;
-    } else if (mode === "counterargument") {
-      modeInstruction = `
-ROLE & COUNTERARGUMENT GENERATOR:
-- Formulate 2-3 rigorous scholarly counterarguments and objections from competing schools of thought or empirical findings.
-- Populate "counterArguments" array with:
-  [
-    {
-      "id": "ca-1",
-      "opposingViewpoint": "...",
-      "theoreticalGrounding": "...",
-      "keyScholarsOrSchools": ["...", "..."],
-      "suggestedRebuttalStrategy": "..."
-    }
-  ]`;
-    } else {
-      modeInstruction = `
-ROLE & ACADEMIC POLISH:
-- Refine prose for formal academic tone, clarity, and conciseness.
-- If applicable, populate "suggestion" with: { "type": "rephrase", "suggestedText": "..." }`;
-    }
+    const modeInstruction = scholarBrain.courseworkPrompts.tutorModeInstruction({ mode });
 
-    const prompt = `You are the Scholar Core Live Academic Tutor & Rubric Estimator.
-Student's Query: "${message}"
-Active Mode: ${mode}
-Current Phase: ${stage}
-Academic Level: ${academicLevel} (${academicLevel === "postgraduate" ? "Expect deep theoretical critique, counterarguments, and advanced academic vocabulary" : "Focus on conceptual clarity, rigorous evidence, clear argument, and accurate referencing"})
-Assignment Type: ${assignmentType}
-Assignment Question: "${question}"
-Central Thesis: "${thesis}"
-Target Word Count: ${targetWordCount} (Current: ${currentWordCount})
-
-${analysisContext}
-${planContext}
-${draftContext}
-
-${modeInstruction}
-
-BIDIRECTIONAL WORKSPACE SYNCHRONIZATION:
-If the student asks to modify, refine, refocus, or add research questions, search queries, scope boundaries, or assignment parameters
-(e.g., "Focus question 2 on EU AI Act compliance", "Add a search query for algorithmic transparency in JSTOR", "Exclude pre-2015 papers"):
-You MUST populate the "patch" object in your JSON response alongside your conversational advice:
-
-Return ONLY valid JSON matching:
-{
-  "reply": "Conversational, constructive academic response explaining the tutor's advice and any updates made...",
-  "mode": "${mode}",
-  "patch": {
-    "plan": {
-      "coreQuestions": [
-        { "id": "q-1", "question": "...", "rationale": "...", "category": "..." }
-      ],
-      "searchStrategies": [
-        { "id": "strat-1", "database": "...", "searchQuery": "...", "relevanceTarget": "..." }
-      ],
-      "outOfScopeTopics": ["...", "..."]
-    },
-    "analysis": {
-      "keyConcepts": ["...", "..."]
-    },
-    "question": "..."
-  },
-  "socraticQuestions": [ ... ],
-  "rubricEstimation": { ... },
-  "counterArguments": [ ... ],
-  "suggestion": {
-    "type": "rephrase" | "replace_text" | "reduce_words" | "add_evidence",
-    "suggestedText": "..."
-  }
-}`;
+    const prompt = scholarBrain.courseworkPrompts.tutorChatPrompt({ message, mode, stage, academicLevel, assignmentType, question, thesis, targetWordCount, currentWordCount, analysisContext, planContext, draftContext, modeInstruction });
 
     let data: any = null;
     try {
       data = await callOpenRouterJSON(
         req,
         res,
-        "You are the Scholar Core Pedagogical Academic Tutor.",
+        scholarBrain.courseworkPrompts.ROLES.tutor,
         prompt,
         undefined,
         "chat"
@@ -995,46 +730,12 @@ router.post("/peel-matrix", async (req: express.Request<{ id: string }>, res) =>
   } = req.body || {};
 
   try {
-    const prompt = `You are the Scholar Core PEEL Argument Matrix Agent.
-Construct an academically rigorous, dialectical body theme using the Point-Evidence-Explanation-Link structure:
-
-Theme Title: "${themeTitle}"
-Central Thesis Defended: "${thesis}"
-Target Word Count: ${targetWords} words
-Academic Level: ${academicLevel} (${academicLevel === "postgraduate" ? "Write with advanced theoretical synthesis, nuanced critique, and seamless scholarly integration." : "Ensure clear logical claims, substantiated evidence, critical evaluation, and clear prose."})
-Citation Style: ${citationStyle}
-Key Points to Cover: ${JSON.stringify(keyPoints)}
-
-STRUCTURE TO GENERATE:
-1. P (Point): A precise, declarative topic sentence that directly advances and defends the central thesis.
-2. E (Evidence): Academic grounding, empirical research, or theoretical models (cite realistic peer-reviewed literature in ${citationStyle}).
-3. E (Explanation & Dialectical Critique):
-   - Critical mechanism: Explain why and how this evidence proves the point.
-   - Counterargument: What would a critical scholar, competing school, or opposing framework object?
-   - Rebuttal: How does the argument answer or assimilate that counterargument without weakening the thesis?
-4. L (Link): A synthesising sentence that connects the analysis back to the overall thesis and creates a transition.
-5. Draft Content: The complete, publication-ready academic paragraph (~${targetWords} words) combining these elements with flawless academic prose.
-
-Return ONLY valid JSON matching:
-{
-  "themeTitle": "${themeTitle}",
-  "targetWords": ${targetWords},
-  "currentWords": 0,
-  "point": "Clear topic sentence claim...",
-  "evidence": "Empirical study / theoretical grounding in ${citationStyle}...",
-  "explanation": "Critical mechanism analysis...",
-  "counterargument": "Opposing viewpoint or limitation...",
-  "rebuttal": "Substantiated defense answering the objection...",
-  "link": "Synthesising sentence connecting to thesis...",
-  "draftContent": "Full polished academic prose for this section...",
-  "status": "complete",
-  "linkedSourceIds": []
-}`;
+    const prompt = scholarBrain.courseworkPrompts.peelMatrixPrompt({ themeTitle, thesis, targetWords, academicLevel, citationStyle, keyPoints });
 
     const data = await callOpenRouterJSON(
       req,
       res,
-      "You are the Scholar Core PEEL Argument Matrix Agent.",
+      scholarBrain.courseworkPrompts.ROLES.peelMatrix,
       prompt,
       undefined,
       "drafting"

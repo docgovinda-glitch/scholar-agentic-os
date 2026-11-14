@@ -4,6 +4,10 @@
  */
 import type { DiscoveredSource } from "../types";
 import { parsePersonName } from "./referenceListGenerator";
+import { cleanEscapes } from "../../../shared/inlineMarkdown";
+import { parseProseBlocks } from "../../../shared/proseBlocks";
+
+export { cleanEscapes, inlineMarkdownRuns, type StyledRun } from "../../../shared/inlineMarkdown";
 
 const norm = (t: string) => (t || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 
@@ -43,43 +47,35 @@ export function selectCitedSources(sources: DiscoveredSource[], bodyText: string
 
 const escapeHtml = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-/** Strip LaTeX/Markdown escapes the model leaves in prose ("\$3\$-noisy" -> "3-noisy", "\_" -> "_"). */
-export function cleanEscapes(text: string): string {
-  return (text || "")
-    .replace(/\\\$([^$]*?)\\\$/g, "$1")
-    .replace(/\$([^$\n]{1,40})\$/g, "$1")
-    .replace(/\\([$_*#%&{}])/g, "$1")
-    .replace(/\[Unverified Claim[^\]]*\]/gi, "")
-    .replace(/[ \t]{2,}/g, " ");
-}
-
 /** Inline Markdown (*italic*, **bold**) to safe HTML. */
 export function inlineMarkdownToHtml(text: string): string {
   return escapeHtml(cleanEscapes(text))
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/(^|[^*\w])\*([^*\n]+)\*(?!\w)/g, "$1<em>$2</em>")
-    .replace(/(^|[^_\w])_([^_\n]+)_(?!\w)/g, "$1<em>$2</em>");
+    .replace(/(^|[^_\w])_([^_\n]+)_(?!\w)/g, "$1<em>$2</em>")
+    .replace(/&lt;u&gt;([\s\S]+?)&lt;\/u&gt;/g, "<u>$1</u>");
 }
 
-export interface StyledRun {
-  text: string;
-  italics?: boolean;
-  bold?: boolean;
-}
-
-/** Inline Markdown as styled runs (for .docx): never prints literal asterisks. */
-export function inlineMarkdownRuns(text: string): StyledRun[] {
-  const clean = cleanEscapes(text);
-  const runs: StyledRun[] = [];
-  const re = /\*\*([^*]+)\*\*|\*([^*\n]+)\*/g;
-  let last = 0;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(clean))) {
-    if (m.index > last) runs.push({ text: clean.slice(last, m.index) });
-    if (m[1] !== undefined) runs.push({ text: m[1], bold: true });
-    else runs.push({ text: m[2], italics: true });
-    last = m.index + m[0].length;
-  }
-  if (last < clean.length) runs.push({ text: clean.slice(last) });
-  return runs.length ? runs : [{ text: clean }];
+/** A section's stored text as safe HTML blocks (paragraphs, sub-headings, quotes, lists, tables). */
+export function proseToHtml(text: string): string {
+  return parseProseBlocks(text)
+    .map((b) => {
+      // Alignment values come from a fixed set (center/right/justify), never free text.
+      const style = "align" in b && b.align ? ` style="text-align:${b.align};text-indent:0"` : "";
+      if (b.kind === "paragraph") return `<p${style}>${inlineMarkdownToHtml(b.text)}</p>`;
+      if (b.kind === "heading") return `<h3${style}>${inlineMarkdownToHtml(b.text)}</h3>`;
+      if (b.kind === "quote") return `<blockquote>${b.text.split("\n").map((l) => `<p>${inlineMarkdownToHtml(l)}</p>`).join("")}</blockquote>`;
+      if (b.kind === "bullets" || b.kind === "numbered") {
+        const tag = b.kind === "bullets" ? "ul" : "ol";
+        return `<${tag}>${b.items.map((i) => `<li>${inlineMarkdownToHtml(i)}</li>`).join("")}</${tag}>`;
+      }
+      const rows = b.rows
+        .map((r, ri) => {
+          const cell = b.header && ri === 0 ? "th" : "td";
+          return `<tr>${r.map((c) => `<${cell}>${inlineMarkdownToHtml(c)}</${cell}>`).join("")}</tr>`;
+        })
+        .join("");
+      return `<table>${rows}</table>`;
+    })
+    .join("");
 }

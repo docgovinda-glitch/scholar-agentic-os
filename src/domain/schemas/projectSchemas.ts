@@ -3,12 +3,14 @@ import { GATE_ORDER } from "../../app/conductor/conductor.ts";
 import { SUBMISSION_STATUSES } from "../submission/types.ts";
 
 // Block & Document Schemas
-export const BlockKindSchema = z.enum(["paragraph", "heading1", "heading2", "heading3", "quote", "list-item"]);
+export const BlockKindSchema = z.enum(["paragraph", "heading1", "heading2", "heading3", "quote", "list-item", "table"]);
 
 export const BlockSchema = z.object({
   id: z.string(),
   kind: BlockKindSchema,
   text: z.string(),
+  rows: z.array(z.array(z.string().max(5000)).max(50)).max(500).optional(),
+  align: z.enum(["center", "right", "justify"]).optional(),
 });
 
 export const CanonicalDocumentSchema = z.object({

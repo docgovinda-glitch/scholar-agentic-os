@@ -1035,6 +1035,14 @@ button:disabled {
 .section-editor h4 { font-size: 1rem; font-weight: 600; margin: 1.1em 0 0.4em; font-family: inherit; }
 .section-editor ul { list-style: disc; padding-left: 1.4em; margin: 0 0 0.85em; }
 .section-editor ol { list-style: decimal; padding-left: 1.4em; margin: 0 0 0.85em; }
+.section-editor:focus, .section-editor.ProseMirror-focused { outline: none; }
+.section-editor blockquote { margin: 0 0 0.85em; padding-left: 1em; border-left: 2px solid var(--border-default); color: var(--text-secondary); font-style: italic; }
+.section-editor .tableWrapper { overflow-x: auto; margin: 0 0 0.85em; }
+.section-editor table { border-collapse: collapse; width: 100%; table-layout: fixed; font-size: 0.9em; }
+.section-editor th, .section-editor td { border: 1px solid var(--border-default); padding: 0.35em 0.6em; vertical-align: top; min-width: 3em; }
+.section-editor th { background: var(--surface-inset); font-weight: 600; text-align: left; }
+.section-editor th p, .section-editor td p { margin: 0; }
+.section-editor .selectedCell { background: var(--surface-hover); }
 .section-editor p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   color: var(--text-muted);

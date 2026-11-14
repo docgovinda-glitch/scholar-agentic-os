@@ -3,7 +3,7 @@ import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import React from "react";
-import { generateCuratedLiteratureSources as seedSourcesFixture } from "../services/scholarlyDiscoveryService";
+import { fixtureSources as seedSourcesFixture } from "./fixtures/sourceFixtures";
 const seedSources = (question: string) => seedSourcesFixture(question, "apa7");
 
 
@@ -20,14 +20,14 @@ const authedJsonFetch = vi.fn();
 // (The app itself no longer substitutes catalog entries when search fails.)
 vi.mock("../services/realScholarlyDiscoveryService", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../services/realScholarlyDiscoveryService")>();
-  const fixtures = await import("../services/scholarlyDiscoveryService");
+  const fixtures = await import("./fixtures/sourceFixtures");
   return {
     ...actual,
     discoverRealScholarlySourcesFromServer: vi.fn(async (question: string, style = "apa7") =>
-      fixtures.generateCuratedLiteratureSources(question, style)
+      fixtures.fixtureSources(question, style)
     ),
-    fetchMoreRealSources: vi.fn(async (existing: Parameters<typeof fixtures.fetchMoreLiteratureSources>[0], question: string, n = 10) =>
-      fixtures.fetchMoreLiteratureSources(existing, question, n)
+    fetchMoreRealSources: vi.fn(async (existing: Parameters<typeof fixtures.fixtureMoreSources>[0], question: string, n = 10) =>
+      fixtures.fixtureMoreSources(existing, question, n)
     ),
   };
 });

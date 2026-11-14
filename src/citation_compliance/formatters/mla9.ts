@@ -4,6 +4,7 @@
  * Formats citations and references according to MLA 9th edition style.
  */
 
+import { doiUrl, endSentence, familyGiven, givenFamily, journalOf, pageRange, publisherOf, quotedTitle, sortedAuthors } from "./bibParts";
 import type { CitationStyle, InTextOptions } from "../formattingEngine";
 import type { CanonicalReference } from "../model/reference";
 
@@ -28,52 +29,40 @@ export class MLA9Formatter implements CitationStyle {
       return "(" + authorPart + " " + options.locator + ")";
     }
 
-    return "( " + authorPart + " )";
+    return "(" + authorPart + ")";
   }
 
+  /**
+   * MLA 9: 'Smith, John, et al. "Title." *Journal*, vol. 12, no. 3, 2021,
+   * pp. 45–67, https://doi.org/….' Two authors: "Smith, John, and Maria Lopez."
+   */
   formatBibliography(reference: CanonicalReference): string {
+    const list = sortedAuthors(reference);
+    const authors =
+      list.length === 0 ? "" : list.length === 1 ? familyGiven(list[0]) : list.length === 2 ? `${familyGiven(list[0])}, and ${givenFamily(list[1])}` : `${familyGiven(list[0])}, et al`;
+    const year = reference.year || reference.publicationDate?.slice(0, 4) || "";
+    const link = doiUrl(reference);
     const parts: string[] = [];
-
-    // Authors
-    if (reference.authors && reference.authors.length > 0) {
-      const authorNames = reference.authors.map((a) => a.lastName + ", " + a.firstName);
-      if (authorNames.length > 1) {
-        const allButLast = authorNames.slice(0, -1).join(", ");
-        const last = authorNames[authorNames.length - 1];
-        parts.push(allButLast + ", and " + last + ".");
-      } else {
-        parts.push(authorNames[0] + ".");
-      }
+    if (authors) parts.push(endSentence(authors));
+    if (reference.kind === "Book") {
+      parts.push(endSentence(`*${reference.title}*`));
+      const tail = [publisherOf(reference), year].filter(Boolean).join(", ");
+      if (tail) parts.push(`${tail}${link ? `, ${link}` : ""}.`);
+      else if (link) parts.push(endSentence(link));
+      return parts.join(" ");
     }
-
-    // Title
-    parts.push(reference.title);
-
-    // Container
-    if (reference.kind === "JournalArticle" && reference.journal) {
-      parts.push("*" + reference.journal + "*");
-    }
-
-    // Publisher
-    if (reference.publisher) {
-      parts.push(reference.publisher);
-    }
-
-    // Date
-    if (reference.publicationDate) {
-      const year = reference.publicationDate.substring(0, 4);
-      parts.push(", " + year);
-    }
-
-    // DOI
-    if (reference.doi) {
-      const normalizedDoi = reference.doi.startsWith("http") ? reference.doi : "https://doi.org/" + reference.doi;
-      parts.push(". " + normalizedDoi);
-    }
-
+    parts.push(quotedTitle(reference.title, "."));
+    const container: string[] = [];
+    const journal = journalOf(reference);
+    if (journal) container.push(`*${journal}*`);
+    if (reference.volume) container.push(`vol. ${reference.volume}`);
+    if (reference.issue) container.push(`no. ${reference.issue}`);
+    if (year) container.push(year);
+    if (reference.pages) container.push(`pp. ${pageRange(reference.pages)}`);
+    if (link) container.push(link);
+    if (container.length) parts.push(`${container.join(", ")}.`);
     return parts.join(" ");
   }
-
   formatReferenceList(references: CanonicalReference[]): string {
     return references.map((ref) => this.formatBibliography(ref)).join("\n\n");
   }

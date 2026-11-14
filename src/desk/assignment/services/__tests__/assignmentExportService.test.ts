@@ -77,3 +77,42 @@ describe("Coursework export (.docx)", () => {
     expect(text).not.toContain("Assignment Prompt");
   });
 });
+
+describe("Coursework export (.docx) rich blocks", () => {
+  it("writes real tables, indented quotes, lists and underline (no raw markup)", async () => {
+    const blob = await generateAssignmentDocx({
+      title: "Rich blocks",
+      brief,
+      sections: [
+        section(
+          "Findings",
+          `${longDraft}\n\nWaiting fell <u>sharply</u> (Okafor, 2021).\n\n> Triage is a moral as well as a clinical act.\n\n- first point\n- second point\n\n| Clinic | Wait |\n| --- | --- |\n| North | 20 min |\n| South | 35 min |`
+        ),
+      ],
+      sources: [source],
+    });
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const xml = await zip.file("word/document.xml")!.async("string");
+    expect(xml).toContain("<w:tbl>");
+    expect(xml).toMatch(/<w:u w:val="single"\/>/);
+    const text = xml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+    for (const t of ["North", "35 min", "Triage is a moral", "second point", "sharply"]) expect(text).toContain(t);
+    expect(text).not.toMatch(/\| ---|<u>|&lt;u&gt;|^> /);
+  });
+});
+
+describe("Coursework export (.docx) alignment", () => {
+  it("writes the stored alignment as Word paragraph alignment", async () => {
+    const blob = await generateAssignmentDocx({
+      title: "Aligned",
+      brief,
+      sections: [section("S", `${longDraft}\n\n<p align="center">A centred line.</p>\n\n<p align="right">A right line.</p>`)],
+      sources: [],
+    });
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const xml = await zip.file("word/document.xml")!.async("string");
+    expect(xml).toMatch(/<w:jc w:val="center"\/>(?:(?!<\/w:p>).)*A centred line/s);
+    expect(xml).toMatch(/<w:jc w:val="(?:right|end)"\/>(?:(?!<\/w:p>).)*A right line/s);
+    expect(xml).not.toContain("align=");
+  });
+});

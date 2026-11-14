@@ -274,6 +274,7 @@ describe("Assignment Phase 4: Submission Audit & Export Flow", () => {
       getRubric.mockResolvedValue(null);
       getOutputTypeSpec.mockResolvedValue(null);
 
+      const downloadPdfSpy = vi.spyOn(exportService, "downloadAssignmentPdf").mockRejectedValue(new Error("offline"));
       const exportPdfSpy = vi.spyOn(exportService, "exportAssignmentToPdf").mockImplementation(() => {});
       const onBack = vi.fn();
 
@@ -289,7 +290,9 @@ describe("Assignment Phase 4: Submission Audit & Export Flow", () => {
 
       const pdfBtn = await screen.findByTestId("export-pdf-button");
       fireEvent.click(pdfBtn);
-      expect(exportPdfSpy).toHaveBeenCalledTimes(1);
+      // The server-rendered PDF is tried first; when it fails the printable view opens.
+      await waitFor(() => expect(downloadPdfSpy).toHaveBeenCalledWith("proj-submission-test", expect.objectContaining({ sections: expect.any(Array) })));
+      await waitFor(() => expect(exportPdfSpy).toHaveBeenCalledTimes(1));
 
       const backBtn = screen.getByText("Back to Drafting");
       fireEvent.click(backBtn);

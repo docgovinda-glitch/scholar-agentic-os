@@ -320,7 +320,7 @@ describe("Round 5: Context Panel Copilot Unification", () => {
         const { unmount } = render(
           <AssignmentWorkspace projectId="proj-copilot-test" initialStage={stage} onStageChange={vi.fn()} />
         );
-        await screen.findByRole("button", { name: /Phase 4: Submission/i });
+        await screen.findByRole("button", { name: /Phase 5: Submission/i });
         expect(screen.queryByTestId("assignment-tutor-drawer")).not.toBeInTheDocument();
         expect(screen.queryByRole("complementary")).not.toBeInTheDocument();
         expect(screen.queryByPlaceholderText(/Ask Architect/i)).not.toBeInTheDocument();
@@ -336,7 +336,7 @@ describe("Round 5: Context Panel Copilot Unification", () => {
           onStageChange={vi.fn()}
         />
       );
-      await screen.findByRole("button", { name: /Phase 4: Submission/i });
+      await screen.findByRole("button", { name: /Phase 5: Submission/i });
       expect(screen.queryByRole("button", { name: "Show Inspector Drawer" })).not.toBeInTheDocument();
       expect(screen.queryByTestId("assignment-tutor-drawer")).not.toBeInTheDocument();
     });

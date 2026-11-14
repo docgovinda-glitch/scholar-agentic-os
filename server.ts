@@ -34,6 +34,8 @@ import http from "node:http";
 import { LOCAL_RUNNERS } from "./src/config/localRunnerCatalog.ts";
 import { registerAiRunRoutes } from "./server/routes/aiRun.ts";
 import { aiRouteDecorator } from "./server/src/ai/routerBridge.ts";
+import { onProjectSaved } from "./src/services/store/projectStore.ts";
+import { mirrorAssignmentProject } from "./server/src/assignmentRelational.ts";
 import { registerHealthRoutes, registerAdminRoutes, registerAuthRoutes, registerAIRoutes, registerStudioRoutes, registerProjectRoutes, registerDraftingRoutes, registerAiAccessRoutes, registerSearchRoutes, registerVaultRoutes, registerPresentationRoutes, registerSupabaseProxy, registerSupabaseWsProxy } from "./server/routes/index.ts";
 
 if (!process.env.VITEST && process.env.NODE_ENV !== "test") {
@@ -234,6 +236,8 @@ registerAiRunRoutes(app);
 app.use(["/api/ai", "/api/drafting", "/api/projects/:id/agent", "/api/projects/:id/agentic", "/api/projects/:id/assignment", "/api/projects/:id/thesis", "/api/projects/:id/proposal", "/api/projects/:id/presentation", "/api/projects/:id/manuscript", "/api/projects/:id/journal-requirements", "/api/projects/:id/cover-letter", "/api/projects/:id/anonymization", "/api/studio/refine", "/api/presentations"], aiRouteDecorator);
 registerAIRoutes(app, aiAbuseLimit, citationStyleRegistry);
 registerStudioRoutes(app, studioLimit);
+// Coursework (OT-01) saves are mirrored into normalized per-stage tables.
+onProjectSaved(mirrorAssignmentProject);
 registerProjectRoutes(app, projectLimit);
 registerDraftingRoutes(app);
 registerAiAccessRoutes(app);

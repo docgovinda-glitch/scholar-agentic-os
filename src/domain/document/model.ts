@@ -28,12 +28,18 @@ export type BlockKind =
   | "heading2"
   | "heading3"
   | "quote"
-  | "list-item";
+  | "list-item"
+  | "table";
 
 export interface Block {
   id: string;
   kind: BlockKind;
+  /** For a table, a plain-text rendering ("a | b" per row) so writers without table support still print it. */
   text: string;
+  /** Table cells, first row the header (only for kind "table"). */
+  rows?: string[][];
+  /** Paragraph alignment when not the default (left). */
+  align?: "center" | "right" | "justify";
 }
 
 export interface CanonicalDocument {

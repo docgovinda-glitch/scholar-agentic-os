@@ -6,6 +6,7 @@ import { CitationReconciliationCard } from "../components/CitationReconciliation
 import { FlowReconciliationCard } from "../components/FlowReconciliationCard";
 import {
   exportAssignmentToDocx,
+  downloadAssignmentPdf,
   exportAssignmentToPdf,
   copyAssignmentMarkdown,
 } from "../services/assignmentExportService";
@@ -52,6 +53,7 @@ export function AssignmentSubmissionStage({
     flowAuditResult,
     setPhase,
     saveAnswers,
+    projectId,
   } = useAssignmentWorkspace();
 
   const [isExportingDocx, setIsExportingDocx] = useState(false);
@@ -133,29 +135,41 @@ export function AssignmentSubmissionStage({
     }
   };
 
-  const handleExportPdf = () => {
-    try {
-      if (saveAnswers) {
-        saveAnswers({
-          student_name: studentName,
-          student_id: studentId,
-          course_name: courseName,
-          institution: institutionName,
-        });
-      }
-      exportAssignmentToPdf({
-        title: assignmentTitle,
-        studentName: studentName || undefined,
-        studentId: studentId || undefined,
-        courseName: courseName || projectState.brief.courseDetails?.courseName || undefined,
-        institution: institutionName || undefined,
-        brief: projectState.brief,
-        sections: activeSections,
-        sources: projectState.sources.curated,
-        actualWordCount: currentWordCount,
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const handleExportPdf = async () => {
+    setIsExportingPdf(true);
+    setExportError(null);
+    if (saveAnswers) {
+      saveAnswers({
+        student_name: studentName,
+        student_id: studentId,
+        course_name: courseName,
+        institution: institutionName,
       });
+    }
+    const params = {
+      title: assignmentTitle,
+      studentName: studentName || undefined,
+      studentId: studentId || undefined,
+      courseName: courseName || projectState.brief.courseDetails?.courseName || undefined,
+      institution: institutionName || undefined,
+      brief: projectState.brief,
+      sections: activeSections,
+      sources: projectState.sources.curated,
+      actualWordCount: currentWordCount,
+    };
+    try {
+      await downloadAssignmentPdf(projectId, params);
     } catch (err: any) {
-      setExportError(err?.message || "Failed to open printable academic PDF view.");
+      // The PDF service is unreachable: fall back to the printable view.
+      try {
+        exportAssignmentToPdf(params);
+        setExportError(`${err?.message || "PDF export failed."} Opened the printable view instead (use Save as PDF).`);
+      } catch {
+        setExportError(err?.message || "Failed to export PDF.");
+      }
+    } finally {
+      setIsExportingPdf(false);
     }
   };
 
@@ -365,13 +379,13 @@ export function AssignmentSubmissionStage({
           <button
             type="button"
             onClick={handleExportPdf}
-            disabled={sectionsWritten === 0}
+            disabled={isExportingPdf || sectionsWritten === 0}
             title={sectionsWritten === 0 ? "Write at least one section first" : undefined}
             data-testid="export-pdf-button"
             className="disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2.5 rounded-xl text-xs font-semibold bg-neutral-100 dark:bg-white/5 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-200/70 dark:hover:bg-white/10 transition-colors cursor-pointer inline-flex items-center gap-2"
           >
             <Printer className="w-4 h-4" />
-            <span>Download PDF Document</span>
+            <span>{isExportingPdf ? "Rendering PDF..." : "Download PDF Document"}</span>
           </button>
 
           {/* Copy Full Markdown */}
@@ -428,7 +442,7 @@ export function AssignmentSubmissionStage({
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wide uppercase bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                Phase 04 · Submission & Review
+                Phase 05 · Submission & Review
               </span>
               <span className="text-xs text-neutral-400 dark:text-neutral-500 font-mono">
                 Before you submit

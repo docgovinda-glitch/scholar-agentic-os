@@ -1,4 +1,9 @@
 import express from "express";
+import { exportDocument } from "../../../../src/app/export/export.ts";
+import {
+  AssignmentPdfRequestSchema,
+  buildAssignmentCanonicalDocument,
+} from "../../../../src/desk/assignment/services/assignmentDocument.ts";
 import { parseDocument } from "../../../../src/document_intelligence/index.ts";
 import {
   buildScholarlyVoiceSystemPrompt,
@@ -38,7 +43,6 @@ import {
   assignmentStructureToOutlineTree,
   outlineTreeToAssignmentStructure,
 } from "../../../../src/desk/assignment/services/outlineService.ts";
-import { conductAskScholarResearchForOutline } from "../../../../src/desk/assignment/services/scholarlyDiscoveryService.ts";
 import { sanitizeBrief } from "../../../../src/features/understand/services/briefSanitizer.ts";
 import { classifyScopeBoundaries, stripLineTags } from "../../../../src/features/understand/services/scopeClassifier.ts";
 import {
@@ -72,6 +76,39 @@ import {
 const router = express.Router({ mergeParams: true });
 
 // 13. POST /api/projects/:id/assignment/audit-export
+/**
+ * Stage 5 PDF: the submission rendered by the shared export pipeline
+ * (same renderer as the other workspaces), returned as a real .pdf file.
+ */
+router.post("/export-pdf", async (req: express.Request<{ id: string }>, res) => {
+  const project = await getProjectSafe(req, res);
+  if (!project) return;
+  const parsed = AssignmentPdfRequestSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Invalid export request", details: parsed.error.issues.slice(0, 5) });
+  }
+  if (!parsed.data.sections.some((s) => s.draftContent.trim())) {
+    return res.status(422).json({ error: "Nothing to export yet: draft at least one section first." });
+  }
+  try {
+    const document = buildAssignmentCanonicalDocument(parsed.data, project.projectId);
+    const result = await exportDocument({
+      document,
+      format: "pdf",
+      title: parsed.data.title,
+      author: parsed.data.studentName || undefined,
+    });
+    const safeName = parsed.data.title.replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "").slice(0, 80) || "Assignment";
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${safeName}_Submission.pdf"`);
+    res.setHeader("Cache-Control", "no-store");
+    return res.send(result.data);
+  } catch (err) {
+    console.error("Assignment PDF export failed:", err);
+    return res.status(500).json({ error: "PDF export failed. Try the Word export or the print view." });
+  }
+});
+
 router.post("/audit-export", async (req: express.Request<{ id: string }>, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
@@ -92,72 +129,12 @@ router.post("/audit-export", async (req: express.Request<{ id: string }>, res) =
     const maxWords = Math.round(targetWordCount * 1.10);
     const isWordCountCompliant = actualWordCount >= minWords && actualWordCount <= maxWords;
 
-    const prompt = `You are the Scholar Core Senior Examiner & Rubric Audit Agent.
-Conduct a rigorous submission check on this assignment against university grading standards:
-
-Question: "${question}"
-Type: ${assignmentType}
-Level: ${academicLevel}
-Target Word Count: ${targetWordCount} words (Actual: ${actualWordCount} words, Allowed: ${minWords} - ${maxWords})
-Citation Standard: ${citationStyle}
-Deconstruction Context: ${JSON.stringify(deconstruction || {})}
-
-Full Assignment Draft:
-"""
-${fullDraft.slice(0, 10000)}
-"""
-
-Evaluate strictly across 10 academic dimensions:
-1. question_addressed (Did the student answer all parts of the question?)
-2. argument_logic (Is the central thesis rigorously defended?)
-3. peel_matrix_depth (Are body themes structured with clear Point-Evidence-Explanation-Link?)
-4. counterargument_critique (Were counterarguments proactively addressed?)
-5. evidence_sufficiency (Are claims grounded in peer-reviewed scholarship?)
-6. academic_level (Appropriate for ${academicLevel}?)
-7. word_count (Within ±10% tolerance?)
-8. citation_accuracy (Consistent ${citationStyle} referencing?)
-9. structure_coherence (Smooth transitions and clear introduction/conclusion?)
-10. originality (Independent analysis vs passive summarisation?)
-
-Assign an overall percentage mark (0-100) and grade band:
-- First Class (1st): 70%+
-- Upper Second (2:1): 60-69%
-- Lower Second (2:2): 50-59%
-- Third / Pass: 40-49%
-
-Return ONLY valid JSON matching:
-{
-  "overallScore": 76,
-  "overallBand": "1st_class",
-  "bandLabel": "First Class (1st) — 76%",
-  "summary": "...",
-  "rubricAlignmentScore": 85,
-  "wordCountAdherence": {
-    "actual": ${actualWordCount},
-    "target": ${targetWordCount},
-    "minAllowed": ${minWords},
-    "maxAllowed": ${maxWords},
-    "status": "${isWordCountCompliant ? "compliant" : actualWordCount < minWords ? "under_budget" : "over_budget"}",
-    "deviationPercent": ${Math.round(Math.abs(actualWordCount - targetWordCount) / targetWordCount * 100)}
-  },
-  "criteriaResults": [
-    {
-      "category": "question_addressed",
-      "label": "Question Addressed",
-      "status": "pass",
-      "summary": "...",
-      "feedback": "..."
-    }
-  ],
-  "strengths": ["...", "..."],
-  "priorityFixes": ["..."],
-  "readyForSubmission": true
-}`;
+    const prompt = scholarBrain.courseworkPrompts.auditExportPrompt({ question, assignmentType, academicLevel, targetWordCount, actualWordCount, minWords, maxWords, citationStyle, deconstruction, fullDraft, isWordCountCompliant });
 
     const data = await callOpenRouterJSON(
       req,
       res,
-      "You are the Scholar Core Senior Examiner & Rubric Audit Agent.",
+      scholarBrain.courseworkPrompts.ROLES.rubricAudit,
       prompt,
       undefined,
       "verification"
@@ -390,83 +367,7 @@ router.post("/copilot-chat", async (req: express.Request<{ id: string }>, res) =
     [];
 
   // Configure persona and prompt
-  let personaName = "Advisor";
-  let personaRole = "Assignment Brief & Rubric Guidance";
-  let scopedContextSummary = "";
-  let systemPrompt = "";
-
-  if (normalizedPhase === "understand") {
-    personaName = "Advisor";
-    personaRole = "Assignment Brief & Rubric Guidance";
-    scopedContextSummary = `
-PHASE 1 BRIEF & RUBRIC STATE:
-- Assignment Topic / Question: "${question}"
-- Academic Level: ${academicLevel}
-- Target Word Count: ${targetWordCount.toLocaleString()} words
-- Citation Style: ${citationStyle.toUpperCase()}
-- Assignment Type: ${assignmentType}
-- Command Verbs: ${JSON.stringify(analysis.commandVerbs || [])}
-- Key Concepts: ${JSON.stringify(analysis.keyConcepts || [])}
-- Scope Boundaries: ${JSON.stringify(analysis.scopeBoundaries || {})}
-- Rubric Criteria: ${JSON.stringify(rubricCriteria || [])}
-`;
-    systemPrompt = `You are the Advisor, the Academic Brief & Rubric Guidance Copilot in Scholar OS.
-Your role is to guide the student in understanding their assignment brief, deconstructing command verbs (e.g. "Critically evaluate", "Analyze", "Examine"), mapping learning outcomes, and clarifying university marking criteria.
-Always ground your answers in the student's exact brief, target word count (${targetWordCount}), academic level (${academicLevel}), and citation style (${citationStyle}).
-Provide rigorous, structured, academic advice in concise markdown.`;
-  } else if (normalizedPhase === "sources") {
-    personaName = "Librarian";
-    personaRole = "Scholarly Literature & Sourcing";
-    scopedContextSummary = `
-PHASE 2 SOURCES & EVIDENCE STATE:
-- Approved / Kept Literature Sources (${keptSources.length} sources):
-${keptSources.map((s: any, i: number) => `  [${i + 1}] "${s.title}" (${s.authors?.join(", ") || "Unknown"}, ${s.year || "n.d."}) - ${s.venue || "Scholarly Source"}. Relevance: ${s.relevanceRationale || s.abstract?.slice(0, 150) || "Approved"}`).join("\n") || "  (No approved sources yet)"}
-- Uploaded Lecture Slides & Concepts (${lectureSlides.length} decks):
-${lectureSlides.map((d: any) => `  - Deck: "${d.title || d.fileName}". Key Concepts: ${(d.extractedConcepts || []).join(", ") || "Lecture notes"}`).join("\n") || "  (No lecture slides uploaded)"}
-- Verified Evidence Ledger (${evidenceItems.length} claims):
-${evidenceItems.map((e: any, i: number) => `  [E${i + 1}] Claim: "${e.claimText}". Source: "${e.sourceTitle || e.sourceId}". Quote: "${e.quoteText?.slice(0, 120)}..."`).join("\n") || "  (No evidence items added)"}
-`;
-    systemPrompt = `You are the Librarian, the Scholarly Literature & Sourcing Copilot in Scholar OS.
-Your role is to help the student curate peer-reviewed academic literature, synthesize concepts from university lecture slides, and construct verified evidence cards with grounded citations.
-Always ground your responses in their approved literature, slide topics, and evidence ledger.
-Help evaluate empirical validity, identify theoretical debates, and bridge lecture concepts to peer-reviewed sources.`;
-  } else if (normalizedPhase === "drafting") {
-    personaName = "Scribe";
-    personaRole = "Academic Drafting & Synthesis";
-    scopedContextSummary = `
-PHASE 3 ACTIVE PEEL DRAFTING STATE:
-- Target Word Budget: ${targetWordCount.toLocaleString()} words (Current Drafted: ${currentTotalWords.toLocaleString()} words)
-- Sections & PEEL Decompositions (${outline.length} sections):
-${outline.map((sec: any, i: number) => {
-  const peel = peelSections.find((p: any) => p.sectionId === sec.id) || {};
-  return `  Section ${i + 1}: "${sec.title}" [Target: ${sec.targetWordCount || 0}w, Current: ${sec.currentWordCount || 0}w]
-    - Point: "${peel.point || sec.guidance || "Core assertion"}"
-    - Evidence: "${peel.evidence || (sec.linkedEvidenceIds?.length ? `${sec.linkedEvidenceIds.length} linked sources` : "Pending citation")}"
-    - Explanation (70% critique): "${peel.explanation || "Critical analysis & evaluation"}"
-    - Link: "${peel.link || "Synthesis back to central thesis"}"
-    - Draft Excerpt: "${(sec.draftContent || "").slice(0, 200)}..."`;
-}).join("\n\n") || "  (Outline not yet initialized)"}
-`;
-    systemPrompt = `You are the Scribe, the Academic Drafting & Synthesis Copilot in Scholar OS.
-Your role is to assist with sequential section drafting using the rigorous PEEL framework (Point, Evidence, Explanation, Link), maintaining an optimal balance of 70% critical analysis to 30% descriptive summary.
-Help deepen analytical critique, strengthen argumentative transitions, eliminate passive phrasing, and smoothly bind claims to in-text citations.`;
-  } else {
-    personaName = "Examiner";
-    personaRole = "Quality Audit & Final Review";
-    scopedContextSummary = `
-PHASE 4 SUBMISSION AUDIT & EXAMINER STATE:
-- Overall Score & Grade Band: ${rubricAudit?.overallScore ? `${rubricAudit.overallScore}% (${rubricAudit.bandLabel || rubricAudit.overallBand})` : "Pending final audit"}
-- Readiness Index: ${rubricAudit?.readinessPercentage ? `${rubricAudit.readinessPercentage}%`.replace(/%%$/, "%") : "Not measured yet"}
-- Priority Fixes Identified:
-${(rubricAudit?.priorityFixes || []).map((f: string, i: number) => `  [Fix ${i + 1}] ${f}`).join("\n") || "  - None identified yet"}
-- Unresolved In-Text Citations (${unresolvedCitations.length}):
-${unresolvedCitations.map((c: any, i: number) => `  [C${i + 1}] "${c.rawCitation || c}" (Missing from bibliography or ambiguous)`).join("\n") || "  - None found"}
-- Word Count Adherence: ${currentTotalWords.toLocaleString()} / ${targetWordCount.toLocaleString()} words (${Math.abs(currentTotalWords - targetWordCount) <= targetWordCount * 0.1 ? "Compliant within ±10%" : "Check word count margin"})
-`;
-    systemPrompt = `You are the Examiner, the Quality Audit & Final Review Copilot in Scholar OS.
-Your role is to evaluate draft submissions against university marking criteria (First Class 70%+, 2:1, 2:2), audit citation reconciliation, and ensure submission formatting perfection.
-Explain predicted marks, highlight priority fixes needed to step up to the next grade band, and guide citation resolution.`;
-  }
+  const { personaName, personaRole, scopedContextSummary, systemPrompt } = scholarBrain.courseworkPrompts.copilotPersona({ normalizedPhase, question, academicLevel, targetWordCount, citationStyle, assignmentType, analysis, rubricCriteria, keptSources, lectureSlides, evidenceItems, currentTotalWords, outline, peelSections, rubricAudit, unresolvedCitations });
 
   // Construct prompt
   let userPrompt = `${scopedContextSummary}\n`;

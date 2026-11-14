@@ -101,6 +101,37 @@ export function createDiskFallbackStore(filePath: string = "data/.scholar_local_
 
 let store: ProjectStore | undefined;
 
+type SavedListener = (record: ProjectRecord) => void;
+const savedListeners = new Set<SavedListener>();
+
+/**
+ * Register a callback run after every successful project save, whichever
+ * backend is active (the server uses it to mirror Coursework state into its
+ * normalized tables). A listener must not throw or block; errors are logged.
+ * Returns an unsubscribe function.
+ */
+export function onProjectSaved(listener: SavedListener): () => void {
+  savedListeners.add(listener);
+  return () => savedListeners.delete(listener);
+}
+
+function withSaveListeners(inner: ProjectStore): ProjectStore {
+  return {
+    ...inner,
+    async save(record) {
+      const saved = await inner.save(record);
+      for (const listener of savedListeners) {
+        try {
+          listener(saved);
+        } catch (err) {
+          console.warn("services/store: a project-saved listener threw", err);
+        }
+      }
+      return saved;
+    },
+  };
+}
+
 /**
  * Lazily resolves the backend on first use rather than at import time, so
  * setting DATABASE_URL in a test's env before calling this still takes
@@ -109,7 +140,7 @@ let store: ProjectStore | undefined;
  */
 export function getProjectStore(): ProjectStore {
   if (!store) {
-    store = resolveStore();
+    store = withSaveListeners(resolveStore());
   }
   return store;
 }

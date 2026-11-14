@@ -3,14 +3,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import React from "react";
 import { render, screen, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
-import {
-  generateCuratedLiteratureSources,
-  fetchMoreLiteratureSources,
-  extractResearchIntent,
-} from "../services/scholarlyDiscoveryService";
 import type { UploadedSourceDocument } from "../types";
-import { UN_PEACE_SECURITY_CATALOG } from "../services/catalogs/unPeaceSecurityCatalog";
-import { generateCuratedLiteratureSources as seedSourcesFixture } from "../services/scholarlyDiscoveryService";
+import { fixtureSources as seedSourcesFixture } from "./fixtures/sourceFixtures";
 const seedSources = (question: string) => seedSourcesFixture(question, "apa7");
 
 
@@ -34,14 +28,14 @@ class UnauthenticatedError extends Error {
 // (The app itself no longer substitutes catalog entries when search fails.)
 vi.mock("../services/realScholarlyDiscoveryService", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../services/realScholarlyDiscoveryService")>();
-  const fixtures = await import("../services/scholarlyDiscoveryService");
+  const fixtures = await import("./fixtures/sourceFixtures");
   return {
     ...actual,
     discoverRealScholarlySourcesFromServer: vi.fn(async (question: string, style = "apa7") =>
-      fixtures.generateCuratedLiteratureSources(question, style)
+      fixtures.fixtureSources(question, style)
     ),
-    fetchMoreRealSources: vi.fn(async (existing: Parameters<typeof fixtures.fetchMoreLiteratureSources>[0], question: string, n = 10) =>
-      fixtures.fetchMoreLiteratureSources(existing, question, n)
+    fetchMoreRealSources: vi.fn(async (existing: Parameters<typeof fixtures.fixtureMoreSources>[0], question: string, n = 10) =>
+      fixtures.fixtureMoreSources(existing, question, n)
     ),
   };
 });
@@ -105,58 +99,6 @@ describe("Phase 2 — Strengthened Literature Discovery, Phase 1 Integration & U
     getOutputTypeSpec.mockResolvedValue({
       id: "OT-01",
       label: "Assignment",
-    });
-  });
-
-  describe("1. Academic Credibility & Deep Literature Curation for UN Question", () => {
-    it("identifies UN peace & security subtopic and extracts seminal entities", () => {
-      const intent = extractResearchIntent(unQuestion);
-      expect(intent.subTopic).toBe("un_peace_security");
-      expect(intent.academicDomain).toBe("International Relations & Geopolitics");
-      expect(intent.primaryEntities).toEqual(
-        expect.arrayContaining([
-          "United Nations",
-          "UN Security Council",
-          "Permanent Five (P5)",
-        ])
-      );
-      expect(intent.coreThematicConcepts).toEqual(
-        expect.arrayContaining([
-          "Collective Security",
-          "Security Council Veto Power",
-          "Chapter VII Enforcement Mandates",
-        ])
-      );
-    });
-
-    it("retrieves authentic seminal UN literature without cross-topic leakage", () => {
-      const sources = generateCuratedLiteratureSources(unQuestion, "apa7");
-      // As many works as the verified UN catalog holds, and no more (the old
-      // floor of 30 was met by works that could not be confirmed).
-      expect(sources.length).toBeGreaterThan(0);
-      const unIds = new Set(UN_PEACE_SECURITY_CATALOG.map((c) => c.id));
-      sources.forEach((s) => expect(unIds.has(s.id), s.id).toBe(true));
-
-      // Verify seminal UN works are ranked at the top
-      const topTitles = sources.slice(0, 10).map((s) => s.title);
-      const hasKennedyOrBarnett = topTitles.some(
-        (t) =>
-          t.includes("Parliament of Man") ||
-          t.includes("Security Council and War") ||
-          t.includes("Eyewitness to a Genocide") ||
-          t.includes("Swords into Plowshares")
-      );
-      expect(hasKennedyOrBarnett).toBe(true);
-
-      // Verify NO cross-topic leakage from China or AI catalogs in top sources
-      const chinaLeakage = sources.slice(0, 15).some((s) => s.title.includes("Rise of China") || s.title.includes("Belt and Road"));
-      expect(chinaLeakage).toBe(false);
-
-      // Verify peer-reviewed and academic-press accreditation
-      const peerReviewedOrPress = sources.every(
-        (s) => s.sourceCredibility === "peer-reviewed" || s.sourceCredibility === "academic-press" || s.isVerifiedAcademic
-      );
-      expect(peerReviewedOrPress).toBe(true);
     });
   });
 

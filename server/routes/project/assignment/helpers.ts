@@ -44,7 +44,6 @@ import {
 } from "../../../../src/desk/assignment/services/outlineService.ts";
 import { parseBriefQuestions } from "../../../../src/utils/briefQuestions.ts";
 import { buildSourceSearchQueries } from "../../../../src/utils/briefSourceQueries.ts";
-import { conductAskScholarResearchForOutline } from "../../../../src/desk/assignment/services/scholarlyDiscoveryService.ts";
 import { sanitizeBrief } from "../../../../src/features/understand/services/briefSanitizer.ts";
 import { classifyScopeBoundaries, stripLineTags } from "../../../../src/features/understand/services/scopeClassifier.ts";
 import {
@@ -72,7 +71,6 @@ interface SupabaseProjectSourceRecord extends Record<string, unknown> {
   year?: number;
   doi?: string;
   venue?: string;
-  journal?: string;
   url?: string;
   source_type: string;
   authority_tier: string;
@@ -104,7 +102,6 @@ export async function persistSourcesToSupabase(projectId: string, sources: Disco
       year: yearNum,
       doi: src.doi,
       venue,
-      journal: venue,
       url: src.url,
       source_type: typeof src.type === "string" ? src.type : "scholarly",
       authority_tier: ((src as unknown as Record<string, unknown>).authorityTier as string) || "A",
@@ -332,10 +329,10 @@ export async function deriveSemanticAcademicTitle(
 
   try {
     if (req && process.env.NODE_ENV !== "test" && !process.env.VITEST) {
-      const prompt = `Generate a concise, academic title (3 to 7 words, e.g. "Quantum Computing Cryptographic Architectures", "Algorithmic Bias in Healthcare") based on this assignment brief. Output ONLY the plain text title, with NO punctuation, NO quotes, NO explanation:\n\n${briefText.slice(0, 1500)}`;
+      const prompt = scholarBrain.courseworkPrompts.academicTitlePrompt({ briefText });
       const text = await routedCompletion(req, {
         task: "fast",
-        systemPrompt: "You are an expert academic research registrar. Craft a concise, formal academic title (3-7 words).",
+        systemPrompt: scholarBrain.courseworkPrompts.ROLES.titleRegistrar,
         userPrompt: prompt,
         maxOutputTokens: 64,
       });
