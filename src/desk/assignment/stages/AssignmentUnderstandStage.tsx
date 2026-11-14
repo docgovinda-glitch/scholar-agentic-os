@@ -55,8 +55,6 @@ import {
   autoBalanceStructure,
   extractBriefInquiriesAndConcepts,
 } from "../services/outlineService";
-import { useSubscriptionLimits } from "../../../hooks/useSubscriptionLimits";
-import { UpgradeModal } from "../../../components/modals/UpgradeModal";
 import { isDeepEqual, safeFormatLabel, allocateWordsByMarks } from "../../../utils/briefExtractor";
 import { validateBriefFile } from "../../../services/documentParser";
 import { classifyScopeBoundaries, stripLineTags } from "../../../features/understand/services/scopeClassifier";
@@ -285,14 +283,7 @@ export default function AssignmentUnderstandStage({
   const [intakeTab, setIntakeTab] = useState<"paste" | "upload">("paste");
   const [uploadedFileName, setUploadedFileName] = useState<string>("");
 
-  const {
-    isAdmin,
-    isPremium,
-    canUploadBrief,
-  } = useSubscriptionLimits();
 
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [upgradeModalDescription, setUpgradeModalDescription] = useState<string | undefined>();
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [parseNotice, setParseNotice] = useState<string | null>(null);
 
@@ -1254,19 +1245,8 @@ export default function AssignmentUnderstandStage({
     setAnalysisError(null);
     setParseNotice(null);
 
-    const existingBriefCount = (uploadedFileName || project?.answers?.["assignment_brief_file"]) ? 1 : 0;
-    const check = canUploadBrief(file, existingBriefCount);
 
-    if (!check.allowed) {
-      setUpgradeModalDescription(check.message);
-      setShowUpgradeModal(true);
-      return;
-    }
-
-    const fileValidation = validateBriefFile(file, {
-      isAdmin,
-      maxBytes: isPremium ? 50 * 1024 * 1024 : 5 * 1024 * 1024,
-    });
+    const fileValidation = validateBriefFile(file);
     if (!fileValidation.valid) {
       setParseNotice(fileValidation.error || "Unsupported file format.");
       return;
@@ -2023,13 +2003,6 @@ export default function AssignmentUnderstandStage({
           </div>
         </div>
       )}
-
-      {/* Role-Aware Tier Upgrade Modal */}
-      <UpgradeModal
-        isOpen={showUpgradeModal}
-        onClose={() => setShowUpgradeModal(false)}
-        description={upgradeModalDescription}
-      />
     </div>
   );
 }

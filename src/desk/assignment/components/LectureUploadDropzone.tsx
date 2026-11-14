@@ -35,6 +35,9 @@ import {
   type ParsedSourcePayload,
 } from "../services/sourceEvidenceExtractionService";
 
+/** The server's upload ceiling (MAX_UPLOAD_MB, at most 10). */
+const SOURCE_MAX_UPLOAD_MB = 10;
+
 export interface LectureUploadDropzoneProps {
   uploadedFiles: UploadedSourceDocument[];
   onUpload: (documents: UploadedSourceDocument[], newEvidences?: EvidenceItem[]) => void | Promise<void>;
@@ -130,6 +133,7 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
   const [isDragOver, setIsDragOver] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStatusText, setProcessingStatusText] = useState("");
+  const [uploadProblems, setUploadProblems] = useState<string[]>([]);
   const [expandedDocIds, setExpandedDocIds] = useState<Set<string>>(new Set());
   const [activeInspectTabs, setActiveInspectTabs] = useState<Record<string, "extracted" | "used" | "original">>({});
   const [copiedDocId, setCopiedDocId] = useState<string | null>(null);
@@ -176,75 +180,59 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
     const newDocs: UploadedSourceDocument[] = [];
     const allEvidenceItems: EvidenceItem[] = [];
 
+    const problems: string[] = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
+      // Refuse what cannot be read, with a reason; never save a placeholder as if it were read.
+      if (file.size === 0) {
+        problems.push(`${file.name}: the file is empty.`);
+        continue;
+      }
+      if (file.size > SOURCE_MAX_UPLOAD_MB * 1024 * 1024) {
+        problems.push(`${file.name}: ${(file.size / (1024 * 1024)).toFixed(1)} MB is over the ${SOURCE_MAX_UPLOAD_MB} MB limit.`);
+        continue;
+      }
       setProcessingStatusText(`Extracting relevant evidence from "${file.name}"...`);
 
       try {
         let payload: ParsedSourcePayload;
-
-        // Try backend parse endpoint first
         try {
           payload = await parseProjectFile(projectId, file);
-        } catch {
-          // Client-side fallback if backend parse fails
+        } catch (parseErr) {
+          // Only plain-text files can be read in the browser when the server cannot;
+          // binary formats (PDF, Word, slides) are never decoded as text.
           const ext = file.name.split(".").pop()?.toLowerCase() || "";
-          let sourceType: UploadedSourceDocument["sourceType"] = "other";
-          if (ext === "pdf") sourceType = "pdf";
-          else if (ext === "docx" || ext === "doc") sourceType = "docx";
-          else if (ext === "pptx" || ext === "ppt") sourceType = "pptx";
-          else if (["xlsx", "xls", "csv", "tsv"].includes(ext)) sourceType = "spreadsheet";
-          else if (["png", "jpg", "jpeg", "webp"].includes(ext)) sourceType = "image";
-          else if (["txt", "md"].includes(ext)) sourceType = "text";
-
-          const text = await file.text().catch(() => `Source document: ${file.name}`);
+          if (!["txt", "md", "csv", "tsv"].includes(ext)) throw parseErr;
           payload = {
             title: file.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " "),
-            sourceType,
-            text,
+            sourceType: ["csv", "tsv"].includes(ext) ? "spreadsheet" : "text",
+            text: await file.text(),
             fileSize: file.size,
           };
         }
+        if (!payload.text || !payload.text.trim()) {
+          problems.push(`${file.name}: no readable text was found (a scanned image needs to be pasted as text).`);
+          continue;
+        }
 
-        // Run contextual evidence extraction
         const extraction = await extractProjectEvidence(payload, {
           projectId,
           assignmentQuestion,
           citationStyle,
         });
 
-        // Ensure doc ID conforms to doc- prefix
-        const docWithStandardId: UploadedSourceDocument = {
+        newDocs.push({
           ...extraction.document,
           id: `doc-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`,
           name: file.name,
-        };
-
-        newDocs.push(docWithStandardId);
+        });
         allEvidenceItems.push(...extraction.evidenceItems);
-      } catch (err: any) {
+      } catch (err) {
         console.error("Error processing file:", err);
-        // Fallback basic document record with traceability
-        const fallbackDoc: UploadedSourceDocument = {
-          id: `doc-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`,
-          name: file.name,
-          fileSize: file.size,
-          uploadedAt: new Date().toISOString(),
-          mimeType: file.type || "application/octet-stream",
-          evidenceCount: 1,
-          extractedEvidences: [
-            {
-              id: `ev-${Date.now()}-${i}`,
-              excerpt: `Uploaded source material: ${file.name}`,
-              sourceLocation: "Document Root",
-              claim: `Evidentiary grounding from ${file.name}`,
-            },
-          ],
-          processingStatus: "extracted",
-        };
-        newDocs.push(fallbackDoc);
+        problems.push(`${file.name}: ${err instanceof Error && err.message ? err.message : "could not be read"}`);
       }
     }
+    setUploadProblems(problems);
 
     setIsProcessing(false);
     setProcessingStatusText("");
@@ -374,6 +362,23 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
         className="hidden"
         data-testid="lecture-file-input"
       />
+
+      {uploadProblems.length > 0 && (
+        <div
+          role="alert"
+          data-testid="source-upload-problems"
+          className="flex items-start justify-between gap-3 rounded-xl border border-[color:var(--state-danger)]/30 bg-[color:var(--state-danger-subtle)] p-3 text-xs text-[color:var(--state-danger)]"
+        >
+          <ul className="space-y-1">
+            {uploadProblems.map((p) => (
+              <li key={p}>Not added: {p}</li>
+            ))}
+          </ul>
+          <button type="button" onClick={() => setUploadProblems([])} className="shrink-0 font-semibold underline cursor-pointer">
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Initial Empty State Dropzone */}
       {!hasUploadedSources && (

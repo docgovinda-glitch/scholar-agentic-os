@@ -272,6 +272,23 @@ interface CrossrefItem {
   created?: { "date-parts"?: number[][] };
 }
 
+/** Crossref record types that are not standalone citable works. */
+export const NOT_A_CITABLE_WORK = new Set([
+  "component",
+  "peer-review",
+  "journal",
+  "journal-issue",
+  "journal-volume",
+  "proceedings",
+  "proceedings-series",
+  "book-series",
+  "book-set",
+  "report-component",
+  "report-series",
+  "grant",
+  "database",
+]);
+
 function mapCrossrefItem(item: CrossrefItem): RawSourceInput {
   const doi = bareDoi(item.DOI);
   const venue = Array.isArray(item["container-title"]) ? item["container-title"][0] : undefined;
@@ -326,7 +343,9 @@ export async function searchCrossref(
       "CrossRef",
       { "User-Agent": CROSSREF_USER_AGENT }
     );
-    const items = (data.message?.items ?? []).map(mapCrossrefItem);
+    // Parts of works (a figure or table of a report), peer-review reports, whole
+    // journals/issues and grants are not citable works: never offer them as sources.
+    const items = (data.message?.items ?? []).filter((it) => !NOT_A_CITABLE_WORK.has(String(it.type ?? ""))).map(mapCrossrefItem);
     return { provider: "crossref", items };
   } catch (err) {
     return failure("crossref", err);
@@ -619,6 +638,20 @@ interface DataCiteAttributes {
   dates?: Array<{ dateType?: string; date?: string }>;
 }
 
+/**
+ * Open repositories (Zenodo via DataCite) also hold keyword-stuffed uploads:
+ * a "title" of several hundred characters, or "authors" that are only numbers.
+ * Such records match any search, so they are not offered as sources.
+ */
+export function isPlausibleRecord(item: Pick<RawSourceInput, "title" | "authors">): boolean {
+  const title = (item.title ?? "").trim();
+  if (!title || title.length > 300) return false;
+  const authors = (item.authors ?? []) as unknown[];
+  const name = (a: unknown) => (typeof a === "string" ? a : a && typeof a === "object" ? Object.values(a as Record<string, unknown>).join(" ") : "");
+  if (authors.length > 0 && !authors.some((a) => /\p{L}{2,}/u.test(name(a)))) return false;
+  return true;
+}
+
 function mapDataCite(attrs: DataCiteAttributes, id?: string): RawSourceInput {
   const doi = bareDoi(attrs.doi);
   const year =
@@ -651,7 +684,7 @@ export async function searchDataCite(query: string, pageSize = 25, options: Prov
       options,
       "DataCite"
     );
-    const items = (data.data ?? []).map((d) => mapDataCite(d.attributes ?? {}, d.id)).filter((i) => i.title);
+    const items = (data.data ?? []).map((d) => mapDataCite(d.attributes ?? {}, d.id)).filter(isPlausibleRecord);
     return { provider: "datacite", items };
   } catch (err) {
     return failure("datacite", err);

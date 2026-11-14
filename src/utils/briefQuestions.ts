@@ -561,7 +561,7 @@ export interface PrescribedBibliographyEntry {
   raw: string;
 }
 
-const BIB_HEADER = /\b(bibliography|references?|reference\s+list|reading\s+list|prescribed\s+(?:texts?|reading))\b/i;
+const BIB_HEADER = /\b(bibliography|references?|reference\s+list|reading\s+list|prescribed\s+(?:texts?|reading)|(?:required|essential|core|key|set|recommended)\s+(?:readings?|texts?))\b/i;
 const ENTRY_START = /^[\p{Lu}][\p{L}'’\-]+(?:\s[\p{Lu}][\p{L}'’\-]+)?,\s*(?:[\p{Lu}]\.?\s?-?){1,4}/u;
 
 /**
@@ -611,20 +611,28 @@ export function parsePrescribedBibliography(briefText: string): PrescribedBiblio
     if (doiMatch) rest = rest.slice(0, doiMatch.index).trim().replace(/[.,]$/, "");
     let title = "";
     let after = "";
+    // APA puts a full stop after the year: "(2020). Title. Journal, 110(4), 943-983."
+    rest = rest.replace(/^\.\s*/, "");
     const quoted = rest.match(/^['‘"“](.+?)['’"”],?\s*(.*)$/);
     if (quoted) {
       title = quoted[1];
       after = quoted[2];
     } else {
-      const dot = rest.search(/\.\s/);
+      const dot = rest.search(/[.?!]\s/);
       title = dot > 0 ? rest.slice(0, dot) : rest;
       after = dot > 0 ? rest.slice(dot + 1).trim() : "";
     }
-    const isBook = !quoted;
+    // A journal article: quoted title (Harvard), or an unquoted title followed by
+    // "Journal, volume(issue), pages" (APA). Anything else is treated as a book.
+    const apaArticle = !quoted && /^[^,]+,\s*\d+\s*(?:\(\d+\))?\s*,\s*(?:pp?\.\s*)?[\d]+/.test(after);
+    const isBook = !quoted && !apaArticle;
     const venue = isBook ? undefined : after.split(/,\s*(?=\d|pp?\.|vol)/i)[0].replace(/[.,]\s*$/, "").trim() || undefined;
     const vi = after.match(/\b(\d+)\s*\((\d+)\)/);
     const volOnly = !vi ? after.match(/,\s*(\d+)\s*,/) : null;
-    const pages = after.match(/\bpp?\.\s*([\d]+(?:\s*[–-]\s*\d+)?)/)?.[1]?.replace(/\s/g, "") ?? after.match(/,\s*(\d{5,7})\b/)?.[1];
+    const pages =
+      after.match(/\bpp?\.\s*([\d]+(?:\s*[–-]\s*\d+)?)/)?.[1]?.replace(/\s/g, "") ??
+      (apaArticle ? after.match(/\)?\s*,\s*(\d+\s*[–-]\s*\d+)/)?.[1]?.replace(/\s/g, "") : undefined) ??
+      after.match(/,\s*(\d{5,7})\b/)?.[1];
     const publisher = isBook ? after.match(/:\s*([^.:]+?)\.?\s*$/)?.[1]?.trim() : undefined;
     const year = parseInt(m[2], 10);
     const fam = (a: string) => a.split(",")[0];

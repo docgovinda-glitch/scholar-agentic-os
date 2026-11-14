@@ -283,6 +283,12 @@ describe("Assignment Phase 1 Wiring & Phase 2 Sources Workspace", () => {
         type: "application/pdf",
       });
 
+      // The server parses the file (a PDF is never decoded as text in the browser).
+      authedFetch.mockImplementation(async (url: string) =>
+        typeof url === "string" && url.includes("/parse-file")
+          ? { ok: true, json: async () => ({ title: "Week 04 Algorithmic Ethics Slides", sourceType: "pdf", text: "Lecture notes on algorithmic ethics and accountability in automated decisions." }) }
+          : { ok: true, json: async () => ({}) }
+      );
       fireEvent.change(fileInput, { target: { files: [file] } });
 
       await waitFor(() => {

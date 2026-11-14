@@ -95,6 +95,22 @@ router.post(
     return res.status(400).json({ error: "No file provided" });
   }
 
+  // A .pdf / .docx / .pptx whose bytes are not that format (renamed or corrupt)
+  // is refused: decoding it as text would put garbage in the brief box.
+  const lowerName = (file.originalname || "").toLowerCase();
+  const head = file.buffer.subarray(0, 5).toString("latin1");
+  const looksPdf = head.startsWith("%PDF");
+  const looksZip = head.startsWith("PK");
+  if ((/\.pdf$/.test(lowerName) && !looksPdf) || (/\.(docx|pptx)$/.test(lowerName) && !looksZip)) {
+    return res.status(422).json({
+      error: "This file is not a valid " + lowerName.split(".").pop()!.toUpperCase() + " document. Save it again from your word processor, or paste the brief text.",
+      code: "brief_unreadable",
+    });
+  }
+  if (file.size === 0) {
+    return res.status(422).json({ error: "This file is empty. Choose another file or paste the brief text.", code: "brief_empty" });
+  }
+
   let text = "";
   try {
     const parsed = await parseDocument({

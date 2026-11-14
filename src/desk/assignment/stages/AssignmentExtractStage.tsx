@@ -27,10 +27,8 @@ import {
 } from "lucide-react";
 import type { SectionBreakdown } from "../../../components/forms/TargetWordCountInput";
 import { generateDynamicAssignmentStructure } from "../services/outlineService";
-import { useSubscriptionLimits } from "../../../hooks/useSubscriptionLimits";
-import { UpgradeModal } from "../../../components/modals/UpgradeModal";
 import { stripCircularReferences, safeFormatLabel } from "../../../utils/briefExtractor";
-import { validateBriefFile } from "../../../services/documentParser";
+import { validateBriefFile, BRIEF_MAX_UPLOAD_MB } from "../../../services/documentParser";
 import BriefScopePanel from "../components/BriefScopePanel";
 import { scopeBrief } from "../../../domain/assignment/briefScoping";
 import {
@@ -134,10 +132,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
   const [uploadedFileName, setUploadedFileName] = useState<string>("");
 
   // Role-based subscription limits
-  const { isAdmin, isPremium, canUploadBrief, maxFileSizeMB } = useSubscriptionLimits();
 
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [upgradeModalDescription, setUpgradeModalDescription] = useState<string | undefined>();
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [parseNotice, setParseNotice] = useState<string | null>(null);
 
@@ -505,21 +500,8 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
 
     setParseNotice(null);
 
-    // 1. Check subscription limits
-    const existingBriefCount = (uploadedFileName || project?.answers?.["assignment_brief_file"]) ? 1 : 0;
-    const check = canUploadBrief(file, existingBriefCount);
-
-    if (!check.allowed) {
-      setUpgradeModalDescription(check.message);
-      setShowUpgradeModal(true);
-      return;
-    }
-
-    // 2. Client-side file type and size validation
-    const validation = validateBriefFile(file, {
-      isAdmin,
-      maxBytes: isPremium ? 50 * 1024 * 1024 : 5 * 1024 * 1024,
-    });
+    // Client-side file type, emptiness and size checks (the server enforces its own limit too).
+    const validation = validateBriefFile(file);
     if (!validation.valid) {
       setParseNotice(validation.error || "Unsupported file format.");
       return;
@@ -541,7 +523,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
 
       if (!res.ok) {
         const body = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw Object.assign(new Error(body?.error || "Brief upload endpoint failed"), { userFacing: res.status === 422 && Boolean(body?.error) });
+        throw Object.assign(new Error(body?.error || "Brief upload endpoint failed"), { userFacing: (res.status === 422 || res.status === 413) && Boolean(body?.error) });
       }
 
       const data = await res.json();
@@ -872,7 +854,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                         Upload your assignment brief or module handbook
                       </p>
                       <p className="text-[11px] text-neutral-400 dark:text-neutral-500 mt-0.5">
-                        Supports PDF, DOCX, DOC, or TXT {isAdmin ? "(Unlimited size · Admin)" : isPremium ? "(Up to 50MB · Pro)" : "(Up to 5MB · Free)"}
+                        Supports PDF, DOCX, DOC, or TXT (up to {BRIEF_MAX_UPLOAD_MB} MB)
                       </p>
                     </div>
 
@@ -1301,14 +1283,6 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
           </div>
         )}
       </div>
-
-      {showUpgradeModal && (
-        <UpgradeModal
-          isOpen={showUpgradeModal}
-          onClose={() => setShowUpgradeModal(false)}
-          description={upgradeModalDescription}
-        />
-      )}
     </div>
   );
 }

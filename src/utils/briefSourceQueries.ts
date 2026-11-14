@@ -150,9 +150,14 @@ export function scoreSourceRelevance(
   for (const q of queries) {
     const terms = contentWords(q).map((w) => w.toLowerCase().replace(/s$/, ""));
     if (!terms.length) continue;
-    const share = terms.filter((t) => words.has(t) || hay.includes(t)).length / terms.length;
+    // "self-attention" also matches a title that says "attention".
+    const hit = (t: string) => words.has(t) || hay.includes(t) || t.split("-").some((p) => p.length >= 4 && (words.has(p) || hay.includes(p)));
+    const share = terms.filter(hit).length / terms.length;
     best = Math.max(best, share);
   }
+  // A short brief yields no subject words; a paper must then share at least
+  // one key word with a search phrase, or anything from any field would pass.
+  if (domainTerms.length === 0 && best === 0) return 0;
   const domainShare = domainTerms.length ? Math.min(1, domainHits / Math.min(2, domainTerms.length)) : 1;
   return Math.round(100 * (0.45 * domainShare + 0.55 * best));
 }

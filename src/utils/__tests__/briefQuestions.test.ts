@@ -181,3 +181,15 @@ describe("QNT-4020 brief (7 questions, rubric part, prescribed bibliography, pag
     expect(parseMarkingCriteria(QNT).map((r) => r.weightPercent)).toEqual([30, 30, 20, 20]);
   });
 });
+
+import { parsePrescribedBibliography as parseBib } from "../briefQuestions";
+describe("parsePrescribedBibliography: APA entries and 'Required reading' headings", () => {
+  it("reads an APA journal entry on a 'Required reading:' line", () => {
+    const [e] = parseBib("Brief text.\n\nRequired reading: Bernanke, B. S. (2020). The New Tools of Monetary Policy. American Economic Review, 110(4), 943-983.");
+    expect(e).toMatchObject({ authors: ["Bernanke, B.S."], year: 2020, title: "The New Tools of Monetary Policy", venue: "American Economic Review", volume: "110", issue: "4", pages: "943-983", isBook: false });
+  });
+  it("keeps an APA book as a book", () => {
+    const [e] = parseBib("Essential reading\nMishkin, F. S. (2019). The Economics of Money, Banking and Financial Markets. Pearson.");
+    expect(e).toMatchObject({ title: "The Economics of Money, Banking and Financial Markets", isBook: true });
+  });
+});

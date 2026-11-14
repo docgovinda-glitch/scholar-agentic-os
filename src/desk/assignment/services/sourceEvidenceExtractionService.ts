@@ -166,6 +166,9 @@ export function generateCitationString(
  * Identifies and pulls only assignment-relevant excerpts with surrounding context.
  * Does NOT retain the full 100 pages of text.
  */
+/** Characters of a source's text kept with the project (about 25 pages). */
+export const MAX_STORED_SOURCE_CHARS = 50_000;
+
 export async function extractProjectEvidence(
   payload: ParsedSourcePayload,
   options: SourceExtractionOptions
@@ -418,8 +421,10 @@ ${candidateSegments.map((s) => `[Location: ${s.location}]\n${s.text}`).join("\n\
     citationStyle
   );
 
-  // Construct lightweight document record (CRITICAL: full text is discarded!)
+  // The document keeps its text (capped) so the AI steps and the database copy
+  // can read it; the cap keeps every project save small.
   const document: UploadedSourceDocument = {
+    extractedText: (payload.text || "").slice(0, MAX_STORED_SOURCE_CHARS),
     id: `src-doc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     name: effectiveTitle,
     sourceType: payload.sourceType,
