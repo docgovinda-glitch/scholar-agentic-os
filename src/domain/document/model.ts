@@ -38,6 +38,8 @@ export interface Block {
   text: string;
   /** Table cells, first row the header (only for kind "table"). */
   rows?: string[][];
+  /** Paragraph alignment when not the default (left). */
+  align?: "center" | "right" | "justify";
 }
 
 export interface CanonicalDocument {

@@ -100,3 +100,19 @@ describe("Coursework export (.docx) rich blocks", () => {
     expect(text).not.toMatch(/\| ---|<u>|&lt;u&gt;|^> /);
   });
 });
+
+describe("Coursework export (.docx) alignment", () => {
+  it("writes the stored alignment as Word paragraph alignment", async () => {
+    const blob = await generateAssignmentDocx({
+      title: "Aligned",
+      brief,
+      sections: [section("S", `${longDraft}\n\n<p align="center">A centred line.</p>\n\n<p align="right">A right line.</p>`)],
+      sources: [],
+    });
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const xml = await zip.file("word/document.xml")!.async("string");
+    expect(xml).toMatch(/<w:jc w:val="center"\/>(?:(?!<\/w:p>).)*A centred line/s);
+    expect(xml).toMatch(/<w:jc w:val="(?:right|end)"\/>(?:(?!<\/w:p>).)*A right line/s);
+    expect(xml).not.toContain("align=");
+  });
+});

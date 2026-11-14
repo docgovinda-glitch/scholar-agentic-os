@@ -1,7 +1,8 @@
 /**
  * A section's stored text (light Markdown: paragraphs, "- " and "1. " lists,
  * "#### " sub-headings, **bold**, *italic*, <u>underline</u>, [CITE:id]
- * citations and, with richBlocks, "> " block quotes and pipe tables) to and
+ * citations and, with richBlocks, "> " block quotes, pipe tables and paragraph
+ * alignment (<p align="center|right|justify">…</p>)) to and
  * from the editor's document. Anything else stays as the text it was. The round trip is exact up to blank-line spacing, so saving
  * from the editor never changes what the author did not touch.
  * Pure; no React.
@@ -18,7 +19,7 @@ export interface PMNode {
   marks?: PMMark[];
 }
 
-import { splitTableRow, tableToMarkdown } from "../../shared/proseBlocks";
+import { splitTableRow, tableToMarkdown, unwrapAlign, wrapAlign } from "../../shared/proseBlocks";
 
 
 /** Inline text → text nodes with bold/italic/underline marks, citation nodes and hard breaks. */
@@ -64,6 +65,18 @@ export function textToDoc(text: string, options: TextToDocOptions = {}): PMNode 
   const blocks = (text ?? "").replace(/\r\n/g, "\n").split(/\n{2,}/).map((b) => b.replace(/^\n+|\n+$/g, "")).filter((b) => b.trim().length);
   const content: PMNode[] = [];
   for (const b of blocks) {
+    if (options.richBlocks) {
+      const aligned = unwrapAlign(b);
+      if (aligned.align) {
+        const inner = aligned.text.trim();
+        if (HEADING.test(inner) && !inner.includes("\n")) {
+          content.push({ type: "heading", attrs: { level: 4, textAlign: aligned.align }, content: parseInline(inner.replace(HEADING, "$1")) });
+        } else {
+          content.push({ type: "paragraph", attrs: { textAlign: aligned.align }, content: parseInline(inner) });
+        }
+        continue;
+      }
+    }
     const lines = b.split("\n");
     if (lines.length === 1 && HEADING.test(lines[0])) {
       content.push({ type: "heading", attrs: { level: 4 }, content: parseInline(lines[0].replace(HEADING, "$1")) });
@@ -139,10 +152,11 @@ function listText(list: PMNode, ordered: boolean): string {
 export function docToText(doc: PMNode): string {
   const parts: string[] = [];
   for (const b of doc.content ?? []) {
+    const align = typeof b.attrs?.textAlign === "string" ? b.attrs.textAlign : null;
     if (b.type === "paragraph") {
       const t = inlineText(b.content);
-      if (t.trim()) parts.push(t);
-    } else if (b.type === "heading") parts.push(`#### ${inlineText(b.content)}`);
+      if (t.trim()) parts.push(wrapAlign(t, align));
+    } else if (b.type === "heading") parts.push(wrapAlign(`#### ${inlineText(b.content)}`, align));
     else if (b.type === "bulletList") parts.push(listText(b, false));
     else if (b.type === "orderedList") parts.push(listText(b, true));
     else if (b.type === "blockquote") {

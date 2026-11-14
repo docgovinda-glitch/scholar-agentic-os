@@ -2,15 +2,20 @@
  * A section's stored text as blocks, for every renderer (editor preview, .docx,
  * PDF, print view). The text is light Markdown: paragraphs separated by blank
  * lines, "#### " sub-headings, "- " / "1. " lists, "> " block quotes and pipe
- * tables ("| a | b |" with a "| --- | --- |" header separator). Inline
+ * tables ("| a | b |" with a "| --- | --- |" header separator). A paragraph
+ * or sub-heading that is not left-aligned is wrapped as a whole block in
+ * <p align="center|right|justify">…</p>. Inline
  * formatting (**bold**, *italic*, <u>underline</u>) is left in the text for
  * inlineMarkdownRuns. Pure; no DOM.
  */
 import { splitProseIntoParagraphs } from "./proseParagraphs";
 
+/** Paragraph alignment; left is the default and is never written out. */
+export type ProseAlign = "center" | "right" | "justify";
+
 export type ProseBlock =
-  | { kind: "paragraph"; text: string }
-  | { kind: "heading"; text: string }
+  | { kind: "paragraph"; text: string; align?: ProseAlign }
+  | { kind: "heading"; text: string; align?: ProseAlign }
   | { kind: "quote"; text: string }
   | { kind: "bullets"; items: string[] }
   | { kind: "numbered"; items: string[] }
@@ -22,6 +27,18 @@ const ORDERED = /^\d+\.\s+(.*)$/;
 const QUOTE = /^>\s?(.*)$/;
 const TABLE_ROW = /^\s*\|.*\|\s*$/;
 const TABLE_SEP = /^\s*\|(?:\s*:?-{3,}:?\s*\|)+\s*$/;
+const ALIGNED = /^<p align="(center|right|justify)">([\s\S]*)<\/p>$/;
+
+/** Split an aligned block into its alignment and inner text ("" alignment = left). */
+export function unwrapAlign(block: string): { align?: ProseAlign; text: string } {
+  const m = block.trim().match(ALIGNED);
+  return m ? { align: m[1] as ProseAlign, text: m[2] } : { text: block };
+}
+
+/** Wrap a block's text in its alignment (left/undefined leaves it as is). */
+export function wrapAlign(text: string, align: string | null | undefined): string {
+  return align === "center" || align === "right" || align === "justify" ? `<p align="${align}">${text}</p>` : text;
+}
 
 /** "| a | b \| c |" -> ["a", "b | c"] */
 export function splitTableRow(line: string): string[] {
@@ -64,6 +81,15 @@ export function parseProseBlocks(text: string): ProseBlock[] {
     pendingProse.length = 0;
   };
   for (const b of raw) {
+    const aligned = unwrapAlign(b);
+    if (aligned.align) {
+      // An aligned block is kept whole (never regrouped) so its alignment stays with it.
+      flushProse();
+      const inner = aligned.text.trim();
+      if (HEADING.test(inner) && !inner.includes("\n")) out.push({ kind: "heading", text: inner.replace(HEADING, "$1").trim(), align: aligned.align });
+      else if (inner) out.push({ kind: "paragraph", text: inner, align: aligned.align });
+      continue;
+    }
     const lines = b.split("\n");
     if (lines.length === 1 && HEADING.test(lines[0])) {
       flushProse();
@@ -104,6 +130,7 @@ export function proseBlocksPlainText(blocks: ProseBlock[]): string {
 /** Words in a section's stored text, not counting markup (pipes, table rules, tags, list and quote markers). */
 export function countProseWords(text: string): number {
   const plain = (text ?? "")
+    .replace(/<p align="(?:center|right|justify)">|<\/p>/g, "")
     .split("\n")
     .filter((l) => !TABLE_SEP.test(l))
     .map((l) => l.replace(/^\s*(?:#{1,6}|>|[-*]|\d+\.)\s+/, ""))

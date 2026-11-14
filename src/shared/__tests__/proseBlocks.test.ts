@@ -52,3 +52,19 @@ describe("countProseWords", () => {
     expect(countProseWords("plain three words")).toBe(3);
   });
 });
+
+describe("paragraph alignment", () => {
+  it("reads aligned paragraphs and sub-headings and never regroups them", () => {
+    const long = Array.from({ length: 20 }, (_, i) => `Sentence ${i + 1} explains the argument in some detail here.`).join(" ");
+    const blocks = parseProseBlocks(`<p align="center">#### Title</p>\n\n<p align="justify">${long}</p>\n\nLeft as usual.`);
+    expect(blocks.map((b) => [b.kind, "align" in b ? b.align : undefined])).toEqual([
+      ["heading", "center"],
+      ["paragraph", "justify"],
+      ["paragraph", undefined],
+    ]);
+  });
+
+  it("does not count the alignment markup as words", () => {
+    expect(countProseWords('<p align="right">two words</p>\n\n<p align="center">#### Head</p>')).toBe(3);
+  });
+});

@@ -9,7 +9,7 @@
  */
 
 import { selectCitedSources, inlineMarkdownRuns, inlineMarkdownToHtml, proseToHtml, type StyledRun } from "./exportText";
-import { parseProseBlocks } from "../../../shared/proseBlocks";
+import { parseProseBlocks, type ProseAlign } from "../../../shared/proseBlocks";
 import {
   Document,
   Packer,
@@ -94,6 +94,11 @@ function docxRun(r: StyledRun, size = 24): TextRun {
   });
 }
 
+/** A block's stored alignment as the .docx paragraph alignment (none = the document default). */
+function docxAlign(align: ProseAlign | undefined) {
+  return align === "center" ? AlignmentType.CENTER : align === "right" ? AlignmentType.RIGHT : align === "justify" ? AlignmentType.JUSTIFIED : undefined;
+}
+
 /**
  * One section's stored text as .docx blocks: paragraphs, sub-headings, block
  * quotes (indented), bulleted/numbered lists and real tables.
@@ -102,9 +107,9 @@ export function proseToDocxBlocks(text: string, line: number, after: number): Ar
   const out: Array<Paragraph | Table> = [];
   for (const b of parseProseBlocks(text)) {
     if (b.kind === "paragraph") {
-      out.push(new Paragraph({ spacing: { line, after }, children: inlineMarkdownRuns(b.text).map((r) => docxRun(r)) }));
+      out.push(new Paragraph({ alignment: docxAlign(b.align), spacing: { line, after }, children: inlineMarkdownRuns(b.text).map((r) => docxRun(r)) }));
     } else if (b.kind === "heading") {
-      out.push(new Paragraph({ spacing: { before: 120, after: 80 }, children: inlineMarkdownRuns(b.text).map((r) => docxRun({ ...r, bold: true })) }));
+      out.push(new Paragraph({ alignment: docxAlign(b.align), spacing: { before: 120, after: 80 }, children: inlineMarkdownRuns(b.text).map((r) => docxRun({ ...r, bold: true })) }));
     } else if (b.kind === "quote") {
       for (const q of b.text.split("\n")) {
         out.push(new Paragraph({ indent: { left: 720, right: 720 }, spacing: { line, after }, children: inlineMarkdownRuns(q).map((r) => docxRun(r)) }));

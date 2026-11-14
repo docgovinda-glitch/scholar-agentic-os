@@ -10,6 +10,7 @@ export const BlockSchema = z.object({
   kind: BlockKindSchema,
   text: z.string(),
   rows: z.array(z.array(z.string().max(5000)).max(50)).max(500).optional(),
+  align: z.enum(["center", "right", "justify"]).optional(),
 });
 
 export const CanonicalDocumentSchema = z.object({

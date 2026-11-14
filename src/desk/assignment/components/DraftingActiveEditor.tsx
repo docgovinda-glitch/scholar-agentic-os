@@ -95,7 +95,7 @@ function renderAcademicProseWithCitations(
   return parseProseBlocks(prose).map((b, idx) => {
     if (b.kind === "heading") {
       return (
-        <h4 key={idx} className="text-sm font-semibold tracking-tight text-neutral-900 dark:text-white mt-5 mb-2">
+        <h4 key={idx} style={b.align ? { textAlign: b.align } : undefined} className="text-sm font-semibold tracking-tight text-neutral-900 dark:text-white mt-5 mb-2">
           {inline(b.text)}
         </h4>
       );
@@ -142,7 +142,7 @@ function renderAcademicProseWithCitations(
       );
     }
     return (
-      <p key={idx} className={`${textClass} mb-4 selection:bg-blue-100 dark:selection:bg-blue-900/40`}>
+      <p key={idx} style={b.align ? { textAlign: b.align } : undefined} className={`${textClass} mb-4 selection:bg-blue-100 dark:selection:bg-blue-900/40`}>
         {inline(b.text)}
       </p>
     );

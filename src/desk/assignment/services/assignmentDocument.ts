@@ -45,7 +45,8 @@ const words = (t: string) => (t.trim() ? t.trim().split(/\s+/).length : 0);
 export function buildAssignmentCanonicalDocument(input: AssignmentPdfRequest, id = "assignment"): CanonicalDocument {
   const blocks: Block[] = [];
   let n = 0;
-  const push = (kind: Block["kind"], text: string) => blocks.push({ id: `${id}-b${++n}`, kind, text });
+  const push = (kind: Block["kind"], text: string, align?: Block["align"]) =>
+    blocks.push({ id: `${id}-b${++n}`, kind, text, ...(align ? { align } : {}) });
 
   // Cover details are the student's own; a missing one is left out, never invented.
   // (The student's name is the PDF byline.)
@@ -62,8 +63,8 @@ export function buildAssignmentCanonicalDocument(input: AssignmentPdfRequest, id
   for (const s of input.sections) {
     push("heading1", s.title || "Untitled section");
     for (const b of parseProseBlocks(s.draftContent || "")) {
-      if (b.kind === "paragraph") push("paragraph", b.text);
-      else if (b.kind === "heading") push("heading2", b.text);
+      if (b.kind === "paragraph") push("paragraph", b.text, b.align);
+      else if (b.kind === "heading") push("heading2", b.text, b.align);
       else if (b.kind === "quote") push("quote", b.text);
       else if (b.kind === "bullets") b.items.forEach((i) => push("list-item", i));
       else if (b.kind === "numbered") b.items.forEach((i, n) => push("paragraph", `${n + 1}. ${i}`));

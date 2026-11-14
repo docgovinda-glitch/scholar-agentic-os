@@ -4,7 +4,8 @@ import { Node, mergeAttributes } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import { TableKit } from "@tiptap/extension-table";
-import { Bold, Columns3, Heading4, Italic, List, ListOrdered, Quote, Redo2, Rows3, Table2, Trash2, Underline as UnderlineIcon, Undo2 } from "lucide-react";
+import TextAlign from "@tiptap/extension-text-align";
+import { AlignCenter, AlignJustify, AlignLeft, AlignRight, Bold, Columns3, Heading4, Italic, List, ListOrdered, Quote, Redo2, Rows3, Table2, Trash2, Underline as UnderlineIcon, Undo2 } from "lucide-react";
 import { docToText, normalizeSectionText, textToDoc, type PMNode } from "./sectionDoc";
 import type React from "react";
 
@@ -71,6 +72,24 @@ function Toolbar({ editor, extra, richBlocks }: { editor: Editor; extra?: React.
       <Button on={editor.isActive("orderedList")} label="Numbered list" icon={<ListOrdered className="w-3.5 h-3.5" />} onClick={() => editor.chain().focus().toggleOrderedList().run()} />
       {richBlocks && (
         <>
+          <span aria-hidden="true" className="mx-1 h-4 w-px bg-[color:var(--border-subtle)]" />
+          {(
+            [
+              ["left", "Align left", AlignLeft],
+              ["center", "Align centre", AlignCenter],
+              ["right", "Align right", AlignRight],
+              ["justify", "Justify", AlignJustify],
+            ] as const
+          ).map(([value, label, Icon]) => (
+            <Button
+              key={value}
+              on={value === "left" ? !["center", "right", "justify"].some((a) => editor.isActive({ textAlign: a })) : editor.isActive({ textAlign: value })}
+              label={label}
+              icon={<Icon className="w-3.5 h-3.5" />}
+              onClick={() => editor.chain().focus().setTextAlign(value).run()}
+            />
+          ))}
+          <span aria-hidden="true" className="mx-1 h-4 w-px bg-[color:var(--border-subtle)]" />
           <Button on={editor.isActive("blockquote")} label="Block quote" icon={<Quote className="w-3.5 h-3.5" />} onClick={() => editor.chain().focus().toggleBlockquote().run()} />
           <Button
             on={false}
@@ -129,7 +148,12 @@ const SectionTextEditor = forwardRef<SectionEditorHandle, {
         horizontalRule: false,
         ...(richBlocks ? {} : { blockquote: false as const, underline: false as const }),
       }),
-      ...(richBlocks ? [TableKit.configure({ table: { resizable: false } })] : []),
+      ...(richBlocks
+        ? [
+            TableKit.configure({ table: { resizable: false } }),
+            TextAlign.configure({ types: ["heading", "paragraph"], alignments: ["left", "center", "right", "justify"], defaultAlignment: "left" }),
+          ]
+        : []),
       Placeholder.configure({ placeholder: placeholder ?? "" }),
       citationNode(citationLabel),
     ],

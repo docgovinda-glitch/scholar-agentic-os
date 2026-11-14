@@ -60,8 +60,10 @@ export function inlineMarkdownToHtml(text: string): string {
 export function proseToHtml(text: string): string {
   return parseProseBlocks(text)
     .map((b) => {
-      if (b.kind === "paragraph") return `<p>${inlineMarkdownToHtml(b.text)}</p>`;
-      if (b.kind === "heading") return `<h3>${inlineMarkdownToHtml(b.text)}</h3>`;
+      // Alignment values come from a fixed set (center/right/justify), never free text.
+      const style = "align" in b && b.align ? ` style="text-align:${b.align};text-indent:0"` : "";
+      if (b.kind === "paragraph") return `<p${style}>${inlineMarkdownToHtml(b.text)}</p>`;
+      if (b.kind === "heading") return `<h3${style}>${inlineMarkdownToHtml(b.text)}</h3>`;
       if (b.kind === "quote") return `<blockquote>${b.text.split("\n").map((l) => `<p>${inlineMarkdownToHtml(l)}</p>`).join("")}</blockquote>`;
       if (b.kind === "bullets" || b.kind === "numbered") {
         const tag = b.kind === "bullets" ? "ul" : "ol";

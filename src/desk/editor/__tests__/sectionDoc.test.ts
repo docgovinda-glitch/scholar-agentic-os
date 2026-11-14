@@ -64,3 +64,26 @@ it("reads underline and bold in either nesting order", () => {
   const p = textToDoc("**<u>x</u>**", { richBlocks: true }).content?.[0];
   expect(p?.content?.[0].marks?.map((m) => m.type).sort()).toEqual(["bold", "underline"]);
 });
+
+describe("paragraph alignment (Coursework editor)", () => {
+  const text = '<p align="center">Centred **bold** line.</p>\n\nLeft paragraph.\n\n<p align="right">#### Signed off</p>\n\n<p align="justify">Justified text.</p>';
+
+  it("round-trips alignment on paragraphs and sub-headings exactly", () => {
+    const doc = textToDoc(text, { richBlocks: true });
+    expect(doc.content?.map((b) => [b.type, b.attrs?.textAlign ?? null])).toEqual([
+      ["paragraph", "center"],
+      ["paragraph", null],
+      ["heading", "right"],
+      ["paragraph", "justify"],
+    ]);
+    expect(docToText(doc)).toBe(text);
+  });
+
+  it("writes nothing for left alignment", () => {
+    expect(docToText({ type: "doc", content: [{ type: "paragraph", attrs: { textAlign: "left" }, content: [{ type: "text", text: "x" }] }] })).toBe("x");
+  });
+
+  it("keeps the markup as plain text when rich blocks are off (Journal)", () => {
+    expect(docToText(textToDoc(text))).toBe(text);
+  });
+});

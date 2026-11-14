@@ -67,7 +67,7 @@ function blockToContent(block: Block): Content {
     case "heading1":
       return { text, style: "heading1" };
     case "heading2":
-      return { text, style: "heading2" };
+      return { text, style: "heading2", ...(block.align ? { alignment: block.align } : {}) } as Content;
     case "heading3":
       return { text, style: "heading3" };
     case "quote":
@@ -88,6 +88,6 @@ function blockToContent(block: Block): Content {
     case "list-item":
       return { ul: [{ text: runs(text) } as Content], style: "listItem" };
     default:
-      return { text: runs(text), style: "paragraph" } as Content;
+      return { text: runs(text), style: "paragraph", ...(block.align ? { alignment: block.align } : {}) } as Content;
   }
 }

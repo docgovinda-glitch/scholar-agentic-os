@@ -60,3 +60,13 @@ describe("rich blocks in the PDF document", () => {
     expect(result.data.subarray(0, 4).toString()).toBe("%PDF");
   }, 30_000);
 });
+
+describe("alignment in the PDF document", () => {
+  it("carries paragraph alignment into the shared document and renders", async () => {
+    const req = AssignmentPdfRequestSchema.parse({ title: "Al", sections: [{ title: "S", draftContent: '<p align="center">Centred.</p>\n\nPlain.' }] });
+    const doc = buildAssignmentCanonicalDocument(req);
+    expect(doc.blocks.filter((b) => b.kind === "paragraph").slice(-2).map((b) => [b.text, b.align])).toEqual([["Centred.", "center"], ["Plain.", undefined]]);
+    const result = await exportDocument({ document: doc, format: "pdf", title: "Al" });
+    expect(result.data.subarray(0, 4).toString()).toBe("%PDF");
+  }, 30_000);
+});
