@@ -2,7 +2,6 @@ import { describe, it, expect, vi } from "vitest";
 import {
   generateDynamicAssignmentStructure,
   generateThesisStatement,
-  generateAiEnhancedOutline,
   deconstructQuestionSemantics,
   formatAcademicTopicTitle,
 } from "../services/outlineService";
@@ -38,19 +37,4 @@ describe("Tailored Academic Outline Generation", () => {
     expect(structure.totalAllocated).toBe(2500);
   });
 
-  it("generateAiEnhancedOutline returns fallback within timeout when LLM is unavailable", async () => {
-    const structure = await generateAiEnhancedOutline({
-      question: "Role of AI in machine learning",
-      assignmentType: "essay",
-      academicLevel: "undergraduate",
-      targetWordCount: 2000,
-      writingTone: "analytical",
-      timeoutMs: 100,
-    } as any);
-
-    expect(structure.headings).toHaveLength(3);
-    expect(structure.totalAllocated).toBe(2000);
-    // Fallback headings come from the question itself, not a subject template.
-    expect(structure.headings[0].title).toMatch(/AI in Machine Learning/);
-  });
 });

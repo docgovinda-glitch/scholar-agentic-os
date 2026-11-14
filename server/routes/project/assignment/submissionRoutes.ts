@@ -38,7 +38,6 @@ import {
 } from "../../../../src/desk/assignment/types.ts";
 import {
   generateDynamicAssignmentStructure,
-  generateAiEnhancedOutline,
   sanitizeOutlineHeadings,
   assignmentStructureToOutlineTree,
   outlineTreeToAssignmentStructure,

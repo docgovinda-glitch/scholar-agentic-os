@@ -36,7 +36,6 @@ import {
 } from "../../../../src/desk/assignment/types.ts";
 import {
   generateDynamicAssignmentStructure,
-  generateAiEnhancedOutline,
   extractBriefInquiriesAndConcepts,
   sanitizeOutlineHeadings,
   assignmentStructureToOutlineTree,
@@ -184,7 +183,9 @@ export function healCorruptedProjectStructure(project: { answers?: Record<string
         }
         changed = true;
       }
-    } catch {}
+    } catch {
+      // A saved structure that is not valid JSON is left for the stage to rebuild; nothing to heal here.
+    }
   }
   return changed;
 }

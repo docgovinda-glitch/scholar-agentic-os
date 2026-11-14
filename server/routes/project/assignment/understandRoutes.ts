@@ -35,7 +35,6 @@ import {
 } from "../../../../src/desk/assignment/types.ts";
 import {
   generateDynamicAssignmentStructure,
-  generateAiEnhancedOutline,
   sanitizeOutlineHeadings,
   assignmentStructureToOutlineTree,
   outlineTreeToAssignmentStructure,
@@ -196,7 +195,9 @@ const handleStructure = async (req: express.Request<{ id: string }>, res: expres
       const parsed = typeof rawThinking === "string" ? JSON.parse(rawThinking) : rawThinking;
       thinkingThesis = parsed?.customThesis || "";
     }
-  } catch (_) {}
+  } catch {
+    // An unreadable saved thinking map means no custom thesis; the request's own thesis (if any) is used.
+  }
 
   const {
     question = project.answers["assignment_question"] || "",
@@ -490,7 +491,9 @@ router.get("/structure", async (req: express.Request<{ id: string }>, res) => {
           question_mapping: parsed.questionMappingMatrix,
         });
       }
-    } catch {}
+    } catch {
+      // Saved structure is not valid JSON: fall through and report that no structure exists yet.
+    }
   }
 
   const briefText = cleanAnswerString(project.answers?.["assignment_brief_text"]) || project.answers?.["assignment_question"] || "";

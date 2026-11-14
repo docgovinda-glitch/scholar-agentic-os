@@ -304,13 +304,13 @@ describe("Phase 4: Submission — Rubric Audit, Citation Reconciliation & Export
     expect(config.name.toLowerCase()).toContain("examiner");
   });
 
-  it("evaluateRubricCompliance returns a score report with overallScore and grade band", () => {
+  it("evaluateRubricCompliance returns a check-based report (no predicted grade)", () => {
     const fullText = MOCK_SECTIONS.map((s) => s.draftContent ?? "").join("\n\n");
     const report = evaluateRubricCompliance(fullText, MOCK_BRIEF);
     expect(report.overallScore).toBeGreaterThanOrEqual(0);
     expect(report.overallScore).toBeLessThanOrEqual(100);
-    expect(report.overallBand).toBeTruthy();
-    expect(report.bandLabel).toBeTruthy();
+    expect(report.overallBand).toBeUndefined();
+    expect(report.bandLabel).toMatch(/checks passed/);
     expect(report.criteria.length).toBeGreaterThan(0);
   });
 

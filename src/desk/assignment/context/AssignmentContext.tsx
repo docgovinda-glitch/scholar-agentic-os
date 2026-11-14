@@ -1452,7 +1452,7 @@ export function AssignmentProvider({
           id: `rubric-est-${Date.now()}`,
           sender: "tutor",
           mode: "rubric",
-          text: `📊 **Rubric Grade Assessment:** Your current draft is estimated at **${data.bandLabel}** (${data.overallScore}%).\n\n${data.summary}`,
+          text: `📊 **AI rubric feedback** (the model's view against your criteria, not a mark; your marker decides the grade): **${data.bandLabel}**.\n\n${data.summary}`,
           timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
           rubricEstimation: data,
         };
@@ -1617,9 +1617,9 @@ export function AssignmentProvider({
         flowAudit: flowAuditResult,
         isReadyForSubmission: Boolean(
           submissionReport &&
-          ((submissionReport as any).readinessPercentage !== undefined
-            ? (submissionReport as any).readinessPercentage >= 70
-            : (submissionReport as any).readyForSubmission) &&
+          // Ready only when nothing checkable is outstanding (no score threshold).
+          Array.isArray((submissionReport as { missingRequirements?: unknown[] }).missingRequirements) &&
+          (submissionReport as { missingRequirements: unknown[] }).missingRequirements.length === 0 &&
           (!citationAuditResult || citationAuditResult.isReconciled)
         ),
       },
@@ -1692,7 +1692,8 @@ export function AssignmentProvider({
         fullMarkdown,
         projectState.brief,
         citAudit,
-        citationCoverage
+        citationCoverage,
+        activeSecs.map((sec: { title?: string; draftContent?: string }) => ({ title: sec.title || "", draftContent: sec.draftContent || "" }))
       );
 
       // 3. Flow & Transitions Audit
