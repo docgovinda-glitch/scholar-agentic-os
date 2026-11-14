@@ -41,38 +41,44 @@ export class APA7Formatter implements CitationStyle {
     return `${names[0]} et al.`;
   }
 
+  /**
+   * APA 7 reference entry (9.8, 9.43): every author up to 20 ("A, B., & C, D."),
+   * 21+ as the first 19, an ellipsis and the last; sentence-ended parts; the
+   * periodical and volume in italics, issue in brackets; the DOI as a URL with
+   * no full stop after it. Missing fields are left out, never filled in.
+   */
   formatBibliography(reference: CanonicalReference): string {
+    const authors = this.formatAuthors(reference.authors, false);
+    const year = `(${authorDateYear(reference)}).`;
+    const endSentence = (t: string) => (/[.?!]$/.test(t) ? t : `${t}.`);
     const parts: string[] = [];
+    if (authors) parts.push(endSentence(authors));
+    parts.push(year);
 
-    // Authors
-    const authorPart = this.formatAuthors(reference.authors, false);
-    parts.push(authorPart);
-
-    // Year
-    parts.push(`(${authorDateYear(reference)}).`);
-
-    // Title
-    parts.push(reference.title);
-
-    // Source information
-    if (reference.kind === "JournalArticle") {
-      if (reference.journal) parts.push(`*${reference.journal}*`);
-      if (reference.volume) parts.push(`*${reference.volume}*`);
-      if (reference.issue) parts.push(`(${reference.issue})`);
-      if (reference.pages) parts.push(`, ${reference.pages}`);
-    } else if (reference.kind === "Book") {
+    if (reference.kind === "Book") {
+      parts.push(endSentence(`*${reference.title}*`));
       const publisher = reference.publisher || reference.source;
-      parts.push(`. ${publisher}`);
-    } else if (reference.kind === "Website") {
-      parts.push(`. ${reference.source}`);
+      if (publisher) parts.push(endSentence(publisher));
+    } else if (reference.kind === "JournalArticle") {
+      parts.push(endSentence(reference.title));
+      const journal = reference.journal || reference.source;
+      if (journal) {
+        let container = `*${journal}*`;
+        if (reference.volume) container += `, *${reference.volume}*${reference.issue ? `(${reference.issue})` : ""}`;
+        else if (reference.issue) container += `, (${reference.issue})`;
+        if (reference.pages) container += `, ${reference.pages}`;
+        parts.push(endSentence(container));
+      }
+    } else {
+      parts.push(endSentence(reference.title));
+      if (reference.source) parts.push(endSentence(reference.source));
     }
 
-    // DOI/URL
-    this.appendDoiOrUrl(parts, reference);
-
-    // Period
-    parts[parts.length - 1] = parts[parts.length - 1] + ".";
-
+    if (reference.doi) {
+      parts.push(reference.doi.startsWith("http") ? reference.doi : `https://doi.org/${reference.doi}`);
+    } else if (reference.url) {
+      parts.push(reference.url);
+    }
     return parts.join(" ");
   }
 
@@ -84,36 +90,24 @@ export class APA7Formatter implements CitationStyle {
   // Private Helpers
   // ============================================================================
 
-  /** Format a single author as "Last, F." - omits the initial (and its trailing period) when no first name is known. */
+  /** "Last, F. M." (initials for every given name; none when no given name is known). */
   private formatSingleAuthor(author: ReferenceAuthor): string {
-    const initial = author.firstName ? `${author.firstName.charAt(0)}.` : "";
-    return initial ? `${author.lastName}, ${initial}` : author.lastName;
+    const initials = (author.firstName || "")
+      .split(/[\s.]+/)
+      .filter(Boolean)
+      .map((n) => n.split("-").map((p) => `${p.charAt(0).toUpperCase()}.`).join("-"))
+      .join(" ");
+    return initials ? `${author.lastName}, ${initials}` : author.lastName;
   }
 
   private formatAuthors(authors: ReferenceAuthor[], etAl?: boolean): string {
     if (!authors || authors.length === 0) return "";
-
-    if (etAl && authors.length > 2) {
-      return `${authors[0].lastName}, et al.`;
-    }
-
-    if (authors.length === 1) {
-      return this.formatSingleAuthor(authors[0]);
-    }
-
-    if (authors.length === 2) {
-      return `${this.formatSingleAuthor(authors[0])} & ${this.formatSingleAuthor(authors[1])}`;
-    }
-
-    return `${this.formatSingleAuthor(authors[0])}, et al.`;
+    if (etAl && authors.length > 2) return `${authors[0].lastName}, et al.`;
+    const names = authors.map((a) => this.formatSingleAuthor(a));
+    if (names.length === 1) return names[0];
+    if (names.length > 20) return `${names.slice(0, 19).join(", ")}, . . . ${names[names.length - 1]}`;
+    return `${names.slice(0, -1).join(", ")}, & ${names[names.length - 1]}`;
   }
 
-  private appendDoiOrUrl(parts: string[], reference: CanonicalReference): void {
-    if (reference.doi) {
-      const normalizedDoi = reference.doi.startsWith("http") ? reference.doi : `https://doi.org/${reference.doi}`;
-      parts.push(`. ${normalizedDoi}`);
-    } else if (reference.url) {
-      parts.push(`. Retrieved from ${reference.url}`);
-    }
-  }
+
 }

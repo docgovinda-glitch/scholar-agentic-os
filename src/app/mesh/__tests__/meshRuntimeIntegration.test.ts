@@ -78,7 +78,7 @@ describe("Agent Mesh Runtime Integration", () => {
       expect(record.status).toBe("completed");
       expect(record.agentId).toBe("AG-14");
       expect(record.output?.bibliography).toHaveLength(1);
-      expect(record.output?.bibliography[0]).toContain("Smith, A. & Jones, B. (2024).");
+      expect(record.output?.bibliography[0]).toContain("Smith, A., & Jones, B. (2024)."); // APA 7 9.8: comma before the ampersand
       expect(record.output?.missingReferenceIndices).toHaveLength(0);
       expect(record.output?.orphanedReferenceIndices).toHaveLength(0);
       expect(record.qaResults.every((q) => q.passed)).toBe(true);
