@@ -38,6 +38,7 @@ import {
   distributeRemainingWords,
   adjustSubheadingWordCount,
   adjustHeadingWordCount,
+  balanceAroundHeading,
   addMainHeading,
   addSubheading,
   removeSubheading,
@@ -84,7 +85,8 @@ function SortableHeadingWrapper({ id, children }: { id: string; children: React.
 export interface DynamicStructurePlannerProps {
   structure: AssignmentStructure;
   targetWordCount: number;
-  onStructureChange?: (structure: AssignmentStructure) => void;
+  /** `balance: false` = the structure is already balanced; save it as given. */
+  onStructureChange?: (structure: AssignmentStructure, opts?: { balance?: boolean }) => void;
   onChange?: (structure: AssignmentStructure) => void;
   onTargetWordCountChange?: (target: number) => void;
   onRegenerateOutline?: () => void;
@@ -183,14 +185,19 @@ export function DynamicStructurePlanner({
     notifyChange(updated);
   };
 
+  // The edited section keeps exactly what the student set; the others make room.
+  const notifyPinned = (updated: AssignmentStructure, headingId: string) => {
+    const balanced = balanceAroundHeading(updated, headingId, targetWordCount);
+    onStructureChange?.(balanced, { balance: false });
+    onChange?.(balanced);
+  };
+
   const handleAdjustHeadingWords = (headingId: string, delta: number) => {
-    const updated = adjustHeadingWordCount(structure, headingId, delta);
-    notifyChange(updated);
+    notifyPinned(adjustHeadingWordCount(structure, headingId, delta), headingId);
   };
 
   const handleExactHeadingWords = (headingId: string, words: number) => {
-    const updated = adjustHeadingWordCount(structure, headingId, { exact: words });
-    notifyChange(updated);
+    notifyPinned(adjustHeadingWordCount(structure, headingId, { exact: words }), headingId);
   };
 
   const handleAutoBalance = () => {
@@ -895,8 +902,9 @@ export function DynamicStructurePlanner({
                               <button
                                 type="button"
                                 onClick={() => handleDeleteSubheading(sub.id)}
-                                className="p-1 text-neutral-400 hover:text-rose-500 hover:bg-rose-500/10 rounded transition-colors cursor-pointer"
-                                title="Delete subheading"
+                                disabled={heading.subheadings.length <= 1}
+                                className="p-1 text-neutral-400 hover:text-rose-500 hover:bg-rose-500/10 rounded transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-neutral-400"
+                                title={heading.subheadings.length <= 1 ? "A section needs at least one part; delete the section instead" : "Delete subheading"}
                                 aria-label={`Delete subheading ${sub.title}`}
                               >
                                 <Trash2 className="w-3 h-3" />

@@ -2170,6 +2170,36 @@ export function autoBalanceStructure(
 }
 
 /**
+ * Keep one heading at the budget the student just set and fit every other
+ * heading around it, so the total still equals the target. (Rescaling all
+ * headings, edited one included, turned a "+50" click into about +30.)
+ */
+export function balanceAroundHeading(
+  structure: AssignmentStructure,
+  headingId: string,
+  targetWordCount: number
+): AssignmentStructure {
+  const total = Math.max(200, Number(targetWordCount) || 2000);
+  const pinned = structure.headings.find((h) => h.id === headingId);
+  const others = structure.headings.filter((h) => h.id !== headingId);
+  if (!pinned || others.length === 0) return autoBalanceStructure(structure, total);
+  const otherSubs = others.flatMap((h) => h.subheadings);
+  if (otherSubs.length === 0) return autoBalanceStructure(structure, total);
+  const pinnedTotal = Math.min(
+    Math.max(0, pinned.subheadings.reduce((n, s) => n + (Number(s.targetWordCount) || 0), 0)),
+    total - otherSubs.length * 10
+  );
+  const words = allocateCleanWords(otherSubs.map((s) => Number(s.targetWordCount) || 1), total - pinnedTotal);
+  let k = 0;
+  const headings = structure.headings.map((h) => {
+    if (h.id === headingId) return { ...h, targetWordCount: pinnedTotal };
+    const subheadings = h.subheadings.map((s) => ({ ...s, targetWordCount: words[k++] }));
+    return { ...h, subheadings, targetWordCount: subheadings.reduce((n, s) => n + s.targetWordCount, 0) };
+  });
+  return { ...structure, version: structure.version + 1, targetWordCount: total, totalAllocated: total, headings };
+}
+
+/**
  * Distribute unallocated remaining words evenly across all subheadings.
  */
 export function distributeRemainingWords(
@@ -2434,6 +2464,11 @@ export function removeSubheading(
   structure: AssignmentStructure,
   subheadingId: string
 ): AssignmentStructure {
+  // A section keeps at least one part: with none, its budget would fall to 0
+  // and the question it answers would be drafted with no words.
+  const owner = structure.headings.find((h) => h.subheadings.some((s) => s.id === subheadingId));
+  if (owner && owner.subheadings.length <= 1) return structure;
+
   const updatedHeadings = structure.headings.map((h) => {
     const remaining = h.subheadings.filter((s) => s.id !== subheadingId);
     if (remaining.length === h.subheadings.length) return h;

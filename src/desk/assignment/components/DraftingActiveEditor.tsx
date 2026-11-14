@@ -773,7 +773,7 @@ export function DraftingActiveEditor({
       </div>
 
       {/* Editor & Content Canvas */}
-      <main
+      <section
         tabIndex={0}
         aria-label="Section Content"
         className="flex-1 p-5 sm:p-8 lg:p-10 min-h-[68vh] focus:outline-none"
@@ -913,7 +913,7 @@ export function DraftingActiveEditor({
             </div>
           </div>
         )}
-      </main>
+      </section>
 
       {/* Footer Navigation Bar */}
       <footer className="px-5 py-3 border-t border-neutral-100 dark:border-white/5 flex items-center justify-between gap-3 bg-neutral-50/30 dark:bg-white/[0.01]">

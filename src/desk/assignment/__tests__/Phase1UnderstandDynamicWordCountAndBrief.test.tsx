@@ -381,15 +381,13 @@ describe("Phase 1: Dynamic Target Word Count & Brief-Specific Outline Generation
       fireEvent.change(subInputs[0], { target: { value: "1.1 Just-in-Time Vulnerabilities" } });
       expect((subInputs[0] as HTMLInputElement).value).toBe("1.1 Just-in-Time Vulnerabilities");
 
-      // 5. Delete a subheading
-      const deleteSubBtns = screen.getAllByTitle(/Delete subheading/i);
-      const initialCount = deleteSubBtns.length;
-      fireEvent.click(deleteSubBtns[deleteSubBtns.length - 1]);
-
-      await waitFor(() => {
-        const updatedDeleteBtns = screen.getAllByTitle(/Delete subheading/i);
-        expect(updatedDeleteBtns.length).toBe(initialCount - 1);
-      });
+      // 5. Delete a subheading (a section's only part cannot be deleted)
+      const parts = () => screen.getAllByPlaceholderText("Subheading Title").length;
+      const before = parts();
+      const deletable = screen.getAllByTitle("Delete subheading");
+      expect(deletable.length).toBeGreaterThan(0);
+      fireEvent.click(deletable[deletable.length - 1]);
+      await waitFor(() => expect(parts()).toBe(before - 1));
 
       // 6. 1-Click Auto-Balance
       const autoBalanceBtn = screen.getByRole("button", { name: /Auto-Balance/i });
