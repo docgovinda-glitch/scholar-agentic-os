@@ -167,8 +167,7 @@ describe("Assignment Data Hydration and Persistence Guarantee", () => {
     expect(saveIntakeAnswers).toHaveBeenCalledWith(
       "proj-edit-test",
       expect.objectContaining({
-        instructions: "Updated prompt: Critically assess the EU AI Act risk categories.",
-        assignment_question: "Updated prompt: Critically assess the EU AI Act risk categories.",
+        assignment_brief: "Updated prompt: Critically assess the EU AI Act risk categories.",
       })
     );
 
@@ -177,17 +176,17 @@ describe("Assignment Data Hydration and Persistence Guarantee", () => {
     fireEvent.change(levelSelect, { target: { value: "postgraduate" } });
 
     // Saves run one after another (a later save can no longer be overtaken by
-    // an earlier one), so this one goes out once the brief's save finishes.
+    // an earlier one), and each sends only what changed: the level goes out on
+    // its own once the brief's save finishes.
     await waitFor(() =>
       expect(saveIntakeAnswers).toHaveBeenLastCalledWith(
         "proj-edit-test",
-        expect.objectContaining({
-          academicLevel: "postgraduate",
-          academic_level: "postgraduate",
-          instructions: "Updated prompt: Critically assess the EU AI Act risk categories.",
-        })
+        expect.objectContaining({ academic_level: "postgraduate" })
       )
     );
+    const last = vi.mocked(saveIntakeAnswers).mock.calls.at(-1)![1] as Record<string, unknown>;
+    expect(last.assignment_brief).toBeUndefined();
+    expect(last.assignment_sources).toBeUndefined();
   });
 
   it("guarantees permanent database persistence immediately on brief file upload", async () => {
@@ -237,10 +236,8 @@ describe("Assignment Data Hydration and Persistence Guarantee", () => {
     expect(saveIntakeAnswers).toHaveBeenCalledWith(
       "proj-upload-persistence",
       expect.objectContaining({
-        instructions: expect.stringContaining("Analyze cybersecurity vulnerabilities in industrial SCADA systems"),
-        assignment_question: expect.stringContaining("Analyze cybersecurity vulnerabilities in industrial SCADA systems"),
-        word_count: 3000,
-        targetWordCount: 3000,
+        assignment_brief: expect.stringContaining("Analyze cybersecurity vulnerabilities in industrial SCADA systems"),
+        word_limit: 3000,
         academic_level: "postgraduate",
         citation_style: "apa7",
       })

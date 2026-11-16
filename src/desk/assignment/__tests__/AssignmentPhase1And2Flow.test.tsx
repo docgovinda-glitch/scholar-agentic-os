@@ -120,13 +120,13 @@ describe("Assignment Phase 1 Wiring & Phase 2 Sources Workspace", () => {
           "proj-sources-1",
           expect.objectContaining({
             rawPrompt: expect.stringContaining("autonomous decision-making systems"),
-            targetWordCount: 2000,
+            word_limit: 2000,
             wordBudget: expect.objectContaining({
               intro: 200,
               conclusion: 200,
               body: 1600,
             }),
-            citationStyle: "apa7",
+            citation_style: "apa7",
             rubricCriteria: expect.arrayContaining([
               expect.objectContaining({
                 criterion: expect.stringContaining("Critical Analysis"),

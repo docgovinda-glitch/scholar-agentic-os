@@ -45,12 +45,9 @@ export function isCorruptedOutlineHeadings(headings: any[], topic: string): bool
 export function healCorruptedProjectStructure(project: { answers?: Record<string, string>; title?: string } | null | undefined): boolean {
   if (!project || !project.answers) return false;
   let changed = false;
-  const rawStructure = project.answers["assignment_structure"] || project.answers["structure"];
+  const rawStructure = project.answers["assignment_structure"];
   const topic = [
-    project.answers["assignment_question"],
-    project.answers["instructions"],
-    project.answers["assignment_brief_text"],
-    project.answers["research_topic"],
+    project.answers["assignment_brief"],
     project.answers["title"],
   ]
     .filter(Boolean)
@@ -60,14 +57,13 @@ export function healCorruptedProjectStructure(project: { answers?: Record<string
     try {
       const parsed = typeof rawStructure === "string" ? JSON.parse(rawStructure) : rawStructure;
       if (parsed?.headings && isCorruptedOutlineHeadings(parsed.headings, topic)) {
-        const briefText = cleanAnswerString(project.answers["assignment_brief_text"]) || topic;
+        const briefText = cleanAnswerString(project.answers["assignment_brief"]) || topic;
         const targetWords = Number(
-          project.answers["targetWordCount"] ||
-          project.answers["word_count"] ||
+          project.answers["word_limit"] ||
           (isTutorialOrShortQABrief(briefText) ? 400 : 2000)
         );
         const repaired = generateDynamicAssignmentStructure({
-          question: project.answers["assignment_question"] || topic,
+          question: project.answers["assignment_brief"] || topic,
           assignmentType: (project.answers["assignment_type"] || "essay") as any,
           academicLevel: (project.answers["academic_level"] || "undergraduate") as any,
           targetWordCount: targetWords,
@@ -75,12 +71,8 @@ export function healCorruptedProjectStructure(project: { answers?: Record<string
           briefText,
         });
         project.answers["assignment_structure"] = JSON.stringify(repaired);
-        project.answers["structure"] = JSON.stringify(repaired);
         if (project.answers["assignment_internal_sections"]) {
           delete project.answers["assignment_internal_sections"];
-        }
-        if (project.answers["assignment_outline"]) {
-          delete project.answers["assignment_outline"];
         }
         changed = true;
       }
@@ -263,7 +255,6 @@ export async function autoUpdateProjectTitleIfUntitled(
 
   const currentTitle = (
     project.answers["title"] ||
-    project.answers["assignment_title"] ||
     project.title ||
     ""
   ).trim();
@@ -276,7 +267,6 @@ export async function autoUpdateProjectTitleIfUntitled(
 
   if (isDefaultOrUntitled && derivedTitle && derivedTitle !== "Academic Assignment") {
     project.answers["title"] = derivedTitle;
-    project.answers["assignment_title"] = derivedTitle;
     if (typeof project.title === "string") {
       project.title = derivedTitle;
     }

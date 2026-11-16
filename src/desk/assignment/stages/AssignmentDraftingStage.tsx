@@ -120,7 +120,7 @@ export function AssignmentDraftingStage({
 
   // Auto-tune generic placeholder titles to question if question is present
   useEffect(() => {
-    const briefText = (typeof project?.answers?.["assignment_brief_text"] === "string" ? project.answers["assignment_brief_text"] : "") || question;
+    const briefText = (typeof project?.answers?.["assignment_brief"] === "string" ? project.answers["assignment_brief"] : "") || question;
     if (internalSections.length > 0 && question && question.trim().length > 0) {
       const isNonML = !/\b(machine learning|deep learning|neural network|transformer|foundation model)\b/i.test(`${question} ${briefText}`);
       const hasGenericOrLeakedTitles = internalSections.some(

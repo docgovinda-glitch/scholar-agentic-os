@@ -303,7 +303,7 @@ export default function AssignmentUnderstandStage({
   );
 
   const [localTone, setLocalTone] = useState<string>(() => {
-    const raw = project?.answers?.["writing_tone"] || project?.answers?.["writingTone"] || writingTone;
+    const raw = project?.answers?.["writing_tone"] || writingTone;
     if (typeof raw === "string" && raw && raw !== "analytical") return raw;
     if (raw && typeof raw === "object") {
       const obj = raw as any;
@@ -320,7 +320,7 @@ export default function AssignmentUnderstandStage({
   // Auto-Update Writing Tone on initial load if essay with default analytical tone
   useEffect(() => {
     const curType = assignmentType || localType || "essay";
-    const rawTone = project?.answers?.["writing_tone"] || project?.answers?.["writingTone"] || writingTone || localTone;
+    const rawTone = project?.answers?.["writing_tone"] || writingTone || localTone;
     const toneStr = (typeof rawTone === "string" ? rawTone : (rawTone as any)?.preset || (rawTone as any)?.id || "").toLowerCase();
     if (curType === "essay" && (toneStr === "analytical" || !toneStr || toneStr === "default")) {
       const targetTone = "formal_academic";
@@ -337,7 +337,7 @@ export default function AssignmentUnderstandStage({
   const initialStepSetRef = useRef(false);
   const userOverrideStepRef = useRef(false);
   const [understandStep, setUnderstandStep] = useState<"brief_input" | "outline_review">(() => {
-    const rawStruct: any = project?.answers?.["assignment_structure"] || project?.answers?.["structure"];
+    const rawStruct: any = project?.answers?.["assignment_structure"];
     if (rawStruct) {
       initialStepSetRef.current = true;
       return "outline_review";
@@ -349,7 +349,7 @@ export default function AssignmentUnderstandStage({
     if (isLoading || initialStepSetRef.current || userOverrideStepRef.current) return;
     if (project) {
       initialStepSetRef.current = true;
-      const rawStruct: any = project?.answers?.["assignment_structure"] || project?.answers?.["structure"];
+      const rawStruct: any = project?.answers?.["assignment_structure"];
       if (rawStruct) {
         setUnderstandStep("outline_review");
       }
@@ -376,7 +376,7 @@ export default function AssignmentUnderstandStage({
       setLocalWordCount((prev) => (prev !== sanitized ? sanitized : prev));
     }
     if (citationStyle) setLocalCitation((prev) => (prev !== citationStyle ? citationStyle : prev));
-    const resolvedTone = project?.answers?.["writing_tone"] || project?.answers?.["writingTone"] || writingTone;
+    const resolvedTone = project?.answers?.["writing_tone"] || writingTone;
     const toneStr = typeof resolvedTone === "string" ? resolvedTone : (resolvedTone as any)?.preset || (resolvedTone as any)?.id;
     if (toneStr && typeof toneStr === "string") {
       setLocalTone((prev) => (prev !== toneStr ? toneStr : prev));
@@ -653,14 +653,14 @@ export default function AssignmentUnderstandStage({
     if (writingStyle) {
       setLocalStyle((prev) => (isDeepEqual(prev, writingStyle) ? prev : writingStyle));
     }
-    const resolvedTone = project?.answers?.["writing_tone"] || project?.answers?.["writingTone"] || writingTone;
+    const resolvedTone = project?.answers?.["writing_tone"] || writingTone;
     const toneStr = typeof resolvedTone === "string" ? resolvedTone : (resolvedTone as any)?.preset || (resolvedTone as any)?.id;
     if (toneStr && typeof toneStr === "string") {
       setLocalTone((prev) => (prev !== toneStr ? toneStr : prev));
     }
     if (structure && structure.headings && structure.headings.length > 0) {
       setLocalStructure(autoBalanceStructure(structure, targetWordCount > 0 ? targetWordCount : 2000));
-      const rawStruct: any = project?.answers?.["assignment_structure"] || project?.answers?.["structure"];
+      const rawStruct: any = project?.answers?.["assignment_structure"];
       if (rawStruct && rawStruct.isConfirmed && !userOverrideStepRef.current) {
         setUnderstandStep("outline_review");
       }
@@ -722,7 +722,6 @@ export default function AssignmentUnderstandStage({
     if (trimmed) {
       const currentTitle =
         project?.answers?.["title"] ||
-        project?.answers?.["assignment_title"] ||
         project?.title ||
         "";
       const isDefaultOrUntitled =

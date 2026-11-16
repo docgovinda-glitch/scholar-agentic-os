@@ -42,6 +42,8 @@ The `assignment_*` tables (migration `20261113180000_coursework_relational_state
 
 `projects` mirrors the server's `ProjectRecord` (`src/app/conductor/projectStore.ts`): intake `answers`, the eight gates (`gates`), the canonical `document`, the latest `rubric_report`, the claim-evidence graph (`claim_graph`), rubric `waivers`, journal `submissions` and `journal_requirements`, and the evidence ledger. Deleting a project cascades through `handle_project_delete_cascade` (`20260924180000_project_cascade_delete.sql`).
 
+Coursework (OT-01) `answers` hold one key per setting (`src/domain/assignment/answerKeys.ts`): `assignment_brief`, `word_limit`, `academic_level`, `assignment_type`, `citation_style`, `writing_style`, `writing_tone`, `section_budgets`, `title`, `approved_source_ids`, `assignment_structure`, `assignment_internal_sections`, `assignment_current_phase`. The project store normalizes every OT-01 record on save and load (older aliases such as `assignment_question`, `targetWordCount` or `structure` are folded into the canonical key and removed), `PATCH /intake` maps aliases in an update first, and the Coursework client sends only the keys that changed.
+
 ### 2.3 Research pipeline (journal)
 
 | Table | Columns | Used |

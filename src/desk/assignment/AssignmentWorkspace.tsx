@@ -109,7 +109,6 @@ function AssignmentWorkspaceInner({
 
   // Inline-editable title with auto-save on blur / Enter
   const initialTitle =
-    project?.answers?.["assignment_title"] ||
     project?.answers?.["title"] ||
     "Academic Assignment";
   const [editableTitle, setEditableTitle] = useState(initialTitle);
@@ -118,7 +117,6 @@ function AssignmentWorkspaceInner({
   useEffect(() => {
     if (project) {
       setEditableTitle(
-        project.answers?.["assignment_title"] ||
         project.answers?.["title"] ||
         "Academic Assignment"
       );
@@ -134,7 +132,7 @@ function AssignmentWorkspaceInner({
   const commitTitle = (next: string) => {
     const trimmed = next.trim() || "Academic Assignment";
     setEditableTitle(trimmed);
-    if (project && (trimmed !== (project.answers?.["assignment_title"] || project.answers?.["title"]))) {
+    if (project && (trimmed !== (project.answers?.["title"]))) {
       saveAnswers({ assignment_title: trimmed, title: trimmed });
       try {
         const p = authedJsonFetch(`/api/projects/${encodeURIComponent(project.projectId)}`, "PATCH", { title: trimmed });

@@ -101,7 +101,6 @@ export function AssignmentSubmissionStage({
   }));
 
   const assignmentTitle =
-    project?.answers?.["assignment_title"] ||
     project?.answers?.["title"] ||
     question ||
     "Academic Assignment";

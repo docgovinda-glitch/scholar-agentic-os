@@ -8,6 +8,7 @@
 
 import { isSourceApproved } from "./approvedSources";
 import { countProseWords } from "../../shared/proseBlocks";
+import { normalizeAssignmentAnswers } from "./answerKeys";
 
 export type AssignmentPhase = "extract" | "understand" | "sources" | "drafting" | "submission";
 
@@ -301,13 +302,15 @@ export function sourceOrigin(s: SourceLike): AssignmentSourceOriginRow["origin"]
 /** Build every normalized row for one Coursework project. */
 export function buildAssignmentRelationalSnapshot(
   projectId: string,
-  answers: Record<string, unknown>,
+  rawAnswers: Record<string, unknown>,
   now: Date = new Date()
 ): AssignmentRelationalSnapshot {
+  // Saved records are already normalized; a raw one (older save, test) is read the same way.
+  const answers = normalizeAssignmentAnswers(rawAnswers);
   const at = now.toISOString();
-  const briefText = str(answers["assignment_brief_text"]) ?? str(answers["assignment_question"]);
-  const targetWords = num(answers["target_word_count"] ?? answers["word_count"]);
-  const phase = normalizePhase(answers["assignment_current_phase"] ?? answers["assignment_current_stage"]);
+  const briefText = str(answers["assignment_brief"]);
+  const targetWords = num(answers["word_limit"]);
+  const phase = normalizePhase(answers["assignment_current_phase"]);
 
   const files: AssignmentFileRow[] = [];
   const briefFile = str(answers["assignment_brief_file"]);
@@ -411,7 +414,7 @@ export function buildAssignmentRelationalSnapshot(
     project: {
       project_id: projectId,
       current_phase: phase,
-      title: str(answers["assignment_title"]) ?? str(answers["title"]),
+      title: str(answers["title"]),
       brief_text: briefText ? briefText.slice(0, MAX_PARSED_TEXT) : null,
       target_word_count: targetWords,
       citation_style: str(answers["citation_style"]),

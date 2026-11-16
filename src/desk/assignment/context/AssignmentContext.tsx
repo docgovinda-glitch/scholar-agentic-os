@@ -1,4 +1,5 @@
 import { countProseWords } from "../../../shared/proseBlocks";
+import { canonicalizeAssignmentUpdate, normalizeAssignmentAnswers } from "../../../domain/assignment/answerKeys";
 import { selectApprovedSources } from "../../../domain/assignment/approvedSources";
 import { clipHeadingWords } from "../../../utils/briefQuestions";
 import { createContext,useContext,useState,useCallback,useEffect,ReactNode,useMemo,useRef } from "react";
@@ -223,6 +224,8 @@ export function AssignmentProvider({
   // What the header shows: only "saved" once the server has the latest answers.
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
   const saveDirtyRef = useRef(false);
+  /** Keys changed since the last successful write: only these are sent (the server merges). */
+  const dirtyKeysRef = useRef<Set<string>>(new Set());
   const [document, setDocument] = useState<CanonicalDocument | null>(null);
   const [rubric, setRubric] = useState<RubricReport | null>(null);
   const [outputType, setOutputType] = useState<OutputTypeSpec | null>(null);
@@ -295,8 +298,9 @@ export function AssignmentProvider({
     setIsLoading(true);
     try {
       const loaded = await getProject(activeProjectId);
-      // Legacy template text from older saves is removed on every load.
-      const proj = { ...loaded, answers: purgeLegacyTemplateText(loaded.answers) } as typeof loaded;
+      // Legacy template text from older saves is removed on every load, and settings
+      // stored under old alias names are read from their one canonical key.
+      const proj = { ...loaded, answers: normalizeAssignmentAnswers(purgeLegacyTemplateText(loaded.answers)) } as typeof loaded;
       const [rub, doc] = proj.hasDocument
         ? await Promise.all([getRubric(activeProjectId), getDocument(activeProjectId)])
         : [null, null];
@@ -307,8 +311,7 @@ export function AssignmentProvider({
 
       if (initialStage === null) {
         const persisted =
-          proj.answers?.["assignment_current_phase"] ||
-          proj.answers?.["assignment_current_stage"];
+          proj.answers?.["assignment_current_phase"];
         const targetPhase: AssignmentPhaseId = normalizeAssignmentPhase(persisted);
         setActiveStage(targetPhase);
         onStageChangeCallback(targetPhase, { replace: true });
@@ -332,72 +335,24 @@ export function AssignmentProvider({
   const saveAnswers = useCallback(
     async (updates: Record<string, any>) => {
       if (!project) return;
-      const standardized: Record<string, any> = { ...updates };
-      if (updates.instructions !== undefined || updates.assignment_question !== undefined) {
-        const text = cleanAnswerString(updates.instructions ?? updates.assignment_question ?? "");
-        standardized.instructions = text;
-        standardized.assignment_question = text;
-        standardized.assignment_brief_text = text;
-        standardized.research_topic = text;
-        if (standardized.assignment_brief === "provisional" || text) {
-          standardized.assignment_brief = text;
-        }
+      // One stored name per setting (answerKeys.ts): older call sites may still
+      // pass an alias ("instructions", "targetWordCount", ...); it lands on the canonical key.
+      const standardized: Record<string, any> = canonicalizeAssignmentUpdate(updates);
+      if (standardized.assignment_brief !== undefined) standardized.assignment_brief = cleanAnswerString(standardized.assignment_brief);
+      if (standardized.word_limit !== undefined) standardized.word_limit = Number(standardized.word_limit);
+      if (standardized.writing_style !== undefined && standardized.writing_tone === undefined) {
+        const ws = standardized.writing_style;
+        standardized.writing_tone = typeof ws === "string" ? ws : ws?.preset || ws?.id || "analytical";
       }
-      if (updates.academicLevel !== undefined || updates.academic_level !== undefined) {
-        const lvl = updates.academicLevel ?? updates.academic_level;
-        standardized.academicLevel = lvl;
-        standardized.academic_level = lvl;
+      if (standardized.writing_tone !== undefined) {
+        const wt = standardized.writing_tone;
+        standardized.writing_tone = typeof wt === "string" ? wt : wt?.preset || wt?.id || "analytical";
+        if (standardized.writing_style === undefined) standardized.writing_style = { preset: standardized.writing_tone, label: standardized.writing_tone };
       }
-      if (updates.assignmentType !== undefined || updates.assignment_type !== undefined) {
-        const t = updates.assignmentType ?? updates.assignment_type;
-        standardized.assignmentType = t;
-        standardized.assignment_type = t;
-      }
-      if (updates.targetWordCount !== undefined || updates.word_count !== undefined || updates.word_limit !== undefined) {
-        const wc = updates.targetWordCount ?? updates.word_count ?? updates.word_limit;
-        standardized.targetWordCount = Number(wc);
-        standardized.target_word_count = Number(wc);
-        standardized.word_count = Number(wc);
-        standardized.word_limit = Number(wc);
-      }
-      if (updates.citationStyle !== undefined || updates.citation_style !== undefined) {
-        const cs = updates.citationStyle ?? updates.citation_style;
-        standardized.citationStyle = cs;
-        standardized.citation_style = cs;
-      }
-      if (updates.sections !== undefined) {
-        standardized.sections = updates.sections;
-      }
-      if (updates.writingStyle !== undefined || updates.writing_style !== undefined) {
-        const ws = updates.writingStyle ?? updates.writing_style;
-        standardized.writingStyle = ws;
-        standardized.writing_style = ws;
-        const toneStr = typeof ws === "string" ? ws : ws?.preset || ws?.id || "analytical";
-        standardized.writingTone = toneStr;
-        standardized.writing_tone = toneStr;
-      }
-      if (updates.writingTone !== undefined || updates.writing_tone !== undefined) {
-        const wt = updates.writingTone ?? updates.writing_tone;
-        const toneStr = typeof wt === "string" ? wt : wt?.preset || wt?.id || "analytical";
-        standardized.writingTone = toneStr;
-        standardized.writing_tone = toneStr;
-        if (!standardized.writingStyle) {
-          standardized.writingStyle = { preset: toneStr as any, label: toneStr };
-          standardized.writing_style = { preset: toneStr as any, label: toneStr };
-        }
-      }
-      if (updates.sectionBudgets !== undefined || updates.section_budgets !== undefined) {
-        const sb = updates.sectionBudgets ?? updates.section_budgets;
-        standardized.sectionBudgets = sb;
-        standardized.section_budgets = sb;
-      }
-
-      if (updates.title !== undefined || updates.assignment_title !== undefined || updates.updatedTitle !== undefined) {
-        const titleVal = String(updates.title ?? updates.assignment_title ?? updates.updatedTitle ?? "").trim();
-        if (titleVal) {
-          standardized.title = titleVal;
-          standardized.assignment_title = titleVal;
-        }
+      if (standardized.title !== undefined) {
+        const titleVal = String(standardized.title ?? "").trim();
+        if (titleVal) standardized.title = titleVal;
+        else delete standardized.title;
       }
 
       const baseAnswers = projectRef.current?.answers || project?.answers || {};
@@ -416,7 +371,10 @@ export function AssignmentProvider({
       });
 
       // One write in flight at a time. The first starts at once; changes made
-      // while it runs are sent together, as the latest answers, right after.
+      // while it runs are sent together, with their latest values, right after.
+      // Only the changed keys are sent: the server merges them into the record, so
+      // a value another request saved meanwhile is not overwritten with a stale copy.
+      for (const k of Object.keys(standardized)) dirtyKeysRef.current.add(k);
       saveDirtyRef.current = true;
       if (!saveRunningRef.current) {
         saveRunningRef.current = true;
@@ -426,11 +384,18 @@ export function AssignmentProvider({
           try {
             while (saveDirtyRef.current) {
               saveDirtyRef.current = false;
+              const keys = Array.from(dirtyKeysRef.current);
+              dirtyKeysRef.current.clear();
+              const latest = (projectRef.current?.answers ?? safeAnswers) as Record<string, unknown>;
+              const patch = Object.fromEntries(keys.filter((k) => latest[k] !== undefined).map((k) => [k, latest[k]]));
+              if (Object.keys(patch).length === 0) continue;
               try {
-                await saveIntakeAnswers(activeProjectId, projectRef.current?.answers ?? safeAnswers);
+                await saveIntakeAnswers(activeProjectId, patch);
                 failed = false;
               } catch (err) {
                 failed = true;
+                // Not lost: these keys go out again with the next save.
+                for (const k of keys) dirtyKeysRef.current.add(k);
                 console.error("Failed to persist assignment answers:", err);
               }
             }
@@ -505,20 +470,20 @@ export function AssignmentProvider({
   // Extract core properties from project answers
   const answers = project?.answers || {};
   const academicLevel: AcademicLevel =
-    (answers["academicLevel"] as AcademicLevel) ||
+    (answers["academic_level"] as AcademicLevel) ||
     (answers["academic_level"] as AcademicLevel) ||
     "undergraduate";
   const assignmentType: AssignmentType =
-    (answers["assignmentType"] as AssignmentType) ||
+    (answers["assignment_type"] as AssignmentType) ||
     (answers["assignment_type"] as AssignmentType) ||
     "essay";
   const rawTarget =
-    answers["targetWordCount"] !== undefined
-      ? answers["targetWordCount"]
-      : answers["target_word_count"] !== undefined
-      ? answers["target_word_count"]
-      : answers["word_count"] !== undefined
-      ? answers["word_count"]
+    answers["word_limit"] !== undefined
+      ? answers["word_limit"]
+      : answers["word_limit"] !== undefined
+      ? answers["word_limit"]
+      : answers["word_limit"] !== undefined
+      ? answers["word_limit"]
       : answers["word_limit"];
   let parsedTarget =
     rawTarget !== undefined && rawTarget !== null && rawTarget !== ""
@@ -533,8 +498,8 @@ export function AssignmentProvider({
   const targetWordCount = parsedTarget;
 
   const rawCitation =
-    answers["citationStyle"] !== undefined
-      ? answers["citationStyle"]
+    answers["citation_style"] !== undefined
+      ? answers["citation_style"]
       : answers["citation_style"];
   const citationStyle =
     rawCitation !== undefined ? cleanAnswerString(rawCitation) : "apa7";
@@ -560,9 +525,7 @@ export function AssignmentProvider({
   );
 
   const rawStyle =
-    answers["writingStyle"] ||
     answers["writing_style"] ||
-    answers["writingTone"] ||
     answers["writing_tone"];
   const rawStyleKey =
     typeof rawStyle === "object" ? JSON.stringify(rawStyle) : String(rawStyle ?? "");
@@ -602,14 +565,14 @@ export function AssignmentProvider({
 
   const question = extractStandardizedInstructions(answers);
   const briefText =
-    cleanAnswerString(answers["assignment_brief_text"]) ||
+    cleanAnswerString(answers["assignment_brief"]) ||
     cleanAnswerString(answers["briefText"]) ||
     cleanAnswerString(answers["brief"]) ||
     question;
   const assignmentBriefText = briefText;
 
   const structure: AssignmentStructure = useMemo(() => {
-    const raw = answers["assignment_structure"] || answers["structure"];
+    const raw = answers["assignment_structure"];
     if (raw) {
       const parsed = safeParseAnswerField<AssignmentStructure | undefined>(raw, undefined);
       if (parsed?.headings && Array.isArray(parsed.headings) && parsed.headings.length > 0) {
@@ -652,7 +615,7 @@ export function AssignmentProvider({
     [saveAnswers]
   );
 
-  const rawBudgets = answers["sectionBudgets"] || answers["section_budgets"];
+  const rawBudgets = answers["section_budgets"];
   const rawBudgetsKey =
     typeof rawBudgets === "object" ? JSON.stringify(rawBudgets) : String(rawBudgets ?? "");
   const sectionBudgets: SectionBudgetItem[] = useMemo(() => {
@@ -759,7 +722,7 @@ export function AssignmentProvider({
   }, [answers]);
 
   const approvedSourceIds: string[] = useMemo(() => {
-    const raw = answers["approved_source_ids"] || answers["approvedSourceIds"];
+    const raw = answers["approved_source_ids"];
     if (raw !== undefined && raw !== null) {
       try {
         const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
@@ -817,7 +780,7 @@ export function AssignmentProvider({
     : null;
 
   const outline: OutlineSection[] = useMemo(() => {
-    const raw = answers["assignment_outline"];
+    const raw = answers["assignment_internal_sections"];
     if (!raw) return [];
     return safeParseAnswerField<OutlineSection[]>(raw, []);
   }, [answers]);
@@ -844,7 +807,7 @@ export function AssignmentProvider({
         }));
       }
     }
-    const rawOutline = answers["assignment_outline"];
+    const rawOutline = answers["assignment_internal_sections"];
     if (rawOutline) {
       const parsed = safeParseAnswerField<any[]>(rawOutline, []);
       if (Array.isArray(parsed) && parsed.length > 0 && !isCorrupted(parsed)) {

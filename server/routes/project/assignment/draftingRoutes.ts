@@ -40,7 +40,7 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
     allocatedWords,
     academicLevel = project.answers["academic_level"] || "undergraduate",
     citationStyle = project.answers["citation_style"] || "apa7",
-    assignmentTopic = project.answers["assignment_question"] || "",
+    assignmentTopic = project.answers["assignment_brief"] || "",
     thesis = "",
     boundSources = [],
     revisionPrompt,
@@ -116,9 +116,7 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
       : "";
 
     const briefRaw = [
-      project.answers["assignment_brief_text"],
-      project.answers["instructions"],
-      project.answers["assignment_question"],
+      project.answers["assignment_brief"],
       assignmentTopic,
     ].filter(Boolean).join(" ");
     const isShortQA = isTutorialOrShortQABrief(briefRaw, targetWordCount) || targetWordCount <= 200;

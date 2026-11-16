@@ -148,7 +148,7 @@ describe("Scholar Core Assignment Workspace", () => {
     await waitFor(() => {
       expect(saveIntakeAnswers).toHaveBeenCalledWith(
         "proj-123",
-        expect.objectContaining({ assignment_title: "Renamed Assignment" })
+        expect.objectContaining({ title: "Renamed Assignment" })
       );
     });
 
@@ -285,7 +285,7 @@ describe("Scholar Core Assignment Workspace", () => {
     fireEvent.change(input, { target: { value: "Renamed From Header" } });
     fireEvent.keyDown(input, { key: "Enter" });
     await waitFor(() =>
-      expect(saveIntakeAnswers).toHaveBeenCalledWith("proj-123", expect.objectContaining({ assignment_title: "Renamed From Header" }))
+      expect(saveIntakeAnswers).toHaveBeenCalledWith("proj-123", expect.objectContaining({ title: "Renamed From Header" }))
     );
   });
 

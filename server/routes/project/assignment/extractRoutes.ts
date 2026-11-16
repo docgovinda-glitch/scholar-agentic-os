@@ -159,11 +159,7 @@ router.post(
     if (!project.answers) {
       project.answers = {};
     }
-    project.answers["instructions"] = cleanedText;
-    project.answers["assignment_question"] =
-      extractedQuestions.length > 0 ? extractedQuestions.join("\n\n") : cleanedText;
-    project.answers["assignment_brief_text"] = cleanedText;
-    project.answers["research_topic"] = cleanedText;
+    // One stored name per setting (answerKeys.ts); the questions are kept below.
     project.answers["assignment_brief"] = cleanedText;
     if (extractedQuestions.length > 0) {
       project.answers["extracted_questions"] = JSON.stringify(extractedQuestions);
@@ -175,17 +171,12 @@ router.post(
     project.answers["mark_allocation"] = JSON.stringify(markAllocation);
 
     if (detectedWordCount) {
-      project.answers["targetWordCount"] = String(detectedWordCount);
-      project.answers["target_word_count"] = String(detectedWordCount);
-      project.answers["word_count"] = String(detectedWordCount);
       project.answers["word_limit"] = String(detectedWordCount);
     }
     if (detectedLevel) {
-      project.answers["academicLevel"] = detectedLevel;
       project.answers["academic_level"] = detectedLevel;
     }
     if (detectedCitation) {
-      project.answers["citationStyle"] = detectedCitation;
       project.answers["citation_style"] = detectedCitation;
     }
     await getProjectStore().save(project);
@@ -224,29 +215,24 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
     extractStandardizedInstructions(project.answers);
   const assignmentType =
     req.body?.assignmentType ||
-    project.answers["assignmentType"] ||
     project.answers["assignment_type"] ||
     "essay";
   const academicLevel =
     req.body?.academicLevel ||
-    project.answers["academicLevel"] ||
     project.answers["academic_level"] ||
     "undergraduate";
   const briefText =
     cleanAnswerString(req.body?.briefText) ||
-    cleanAnswerString(project.answers["assignment_brief_text"]) ||
+    cleanAnswerString(project.answers["assignment_brief"]) ||
     question;
   const isTutorial = isTutorialOrShortQABrief(briefText) || isTutorialOrShortQABrief(question);
   const targetWordCount = Number(
     req.body?.targetWordCount ||
-    project.answers["targetWordCount"] ||
-    project.answers["word_count"] ||
     project.answers["word_limit"] ||
     (isTutorial ? 400 : 2000)
   );
   const citationStyle =
     cleanAnswerString(req.body?.citationStyle) ||
-    cleanAnswerString(project.answers["citationStyle"]) ||
     cleanAnswerString(project.answers["citation_style"]) ||
     "apa7";
   const rubricText =
@@ -479,13 +465,9 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
     }
 
     project.answers.assignment_structure = JSON.stringify(structure);
-    project.answers.structure = JSON.stringify(structure);
     project.answers.target_frameworks = JSON.stringify(structure.targetFrameworks || []);
     if (project.answers.assignment_internal_sections) {
       delete project.answers.assignment_internal_sections;
-    }
-    if (project.answers.assignment_outline) {
-      delete project.answers.assignment_outline;
     }
 
     await getProjectStore().save(project);
@@ -527,11 +509,11 @@ export async function writeOutlineForProject(
   opts: { instruction?: string; plan?: string } = {}
 ) {
   const a = project.answers;
-  const question = cleanAnswerString(a["assignment_question"]) || extractStandardizedInstructions(a);
-  const briefText = cleanAnswerString(a["assignment_brief_text"]) || question;
-  const targetWords = Number(a["targetWordCount"] || a["word_count"] || a["word_limit"] || 1500) || 1500;
-  const assignmentType = String(a["assignmentType"] || a["assignment_type"] || "essay");
-  const current = safeParseObject(a["assignment_structure"] || a["structure"]) as any;
+  const question = cleanAnswerString(a["assignment_brief"]) || extractStandardizedInstructions(a);
+  const briefText = cleanAnswerString(a["assignment_brief"]) || question;
+  const targetWords = Number(a["word_limit"] || 1500) || 1500;
+  const assignmentType = String(a["assignment_type"] || "essay");
+  const current = safeParseObject(a["assignment_structure"]) as any;
   const previous = (safeParseObject(a["assignment_internal_sections"]) as AssignmentDraftingSection[] | undefined) ?? [];
   const ledger = safeParseObject(a["brief_ledger"]) as Array<{ category?: string; verbatimText?: string }> | undefined;
   const extraction = safeParseObject(a["assignment_extraction"]) as { criteria?: Array<{ criterion: string; weight?: number }> } | null;
@@ -548,9 +530,9 @@ export async function writeOutlineForProject(
       brief: briefText,
       question,
       assignmentType,
-      academicLevel: String(a["academicLevel"] || a["academic_level"] || "undergraduate"),
+      academicLevel: String(a["academic_level"] || "undergraduate"),
       discipline: discipline || undefined,
-      citationStyle: cleanAnswerString(a["citationStyle"] || a["citation_style"]) || undefined,
+      citationStyle: cleanAnswerString(a["citation_style"]) || undefined,
       targetWords,
       criteria,
       instruction: opts.instruction,
@@ -563,10 +545,8 @@ export async function writeOutlineForProject(
   if (!structure) throw new UnusableAiResponseError("outline");
   structure.version = (Number(current?.version) || 0) + 1;
   project.answers.assignment_structure = JSON.stringify(structure);
-  project.answers.structure = JSON.stringify(structure);
-  if (structure.targetWordCount !== targetWords) project.answers.targetWordCount = String(structure.targetWordCount);
+  if (structure.targetWordCount !== targetWords) project.answers.word_limit = String(structure.targetWordCount);
   delete project.answers.assignment_internal_sections;
-  delete project.answers.assignment_outline;
   await getProjectStore().save(project);
   return structure;
 }
@@ -578,7 +558,7 @@ router.post("/outline", async (req: express.Request<{ id: string }>, res: expres
   const raw = req.body?.instruction;
   const instruction = typeof raw === "string" ? raw.trim().slice(0, 600) || undefined : undefined;
   const a = project.answers;
-  const briefText = cleanAnswerString(a["assignment_brief_text"]) || cleanAnswerString(a["assignment_question"]) || extractStandardizedInstructions(a);
+  const briefText = cleanAnswerString(a["assignment_brief"]) || extractStandardizedInstructions(a);
   if (!briefText || briefText.trim().length < 10) {
     return res.status(400).json({ error: "Add your assignment brief first, so the outline can be about your assignment.", code: "missing_brief" });
   }

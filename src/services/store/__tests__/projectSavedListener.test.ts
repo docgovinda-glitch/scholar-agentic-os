@@ -12,7 +12,9 @@ describe("onProjectSaved", () => {
     const store = getProjectStore();
     const record = await store.create("OT-01", "owner-1");
     const saved = await store.save({ ...record, answers: { assignment_title: "T" } });
-    expect(saved.answers.assignment_title).toBe("T");
+    // Coursework settings keep one stored name: the old alias lands on "title".
+    expect(saved.answers.title).toBe("T");
+    expect(saved.answers.assignment_title).toBeUndefined();
     expect(seen).toHaveBeenCalledWith(expect.objectContaining({ projectId: record.projectId }));
   });
 });

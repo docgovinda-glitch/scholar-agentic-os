@@ -27,6 +27,8 @@ export function isBlankProject(p: ProjectTitleItem | null | undefined): boolean 
 
   const answers = (p.answers || {}) as Record<string, unknown>;
   const briefText =
+    // Coursework stores its brief under assignment_brief (answerKeys.ts); other workspaces use the rest.
+    (typeof answers.assignment_brief === "string" ? answers.assignment_brief : "") ||
     (typeof answers.instructions === "string" ? answers.instructions : "") ||
     (typeof answers.assignment_question === "string" ? answers.assignment_question : "") ||
     (typeof answers.assignment_brief_text === "string" ? answers.assignment_brief_text : "") ||
@@ -39,7 +41,7 @@ export function isBlankProject(p: ProjectTitleItem | null | undefined): boolean 
   const cleanBrief = briefText.trim().replace(/^provisional$/i, "");
   if (cleanBrief.length > 0) return false;
 
-  const wordCount = Number(answers.word_count || answers.targetWordCount || answers.target_word_count || 0);
+  const wordCount = Number(answers.word_limit || answers.word_count || answers.targetWordCount || answers.target_word_count || 0);
   if (wordCount > 0 && wordCount !== 2000) return false;
 
   if (p.document && Object.keys(p.document).length > 0) return false;
@@ -215,6 +217,8 @@ export function matchesProjectSearch(
       ? answers.topic
       : typeof answers.research_topic === "string"
       ? answers.research_topic
+      : typeof answers.assignment_brief === "string"
+      ? answers.assignment_brief
       : ""
   ).toLowerCase();
   if (topic.includes(q)) return true;

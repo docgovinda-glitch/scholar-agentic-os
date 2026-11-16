@@ -151,7 +151,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
   );
 
   const [localTone, setLocalTone] = useState<string>(() => {
-    const raw = project?.answers?.["writing_tone"] || project?.answers?.["writingTone"] || project?.answers?.["academicTone"] || writingTone;
+    const raw = project?.answers?.["writing_tone"] || project?.answers?.["academicTone"] || writingTone;
     const curType = assignmentType || (project?.answers?.["assignment_type"] as AssignmentType) || "essay";
     if (typeof raw === "string" && raw && raw !== "analytical") return raw;
     if (raw && typeof raw === "object") {
@@ -229,7 +229,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
   // Auto-Update Writing Tone on initial load if essay with default analytical tone
   useEffect(() => {
     const curType = assignmentType || localType || "essay";
-    const rawTone = project?.answers?.["writing_tone"] || project?.answers?.["writingTone"] || writingTone || localTone;
+    const rawTone = project?.answers?.["writing_tone"] || writingTone || localTone;
     const toneStr = (typeof rawTone === "string" ? rawTone : (rawTone as any)?.preset || (rawTone as any)?.id || "").toLowerCase();
     if (curType === "essay" && (toneStr === "analytical" || !toneStr || toneStr === "default")) {
       const targetTone = resolveMappedTone("essay");
@@ -262,7 +262,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
       setLocalWordCount((prev) => (prev !== sanitized ? sanitized : prev));
     }
     if (citationStyle) setLocalCitation((prev) => (prev !== citationStyle ? citationStyle : prev));
-    const resolvedTone = project?.answers?.["writing_tone"] || project?.answers?.["writingTone"] || writingTone;
+    const resolvedTone = project?.answers?.["writing_tone"] || writingTone;
     const toneStr = typeof resolvedTone === "string" ? resolvedTone : (resolvedTone as any)?.preset || (resolvedTone as any)?.id;
     if (toneStr && typeof toneStr === "string") {
       setLocalTone((prev) => (prev !== toneStr ? toneStr : prev));
@@ -458,7 +458,6 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
 
     const currentTitle =
       project?.answers?.["title"] ||
-      project?.answers?.["assignment_title"] ||
       project?.title ||
       "";
     const isDefaultOrUntitled =

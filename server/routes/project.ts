@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { canonicalizeAssignmentUpdate } from "../../src/domain/assignment/answerKeys.ts";
 import express from "express";
 import { requestCompleter } from "../src/ai/browserHandoff.ts";
 import { sendAiFailure } from "../src/ai/aiRouteErrors.ts";
@@ -469,7 +470,9 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     }
 
     const spec = catalog.getOrThrow(record.outputTypeId);
-    const nextAnswers = { ...record.answers, ...(answers as Record<string, any>) };
+    // Coursework settings have one stored name; an update naming an old alias lands on it.
+    const patch = record.outputTypeId === "OT-01" ? canonicalizeAssignmentUpdate(answers as Record<string, unknown>) : (answers as Record<string, unknown>);
+    const nextAnswers = { ...record.answers, ...(patch as Record<string, any>) };
     const criteria = computeG0ExitCriteria(spec, nextAnswers as any);
 
     try {

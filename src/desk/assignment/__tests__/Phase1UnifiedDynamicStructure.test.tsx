@@ -271,7 +271,7 @@ describe("Phase 1 — Unified Assignment Setup Box & Question-Specific Dynamic S
       expect(saveIntakeAnswers).toHaveBeenCalledWith(
         "proj-proceed-demo",
         expect.objectContaining({
-          assignment_question: expect.stringContaining("cell therapy"),
+          assignment_brief: expect.stringContaining("cell therapy"),
           assignment_structure: expect.objectContaining({
             isConfirmed: true,
             headings: expect.arrayContaining([
@@ -286,7 +286,7 @@ describe("Phase 1 — Unified Assignment Setup Box & Question-Specific Dynamic S
               }),
             ]),
           }),
-          sectionBudgets: expect.any(Array),
+          section_budgets: expect.any(Array),
           assignment_internal_sections: expect.any(Array),
         })
       );

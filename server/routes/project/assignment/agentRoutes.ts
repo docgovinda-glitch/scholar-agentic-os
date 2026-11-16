@@ -36,7 +36,7 @@ type Req = express.Request<{ id: string }>;
 const now = () => new Date().toISOString();
 
 function briefOf(a: Record<string, unknown>): string {
-  return cleanAnswerString(a["assignment_brief_text"]) || cleanAnswerString(a["assignment_question"]) || extractStandardizedInstructions(a);
+  return cleanAnswerString(a["assignment_brief"]) || extractStandardizedInstructions(a);
 }
 
 function materialsOf(a: Record<string, unknown>): Array<{ name: string; text: string }> {
@@ -64,8 +64,8 @@ router.post("/agent/extract", async (req: Req, res: express.Response) => {
     project.answers.assignment_extraction = JSON.stringify({ ...extraction, at: now() });
     if (clarifications) project.answers.assignment_clarifications = clarifications;
     // Fill settings the student has not set, from what the brief states.
-    if (extraction.constraints.wordCount && !Number(a["targetWordCount"] || a["word_count"])) project.answers.targetWordCount = String(extraction.constraints.wordCount);
-    if (extraction.constraints.citationStyle && !a["citation_style"] && !a["citationStyle"]) project.answers.citation_style = extraction.constraints.citationStyle;
+    if (extraction.constraints.wordCount && !Number(a["word_limit"])) project.answers.word_limit = String(extraction.constraints.wordCount);
+    if (extraction.constraints.citationStyle && !a["citation_style"]) project.answers.citation_style = extraction.constraints.citationStyle;
     // Later steps were based on an older reading of the brief.
     delete project.answers.assignment_understanding;
     await getProjectStore().save(project);
@@ -86,9 +86,9 @@ router.post("/agent/understand", async (req: Req, res: express.Response) => {
       task: "reasoning",
       systemPrompt: scholarBrain.courseworkPrompts.understandPrompt(),
       userPrompt: scholarBrain.courseworkPrompts.understandUserPrompt(extraction, briefOf(a), {
-        level: String(a["academicLevel"] || a["academic_level"] || ""),
-        citationStyle: String(a["citationStyle"] || a["citation_style"] || ""),
-        words: Number(a["targetWordCount"] || a["word_count"]) || undefined,
+        level: String(a["academic_level"] || ""),
+        citationStyle: String(a["citation_style"] || ""),
+        words: Number(a["word_limit"]) || undefined,
       }),
     });
     const understanding = parseUnderstanding(text ?? "");
@@ -145,7 +145,7 @@ router.post("/agent/sources", async (req: Req, res: express.Response) => {
 
   const extraction = safeParseObject(a["assignment_extraction"]) as Extraction | null;
   const understanding = safeParseObject(a["assignment_understanding"]) as Understanding | null;
-  const structure = safeParseObject(a["assignment_structure"] || a["structure"]) as { headings?: Array<{ subheadings?: Array<{ id: string; numberStr?: string; title: string }> }> } | null;
+  const structure = safeParseObject(a["assignment_structure"]) as { headings?: Array<{ subheadings?: Array<{ id: string; numberStr?: string; title: string }> }> } | null;
   const sections = (structure?.headings ?? []).flatMap((h) => h.subheadings ?? []).map((s) => ({ id: s.id, title: `${s.numberStr ?? ""} ${s.title}`.trim() }));
   const task = understanding?.produce || extraction?.task || briefOf(a).slice(0, 600);
   try {
@@ -182,7 +182,7 @@ router.post("/agent/evidence", async (req: Req, res: express.Response) => {
   const body = EvidenceBody.safeParse(req.body ?? {});
   if (!body.success) return res.status(400).json({ error: "Send the document's title and up to four passages.", code: "invalid_body" });
   const a = project.answers;
-  const question = cleanAnswerString(a["assignment_brief_text"]) || cleanAnswerString(a["assignment_question"]) || extractStandardizedInstructions(a);
+  const question = cleanAnswerString(a["assignment_brief"]) || extractStandardizedInstructions(a);
   if (!question || question.trim().length < 10) {
     return res.status(400).json({ error: "Add your assignment brief first.", code: "missing_brief" });
   }
@@ -218,9 +218,9 @@ router.post("/agent/review", async (req: Req, res: express.Response) => {
     draft,
     requirements: (extraction?.requirements ?? []).map((r) => ({ text: r.text, kind: r.kind })),
     criteria: (extraction?.criteria ?? []).map((c) => ({ criterion: c.criterion, weight: c.weight })),
-    question: extraction?.questions?.[0]?.text || cleanAnswerString(a["assignment_question"]),
-    citationStyle: String(a["citationStyle"] || a["citation_style"] || ""),
-    targetWords: Number(a["targetWordCount"] || a["word_count"]) || undefined,
+    question: extraction?.questions?.[0]?.text || cleanAnswerString(a["assignment_brief"]),
+    citationStyle: String(a["citation_style"] || ""),
+    targetWords: Number(a["word_limit"]) || undefined,
   };
   try {
     const text = await routedCompletion(req, { task: "long-context", systemPrompt: scholarBrain.courseworkPrompts.reviewPrompt(), userPrompt: scholarBrain.courseworkPrompts.reviewUserPrompt(input) });

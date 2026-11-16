@@ -6,6 +6,7 @@
  */
 
 import fs from "fs";
+import { normalizeAssignmentAnswers } from "../../domain/assignment/answerKeys";
 import path from "path";
 import * as inMemory from "../../app/conductor/projectStore";
 import { createPgProjectStore, createPool } from "./pgProjectStore";
@@ -115,11 +116,24 @@ export function onProjectSaved(listener: SavedListener): () => void {
   return () => savedListeners.delete(listener);
 }
 
+/** Coursework records keep one key per setting (see answerKeys.ts), on every backend. */
+function normalizeRecord<T extends ProjectRecord | undefined>(record: T): T {
+  if (!record || record.outputTypeId !== "OT-01") return record;
+  record.answers = normalizeAssignmentAnswers(record.answers as Record<string, unknown>) as ProjectRecord["answers"];
+  return record;
+}
+
 function withSaveListeners(inner: ProjectStore): ProjectStore {
   return {
     ...inner,
+    async get(projectId) {
+      return normalizeRecord(await inner.get(projectId));
+    },
+    async listByOwner(ownerId) {
+      return (await inner.listByOwner(ownerId)).map((r) => normalizeRecord(r));
+    },
     async save(record) {
-      const saved = await inner.save(record);
+      const saved = await inner.save(normalizeRecord(record));
       for (const listener of savedListeners) {
         try {
           listener(saved);

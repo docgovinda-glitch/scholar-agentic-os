@@ -83,31 +83,26 @@ router.post("/copilot-chat", async (req: express.Request<{ id: string }>, res) =
   // Phase 1 Grounding: Brief requirements & rubric
   const question =
     projectState?.brief?.assignmentQuestion ||
-    answers["assignment_question"] ||
-    answers["research_topic"] ||
-    answers["instructions"] ||
+    answers["assignment_brief"] ||
     (project as any).title ||
     "Academic Assignment";
 
   const targetWordCount =
-    Number(projectState?.brief?.targetWordCount || answers["target_word_count"] || answers["word_count"] || 2000);
+    Number(projectState?.brief?.targetWordCount || answers["word_limit"] || 2000);
 
   const academicLevel =
     projectState?.brief?.academicLevel ||
     answers["academic_level"] ||
-    answers["academicLevel"] ||
     "undergraduate";
 
   const citationStyle =
     projectState?.brief?.citationStyle ||
     answers["citation_style"] ||
-    answers["citationStyle"] ||
     "apa7";
 
   const assignmentType =
     projectState?.brief?.assignmentType ||
     answers["assignment_type"] ||
-    answers["assignmentType"] ||
     "critical_essay";
 
   const analysis =
@@ -149,7 +144,7 @@ router.post("/copilot-chat", async (req: express.Request<{ id: string }>, res) =
   // Phase 3 Grounding: Active PEEL section drafts & word budget progress
   const outline: any[] =
     projectState?.outline ||
-    safeParseObject(answers["assignment_outline"]) ||
+    safeParseObject(answers["assignment_internal_sections"]) ||
     safeParseObject(answers["sections"]) ||
     [];
 

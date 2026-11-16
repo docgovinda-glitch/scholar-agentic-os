@@ -64,7 +64,6 @@ describe("Semantic Academic Auto-Naming", () => {
 
       expect(result).toBe("Quantum Computing Cryptographic Architectures");
       expect(mockProject.answers.title).toBe("Quantum Computing Cryptographic Architectures");
-      expect(mockProject.answers.assignment_title).toBe("Quantum Computing Cryptographic Architectures");
       expect(mockProject.title).toBe("Quantum Computing Cryptographic Architectures");
     });
 

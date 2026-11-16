@@ -119,7 +119,7 @@ export function useCourseworkAgent(d: Deps): CourseworkAgent {
         const a0 = await dd.reload();
         const u = safeParseAnswerField<Understanding | null>(a0["assignment_understanding"], null);
         const existing = safeParseAnswerField<DiscoveredSource[]>(a0["assignment_sources"], []) ?? [];
-        const approved = safeParseAnswerField<string[]>(a0["approved_source_ids"] ?? a0["approvedSourceIds"], []) ?? [];
+        const approved = safeParseAnswerField<string[]>(a0["approved_source_ids"] ?? a0["approved_source_ids"], []) ?? [];
         const queries = u?.searchQueries?.length ? u.searchQueries.slice(0, 3) : [dd.question];
         let found: DiscoveredSource[] = [];
         for (const q of queries) {
@@ -133,7 +133,7 @@ export function useCourseworkAgent(d: Deps): CourseworkAgent {
         const analyses = data.analyses as SourceAnalysis[];
         // The server saved the analysis; reload, then save the sources and links on top.
         const a1 = await dd.reload();
-        const structure = safeParseAnswerField<AssignmentStructure | null>(a1["assignment_structure"] ?? a1["structure"], null) ?? dd.structure;
+        const structure = safeParseAnswerField<AssignmentStructure | null>(a1["assignment_structure"] ?? a1["assignment_structure"], null) ?? dd.structure;
         const sections = safeParseAnswerField<AssignmentDraftingSection[]>(a1["assignment_internal_sections"], []) ?? [];
         const titles: Record<string, string> = {};
         for (const h of structure.headings ?? []) for (const s of h.subheadings ?? []) titles[s.id] = `${s.numberStr} ${s.title}`;
