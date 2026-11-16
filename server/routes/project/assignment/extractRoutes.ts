@@ -23,10 +23,9 @@ import {
 cleanAnswerString,
 extractStandardizedInstructions
 } from "../../../../src/desk/assignment/types.ts";
-import {
-generateDynamicAssignmentStructure,
-extractBriefInquiriesAndConcepts,assignmentStructureToOutlineTree
-} from "../../../../src/desk/assignment/services/outlineService.ts";
+import { generateDynamicAssignmentStructure } from "../../../../src/desk/assignment/services/dynamicStructure.ts";
+import { extractBriefInquiriesAndConcepts } from "../../../../src/desk/assignment/services/briefSemantics.ts";
+import { assignmentStructureToOutlineTree } from "../../../../src/desk/assignment/services/outlineTree.ts";
 import { sanitizeBrief } from "../../../../src/features/understand/services/briefSanitizer.ts";
 import { classifyScopeBoundaries } from "../../../../src/features/understand/services/scopeClassifier.ts";
 import {

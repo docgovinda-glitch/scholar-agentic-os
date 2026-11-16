@@ -26,7 +26,7 @@ import {
   X,
 } from "lucide-react";
 import type { SectionBreakdown } from "../../../components/forms/TargetWordCountInput";
-import { generateDynamicAssignmentStructure } from "../services/outlineService";
+import { generateDynamicAssignmentStructure } from "../services/dynamicStructure";
 import { stripCircularReferences, safeFormatLabel } from "../../../utils/briefExtractor";
 import { validateBriefFile, BRIEF_MAX_UPLOAD_MB } from "../../../services/documentParser";
 import BriefScopePanel from "../components/BriefScopePanel";

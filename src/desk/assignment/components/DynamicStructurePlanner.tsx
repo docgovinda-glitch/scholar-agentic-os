@@ -33,29 +33,27 @@ import type {
   ResearchSourceReference,
   QuestionMappingMatrixItem,
 } from "../types";
-import {
-  autoBalanceStructure,
-  distributeRemainingWords,
-  adjustSubheadingWordCount,
-  adjustHeadingWordCount,
-  balanceAroundHeading,
-  addMainHeading,
-  addSubheading,
-  removeSubheading,
-  removeMainHeading,
-  reorderHeadings,
-  reorderSubheadings,
-  updateSubheadingNotes,
-  updateMainHeadingTitle,
-  updateSubheadingTitle,
-  generateDynamicAssignmentStructure,
-  updateThesisStatement,
-  addKeyPoint,
-  removeKeyPoint,
-  updateKeyPoint,
-  addTargetFramework,
-  removeTargetFramework,
-} from "../services/outlineService";
+import { generateDynamicAssignmentStructure } from "../services/dynamicStructure";
+import { updateThesisStatement } from "../services/outlineEditing";
+import { removeTargetFramework } from "../services/outlineEditing";
+import { addTargetFramework } from "../services/outlineEditing";
+import { removeKeyPoint } from "../services/outlineEditing";
+import { updateKeyPoint } from "../services/outlineEditing";
+import { addKeyPoint } from "../services/outlineEditing";
+import { balanceAroundHeading } from "../services/outlineEditing";
+import { autoBalanceStructure } from "../services/outlineEditing";
+import { distributeRemainingWords } from "../services/outlineEditing";
+import { reorderSubheadings } from "../services/outlineEditing";
+import { reorderHeadings } from "../services/outlineEditing";
+import { adjustSubheadingWordCount } from "../services/outlineEditing";
+import { updateSubheadingNotes } from "../services/outlineEditing";
+import { updateSubheadingTitle } from "../services/outlineEditing";
+import { removeSubheading } from "../services/outlineEditing";
+import { addSubheading } from "../services/outlineEditing";
+import { adjustHeadingWordCount } from "../services/outlineEditing";
+import { updateMainHeadingTitle } from "../services/outlineEditing";
+import { removeMainHeading } from "../services/outlineEditing";
+import { addMainHeading } from "../services/outlineEditing";
 import { safeFormatLabel } from "../../../utils/briefExtractor";
 
 function SortableHeadingWrapper({ id, children }: { id: string; children: React.ReactNode }) {

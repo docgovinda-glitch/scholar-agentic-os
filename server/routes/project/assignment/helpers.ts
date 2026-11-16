@@ -7,9 +7,7 @@ import { scholarBrain } from "../../../src/services/scholarBrain.ts";
 import {
 cleanAnswerString
 } from "../../../../src/desk/assignment/types.ts";
-import {
-generateDynamicAssignmentStructure
-} from "../../../../src/desk/assignment/services/outlineService.ts";
+import { generateDynamicAssignmentStructure } from "../../../../src/desk/assignment/services/dynamicStructure.ts";
 import {
 isClassroomLogisticsLine,
 isTutorialOrShortQABrief

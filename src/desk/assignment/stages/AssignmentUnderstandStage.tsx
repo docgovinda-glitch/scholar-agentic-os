@@ -50,11 +50,9 @@ import {
 import type { SectionBreakdown } from "../../../components/forms/TargetWordCountInput";
 import DynamicStructurePlanner from "../components/DynamicStructurePlanner";
 import { TONE_SUGGESTION_CHIPS } from "../components/WritingStyleSelector";
-import {
-  generateDynamicAssignmentStructure,
-  autoBalanceStructure,
-  extractBriefInquiriesAndConcepts,
-} from "../services/outlineService";
+import { generateDynamicAssignmentStructure } from "../services/dynamicStructure";
+import { autoBalanceStructure } from "../services/outlineEditing";
+import { extractBriefInquiriesAndConcepts } from "../services/briefSemantics";
 import { isDeepEqual, safeFormatLabel, allocateWordsByMarks } from "../../../utils/briefExtractor";
 import { validateBriefFile } from "../../../services/documentParser";
 import { classifyScopeBoundaries, stripLineTags } from "../../../features/understand/services/scopeClassifier";

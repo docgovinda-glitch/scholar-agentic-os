@@ -44,7 +44,7 @@ AssignmentDraftingSection,
 structureToInternalSections,
 structureToSectionBudgets
 } from "../types";
-import { generateDynamicAssignmentStructure } from "../services/outlineService";
+import { generateDynamicAssignmentStructure } from "../services/dynamicStructure";
 import {
 decomposeWordBudget,
 tuneSectionsToQuestion,
