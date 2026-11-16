@@ -52,14 +52,15 @@ const router = express.Router({ mergeParams: true });
 router.post(
   "/parse-brief",
   async (req: express.Request<{ id: string }>, res: express.Response, next: express.NextFunction) => {
+    // Ownership is checked before the upload is read; the handler reuses this project.
     const project = await getProjectSafe(req, res);
     if (!project) return;
+    res.locals.project = project;
     next();
   },
   upload.single("file"),
   async (req: express.Request<{ id: string }>, res: express.Response) => {
-  const project = await getProjectSafe(req, res);
-  if (!project) return;
+  const project = res.locals.project as NonNullable<Awaited<ReturnType<typeof getProjectSafe>>>;
 
   const file = req.file;
   if (!file) {

@@ -217,6 +217,8 @@ export function AssignmentProvider({
   const [isLoading, setIsLoading] = useState(true);
 
   const justPersistedIdRef = useRef<string | null>(null);
+  const draftingInitTriedRef = useRef(false);
+  const submissionAuditTriedRef = useRef(false);
   useEffect(() => {
     setActiveProjectId(projectId);
   }, [projectId]);
@@ -371,7 +373,8 @@ export function AssignmentProvider({
               const keys = Array.from(dirtyKeysRef.current);
               dirtyKeysRef.current.clear();
               const latest = (projectRef.current?.answers ?? safeAnswers) as Record<string, unknown>;
-              const patch = Object.fromEntries(keys.filter((k) => latest[k] !== undefined).map((k) => [k, latest[k]]));
+              // A key cleared in the editor (undefined) is sent as null so the clear is saved too.
+              const patch = Object.fromEntries(keys.map((k) => [k, latest[k] === undefined ? null : latest[k]]));
               if (Object.keys(patch).length === 0) continue;
               try {
                 await saveIntakeAnswers(activeProjectId, patch);
@@ -1056,7 +1059,13 @@ export function AssignmentProvider({
 
   // Phase 3 auto-initialization: if entering Phase 3 with empty sections, decompose word budget
   useEffect(() => {
-    if (currentPhase === "drafting" && !isLoading && internalSections.length === 0 && targetWordCount > 0) {
+    if (currentPhase !== "drafting") {
+      draftingInitTriedRef.current = false;
+      return;
+    }
+    // Once per visit: an empty plan must not retrigger itself through the save it causes.
+    if (!isLoading && internalSections.length === 0 && targetWordCount > 0 && !draftingInitTriedRef.current) {
+      draftingInitTriedRef.current = true;
       initializeDraftingPlan();
     }
   }, [currentPhase, isLoading, internalSections.length, targetWordCount, initializeDraftingPlan]);
@@ -1074,6 +1083,7 @@ export function AssignmentProvider({
     structure,
     analysis,
     sources,
+    approvedSourceIds,
     currentWordCount,
     submissionReport,
     currentPhase,
@@ -1173,8 +1183,14 @@ export function AssignmentProvider({
   // Phase 4 auto-initialization: entering Phase 4 with a draft but no
   // submissionReport runs the audit. An empty paper is never graded.
   useEffect(() => {
-    if (currentPhase === "submission" && !isLoading && currentWordCount > 0 && !submissionReport && !isAuditingSubmission) {
-      runSubmissionAudit();
+    if (currentPhase !== "submission") {
+      submissionAuditTriedRef.current = false;
+      return;
+    }
+    // Once per visit: a failing audit must not restart itself in a loop.
+    if (!isLoading && currentWordCount > 0 && !submissionReport && !isAuditingSubmission && !submissionAuditTriedRef.current) {
+      submissionAuditTriedRef.current = true;
+      runSubmissionAudit().catch((e) => console.error("Submission audit failed:", e));
     }
   }, [currentPhase, isLoading, currentWordCount, submissionReport, isAuditingSubmission, runSubmissionAudit]);
 
