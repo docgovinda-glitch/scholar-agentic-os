@@ -1,3 +1,4 @@
+import { countProseWords } from "../../../src/shared/proseBlocks.ts";
 /**
  * Automated Sub-Section Word Budget Allocator
  *
@@ -248,8 +249,7 @@ export const MAX_SUBSECTION_WORDS = 500;
  * Counts exact words in a text block, stripping markdown headers and code blocks.
  */
 export function countExactWords(text: string): number {
-  if (!text || text.trim().length === 0) return 0;
-  return text.trim().split(/\s+/).filter(Boolean).length;
+  return countProseWords(text || "");
 }
 
 /**
