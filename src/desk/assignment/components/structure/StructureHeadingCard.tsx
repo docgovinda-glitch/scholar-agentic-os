@@ -7,7 +7,10 @@ Edit2,
 BookOpen,BookmarkCheck
 } from "lucide-react";
 import type {
-AssignmentStructure
+AssignmentStructure,
+AssignmentMainHeading,
+AssignmentSubheading,
+ResearchSourceReference
 } from "../../types";
 import { removeKeyPoint } from "../../services/outlineEditing";
 import { updateKeyPoint } from "../../services/outlineEditing";
@@ -30,7 +33,7 @@ export interface StructureHeadingCardProps {
   handleExactWords: (subheadingId: string, words: number) => void;
   handleMoveHeading: (fromIdx: number, toIdx: number) => void;
   handleMoveSubheading: (headingId: string, fromIdx: number, toIdx: number) => void;
-  heading: import("/home/user/scholar-agentic-os/src/desk/assignment/types").AssignmentMainHeading;
+  heading: AssignmentMainHeading;
   headingPercentage: number;
   notifyChange: (updated: AssignmentStructure) => void;
   structure: AssignmentStructure;
@@ -242,7 +245,7 @@ export function StructureHeadingCard({ expandedBlueprintHeadings, expandedBluepr
                           <span>Supporting Scholarly Sources ({heading.scholarlySources.length})</span>
                         </span>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {heading.scholarlySources.map((src, sIdx) => (
+                          {heading.scholarlySources.map((src: ResearchSourceReference, sIdx: number) => (
                             <div
                               key={sIdx}
                               className="p-2 rounded-lg bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-2xs space-y-1"
@@ -293,7 +296,7 @@ export function StructureHeadingCard({ expandedBlueprintHeadings, expandedBluepr
                       </button>
                     </div>
                   ) : (
-                    heading.subheadings.map((sub, sIdx) => {
+                    heading.subheadings.map((sub: AssignmentSubheading, sIdx: number) => {
                       const subPercent =
                         targetWordCount > 0
                           ? Math.round((sub.targetWordCount / targetWordCount) * 100)
@@ -450,7 +453,7 @@ export function StructureHeadingCard({ expandedBlueprintHeadings, expandedBluepr
 
                           {sub.keyPoints && sub.keyPoints.length > 0 && (
                             <div className="space-y-1 pl-2 border-l-2 border-blue-500/20">
-                              {sub.keyPoints.map((point, pIdx) => (
+                              {sub.keyPoints.map((point: string, pIdx: number) => (
                                 <div key={pIdx} className="flex items-center gap-2 group/h3">
                                   <span className="text-xs text-[color:var(--text-muted)] font-mono shrink-0">
                                     {sub.numberStr}.{pIdx + 1}
@@ -556,7 +559,7 @@ export function StructureHeadingCard({ expandedBlueprintHeadings, expandedBluepr
                                   Supporting Scholarly Sources:
                                 </span>
                                 <div className="space-y-1">
-                                  {sub.scholarlySources.map((src, sIdx) => (
+                                  {sub.scholarlySources.map((src: ResearchSourceReference, sIdx: number) => (
                                     <div
                                       key={sIdx}
                                       className="p-1.5 rounded bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] text-xs flex items-center justify-between gap-2"
