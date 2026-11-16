@@ -7,7 +7,6 @@ import {
   ASSIGNMENT_TYPE_LABELS,
   COMMON_COMMAND_VERBS,
   normalizeProjectAnswers,
-  getSectionPromptGuidelines,
   type AssignmentStage,
   type AssignmentPhaseId,
   type AssignmentProjectState,
@@ -146,48 +145,6 @@ describe("Assignment Stages & Domain Taxonomy", () => {
     });
   });
 
-  describe("getSectionPromptGuidelines", () => {
-    it("formats section allocation and user instructions when custom guidelines exist", () => {
-      const answers = {
-        sections: {
-          isCustomized: true,
-          intro: {
-            targetWords: 250,
-            guidelines: "Highlight clean energy transition barriers and thesis on regulatory policy.",
-          },
-        },
-      };
-
-      const result = getSectionPromptGuidelines("intro", answers);
-      expect(result).toBe(
-        "SECTION ALLOCATION: ~250 words\nUSER INSTRUCTIONS / MANDATORY CONTENT: Highlight clean energy transition barriers and thesis on regulatory policy."
-      );
-    });
-
-    it("falls back to standard academic rigor instruction when guidelines are empty", () => {
-      const answers = {
-        sections: {
-          body: {
-            targetWords: 1450,
-            guidelines: "   ",
-          },
-        },
-      };
-
-      const result = getSectionPromptGuidelines("body", answers);
-      expect(result).toBe(
-        "SECTION ALLOCATION: ~1450 words\nUSER INSTRUCTIONS / MANDATORY CONTENT: Standard academic rigor and appropriate depth for this section."
-      );
-    });
-
-    it("falls back to 500 words when targetWords is omitted", () => {
-      const answers = {};
-      const result = getSectionPromptGuidelines("conclusion", answers);
-      expect(result).toBe(
-        "SECTION ALLOCATION: ~500 words\nUSER INSTRUCTIONS / MANDATORY CONTENT: Standard academic rigor and appropriate depth for this section."
-      );
-    });
-  });
 
   describe("Approved 5-Phase Architecture (extract -> understand -> sources -> drafting -> submission)", () => {
     it("defines exactly 5 canonical phases with metadata and Lucide icon keys", () => {

@@ -1,3 +1,5 @@
+import { safeParseAnswerField } from "../../../shared/projectStateSchema";
+import { tonePresetOf } from "../types";
 import { UnderstandAgentPanel } from "../components/AgentPanels";
 import { SubQuestionsCard,GradingCriteriaCard } from "../components/BriefBreakdownCards";
 import { buildBriefSummary,parseBriefQuestions } from "../../../utils/briefQuestions";
@@ -117,8 +119,7 @@ export default function AssignmentUnderstandStage({
     const raw = project?.answers?.["writing_tone"] || writingTone;
     if (typeof raw === "string" && raw && raw !== "analytical") return raw;
     if (raw && typeof raw === "object") {
-      const obj = raw as any;
-      const t = obj.preset || obj.id;
+      const t = tonePresetOf(raw);
       if (t && t !== "analytical") return t;
     }
     if (writingStyle?.preset && writingStyle.preset !== "analytical") return writingStyle.preset;
@@ -131,7 +132,7 @@ export default function AssignmentUnderstandStage({
   useEffect(() => {
     const curType = assignmentType || localType || "essay";
     const rawTone = project?.answers?.["writing_tone"] || writingTone || localTone;
-    const toneStr = (typeof rawTone === "string" ? rawTone : (rawTone as any)?.preset || (rawTone as any)?.id || "").toLowerCase();
+    const toneStr = (tonePresetOf(rawTone) || "").toLowerCase();
     if (curType === "essay" && (toneStr === "analytical" || !toneStr || toneStr === "default")) {
       const targetTone = "formal_academic";
       setLocalTone(targetTone);
@@ -147,7 +148,7 @@ export default function AssignmentUnderstandStage({
   const initialStepSetRef = useRef(false);
   const userOverrideStepRef = useRef(false);
   const [understandStep, setUnderstandStep] = useState<"brief_input" | "outline_review">(() => {
-    const rawStruct: any = project?.answers?.["assignment_structure"];
+    const rawStruct: unknown = project?.answers?.["assignment_structure"];
     if (rawStruct) {
       initialStepSetRef.current = true;
       return "outline_review";
@@ -159,7 +160,7 @@ export default function AssignmentUnderstandStage({
     if (isLoading || initialStepSetRef.current || userOverrideStepRef.current) return;
     if (project) {
       initialStepSetRef.current = true;
-      const rawStruct: any = project?.answers?.["assignment_structure"];
+      const rawStruct: unknown = project?.answers?.["assignment_structure"];
       if (rawStruct) {
         setUnderstandStep("outline_review");
       }
@@ -187,7 +188,7 @@ export default function AssignmentUnderstandStage({
     }
     if (citationStyle) setLocalCitation((prev) => (prev !== citationStyle ? citationStyle : prev));
     const resolvedTone = project?.answers?.["writing_tone"] || writingTone;
-    const toneStr = typeof resolvedTone === "string" ? resolvedTone : (resolvedTone as any)?.preset || (resolvedTone as any)?.id;
+    const toneStr = tonePresetOf(resolvedTone);
     if (toneStr && typeof toneStr === "string") {
       setLocalTone((prev) => (prev !== toneStr ? toneStr : prev));
     }
@@ -321,14 +322,15 @@ export default function AssignmentUnderstandStage({
       setLocalStyle((prev) => (isDeepEqual(prev, writingStyle) ? prev : writingStyle));
     }
     const resolvedTone = project?.answers?.["writing_tone"] || writingTone;
-    const toneStr = typeof resolvedTone === "string" ? resolvedTone : (resolvedTone as any)?.preset || (resolvedTone as any)?.id;
+    const toneStr = tonePresetOf(resolvedTone);
     if (toneStr && typeof toneStr === "string") {
       setLocalTone((prev) => (prev !== toneStr ? toneStr : prev));
     }
     if (structure && structure.headings && structure.headings.length > 0) {
       setLocalStructure(autoBalanceStructure(structure, targetWordCount > 0 ? targetWordCount : 2000));
-      const rawStruct: any = project?.answers?.["assignment_structure"];
-      if (rawStruct && rawStruct.isConfirmed && !userOverrideStepRef.current) {
+      // The saved structure may be JSON text or an object (older saves).
+      const savedStruct = safeParseAnswerField<{ isConfirmed?: boolean } | null>(project?.answers?.["assignment_structure"], null);
+      if (savedStruct?.isConfirmed && !userOverrideStepRef.current) {
         setUnderstandStep("outline_review");
       }
     }
@@ -400,7 +402,7 @@ export default function AssignmentUnderstandStage({
       const internalSecs = structureToInternalSections(localStructure);
       const budgets = structureToSectionBudgets(localStructure);
 
-      const updates: Record<string, any> = {
+      const updates: Record<string, unknown> = {
         rawPrompt: trimmed,
         raw_prompt: trimmed,
         instructions: trimmed,
@@ -469,7 +471,7 @@ export default function AssignmentUnderstandStage({
     const budgets = structureToSectionBudgets(updated);
     const internalSecs = structureToInternalSections(updated);
 
-    const updates: Record<string, any> = {
+    const updates: Record<string, unknown> = {
       targetWordCount: validCount,
       target_word_count: validCount,
       word_count: validCount,
@@ -527,15 +529,8 @@ export default function AssignmentUnderstandStage({
     if (setWritingStyle) {
       setWritingStyle(updatedStyle);
     }
-    if (setWritingTone) {
-      setWritingTone(newTone as any);
-    }
-    saveAnswers({
-      writing_tone: newTone,
-      writingTone: newTone,
-      writingStyle: updatedStyle,
-      writing_style: updatedStyle,
-    }).catch(console.warn);
+    // One save holds both (the tone as a string, the style as its object).
+    saveAnswers({ writing_tone: newTone, writing_style: updatedStyle }).catch(console.warn);
   };
 
   const handleLevelChange = (lvl: AcademicLevel) => {
@@ -789,7 +784,7 @@ export default function AssignmentUnderstandStage({
     const budget = computeWordBudgetFromSections(localWordCount, budgets);
     const legacyBreakdown = computeSectionBreakdown(localWordCount, budgets);
 
-    const updates: Record<string, any> = {
+    const updates: Record<string, unknown> = {
       instructions: localQuestion,
       research_topic: localQuestion,
       assignment_question: localQuestion,

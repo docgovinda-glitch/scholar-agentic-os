@@ -74,7 +74,7 @@ export const OutlineBody = z.object({
 }).passthrough();
 
 /** Parse a body or answer 400 with what was wrong (field names only). */
-export function parseBody<T extends z.ZodTypeAny>(schema: T, req: express.Request<any>, res: express.Response): z.infer<T> | null {
+export function parseBody<T extends z.ZodTypeAny>(schema: T, req: express.Request<Record<string, string>>, res: express.Response): z.infer<T> | null {
   const parsed = schema.safeParse(req.body ?? {});
   if (parsed.success) return parsed.data;
   res.status(400).json({

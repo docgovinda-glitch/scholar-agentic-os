@@ -25,9 +25,9 @@ export function generateAdaptiveDefaultOutline(
         id: s.id,
         title: s.title,
         targetWordCount: s.targetWordCount,
-        currentWordCount: (s as any).currentWordCount || 0,
-        linkedEvidenceIds: (s as any).linkedEvidenceIds || [],
-        status: (s as any).status || "not_started",
+        currentWordCount: 0,
+        linkedEvidenceIds: [],
+        status: "not_started" as const, // freshly built from the structure
         guidance: s.guidance,
         keyPoints: s.keyPoints || [],
       }));

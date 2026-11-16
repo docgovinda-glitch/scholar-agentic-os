@@ -3,9 +3,36 @@
  * scholarBrain.courseworkPrompts and never write prompt text themselves.
  * Moved verbatim from the assignment routes; inputs are the brief and project data they used.
  */
-// Saved project answers are free-form JSON (no schema); the copilot context reads them as such.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Loose = any;
+/**
+ * What the Coursework copilot reads from the project. Saved answers are free-form
+ * JSON, so every field is optional; the prompt prints only what is there.
+ */
+export interface CopilotSource { id: string; isExcluded?: boolean; title?: string; authors?: string[]; year?: string | number; venue?: string; relevanceRationale?: string; abstract?: string; prescribedInBrief?: boolean; status?: string }
+export interface CopilotDeck { title?: string; fileName?: string; extractedConcepts?: string[] }
+export interface CopilotEvidence { claimText?: string; sourceTitle?: string; sourceId?: string; quoteText?: string }
+export interface CopilotSection { id?: string; title?: string; targetWordCount?: number; currentWordCount?: number; guidance?: string; linkedEvidenceIds?: string[]; draftContent?: string }
+export interface CopilotPeel { sectionId?: string; point?: string; evidence?: string; explanation?: string; link?: string }
+export interface CopilotAudit { overallScore?: number; bandLabel?: string; overallBand?: string; readinessPercentage?: number; priorityFixes?: string[]; unresolvedCitations?: CopilotCitation[] }
+export type CopilotCitation = string | { rawCitation?: string };
+export interface CopilotAnalysis { commandVerbs?: unknown; keyConcepts?: unknown; scopeBoundaries?: unknown; markingRubric?: unknown[] }
+export interface CopilotContext {
+  normalizedPhase: "understand" | "sources" | "drafting" | "submission";
+  question: string;
+  academicLevel: string;
+  targetWordCount: number;
+  citationStyle: string;
+  assignmentType: string;
+  analysis: CopilotAnalysis;
+  rubricCriteria: unknown[];
+  keptSources: CopilotSource[];
+  lectureSlides: CopilotDeck[];
+  evidenceItems: CopilotEvidence[];
+  currentTotalWords: number;
+  outline: CopilotSection[];
+  peelSections: CopilotPeel[];
+  rubricAudit: CopilotAudit | null;
+  unresolvedCitations: CopilotCitation[];
+}
 
 import { buildSectionContract, type ContractSource } from "../../utils/sectionContract.ts";
 import { paragraphRange } from "../../utils/sectionStream.ts";
@@ -103,7 +130,7 @@ export function streamSectionFrameworkGuidelines({ isShortQA, mappedSources, cit
  * The phase copilot's persona and scoped context (Advisor / Librarian / Scribe / Examiner).
  * Inputs are the project's saved answers as the route reads them (free-form JSON).
  */
-export function copilotPersona({ normalizedPhase, question, academicLevel, targetWordCount, citationStyle, assignmentType, analysis, rubricCriteria, keptSources, lectureSlides, evidenceItems, currentTotalWords, outline, peelSections, rubricAudit, unresolvedCitations }: { normalizedPhase: Loose; question: Loose; academicLevel: Loose; targetWordCount: Loose; citationStyle: Loose; assignmentType: Loose; analysis: Loose; rubricCriteria: Loose; keptSources: Loose; lectureSlides: Loose; evidenceItems: Loose; currentTotalWords: Loose; outline: Loose; peelSections: Loose; rubricAudit: Loose; unresolvedCitations: Loose }): { personaName: string; personaRole: string; scopedContextSummary: string; systemPrompt: string } {
+export function copilotPersona({ normalizedPhase, question, academicLevel, targetWordCount, citationStyle, assignmentType, analysis, rubricCriteria, keptSources, lectureSlides, evidenceItems, currentTotalWords, outline, peelSections, rubricAudit, unresolvedCitations }: CopilotContext): { personaName: string; personaRole: string; scopedContextSummary: string; systemPrompt: string } {
   let personaName = "Advisor";
   let personaRole = "Assignment Brief & Rubric Guidance";
   let scopedContextSummary = "";
@@ -134,11 +161,11 @@ Provide rigorous, structured, academic advice in concise markdown.`;
     scopedContextSummary = `
 PHASE 2 SOURCES & EVIDENCE STATE:
 - Approved / Kept Literature Sources (${keptSources.length} sources):
-${keptSources.map((s: any, i: number) => `  [${i + 1}] "${s.title}" (${s.authors?.join(", ") || "Unknown"}, ${s.year || "n.d."}) - ${s.venue || "Scholarly Source"}. Relevance: ${s.relevanceRationale || s.abstract?.slice(0, 150) || "Approved"}`).join("\n") || "  (No approved sources yet)"}
+${keptSources.map((s, i) => `  [${i + 1}] "${s.title}" (${s.authors?.join(", ") || "Unknown"}, ${s.year || "n.d."}) - ${s.venue || "Scholarly Source"}. Relevance: ${s.relevanceRationale || s.abstract?.slice(0, 150) || "Approved"}`).join("\n") || "  (No approved sources yet)"}
 - Uploaded Lecture Slides & Concepts (${lectureSlides.length} decks):
-${lectureSlides.map((d: any) => `  - Deck: "${d.title || d.fileName}". Key Concepts: ${(d.extractedConcepts || []).join(", ") || "Lecture notes"}`).join("\n") || "  (No lecture slides uploaded)"}
+${lectureSlides.map((d) => `  - Deck: "${d.title || d.fileName}". Key Concepts: ${(d.extractedConcepts || []).join(", ") || "Lecture notes"}`).join("\n") || "  (No lecture slides uploaded)"}
 - Verified Evidence Ledger (${evidenceItems.length} claims):
-${evidenceItems.map((e: any, i: number) => `  [E${i + 1}] Claim: "${e.claimText}". Source: "${e.sourceTitle || e.sourceId}". Quote: "${e.quoteText?.slice(0, 120)}..."`).join("\n") || "  (No evidence items added)"}
+${evidenceItems.map((e, i) => `  [E${i + 1}] Claim: "${e.claimText}". Source: "${e.sourceTitle || e.sourceId}". Quote: "${e.quoteText?.slice(0, 120)}..."`).join("\n") || "  (No evidence items added)"}
 `;
     systemPrompt = `You are the Librarian, the Scholarly Literature & Sourcing Copilot in Scholar OS.
 Your role is to help the student curate peer-reviewed academic literature, synthesize concepts from university lecture slides, and construct verified evidence cards with grounded citations.
@@ -151,8 +178,8 @@ Help evaluate empirical validity, identify theoretical debates, and bridge lectu
 PHASE 3 ACTIVE PEEL DRAFTING STATE:
 - Target Word Budget: ${targetWordCount.toLocaleString()} words (Current Drafted: ${currentTotalWords.toLocaleString()} words)
 - Sections & PEEL Decompositions (${outline.length} sections):
-${outline.map((sec: any, i: number) => {
-  const peel = peelSections.find((p: any) => p.sectionId === sec.id) || {};
+${outline.map((sec, i) => {
+  const peel = peelSections.find((p) => p.sectionId === sec.id) ?? ({} as CopilotPeel);
   return `  Section ${i + 1}: "${sec.title}" [Target: ${sec.targetWordCount || 0}w, Current: ${sec.currentWordCount || 0}w]
     - Point: "${peel.point || sec.guidance || "Core assertion"}"
     - Evidence: "${peel.evidence || (sec.linkedEvidenceIds?.length ? `${sec.linkedEvidenceIds.length} linked sources` : "Pending citation")}"
@@ -172,9 +199,9 @@ PHASE 4 SUBMISSION AUDIT & EXAMINER STATE:
 - Overall Score & Grade Band: ${rubricAudit?.overallScore ? `${rubricAudit.overallScore}% (${rubricAudit.bandLabel || rubricAudit.overallBand})` : "Pending final audit"}
 - Readiness Index: ${rubricAudit?.readinessPercentage ? `${rubricAudit.readinessPercentage}%`.replace(/%%$/, "%") : "Not measured yet"}
 - Priority Fixes Identified:
-${(rubricAudit?.priorityFixes || []).map((f: string, i: number) => `  [Fix ${i + 1}] ${f}`).join("\n") || "  - None identified yet"}
+${(rubricAudit?.priorityFixes || []).map((f, i) => `  [Fix ${i + 1}] ${f}`).join("\n") || "  - None identified yet"}
 - Unresolved In-Text Citations (${unresolvedCitations.length}):
-${unresolvedCitations.map((c: any, i: number) => `  [C${i + 1}] "${c.rawCitation || c}" (Missing from bibliography or ambiguous)`).join("\n") || "  - None found"}
+${unresolvedCitations.map((c, i) => `  [C${i + 1}] "${typeof c === "string" ? c : c.rawCitation || ""}" (Missing from bibliography or ambiguous)`).join("\n") || "  - None found"}
 - Word Count Adherence: ${currentTotalWords.toLocaleString()} / ${targetWordCount.toLocaleString()} words (${Math.abs(currentTotalWords - targetWordCount) <= targetWordCount * 0.1 ? "Compliant within ±10%" : "Check word count margin"})
 `;
     systemPrompt = `You are the Examiner, the Quality Audit & Final Review Copilot in Scholar OS.

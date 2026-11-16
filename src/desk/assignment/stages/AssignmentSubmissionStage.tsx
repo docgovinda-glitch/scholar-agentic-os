@@ -186,7 +186,7 @@ export function AssignmentSubmissionStage({
     [sources, approvedSourceIds]
   );
   const citationCoverage = useMemo(
-    () => getCitationCoverage(activeSections as any, approvedSources),
+    () => getCitationCoverage(activeSections, approvedSources),
     [activeSections, approvedSources]
   );
 
@@ -204,7 +204,7 @@ export function AssignmentSubmissionStage({
       {/* Left Column: Rubric Compliance Card */}
       <div className="lg:col-span-1 min-h-[400px]">
         <RubricComplianceCard
-          report={submissionReport as any}
+          report={submissionReport && "missingRequirements" in submissionReport ? submissionReport : null}
           isLoading={isAuditingSubmission}
           onReRunAudit={runSubmissionAudit}
         />

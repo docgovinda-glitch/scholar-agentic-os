@@ -4,7 +4,8 @@ import { routedCompletion } from "../../../src/ai/routerBridge.ts";
 import { sendAiFailure,UnusableAiResponseError } from "../../../src/ai/aiRouteErrors.ts";
 import { structureFromAi } from "../../../../src/domain/assignment/aiAssignmentOutline.ts";
 import { scopeBrief } from "../../../../src/domain/assignment/briefScoping.ts";
-import type { AssignmentDraftingSection } from "../../../../src/desk/assignment/types.ts";
+import type { AcademicLevel, AssignmentDraftingSection, AssignmentStructure, AssignmentType } from "../../../../src/desk/assignment/types.ts";
+import type { ProjectRecord } from "../../../../src/services/store/types.ts";
 import express from "express";
 import { parseDocument } from "../../../../src/document_intelligence/index.ts";
 import {
@@ -240,7 +241,8 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
     cleanAnswerString(project.answers["marking_rubric"]) ||
     "";
   const rawSections = req.body?.sections || project.answers["sections"];
-  const parsedSections = safeParseObject(rawSections);
+  type SavedBreakdown = { intro?: { targetWords?: number }; body?: { targetWords?: number }; conclusion?: { targetWords?: number }; isCustomized?: boolean };
+  const parsedSections = safeParseObject<SavedBreakdown>(rawSections);
 
   try {
     const combinedContent = [question, briefText, rubricText].filter(Boolean).join("\n\n").trim();
@@ -459,7 +461,7 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
     }
     if (!structure) {
       structure = {
-        ...generateDynamicAssignmentStructure({ question, assignmentType: assignmentType as any, academicLevel: academicLevel as any, targetWordCount: targetWords, citationStyle, briefText }),
+        ...generateDynamicAssignmentStructure({ question, assignmentType: assignmentType as AssignmentType, academicLevel: academicLevel as AcademicLevel, targetWordCount: targetWords, citationStyle, briefText }),
         source: "starter",
       };
     }
@@ -475,7 +477,7 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
     res.json({
       ...finalAnalysis,
       briefLedger: ledger,
-      updatedTitle: updatedTitle || project.answers?.["title"] || (project as any).title,
+      updatedTitle: updatedTitle || project.answers?.["title"],
       structure,
       outlineSource: structure.source,
       outlineNote,
@@ -505,7 +507,7 @@ router.post("/analyze", handleDeconstruct);
  */
 export async function writeOutlineForProject(
   req: express.Request<{ id: string }>,
-  project: any,
+  project: ProjectRecord,
   opts: { instruction?: string; plan?: string } = {}
 ) {
   const a = project.answers;
@@ -513,7 +515,7 @@ export async function writeOutlineForProject(
   const briefText = cleanAnswerString(a["assignment_brief"]) || question;
   const targetWords = Number(a["word_limit"] || 1500) || 1500;
   const assignmentType = String(a["assignment_type"] || "essay");
-  const current = safeParseObject(a["assignment_structure"]) as any;
+  const current = safeParseObject<AssignmentStructure>(a["assignment_structure"]);
   const previous = (safeParseObject(a["assignment_internal_sections"]) as AssignmentDraftingSection[] | undefined) ?? [];
   const ledger = safeParseObject(a["brief_ledger"]) as Array<{ category?: string; verbatimText?: string }> | undefined;
   const extraction = safeParseObject(a["assignment_extraction"]) as { criteria?: Array<{ criterion: string; weight?: number }> } | null;

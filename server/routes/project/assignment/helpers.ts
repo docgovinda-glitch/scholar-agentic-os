@@ -7,19 +7,22 @@ import { scholarBrain } from "../../../src/services/scholarBrain.ts";
 import {
 cleanAnswerString
 } from "../../../../src/desk/assignment/types.ts";
+import type { AcademicLevel, AssignmentType } from "../../../../src/desk/assignment/types.ts";
 import { generateDynamicAssignmentStructure } from "../../../../src/desk/assignment/services/dynamicStructure.ts";
 import {
 isClassroomLogisticsLine,
 isTutorialOrShortQABrief
 } from "../../../../src/utils/briefExtractor.ts";
 
-export function isCorruptedOutlineHeadings(headings: any[], topic: string): boolean {
+type HeadingLike = { title?: string; subheadings?: Array<{ title?: string }> };
+
+export function isCorruptedOutlineHeadings(headings: HeadingLike[], topic: string): boolean {
   if (!headings || !Array.isArray(headings) || headings.length === 0) return false;
   const flatTitles: string[] = [];
-  headings.forEach((h: any) => {
+  headings.forEach((h) => {
     if (h.title) flatTitles.push(h.title);
     if (h.subheadings && Array.isArray(h.subheadings)) {
-      h.subheadings.forEach((s: any) => {
+      h.subheadings.forEach((s) => {
         if (s.title) flatTitles.push(s.title);
       });
     }
@@ -62,8 +65,8 @@ export function healCorruptedProjectStructure(project: { answers?: Record<string
         );
         const repaired = generateDynamicAssignmentStructure({
           question: project.answers["assignment_brief"] || topic,
-          assignmentType: (project.answers["assignment_type"] || "essay") as any,
-          academicLevel: (project.answers["academic_level"] || "undergraduate") as any,
+          assignmentType: (project.answers["assignment_type"] || "essay") as AssignmentType,
+          academicLevel: (project.answers["academic_level"] || "undergraduate") as AcademicLevel,
           targetWordCount: targetWords,
           citationStyle: project.answers["citation_style"] || "apa7",
           briefText,
@@ -81,12 +84,13 @@ export function healCorruptedProjectStructure(project: { answers?: Record<string
   return changed;
 }
 
-export function safeParseObject<T = any>(val: any): T | null {
+/** A saved answer that may be stored as JSON text or already parsed; null when unreadable. */
+export function safeParseObject<T = unknown>(val: unknown): T | null {
   if (!val) return null;
-  if (typeof val === "object") return val;
+  if (typeof val === "object") return val as T;
   if (typeof val === "string") {
     try {
-      return JSON.parse(val);
+      return JSON.parse(val) as T;
     } catch {
       return null;
     }

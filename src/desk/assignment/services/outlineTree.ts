@@ -13,7 +13,7 @@ export function assignmentStructureToOutlineTree(structure: AssignmentStructure)
     target_frameworks: structure.targetFrameworks || [],
     targetWordCount: structure.targetWordCount,
     writingTone: structure.writingTone,
-    academicLevel: (structure as any).academicLevel,
+    academicLevel: (structure as AssignmentStructure & { academicLevel?: string }).academicLevel,
     sections: structure.headings.map((h) => ({
       level: "h1" as const,
       title: h.title,
@@ -64,7 +64,7 @@ export function outlineTreeToAssignmentStructure(
       const subNumberStr = `${headingNumber}.${sIdx + 1}`;
       const keyPoints = Array.isArray(h2.children)
         ? h2.children.map((c) => (typeof c === "string" ? c : c.title)).filter(Boolean)
-        : (h2 as any).keyPoints || [];
+        : (h2 as { keyPoints?: string[] }).keyPoints || [];
 
       const words = h2.targetWordCount ||
         Math.round(total / (h1Sections.length * (h2Sections.length || 1)));

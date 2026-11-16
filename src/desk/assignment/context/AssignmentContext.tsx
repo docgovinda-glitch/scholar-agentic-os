@@ -1,3 +1,4 @@
+import { tonePresetOf } from "../types";
 import { generateDynamicAssignmentStructure } from "../services/dynamicStructure";
 import { countProseWords } from "../../../shared/proseBlocks";
 import { canonicalizeAssignmentUpdate,normalizeAssignmentAnswers } from "../../../domain/assignment/answerKeys";
@@ -166,8 +167,8 @@ export interface AssignmentContextValue {
 
 
   // Save Answers Helper
-  saveAnswers: (updates: Record<string, any>) => Promise<void>;
-  updateProjectAnswers: (updates: Record<string, any>) => Promise<void>;
+  saveAnswers: (updates: Record<string, unknown>) => Promise<void>;
+  updateProjectAnswers: (updates: Record<string, unknown>) => Promise<void>;
   ensurePersisted: () => Promise<string>;
 }
 
@@ -313,20 +314,18 @@ export function AssignmentProvider({
 
   // Persist answers
   const saveAnswers = useCallback(
-    async (updates: Record<string, any>) => {
+    async (updates: Record<string, unknown>) => {
       if (!project) return;
       // One stored name per setting (answerKeys.ts): older call sites may still
       // pass an alias ("instructions", "targetWordCount", ...); it lands on the canonical key.
-      const standardized: Record<string, any> = canonicalizeAssignmentUpdate(updates);
+      const standardized: Record<string, unknown> = canonicalizeAssignmentUpdate(updates);
       if (standardized.assignment_brief !== undefined) standardized.assignment_brief = cleanAnswerString(standardized.assignment_brief);
       if (standardized.word_limit !== undefined) standardized.word_limit = Number(standardized.word_limit);
       if (standardized.writing_style !== undefined && standardized.writing_tone === undefined) {
-        const ws = standardized.writing_style;
-        standardized.writing_tone = typeof ws === "string" ? ws : ws?.preset || ws?.id || "analytical";
+        standardized.writing_tone = tonePresetOf(standardized.writing_style) || "analytical";
       }
       if (standardized.writing_tone !== undefined) {
-        const wt = standardized.writing_tone;
-        standardized.writing_tone = typeof wt === "string" ? wt : wt?.preset || wt?.id || "analytical";
+        standardized.writing_tone = tonePresetOf(standardized.writing_tone) || "analytical";
         if (standardized.writing_style === undefined) standardized.writing_style = { preset: standardized.writing_tone, label: standardized.writing_tone };
       }
       if (standardized.title !== undefined) {
@@ -336,18 +335,21 @@ export function AssignmentProvider({
       }
 
       const baseAnswers = projectRef.current?.answers || project?.answers || {};
-      const mergedAnswers = { ...baseAnswers, ...standardized };
+      // ProjectView types answers as strings, but Coursework keeps JSON values
+      // (sources, sections, structure) in them too: cast once, here.
+      const mergedAnswers = { ...baseAnswers, ...standardized } as ProjectView["answers"];
       const safeAnswers = stripCircularReferences(mergedAnswers);
+      const newTitle = typeof standardized.title === "string" ? standardized.title : undefined;
       if (projectRef.current) {
         projectRef.current = {
           ...projectRef.current,
           answers: safeAnswers,
-          title: standardized.title || projectRef.current.title,
+          title: newTitle || projectRef.current.title,
         };
       }
       setProject((prev) => {
         if (!prev) return null;
-        return { ...prev, answers: safeAnswers, title: standardized.title || prev.title };
+        return { ...prev, answers: safeAnswers, title: newTitle || prev.title };
       });
 
       // One write in flight at a time. The first starts at once; changes made
@@ -1161,7 +1163,7 @@ export function AssignmentProvider({
 
       // 1b. Citation Coverage
       const approvedSources = selectApprovedSources(sources, approvedSourceIds);
-      const citationCoverage = getCitationCoverage(activeSecs as any, approvedSources);
+      const citationCoverage = getCitationCoverage(activeSecs, approvedSources);
 
       // 2. Rubric Compliance Evaluation
       const rubricReport = evaluateRubricCompliance(

@@ -680,47 +680,26 @@ export interface SectionBreakdown {
   conclusion: SectionDetail;
 }
 
-export interface AssignmentProjectAnswers {
-  instructions: string;
-  academicLevel: AcademicLevel;
-  assignmentType: AssignmentType;
-  targetWordCount: number;
-  citationStyle: string;
-  sections?: SectionBreakdown;
-  courseDetails?: CourseDetails;
-  assignment_analysis?: AssignmentAnalysis;
-  brief_ledger?: DocumentRequirement[];
-  assignment_plan?: ResearchPlan;
-  structure?: AssignmentStructure;
-  assignment_structure?: AssignmentStructure;
-  analyticalSyntheses?: SectionAnalyticalSynthesis[];
-  analytical_syntheses?: SectionAnalyticalSynthesis[];
-  activeSourceView?: "vault" | "analysis";
-  // Legacy / interoperability aliases
-  assignment_question?: string;
-  assignment_brief_text?: string;
-  research_topic?: string;
-  word_count?: number;
-  word_limit?: number;
-  target_word_count?: number;
-  citation_style?: string;
-  academic_level?: AcademicLevel;
-  assignment_type?: AssignmentType;
-  course_name?: string;
-  institution?: string;
-  deadline?: string;
-  marking_rubric?: string;
-  [key: string]: any;
+
+/** A writing tone saved as a string or as { preset } / { id } (older saves), as a string. */
+export function tonePresetOf(tone: unknown): string {
+  if (typeof tone === "string") return tone;
+  if (tone && typeof tone === "object") {
+    const t = tone as { preset?: unknown; id?: unknown };
+    if (typeof t.preset === "string") return t.preset;
+    if (typeof t.id === "string") return t.id;
+  }
+  return "";
 }
 
-export function cleanAnswerString(val: any): string {
+export function cleanAnswerString(val: unknown): string {
   if (typeof val !== "string") return "";
   const trimmed = val.trim();
   if (trimmed.toLowerCase() === "provisional") return "";
   return trimmed;
 }
 
-export function extractStandardizedInstructions(answers: Record<string, any> = {}): string {
+export function extractStandardizedInstructions(answers: Record<string, unknown> = {}): string {
   const candidates = [
     answers.instructions,
     answers.assignment_question,
@@ -738,37 +717,29 @@ export function extractStandardizedInstructions(answers: Record<string, any> = {
   return "";
 }
 
-export function normalizeProjectAnswers(answers: any) {
-  if (!answers || typeof answers !== "object") return answers;
-  const target = Number(answers.targetWordCount || answers.word_count || answers.target_word_count || answers.word_limit) || 2000;
-  if (!answers.sections) {
-    const intro = Math.round(target * 0.10);
-    const conclusion = Math.round(target * 0.15);
-    const body = Math.max(0, target - intro - conclusion);
-
-    answers.sections = {
+/**
+ * The answers with a default 10/75/15 intro/body/conclusion split when none is
+ * saved (a customised split is kept as it is). The target is the canonical
+ * word_limit, or an older alias, or 2,000 words.
+ */
+export function normalizeProjectAnswers<T extends Record<string, unknown> & { sections?: SectionBreakdown }>(
+  answers: T
+): T & { sections: SectionBreakdown } {
+  const target = Number(answers.word_limit || answers.targetWordCount || answers.word_count || answers.target_word_count) || 2000;
+  if (answers.sections) return answers as T & { sections: SectionBreakdown };
+  const intro = Math.round(target * 0.1);
+  const conclusion = Math.round(target * 0.15);
+  const body = Math.max(0, target - intro - conclusion);
+  return Object.assign(answers, {
+    sections: {
       isCustomized: false,
-      intro: { targetWords: intro, guidelines: '' },
-      body: { targetWords: body, guidelines: '' },
-      conclusion: { targetWords: conclusion, guidelines: '' },
-    };
-  }
-  return answers;
+      intro: { targetWords: intro, guidelines: "" },
+      body: { targetWords: body, guidelines: "" },
+      conclusion: { targetWords: conclusion, guidelines: "" },
+    },
+  });
 }
 
-export function getSectionPromptGuidelines(
-  sectionKey: 'intro' | 'body' | 'conclusion',
-  answers: any
-): string {
-  const section = answers?.sections?.[sectionKey];
-  const targetWords = section?.targetWords ?? 500;
-  const guidelines = section?.guidelines?.trim();
-
-  return `
-SECTION ALLOCATION: ~${targetWords} words
-USER INSTRUCTIONS / MANDATORY CONTENT: ${guidelines ? guidelines : 'Standard academic rigor and appropriate depth for this section.'}
-`.trim();
-}
 
 /**
  * ============================================================================

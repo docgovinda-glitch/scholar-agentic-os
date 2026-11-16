@@ -1,3 +1,4 @@
+import type { SectionAnalyticalSynthesis } from "../types";
 import OutlineByAiPanel from "../components/OutlineByAiPanel";
 import { selectApprovedSources } from "../../../domain/assignment/approvedSources";
 import { clipHeadingWords } from "../../../utils/briefQuestions";
@@ -180,7 +181,7 @@ export function AssignmentDraftingStage({
 
       // Get analytical syntheses from project answers
       const projectAnswers = project?.answers || {};
-      const syntheses = (projectAnswers.analyticalSyntheses || projectAnswers.analytical_syntheses || []) as any[];
+      const syntheses = (projectAnswers.analyticalSyntheses || projectAnswers.analytical_syntheses || []) as SectionAnalyticalSynthesis[];
 
       // Build evidence pack for this section
       const evidencePack = buildEvidencePack(

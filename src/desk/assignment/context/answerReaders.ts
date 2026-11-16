@@ -15,15 +15,15 @@ export function readInternalSections({ answers, briefText, question }: {
   question: string;
 }): AssignmentDraftingSection[] {
   const isNonML = !/\b(machine learning|deep learning|neural network|transformer|foundation model)\b/i.test(`${question} ${briefText}`);
-  const isCorrupted = (list: any[]) =>
-    list.some((sec: any) =>
+  const isCorrupted = (list: Array<{ title?: string }>) =>
+    list.some((sec) =>
       (isNonML && /Mathematical Formulations|Loss Optimization Landscapes|Algorithmic Architectures/i.test(sec.title || "")) ||
       /Divide Yourself in Teams|teams of 2|in classroom discussion/i.test(sec.title || "")
     );
 
   const rawInternal = answers["assignment_internal_sections"];
   if (rawInternal) {
-    const parsed = safeParseAnswerField<any[]>(rawInternal, []);
+    const parsed = safeParseAnswerField<AssignmentDraftingSection[]>(rawInternal, []);
     // Word counts always come from the text: a stored count can be stale after
     // a write that did not refresh it (server-side revisions, older saves).
     if (Array.isArray(parsed) && parsed.length > 0 && !isCorrupted(parsed)) {
@@ -32,26 +32,6 @@ export function readInternalSections({ answers, briefText, question }: {
         // Older saves clipped titles with a trailing "…"; show them cut at a clean word.
         ...(typeof sec?.title === "string" && /…\s*$/.test(sec.title) ? { title: clipHeadingWords(sec.title) } : {}),
         currentWordCount: countProseWords(sec?.draftContent || ""),
-      }));
-    }
-  }
-  const rawOutline = answers["assignment_internal_sections"];
-  if (rawOutline) {
-    const parsed = safeParseAnswerField<any[]>(rawOutline, []);
-    if (Array.isArray(parsed) && parsed.length > 0 && !isCorrupted(parsed)) {
-      return parsed.map((sec: any) => ({
-        id: sec.id,
-        title: sec.title,
-        targetWordCount: sec.targetWordCount,
-        currentWordCount: countProseWords(sec.draftContent || ""),
-        guidance: sec.guidance || "",
-        draftContent: sec.draftContent || "",
-        status: sec.draftContent?.trim() ? "completed" : sec.status || "pending",
-        keyPoints: sec.keyPoints,
-        linkedEvidenceIds: sec.linkedEvidenceIds,
-        boundSourceIds: sec.boundSourceIds || [],
-        academicFunction: sec.academicFunction,
-        sectionType: sec.sectionType || (sec.id.includes("intro") ? "intro" : sec.id.includes("conclusion") ? "conclusion" : "body"),
       }));
     }
   }
@@ -102,11 +82,11 @@ export function readStructure({ academicLevel, answers, assignmentType, briefTex
     const parsed = safeParseAnswerField<AssignmentStructure | undefined>(raw, undefined);
     if (parsed?.headings && Array.isArray(parsed.headings) && parsed.headings.length > 0) {
       const isNonMLTopic = !/\b(machine learning|deep learning|neural network|transformer|foundation model)\b/i.test(`${question} ${briefText}`);
-      const hasLeakedML = parsed.headings.some((h: any) =>
+      const hasLeakedML = parsed.headings.some((h) =>
         /Mathematical Formulations|Loss Optimization Landscapes|Algorithmic Architectures/i.test(h.title || "") ||
-        (h.subheadings || []).some((sub: any) => /Mathematical Formulations|Loss Optimization Landscapes|empirical risk minimization/i.test(sub.title || sub.guidance || ""))
+        (h.subheadings || []).some((sub) => /Mathematical Formulations|Loss Optimization Landscapes|empirical risk minimization/i.test(sub.title || sub.guidance || ""))
       );
-      const hasClassroomLogistics = parsed.headings.some((h: any) =>
+      const hasClassroomLogistics = parsed.headings.some((h) =>
         /Divide Yourself in Teams|teams of 2|in classroom discussion/i.test(h.title || "")
       );
 

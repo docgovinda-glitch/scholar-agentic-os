@@ -1,3 +1,4 @@
+import { tonePresetOf } from "../types";
 import { ExtractAgentPanel } from "../components/AgentPanels";
 import React,{ useState,useRef,useEffect,useMemo } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
@@ -107,7 +108,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
     ensurePersisted,
     isLoading,
     agent,
-  } = useAssignmentWorkspace() as any;
+  } = useAssignmentWorkspace();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -144,8 +145,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
     const curType = assignmentType || (project?.answers?.["assignment_type"] as AssignmentType) || "essay";
     if (typeof raw === "string" && raw && raw !== "analytical") return raw;
     if (raw && typeof raw === "object") {
-      const obj = raw as any;
-      const t = obj.preset || obj.id;
+      const t = tonePresetOf(raw);
       if (t && t !== "analytical") return t;
     }
     if (writingStyle?.preset && writingStyle.preset !== "analytical") return writingStyle.preset;
@@ -219,7 +219,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
   useEffect(() => {
     const curType = assignmentType || localType || "essay";
     const rawTone = project?.answers?.["writing_tone"] || writingTone || localTone;
-    const toneStr = (typeof rawTone === "string" ? rawTone : (rawTone as any)?.preset || (rawTone as any)?.id || "").toLowerCase();
+    const toneStr = (tonePresetOf(rawTone) || "").toLowerCase();
     if (curType === "essay" && (toneStr === "analytical" || !toneStr || toneStr === "default")) {
       const targetTone = resolveMappedTone("essay");
       setLocalTone(targetTone);
@@ -252,7 +252,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
     }
     if (citationStyle) setLocalCitation((prev) => (prev !== citationStyle ? citationStyle : prev));
     const resolvedTone = project?.answers?.["writing_tone"] || writingTone;
-    const toneStr = typeof resolvedTone === "string" ? resolvedTone : (resolvedTone as any)?.preset || (resolvedTone as any)?.id;
+    const toneStr = tonePresetOf(resolvedTone);
     if (toneStr && typeof toneStr === "string") {
       setLocalTone((prev) => (prev !== toneStr ? toneStr : prev));
     }
@@ -404,7 +404,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
     const budget = computeWordBudgetFromSections(localWordCount, budgets);
     const legacyBreakdown = computeSectionBreakdown(localWordCount, budgets);
 
-    const updates: Record<string, any> = {
+    const updates: Record<string, unknown> = {
       rawPrompt: localQuestion,
       raw_prompt: localQuestion,
       instructions: localQuestion,
@@ -618,7 +618,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
       const budget = computeWordBudgetFromSections(newWordCount, budgets);
       const legacyBreakdown = computeSectionBreakdown(newWordCount, budgets);
 
-      const updates: Record<string, any> = {
+      const updates: Record<string, unknown> = {
         instructions: cleanPrompt,
         assignment_prompt: cleanPrompt,
         assignment_question: cleanPrompt,

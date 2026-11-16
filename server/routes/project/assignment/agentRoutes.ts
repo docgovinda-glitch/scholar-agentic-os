@@ -130,7 +130,8 @@ router.post("/agent/sources", async (req: Req, res: express.Response) => {
   const body = req.body?.sources;
   const sources: SourceForAnalysis[] = (Array.isArray(body) ? body : [])
     .slice(0, 20)
-    .map((s: any) => ({
+    .map((raw: unknown) => (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>)
+    .map((s) => ({
       id: String(s?.id ?? "").slice(0, 200),
       title: String(s?.title ?? "").slice(0, 400),
       authors: Array.isArray(s?.authors) ? s.authors.map(String).slice(0, 8) : [],

@@ -16,7 +16,34 @@ import {
 getProjectSafe,safeParseObject
 } from "./helpers.ts";
 
+import type {
+CopilotAnalysis, CopilotAudit, CopilotCitation, CopilotDeck, CopilotEvidence, CopilotPeel, CopilotSection, CopilotSource
+} from "../../../src/services/prompts/courseworkPrompts.ts";
+
 const router = express.Router({ mergeParams: true });
+
+interface CopilotProjectState {
+  brief?: {
+    assignmentQuestion?: string;
+    targetWordCount?: number | string;
+    academicLevel?: string;
+    citationStyle?: string;
+    assignmentType?: string;
+    analysis?: CopilotAnalysis;
+    rubricCriteria?: unknown[];
+  };
+  sources?: CopilotSource[];
+  lectureSlides?: CopilotDeck[];
+  evidenceItems?: CopilotEvidence[];
+  outline?: CopilotSection[];
+  peelSections?: CopilotPeel[];
+  rubricAudit?: CopilotAudit;
+}
+
+/** A saved list, or none when the value is missing or not a list. */
+function asArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
 
 // 13. POST /api/projects/:id/assignment/audit-export
 /**
@@ -79,47 +106,48 @@ router.post("/copilot-chat", async (req: express.Request<{ id: string }>, res) =
       : "understand";
 
   const answers = project.answers || {};
+  // The browser's view of the project (optional); saved answers fill any gap.
+  const state = (projectState ?? {}) as CopilotProjectState;
 
   // Phase 1 Grounding: Brief requirements & rubric
   const question =
-    projectState?.brief?.assignmentQuestion ||
+    state.brief?.assignmentQuestion ||
     answers["assignment_brief"] ||
-    (project as any).title ||
+    project.answers?.["title"] ||
     "Academic Assignment";
 
   const targetWordCount =
-    Number(projectState?.brief?.targetWordCount || answers["word_limit"] || 2000);
+    Number(state.brief?.targetWordCount || answers["word_limit"] || 2000);
 
   const academicLevel =
-    projectState?.brief?.academicLevel ||
+    state.brief?.academicLevel ||
     answers["academic_level"] ||
     "undergraduate";
 
   const citationStyle =
-    projectState?.brief?.citationStyle ||
+    state.brief?.citationStyle ||
     answers["citation_style"] ||
     "apa7";
 
   const assignmentType =
-    projectState?.brief?.assignmentType ||
+    state.brief?.assignmentType ||
     answers["assignment_type"] ||
     "critical_essay";
 
-  const analysis =
-    projectState?.brief?.analysis ||
-    safeParseObject(answers["assignment_analysis"]) ||
+  const analysis: CopilotAnalysis =
+    state.brief?.analysis ||
+    safeParseObject<CopilotAnalysis>(answers["assignment_analysis"]) ||
     {};
 
-  const rubricCriteria =
-    projectState?.brief?.rubricCriteria ||
+  const rubricCriteria: unknown[] =
+    state.brief?.rubricCriteria ||
     analysis.markingRubric ||
     [];
 
   // Phase 2 Grounding: Approved literature & lecture slides
-  const sources: any[] =
-    projectState?.sources ||
-    safeParseObject(answers["assignment_sources"]) ||
-    [];
+  const sources: CopilotSource[] = asArray<CopilotSource>(
+    state.sources || safeParseObject(answers["assignment_sources"])
+  ).map((s) => ({ ...s, id: String(s?.id ?? "") }));
 
   const approvedIds: string[] | null = (() => {
     const raw = safeParseObject(answers["approved_source_ids"]);
@@ -128,47 +156,43 @@ router.post("/copilot-chat", async (req: express.Request<{ id: string }>, res) =
   // Only what the student approved (before any decision: the brief's prescribed references).
   const keptSources = selectApprovedSources(
     sources,
-    approvedIds ?? sources.filter((s: any) => s?.prescribedInBrief).map((s: any) => String(s.id))
+    approvedIds ?? sources.filter((s) => s.prescribedInBrief).map((s) => s.id)
   );
 
-  const lectureSlides: any[] =
-    projectState?.lectureSlides ||
-    safeParseObject(answers["lecture_slides"]) ||
-    [];
+  const lectureSlides = asArray<CopilotDeck>(
+    state.lectureSlides || safeParseObject(answers["lecture_slides"])
+  );
 
-  const evidenceItems: any[] =
-    projectState?.evidenceItems ||
-    safeParseObject(answers["assignment_evidence"]) ||
-    [];
+  const evidenceItems = asArray<CopilotEvidence>(
+    state.evidenceItems || safeParseObject(answers["assignment_evidence"])
+  );
 
   // Phase 3 Grounding: Active PEEL section drafts & word budget progress
-  const outline: any[] =
-    projectState?.outline ||
+  const outline = asArray<CopilotSection>(
+    state.outline ||
     safeParseObject(answers["assignment_internal_sections"]) ||
-    safeParseObject(answers["sections"]) ||
-    [];
+    safeParseObject(answers["sections"])
+  );
 
-  const peelSections: any[] =
-    projectState?.peelSections ||
-    safeParseObject(answers["assignment_peel_sections"]) ||
-    [];
+  const peelSections = asArray<CopilotPeel>(
+    state.peelSections || safeParseObject(answers["assignment_peel_sections"])
+  );
 
   const currentTotalWords = outline.reduce(
-    (acc: number, sec: any) => acc + (sec.currentWordCount || 0),
+    (acc, sec) => acc + (Number(sec?.currentWordCount) || 0),
     0
   );
 
   // Phase 4 Grounding: Rubric scores & unresolved citations
-  const rubricAudit =
-    projectState?.rubricAudit ||
-    safeParseObject(answers["submission_audit"]) ||
-    safeParseObject(answers["rubric_evaluation"]) ||
+  const rubricAudit: CopilotAudit | null =
+    state.rubricAudit ||
+    safeParseObject<CopilotAudit>(answers["submission_audit"]) ||
+    safeParseObject<CopilotAudit>(answers["rubric_evaluation"]) ||
     null;
 
-  const unresolvedCitations =
-    rubricAudit?.unresolvedCitations ||
-    safeParseObject(answers["unresolved_citations"]) ||
-    [];
+  const unresolvedCitations = asArray<CopilotCitation>(
+    rubricAudit?.unresolvedCitations || safeParseObject(answers["unresolved_citations"])
+  );
 
   // Configure persona and prompt
   const { personaName, personaRole, scopedContextSummary, systemPrompt } = scholarBrain.courseworkPrompts.copilotPersona({ normalizedPhase, question, academicLevel, targetWordCount, citationStyle, assignmentType, analysis, rubricCriteria, keptSources, lectureSlides, evidenceItems, currentTotalWords, outline, peelSections, rubricAudit, unresolvedCitations });
