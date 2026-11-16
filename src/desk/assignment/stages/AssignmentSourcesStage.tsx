@@ -1,4 +1,6 @@
 import { SourcesAgentPanel } from "../components/AgentPanels";
+import { splitAuthorList } from "../services/personName";
+import { formatSourceBibliography } from "../services/citationFormatService";
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
 import { ReferenceBarItem } from "../ReferenceBarItem";
@@ -51,24 +53,9 @@ import {
   List,
 } from "lucide-react";
 
-export function formatHarvardCitation(source: Partial<DiscoveredSource>): string {
-  if (source.citation && source.citation.trim()) {
-    return source.citation.trim();
-  }
-  const rawAuthors = (source as any).authors;
-  const authorsStr =
-    Array.isArray(rawAuthors) && rawAuthors.length > 0
-      ? rawAuthors.join(", ")
-      : typeof rawAuthors === "string" && rawAuthors.trim()
-      ? rawAuthors.trim()
-      : "[Author unknown]";
-  const yearStr = source.year || "n.d.";
-  const titleStr = source.title ? `'${source.title}'` : "Untitled";
-  const venueStr = source.journal || source.publisher || "";
-  const volStr = source.volumeIssue ? `, ${source.volumeIssue}` : "";
-  const doiStr = source.doi ? `. doi: ${source.doi}` : source.url ? `. Available at: ${source.url}` : "";
-
-  return `${authorsStr} (${yearStr}) ${titleStr}${venueStr ? `, ${venueStr}` : ""}${volStr}${doiStr}.`;
+/** A source's reference entry in the project's style, from the shared formatter. */
+export function formatSourceReference(source: Partial<DiscoveredSource>, style: string): string {
+  return formatSourceBibliography(source, style || "harvard");
 }
 
 
@@ -206,7 +193,7 @@ export default function AssignmentSourcesStage({
       journal: source.journal || source.publisher || "",
       volumeIssue: source.volumeIssue || "",
       doi: source.doi || "",
-      citation: source.citation || formatHarvardCitation(source),
+      citation: formatSourceReference(source, citationStyle),
       roleInAssignment: source.roleInAssignment || "Empirical evidence",
     });
   };
@@ -276,18 +263,14 @@ export default function AssignmentSourcesStage({
   const handleAddCustomSource = async () => {
     if (!customForm.title.trim()) return;
 
-    const authorsList = customForm.authors
-      .split(",")
-      .map((a) => a.trim())
-      .filter(Boolean);
-
+    const authorsList = splitAuthorList(customForm.authors);
+    // The student's own citation text wins; otherwise the shared formatter writes it.
     const autoCitation =
       customForm.citation.trim() ||
-      `${customForm.authors || "[Author unknown]"} (${customForm.year || "n.d."}) '${customForm.title}'${
-        customForm.journal ? `, ${customForm.journal}` : ""
-      }${customForm.volumeIssue ? `, ${customForm.volumeIssue}` : ""}${
-        customForm.doi ? `. doi: ${customForm.doi}` : ""
-      }.`;
+      formatSourceReference(
+        { title: customForm.title.trim(), authors: authorsList, year: customForm.year || "n.d.", journal: customForm.journal, doi: customForm.doi },
+        citationStyle
+      );
 
     const newSource: DiscoveredSource = {
       id: `src-custom-${Date.now()}`,
@@ -331,7 +314,8 @@ export default function AssignmentSourcesStage({
   };
 
   const handleCopyCitation = (source: DiscoveredSource) => {
-    const text = source.citation || formatHarvardCitation(source);
+    // From the source's metadata (edited fields included), in the project's style.
+    const text = formatSourceReference(source, citationStyle);
     navigator.clipboard?.writeText(text);
     setCopiedSourceId(source.id);
     setTimeout(() => setCopiedSourceId(null), 2000);
@@ -340,7 +324,7 @@ export default function AssignmentSourcesStage({
   const handleCopyAllReferences = () => {
     const approved = allMasterSources.filter((s) => approvedSourceIds.includes(s.id));
     const text = approved
-      .map((s) => s.citation || formatHarvardCitation(s))
+      .map((s) => formatSourceReference(s, citationStyle))
       .sort((a, b) => a.localeCompare(b))
       .join("\n\n");
     navigator.clipboard?.writeText(text);
@@ -1483,7 +1467,7 @@ export default function AssignmentSourcesStage({
 
                   <div className="space-y-1">
                     <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">
-                      Authors (comma-separated)
+                      Authors (separate people with ; or ,)
                     </label>
                     <input
                       type="text"

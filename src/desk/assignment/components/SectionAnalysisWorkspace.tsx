@@ -721,10 +721,12 @@ export const SectionAnalysisWorkspace: React.FC<SectionAnalysisWorkspaceProps> =
                 <p className="text-[11px] text-neutral-600 dark:text-neutral-400">
                   {(traceabilityItem.source?.authors || traceabilityItem.synthesis.sourceAuthors || []).join(", ")} (
                   {traceabilityItem.source?.year || traceabilityItem.synthesis.sourceYear || "n.d."})
-                  {" · "}
-                  <span className="italic">
-                    {traceabilityItem.source?.journal || traceabilityItem.synthesis.sourceJournal || "Academic Press"}
-                  </span>
+                  {(traceabilityItem.source?.journal || traceabilityItem.synthesis.sourceJournal) && (
+                    <>
+                      {" · "}
+                      <span className="italic">{traceabilityItem.source?.journal || traceabilityItem.synthesis.sourceJournal}</span>
+                    </>
+                  )}
                 </p>
               </div>
 

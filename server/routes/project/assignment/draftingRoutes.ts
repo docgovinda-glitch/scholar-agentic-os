@@ -1,3 +1,4 @@
+import { parseBody, StreamSectionBody } from "./schemas.ts";
 import express from "express";
 import { buildSectionScaffold,type ScaffoldSource } from "../../../src/utils/sectionScaffold.ts";
 import { BrowserAiRequiredError,InvalidLlmChallengeError,LocalModelUnreachableError,NoClientAiProviderError } from "../../../src/ai/aiRouteErrors.ts";
@@ -29,6 +30,8 @@ const router = express.Router({ mergeParams: true });
 router.post("/stream-section", async (req: express.Request<{ id: string }>, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
+  const body = parseBody(StreamSectionBody, req, res);
+  if (!body) return;
 
   const {
     sectionTitle,
@@ -51,7 +54,7 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
     outlineTitles,
     previousTail,
     writingStyle,
-  } = req.body || {};
+  } = body;
   // The section's exact budget from the outline (±5%), never more than what the
   // whole essay still has left, so a 1,000-word paper cannot reach 1,450.
   const allocated = Math.round(Number(allocatedWords ?? requestedTarget) || 500);

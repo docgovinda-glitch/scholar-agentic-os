@@ -93,12 +93,12 @@ Export formats: `docx`, `odt`, `pdf`, `latex`, `typst`, `camera_ready_pdf`, `mar
 
 `server/routes/project/assignment/`, all POST unless noted.
 
-- Extract: `/analyze`, `/deconstruct`, `/outline`.
-- Understand: `/plan`, `/think`, `/structure` (also GET), `/generate-outline`, `/estimate-rubric`, `/thesis-budget`.
-- Sources: `/research`, `/citations-ground`.
-- Drafting: `/draft-section`, `/stream-section` (SSE opened before the model call, `: keep-alive` every 5 s, failures as `{ error, recoverable: true }` events; 426 hand-off only before the stream opens; accepts `allocatedWords`), `/review`, `/tutor-chat`, `/peel-matrix`.
-- Submission: `/audit-export`, `/copilot-chat`.
-- Stage agents: `/agent/extract`, `/agent/understand`, `/agent/sources`, `/agent/review`.
+Every body is validated with zod (`schemas.ts`); a bad body is a 400 `{ code: "invalid_body", fields }`.
+
+- Extract: `/parse-brief` (multipart), `/analyze`, `/outline`.
+- Drafting: `/stream-section` (SSE opened before the model call, `: keep-alive` every 5 s, failures as `{ error, recoverable: true }` events; 426 hand-off only before the stream opens; accepts `allocatedWords`).
+- Submission: `/export-pdf`, `/copilot-chat` (the student's AI answers or a 502 `{ code: "ai_unavailable" }`; never canned advice).
+- Stage agents: `/agent/extract`, `/agent/understand`, `/agent/sources`, `/agent/review`, `/agent/evidence` (excerpts from an uploaded document, kept only when found word for word).
 
 ### 5.5 Thesis, proposal, presentation
 

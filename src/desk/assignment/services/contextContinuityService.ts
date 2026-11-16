@@ -12,6 +12,7 @@
  */
 
 import type { AssignmentDraftingSection } from "../types";
+import { countProseWords } from "../../../shared/proseBlocks";
 import type { ContextContinuityState } from "./evidencePackService";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -152,8 +153,7 @@ function extractLastSectionLink(draftContent: string): string {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function countWords(text: string): number {
-  if (!text) return 0;
-  return text.trim().split(/\s+/).filter(Boolean).length;
+  return countProseWords(text || "");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

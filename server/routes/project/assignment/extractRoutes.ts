@@ -1,3 +1,4 @@
+import { parseBody, AnalyzeBody, OutlineBody } from "./schemas.ts";
 import { routedCompletion } from "../../../src/ai/routerBridge.ts";
 import { sendAiFailure,UnusableAiResponseError } from "../../../src/ai/aiRouteErrors.ts";
 import { structureFromAi } from "../../../../src/domain/assignment/aiAssignmentOutline.ts";
@@ -213,6 +214,7 @@ router.post(
 
 // 1. POST /api/projects/:id/assignment/analyze & /deconstruct
 const handleDeconstruct = async (req: express.Request<{ id: string }>, res: express.Response) => {
+  if (!parseBody(AnalyzeBody, req, res)) return;
   const project = await getProjectSafe(req, res);
   if (!project) return;
 
@@ -572,6 +574,7 @@ export async function writeOutlineForProject(
 router.post("/outline", async (req: express.Request<{ id: string }>, res: express.Response) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
+  if (!parseBody(OutlineBody, req, res)) return;
   const raw = req.body?.instruction;
   const instruction = typeof raw === "string" ? raw.trim().slice(0, 600) || undefined : undefined;
   const a = project.answers;

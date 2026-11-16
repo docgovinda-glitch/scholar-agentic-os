@@ -34,6 +34,19 @@ export class HarvardFormatter implements CitationStyle {
     const head = names.length ? `${joinNames(names)} ${year}` : `${reference.title} ${year}`;
     const link = doiUrl(reference);
     const tail = link ? ` Available at: ${link}.` : "";
+    // No author: the title leads, once, then the year (Cite Them Right).
+    if (!names.length) {
+      const journal = journalOf(reference);
+      const pub = publisherOf(reference);
+      if (reference.kind === "Book") return `*${reference.title}* ${year}${pub ? ` ${endSentence(pub)}` : "."}${tail}`;
+      if (reference.kind === "JournalArticle" && journal) {
+        const vol = reference.volume ? `, ${reference.volume}${reference.issue ? `(${reference.issue})` : ""}` : "";
+        const pages = reference.pages ? `, pp. ${pageRange(reference.pages)}` : "";
+        return `'${reference.title}' ${year} *${journal}*${vol}${pages}.${tail}`;
+      }
+      const src = reference.source && reference.source !== reference.title ? ` ${endSentence(reference.source)}` : ".";
+      return `${reference.title} ${year}${src}${tail}`.replace(/\s+/g, " ").trim();
+    }
     if (reference.kind === "Book") {
       const pub = publisherOf(reference);
       return `${head} *${reference.title}*.${pub ? ` ${endSentence(pub)}` : ""}${tail}`;

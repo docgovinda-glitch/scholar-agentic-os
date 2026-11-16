@@ -14,7 +14,8 @@ describe("citations with missing author, year or venue", () => {
     const ref = discoveredSourceToCanonical(bare);
     expect(ref.year).toBe("n.d.");
     expect(ref.source).toBe("");
-    expect(ref.authors.map((a) => a.lastName)).toEqual(["[Author unknown]"]);
+    // No stand-in author: the formatters move the title into the author position.
+    expect(ref.authors).toEqual([]);
   });
 
   it("formatted citations never contain the old placeholders", () => {
@@ -32,4 +33,18 @@ describe("citations with missing author, year or venue", () => {
     expect(bib).toContain("year = {n.d.}");
     expect(bib).not.toMatch(/journal =|Journal of Academic Research|2024/);
   });
+
+  it("an entry with no author leads with the title in every style, with no doubled full stops", async () => {
+    const { CitationFormatterFactory } = await import("../../../citation_compliance");
+    const ref = discoveredSourceToCanonical({ title: "Week 3 notes", authors: [], year: "n.d." } as never);
+    const out = Object.fromEntries(["apa7", "harvard", "mla9", "chicago", "ieee", "vancouver"].map((st) => [st, CitationFormatterFactory.formatBibliography(st, ref)]));
+    expect(out.apa7).toBe("Week 3 notes. (n.d.).");
+    expect(out.harvard).toBe("Week 3 notes (n.d.).");
+    expect(out.chicago).toBe('"Week 3 notes." n.d.');
+    for (const entry of Object.values(out)) {
+      expect(entry).not.toMatch(/Author unknown|Course Materials|(?<!\.)\.\.(?!\.)/);
+      expect(entry.startsWith('"Week 3 notes') || entry.startsWith("Week 3 notes")).toBe(true);
+    }
+  });
 });
+

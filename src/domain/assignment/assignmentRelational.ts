@@ -7,6 +7,7 @@
  */
 
 import { isSourceApproved } from "./approvedSources";
+import { countProseWords } from "../../shared/proseBlocks";
 
 export type AssignmentPhase = "extract" | "understand" | "sources" | "drafting" | "submission";
 
@@ -147,9 +148,9 @@ function num(value: unknown): number | null {
   return Number.isFinite(n) && n >= 0 ? Math.round(n) : null;
 }
 
+/** Same count the app shows (markup, table rules and list markers are not words). */
 function words(text: string): number {
-  const t = text.replace(/<[^>]+>/g, " ").trim();
-  return t ? t.split(/\s+/).length : 0;
+  return countProseWords(text);
 }
 
 /** Stable, browser-safe 53-bit string hash (cyrb53), hex-encoded. */

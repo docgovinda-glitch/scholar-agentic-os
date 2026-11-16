@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { countProseWords } from "../../../../src/shared/proseBlocks.ts";
 import { scholarBrain } from "../../../src/services/scholarBrain.ts";
 import express from "express";
 import { routedCompletion } from "../../../src/ai/routerBridge.ts";
@@ -209,7 +210,7 @@ router.post("/agent/review", async (req: Req, res: express.Response) => {
     .filter((s) => (s.draftContent ?? "").trim())
     .map((s) => `## ${s.title}\n\n${s.draftContent}`)
     .join("\n\n");
-  if (draft.trim().split(/\s+/).length < 30) {
+  if (countProseWords(draft) < 30) {
     return res.status(400).json({ error: "Write at least part of the draft before the review.", code: "missing_draft" });
   }
   const extraction = safeParseObject(a["assignment_extraction"]) as Extraction | null;
@@ -225,7 +226,7 @@ router.post("/agent/review", async (req: Req, res: express.Response) => {
     const text = await routedCompletion(req, { task: "long-context", systemPrompt: scholarBrain.courseworkPrompts.reviewPrompt(), userPrompt: scholarBrain.courseworkPrompts.reviewUserPrompt(input) });
     const review = parseReview(text ?? "", input);
     if (!review) return sendAiFailure(res, new UnusableAiResponseError("draft review"), "Review");
-    project.answers.assignment_ai_review = JSON.stringify({ ...review, at: now(), words: draft.split(/\s+/).length });
+    project.answers.assignment_ai_review = JSON.stringify({ ...review, at: now(), words: countProseWords(draft) });
     await getProjectStore().save(project);
     res.json({ review });
   } catch (err) {

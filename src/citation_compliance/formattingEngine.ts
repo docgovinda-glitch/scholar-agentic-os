@@ -221,7 +221,7 @@ export class CitationFormatterFactory {
     if (!formatter) {
       return reference.title || "Unknown Reference";
     }
-    return formatter.formatBibliography(reference);
+    return tidyEntry(formatter.formatBibliography(reference));
   }
 
   /**
@@ -232,6 +232,11 @@ export class CitationFormatterFactory {
     if (!formatter) {
       return references.map((r) => r.title || "Unknown Reference").join("\n\n");
     }
-    return formatter.formatReferenceList(references);
+    return formatter.formatReferenceList(references).split("\n\n").map(tidyEntry).join("\n\n");
   }
+}
+
+/** One full stop where a field already ends in one ("n.d.." -> "n.d."); an ellipsis is kept. */
+export function tidyEntry(entry: string): string {
+  return entry.replace(/(?<!\.)\.\.(?!\.)/g, ".");
 }

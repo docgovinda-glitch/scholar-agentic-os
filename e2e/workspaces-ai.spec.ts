@@ -57,10 +57,10 @@ async function withProject(page: Page, outputTypeId: string, answers: Record<str
 
 test.use({ storageState: AUTH_FILES.A });
 
-test("without the user's AI, drafting asks for it instead of inventing text", async ({ page }) => {
-  await withProject(page, "OT-01", { title: "E2E no-AI coursework" }, async (id) => {
+test("without the user's AI, the Coursework copilot asks for it instead of sending canned advice", async ({ page }) => {
+  await withProject(page, "OT-01", { title: "E2E no-AI coursework", assignment_question: "Discuss group work." }, async (id) => {
     const before = await stubCalls();
-    const res = await api(page, "POST", `/api/projects/${id}/assignment/draft-section`, { sectionTitle: "Introduction" });
+    const res = await api(page, "POST", `/api/projects/${id}/assignment/copilot-chat`, { phase: "understand", message: "What do the marking criteria mean?" });
     expect(res.status).toBe(426);
     expect(res.json?.requireFrontendLLM).toBe(true);
     expect(res.text).not.toContain(MARKER);
@@ -68,12 +68,13 @@ test("without the user's AI, drafting asks for it instead of inventing text", as
   });
 });
 
-test("Coursework (OT-01): a section is drafted by the user's AI", async ({ page }) => {
+test("Coursework (OT-01): the copilot answers with the user's AI", async ({ page }) => {
   await withProject(page, "OT-01", { title: "E2E coursework", assignment_question: "Discuss group work." }, async (id) => {
     const before = await stubCalls();
-    const res = await api(page, "POST", `/api/projects/${id}/assignment/draft-section`, { sectionTitle: "Introduction", targetWordCount: 150 }, AI_HEADERS);
+    const res = await api(page, "POST", `/api/projects/${id}/assignment/copilot-chat`, { phase: "drafting", message: "How should I open this section?" }, AI_HEADERS);
     expect(res.status, res.text.slice(0, 300)).toBe(200);
-    expect(res.json?.draft).toContain(MARKER);
+    expect(res.json?.response).toContain(MARKER);
+    expect(res.text).not.toMatch(/First Class|Rubric Alignment/);
     expect(await stubCalls()).toBeGreaterThan(before);
   });
 });

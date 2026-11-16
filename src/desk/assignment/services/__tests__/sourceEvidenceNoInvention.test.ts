@@ -42,3 +42,14 @@ describe("upload evidence without an AI", () => {
     expect(entry).not.toMatch(/Course Syllabus|Academic Research Repository|Scholar Academic Archive|20\d\d/);
   });
 });
+
+describe("splitAuthorList", () => {
+  it("keeps 'Family, Initials' together and splits people", async () => {
+    const { splitAuthorList } = await import("../personName");
+    expect(splitAuthorList("Nielsen, M. A., Chuang, I. L.")).toEqual(["Nielsen, M. A.", "Chuang, I. L."]);
+    expect(splitAuthorList("Kuncoro, H.")).toEqual(["Kuncoro, H."]);
+    expect(splitAuthorList("Ada Lovelace, Charles Babbage")).toEqual(["Ada Lovelace", "Charles Babbage"]);
+    expect(splitAuthorList("Smith, John; Doe, Jane")).toEqual(["Smith, John", "Doe, Jane"]);
+    expect(splitAuthorList("Smith and Jones")).toEqual(["Smith", "Jones"]);
+  });
+});

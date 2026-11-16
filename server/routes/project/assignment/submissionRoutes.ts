@@ -1,3 +1,4 @@
+import { parseBody, CopilotChatBody } from "./schemas.ts";
 import express from "express";
 import { selectApprovedSources } from "../../../../src/domain/assignment/approvedSources.ts";
 import { exportDocument } from "../../../../src/app/export/export.ts";
@@ -58,13 +59,15 @@ router.post("/export-pdf", async (req: express.Request<{ id: string }>, res) => 
 router.post("/copilot-chat", async (req: express.Request<{ id: string }>, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
+  const body = parseBody(CopilotChatBody, req, res);
+  if (!body) return;
 
   const {
     message,
     phase = "understand",
     history = [],
     projectState,
-  } = req.body || {};
+  } = body;
 
   if (!message || typeof message !== "string") {
     return res.status(400).json({ error: "Message is required." });

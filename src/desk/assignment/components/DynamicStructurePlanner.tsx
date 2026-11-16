@@ -731,7 +731,7 @@ export function DynamicStructurePlanner({
                                 )}
                               </div>
                               <p className="text-[10px] text-neutral-500 dark:text-neutral-400">
-                                {src.authors?.slice(0, 2).join(", ")} ({src.year}) • {src.journalOrPublisher || "Academic Press"}
+                                {src.authors?.slice(0, 2).join(", ")} ({src.year || "n.d."}){src.journalOrPublisher ? ` • ${src.journalOrPublisher}` : ""}
                               </p>
                               {src.relevance && (
                                 <p className="text-[10px] text-neutral-600 dark:text-neutral-300 italic line-clamp-2">

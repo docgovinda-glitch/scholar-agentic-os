@@ -77,4 +77,21 @@ describe("Coursework copilot-chat", () => {
     expect(res.status).toBe(426);
     expect(res.body.requireFrontendLLM).toBe(true);
   });
+
+  it("rejects a malformed body with a 400 before any AI call", async () => {
+    const res = await request(app).post(`/api/projects/${ID}/assignment/copilot-chat`).send({ message: 42 });
+    expect(res.status).toBe(400);
+    expect(res.body.fields).toContain("message");
+    const tooLong = await request(app).post(`/api/projects/${ID}/assignment/copilot-chat`).send({ message: "x".repeat(5000) });
+    expect(tooLong.status).toBe(400);
+    expect(callOpenRouterText).not.toHaveBeenCalled();
+  });
+
+  it("/stream-section rejects wrong types and oversized prompt fields with a 400", async () => {
+    const bad = await request(app).post(`/api/projects/${ID}/assignment/stream-section`).send({ sectionTitle: { x: 1 }, guidance: "g".repeat(9000) });
+    expect(bad.status).toBe(400);
+    expect(bad.body.fields).toEqual(expect.arrayContaining(["sectionTitle", "guidance"]));
+    expect(callOpenRouterText).not.toHaveBeenCalled();
+  });
 });
+
