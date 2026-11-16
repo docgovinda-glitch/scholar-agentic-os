@@ -1,62 +1,46 @@
 import { UnderstandAgentPanel } from "../components/AgentPanels";
-import { SubQuestionsCard, GradingCriteriaCard } from "../components/BriefBreakdownCards";
-import { buildBriefSummary, parseBriefQuestions } from "../../../utils/briefQuestions";
+import { SubQuestionsCard,GradingCriteriaCard } from "../components/BriefBreakdownCards";
+import { buildBriefSummary,parseBriefQuestions } from "../../../utils/briefQuestions";
 import { briefGroundedStances } from "../../../domain/assignment/briefThesis";
 import { applyQuestionWordTargets } from "../../../domain/assignment/outlineBudget";
-import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import React,{ useState,useRef,useEffect,useCallback,useMemo } from "react";
 import BriefScopePanel from "../components/BriefScopePanel";
 import { useAssignmentWorkspace } from "../AssignmentContext";
-import { authedJsonFetch, authedFetch } from "../../api";
+import { authedJsonFetch,authedFetch } from "../../api";
 import {
-  type AcademicLevel,
-  type AssignmentType,
-  type AssignmentAnalysis,
-  type AssignmentStructure,
-  type SectionBudgetItem,
-  type WritingToneConfig,
-  type WritingStyleConfig,
-  type WritingStylePreset,
-  ASSIGNMENT_TYPE_LABELS,
-  ACADEMIC_LEVEL_OPTIONS,
-  ASSIGNMENT_TYPE_OPTIONS,
-  STAGE_CITATION_STYLES as CITATION_STYLES,
-  WRITING_TONE_OPTIONS,
-  ARCHETYPE_DEFAULT_TONES,
-  AGENTIC_THINKING_STAGES,
-  cleanAnswerString,
-  extractStandardizedInstructions,
-  structureToInternalSections,
-  structureToSectionBudgets,
+type AcademicLevel,
+type AssignmentType,
+type AssignmentAnalysis,
+type AssignmentStructure,
+type SectionBudgetItem,type WritingStyleConfig,
+type WritingStylePreset,ACADEMIC_LEVEL_OPTIONS,
+ASSIGNMENT_TYPE_OPTIONS,
+STAGE_CITATION_STYLES as CITATION_STYLES,
+WRITING_TONE_OPTIONS,
+ARCHETYPE_DEFAULT_TONES,
+AGENTIC_THINKING_STAGES,
+cleanAnswerString,
+extractStandardizedInstructions,
+structureToInternalSections,
+structureToSectionBudgets
 } from "../types";
 import { deriveHeuristicTitle } from "../../projectNaming";
 import {
-  Upload,
-  ChevronDown,
-  Sparkles,
-  ArrowRight,
-  Check,
-  AlertCircle,
-  FileText,
-  X,
-  Plus,
-  Trash2,
-  Edit2,
-  RotateCcw,
-  BookOpen,
-  ArrowLeft,
-  SlidersHorizontal,
-  CheckCircle2,
+Upload,
+ChevronDown,
+Sparkles,
+ArrowRight,AlertCircle,
+FileText,Edit2,
+RotateCcw
 } from "lucide-react";
 import type { SectionBreakdown } from "../../../components/forms/TargetWordCountInput";
 import DynamicStructurePlanner from "../components/DynamicStructurePlanner";
 import { TONE_SUGGESTION_CHIPS } from "../components/WritingStyleSelector";
 import { generateDynamicAssignmentStructure } from "../services/dynamicStructure";
 import { autoBalanceStructure } from "../services/outlineEditing";
-import { extractBriefInquiriesAndConcepts } from "../services/briefSemantics";
-import { isDeepEqual, safeFormatLabel, allocateWordsByMarks } from "../../../utils/briefExtractor";
+import { briefSubQuestions } from "../services/briefSemantics";
+import { isDeepEqual,safeFormatLabel } from "../../../utils/briefExtractor";
 import { validateBriefFile } from "../../../services/documentParser";
-import { classifyScopeBoundaries, stripLineTags } from "../../../features/understand/services/scopeClassifier";
-import type { CourseworkExecutionMode, CourseworkProgressEvent } from "../../../features/coursework/types/orchestrator";
 
 class DropzoneErrorBoundary extends React.Component<
   { children: React.ReactNode; onError?: (error: Error) => void },
@@ -103,136 +87,12 @@ export {
   AGENTIC_THINKING_STAGES,
 };
 
-function cleanTopic(question: string): string {
-  if (!question) return "your assignment topic";
-  return question
-    .replace(/^(critically\s+evaluate|evaluate|analyze|analyse|assess|compare\s+and\s+contrast|compare|discuss|examine|explore|investigate|formulate)\s+/i, "")
-    .replace(/^the\s+/i, "")
-    .replace(/[\?\.!]+$/, "")
-    .trim() || question.trim();
-}
-
-function decodeCommandVerb(question: string): {
-  verb: string;
-  definition: string;
-  expectation: string;
-} {
-  const q = (question || "").toLowerCase();
-  if (q.includes("critically evaluate") || q.includes("critical evaluation")) {
-    return {
-      verb: "Critically Evaluate",
-      definition: "Weigh competing theoretical arguments and empirical evidence to judge their validity.",
-      expectation: "Don't just describe the topic—synthesize counterarguments, identify structural trade-offs, and reach a reasoned, defensible conclusion backed by authoritative literature.",
-    };
-  }
-  if (q.includes("analyze") || q.includes("analyse") || q.includes("analysis")) {
-    return {
-      verb: "Analyze",
-      definition: "Break down complex issues into component parts to examine relationships and causes.",
-      expectation: "Explain 'how' and 'why' mechanisms work rather than merely reciting descriptive facts. Trace cause-and-effect connections with academic precision.",
-    };
-  }
-  if (q.includes("assess")) {
-    return {
-      verb: "Assess",
-      definition: "Determine the significance, scale, efficacy, or value of concepts or findings.",
-      expectation: "Provide balanced criteria-based judgments supported by scholarly consensus and practical benchmarks.",
-    };
-  }
-  if (q.includes("compare") || q.includes("contrast")) {
-    return {
-      verb: "Compare & Contrast",
-      definition: "Identify meaningful parallels and divergences between two or more frameworks or cases.",
-      expectation: "Juxtapose core mechanisms systematically, evaluating which approach offers superior explanatory power or outcomes.",
-    };
-  }
-  if (q.includes("discuss")) {
-    return {
-      verb: "Discuss",
-      definition: "Explore multiple viewpoints, debates, and nuances surrounding the core question.",
-      expectation: "Structure a cohesive, balanced narrative weighing primary schools of thought before delivering a clear synthesis.",
-    };
-  }
-  if (q.includes("examine") || q.includes("investigate")) {
-    return {
-      verb: "Examine",
-      definition: "Investigate closely, scrutinizing assumptions and empirical proof.",
-      expectation: "Surface hidden assumptions and cross-reference them with primary research and verified case evidence.",
-    };
-  }
-  if (q.includes("evaluate")) {
-    return {
-      verb: "Evaluate",
-      definition: "Form a judgment on the value, efficacy, or validity of theories and evidence.",
-      expectation: "Deliver reasoned, criteria-based conclusions supported by empirical data and scholarly consensus.",
-    };
-  }
-  return {
-    verb: "Analyze & Synthesize",
-    definition: "Dissect core themes and engage critically with peer-reviewed scholarship.",
-    expectation: "Demonstrate independent evaluation, rigorous evidence grounding, and coherent structural development.",
-  };
-}
-
-function generateThesisStances(question: string, briefText?: string): {
-  id: string;
-  badge: string;
-  title: string;
-  statement: string;
-  isRecommended?: boolean;
-}[] {
-  // Grounded in the brief's own title and questions; never a subject lookup table.
-  const grounded = briefGroundedStances([briefText, question].filter(Boolean).join("\n"));
-  if (grounded.length) return grounded;
-  const topic = cleanTopic(question);
-
-  return [
-    {
-      id: "stance-gen-balanced",
-      badge: "Recommended",
-      title: "Balanced Synthesis Stance",
-      statement: `While ${topic} presents complex institutional and analytical trade-offs, a rigorous framework integrating competing theoretical perspectives provides the most coherent and defensible foundation.`,
-      isRecommended: true,
-    },
-    {
-      id: "stance-gen-critical",
-      badge: "Critical Analysis",
-      title: "Structural Critique Stance",
-      statement: `A critical examination indicates that conventional assumptions regarding ${topic} overlook underlying systemic vulnerabilities, demanding fundamental structural reassessment rather than incremental adaptation.`,
-    },
-    {
-      id: "stance-gen-reform",
-      badge: "Pragmatic Reform",
-      title: "Evidence-Led Reform Stance",
-      statement: `Empirical evidence indicates that addressing ${topic} effectively requires targeted policy interventions, transparent evaluation benchmarks, and adaptive stakeholder alignment.`,
-    },
-  ];
-}
-
 const WRITING_VOICE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "natural", label: "Clear & Natural Academic (Default)" },
   { value: "expository", label: "Simple & Direct" },
   { value: "analytical", label: "Analytical" },
   { value: "custom", label: "My Own Writing Style" },
 ];
-
-function generateSubQuestions(question: string, briefText?: string): string[] {
-  const extracted = extractBriefInquiriesAndConcepts(question || "", briefText || "");
-  const found = [...(extracted.subQuestions || []), ...(extracted.extractedTasks || [])].filter(
-    (q) => q && q.trim().length > 15
-  );
-  if (found.length >= 2) {
-    return found;
-  }
-
-  const topic = cleanTopic(question);
-  return [
-    `What theoretical frameworks and foundational literature define the scope of ${topic}?`,
-    `How do competing academic perspectives and counter-evidence challenge conventional assumptions?`,
-    `What empirical case studies or practical evidence best demonstrate the real-world trade-offs involved?`,
-    `What actionable conclusions and strategic recommendations follow from a critical synthesis of the findings?`,
-  ];
-}
 
 export interface AssignmentUnderstandStageProps {
   onBack?: () => void;
@@ -244,7 +104,6 @@ export default function AssignmentUnderstandStage({
   onProceed,
 }: AssignmentUnderstandStageProps = {}) {
   const {
-    projectId,
     project,
     question,
     academicLevel,
@@ -259,7 +118,6 @@ export default function AssignmentUnderstandStage({
     structure,
     setStructure,
     saveAnswers,
-    analysis,
     setAnalysis,
     advancePhase,
     setPhase,
@@ -312,7 +170,6 @@ export default function AssignmentUnderstandStage({
     return ARCHETYPE_DEFAULT_TONES[curType] || "formal_academic";
   });
 
-  const [isWordCountFocused, setIsWordCountFocused] = useState<boolean>(false);
 
   // Auto-Update Writing Tone on initial load if essay with default analytical tone
   useEffect(() => {
@@ -401,18 +258,13 @@ export default function AssignmentUnderstandStage({
   const [activeThesis, setActiveThesis] = useState<string>(() => {
     const existing = project?.answers?.["assignment_thesis"] || project?.answers?.["thesis_statement"] || structure?.thesisStatement;
     if (typeof existing === "string" && existing.trim().length > 0) return existing;
-    const defaultStances = generateThesisStances(cleanAnswerString(question), cleanAnswerString(assignmentBriefText));
+    const defaultStances = briefGroundedStances([cleanAnswerString(assignmentBriefText), cleanAnswerString(question)].filter(Boolean).join("\n"));
     return defaultStances[0]?.statement || "";
   });
 
   const [isGeneratingStructure, setIsGeneratingStructure] = useState(false);
-  const [agenticStageIndex, setAgenticStageIndex] = useState(0);
-  const [structureError, setStructureError] = useState<string | null>(null);
 
   // Autonomous synthesis progress state
-  const [autonomousProgress, setAutonomousProgress] = useState<CourseworkProgressEvent | null>(null);
-  const [isExecutingAutonomous, setIsExecutingAutonomous] = useState<boolean>(false);
-  const [autonomousError, setAutonomousError] = useState<string | null>(null);
 
   // Writing Style state
   const [localStyle, setLocalStyle] = useState<WritingStyleConfig>(() => {
@@ -450,146 +302,8 @@ export default function AssignmentUnderstandStage({
   const [institution, setInstitution] = useState(institutionName);
   const [deadline, setDeadline] = useState(deadlineDate);
   const [rubricText, setRubricText] = useState(markingRubricText);
-  const rubricFileInputRef = useRef<HTMLInputElement>(null);
 
   const [uploadingBrief, setUploadingBrief] = useState(false);
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
-
-  // Scope boundaries
-  const [editingIncludedIdx, setEditingIncludedIdx] = useState<number | null>(null);
-  const [editingIncludedText, setEditingIncludedText] = useState("");
-  const [isAddingIncluded, setIsAddingIncluded] = useState(false);
-  const [newIncludedText, setNewIncludedText] = useState("");
-
-  const [editingExcludedIdx, setEditingExcludedIdx] = useState<number | null>(null);
-  const [editingExcludedText, setEditingExcludedText] = useState("");
-  const [isAddingExcluded, setIsAddingExcluded] = useState(false);
-  const [newExcludedText, setNewExcludedText] = useState("");
-
-  const scopeClassification = useMemo(() => {
-    return classifyScopeBoundaries(
-      localBrief || localQuestion || "",
-      analysis?.keyConcepts || []
-    );
-  }, [localBrief, localQuestion, analysis?.keyConcepts]);
-
-  const currentIncluded = useMemo(() => {
-    const raw = analysis?.scopeBoundaries?.included;
-    if (raw && raw.length > 0) {
-      return raw.map(stripLineTags).filter(Boolean);
-    }
-    return scopeClassification.included.map(stripLineTags).filter(Boolean);
-  }, [analysis?.scopeBoundaries?.included, scopeClassification]);
-
-  const currentExcluded = useMemo(() => {
-    const raw = analysis?.scopeBoundaries?.excluded;
-    if (raw && raw.length > 0) {
-      return raw.map(stripLineTags).filter(Boolean);
-    }
-    return scopeClassification.excluded.map(stripLineTags).filter(Boolean);
-  }, [analysis?.scopeBoundaries?.excluded, scopeClassification]);
-
-  const handleSaveIncludedEdit = (idx: number) => {
-    if (!editingIncludedText.trim()) {
-      setEditingIncludedIdx(null);
-      return;
-    }
-    const updated = [...currentIncluded];
-    updated[idx] = editingIncludedText.trim();
-    if (analysis) {
-      setAnalysis({
-        ...analysis,
-        scopeBoundaries: {
-          ...analysis.scopeBoundaries,
-          included: updated,
-          excluded: currentExcluded,
-        },
-      });
-    }
-    setEditingIncludedIdx(null);
-  };
-
-  const handleDeleteIncluded = (idx: number) => {
-    const updated = currentIncluded.filter((_, i) => i !== idx);
-    if (analysis) {
-      setAnalysis({
-        ...analysis,
-        scopeBoundaries: {
-          ...analysis.scopeBoundaries,
-          included: updated,
-          excluded: currentExcluded,
-        },
-      });
-    }
-  };
-
-  const handleAddIncluded = () => {
-    if (!newIncludedText.trim()) return;
-    const updated = [...currentIncluded, newIncludedText.trim()];
-    if (analysis) {
-      setAnalysis({
-        ...analysis,
-        scopeBoundaries: {
-          ...analysis.scopeBoundaries,
-          included: updated,
-          excluded: currentExcluded,
-        },
-      });
-    }
-    setNewIncludedText("");
-    setIsAddingIncluded(false);
-  };
-
-  const handleSaveExcludedEdit = (idx: number) => {
-    if (!editingExcludedText.trim()) {
-      setEditingExcludedIdx(null);
-      return;
-    }
-    const updated = [...currentExcluded];
-    updated[idx] = editingExcludedText.trim();
-    if (analysis) {
-      setAnalysis({
-        ...analysis,
-        scopeBoundaries: {
-          ...analysis.scopeBoundaries,
-          included: currentIncluded,
-          excluded: updated,
-        },
-      });
-    }
-    setEditingExcludedIdx(null);
-  };
-
-  const handleDeleteExcluded = (idx: number) => {
-    const updated = currentExcluded.filter((_, i) => i !== idx);
-    if (analysis) {
-      setAnalysis({
-        ...analysis,
-        scopeBoundaries: {
-          ...analysis.scopeBoundaries,
-          included: currentIncluded,
-          excluded: updated,
-        },
-      });
-    }
-  };
-
-  const handleAddExcluded = () => {
-    if (!newExcludedText.trim()) return;
-    const updated = [...currentExcluded, newExcludedText.trim()];
-    if (analysis) {
-      setAnalysis({
-        ...analysis,
-        scopeBoundaries: {
-          ...analysis.scopeBoundaries,
-          included: currentIncluded,
-          excluded: updated,
-        },
-      });
-    }
-    setNewExcludedText("");
-    setIsAddingExcluded(false);
-  };
 
   const computeWordBudgetFromSections = (
     total: number,
@@ -892,45 +606,7 @@ export default function AssignmentUnderstandStage({
     saveAnswers({ citationStyle: cs, citation_style: cs });
   };
 
-  const handleCourseDetailsBlur = () => {
-    const parsedCriteria = parseRubricCriteria(rubricText);
-    saveAnswers({
-      course_name: course,
-      institution,
-      deadline,
-      marking_rubric: rubricText,
-      rubric: rubricText,
-      rubricCriteria: parsedCriteria,
-      rubric_criteria: parsedCriteria,
-      courseDetails: {
-        courseCode: course,
-        institution,
-        deadline,
-        rubric: rubricText,
-      },
-    });
-  };
 
-  const handleRubricFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const text = ev.target?.result as string;
-      setRubricText(text);
-      const parsedCriteria = parseRubricCriteria(text);
-      saveAnswers({
-        marking_rubric: text,
-        rubric: text,
-        rubricCriteria: parsedCriteria,
-        rubric_criteria: parsedCriteria,
-      });
-    };
-    reader.readAsText(file);
-    if (e.target) {
-      e.target.value = "";
-    }
-  };
 
   const canProceedToSources =
     localQuestion.trim().length > 0 &&
@@ -952,12 +628,9 @@ export default function AssignmentUnderstandStage({
   ].filter((x): x is string => Boolean(x));
 
   const subQuestions = useMemo(() => {
-    return generateSubQuestions(localQuestion, localBrief);
+    return briefSubQuestions(localQuestion, localBrief);
   }, [localQuestion, localBrief]);
 
-  const markBudgets = useMemo(() => {
-    return allocateWordsByMarks(subQuestions, localWordCount);
-  }, [subQuestions, localWordCount]);
 
   const briefSummary = useMemo(() => {
     const text = cleanAnswerString(localBrief) || cleanAnswerString(localQuestion);
@@ -981,7 +654,8 @@ export default function AssignmentUnderstandStage({
   }, [localBrief, localQuestion, subQuestions]);
 
   const thesisStances = useMemo(() => {
-    return generateThesisStances(localQuestion, localBrief);
+    // Only stances grounded in the brief's own title and questions; none are made up.
+    return briefGroundedStances([localBrief, localQuestion].filter(Boolean).join("\n"));
   }, [localQuestion, localBrief]);
 
   // Synchronize active thesis if empty: the AI's own line of argument first.
@@ -1084,15 +758,6 @@ export default function AssignmentUnderstandStage({
   const handleGenerateStructure = async () => {
     if (!canGenerate || isGeneratingStructure) return;
     setIsGeneratingStructure(true);
-    setStructureError(null);
-    setAnalysisError(null);
-    setAgenticStageIndex(0);
-
-    const stageInterval = setInterval(() => {
-      setAgenticStageIndex((prev) =>
-        prev < AGENTIC_THINKING_STAGES.length - 1 ? prev + 1 : prev
-      );
-    }, 500);
 
     let proposedStructure = generateDynamicAssignmentStructure({
       question: localQuestion,
@@ -1114,7 +779,7 @@ export default function AssignmentUnderstandStage({
     userOverrideStepRef.current = false;
     setUnderstandStep("outline_review");
 
-    const defaultStances = generateThesisStances(localQuestion, localBrief);
+    const defaultStances = briefGroundedStances([localBrief, localQuestion].filter(Boolean).join("\n"));
     if (!activeThesis && defaultStances.length > 0) {
       setActiveThesis(defaultStances[0].statement);
     }
@@ -1226,7 +891,6 @@ export default function AssignmentUnderstandStage({
     } catch (saveErr) {
       console.warn("Could not save answers during structure generation:", saveErr);
     } finally {
-      clearInterval(stageInterval);
       setIsGeneratingStructure(false);
     }
   };
@@ -1234,7 +898,6 @@ export default function AssignmentUnderstandStage({
   const processUploadedFile = async (file: File) => {
     if (!file) return;
 
-    setAnalysisError(null);
     setParseNotice(null);
 
 
@@ -1320,7 +983,6 @@ export default function AssignmentUnderstandStage({
       });
     } catch (err: any) {
       console.warn("Upload error:", err);
-      setAnalysisError(err.message || "Failed to parse brief file.");
     } finally {
       setUploadingBrief(false);
       if (fileInputRef.current) {
@@ -1452,6 +1114,11 @@ export default function AssignmentUnderstandStage({
                   </div>
                 </div>
               </DropzoneErrorBoundary>
+            )}
+            {parseNotice && (
+              <p role="alert" data-testid="understand-parse-notice" className="text-xs text-[color:var(--state-danger)]">
+                {parseNotice}
+              </p>
             )}
 
             <BriefScopePanel

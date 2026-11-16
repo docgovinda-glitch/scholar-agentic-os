@@ -407,3 +407,12 @@ export function generateThesisStatement(
   }
   return `This study provides a systematic academic investigation into ${topicText}, synthesizing authoritative theoretical frameworks and empirical evidence to evaluate contemporary outcomes.`;
 }
+
+/**
+ * The research sub-questions the brief itself asks (its questions and tasks).
+ * Empty when the brief states none: no generic questions are made up.
+ */
+export function briefSubQuestions(question: string, briefText?: string): string[] {
+  const extracted = extractBriefInquiriesAndConcepts(question || "", briefText || "");
+  return [...(extracted.subQuestions || []), ...(extracted.extractedTasks || [])].filter((q) => q && q.trim().length > 15);
+}

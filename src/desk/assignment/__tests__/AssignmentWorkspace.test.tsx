@@ -260,7 +260,10 @@ describe("Scholar Core Assignment Workspace", () => {
     expect(screen.queryByText(/Visual Storyline Roadmap/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Clean Grading Checklist/i)).not.toBeInTheDocument();
     expect(screen.getByText(/Topic & Core Angle/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/Do not write about general history before 2000/i).length).toBeGreaterThanOrEqual(1);
+    // No generic research questions are made up when the brief states none
+    // (the old fallback pasted the whole brief into a template question).
+    expect(screen.queryByText(/What theoretical frameworks and foundational literature define the scope/i)).toBeNull();
+    expect(screen.queryByText(/Balanced Synthesis Stance/i)).toBeNull();
 
     // 5. Confirm no visual regressions or unwanted stage tabs exist
     expect(screen.queryByText(/AssignmentDeconstructStage/i)).not.toBeInTheDocument();
