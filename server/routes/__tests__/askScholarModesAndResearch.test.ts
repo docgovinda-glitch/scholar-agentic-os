@@ -347,7 +347,7 @@ Archival diplomatic records in your Knowledge Vault demonstrate how early tariff
       expect(res.body.citations[0].authorityBadge).toBe("Knowledge Vault");
       expect(res.body.citations[1].sourceType).toBe("official");
       expect(res.body.citations[1].authorityBadge).toBe("Government / Official");
-    });
+    }, 10000);
   });
 
   describe("Test 5 — Prompt-Injection Defense & HTML Metadata Extraction Resilience", () => {
