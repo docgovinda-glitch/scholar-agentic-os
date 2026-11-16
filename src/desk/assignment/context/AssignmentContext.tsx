@@ -403,7 +403,6 @@ export function AssignmentProvider({
       setActiveStage(phase);
       saveAnswers({
         assignment_current_phase: phase,
-        assignment_current_stage: phase,
       });
       if (typeof onStageChangeCallback === "function") {
         onStageChangeCallback(phase, options);
@@ -474,9 +473,7 @@ export function AssignmentProvider({
   const setWritingStyle = useCallback(
     async (style: WritingStyleConfig) => {
       await saveAnswers({
-        writingStyle: style,
         writing_style: style,
-        writingTone: style,
         writing_tone: style,
       });
     },
@@ -510,11 +507,8 @@ export function AssignmentProvider({
       const budgets = structureToSectionBudgets(newStructure);
       await saveAnswers({
         assignment_structure: newStructure,
-        structure: newStructure,
-        sectionBudgets: budgets,
         section_budgets: budgets,
         assignment_internal_sections: internalSecs,
-        assignment_outline: internalSecs,
       });
     },
     [saveAnswers]
@@ -535,7 +529,6 @@ export function AssignmentProvider({
       };
       const updated = [...sectionBudgets, newSection];
       await saveAnswers({
-        sectionBudgets: updated,
         section_budgets: updated,
       });
     },
@@ -548,7 +541,6 @@ export function AssignmentProvider({
         sec.id === id ? { ...sec, ...updates } : sec
       );
       await saveAnswers({
-        sectionBudgets: updated,
         section_budgets: updated,
       });
     },
@@ -559,7 +551,6 @@ export function AssignmentProvider({
     async (id: string) => {
       const updated = sectionBudgets.filter((sec) => sec.id !== id);
       await saveAnswers({
-        sectionBudgets: updated,
         section_budgets: updated,
       });
     },
@@ -578,7 +569,6 @@ export function AssignmentProvider({
         { id: "conclusion", title: "Conclusion", targetWordCount: conclusion, isCustom: false },
       ];
       await saveAnswers({
-        sectionBudgets: defaults,
         section_budgets: defaults,
       });
     },
@@ -680,7 +670,6 @@ export function AssignmentProvider({
     async (newPlan: ResearchPlan) => {
       await saveAnswers({
         assignment_plan: typeof newPlan === "string" ? newPlan : JSON.stringify(newPlan),
-        assignment_research_plan: typeof newPlan === "string" ? newPlan : JSON.stringify(newPlan),
       });
     },
     [saveAnswers]
@@ -721,7 +710,6 @@ export function AssignmentProvider({
     async (ids: string[]) => {
       await saveAnswers({
         approved_source_ids: ids,
-        approvedSourceIds: ids,
       });
     },
     [saveAnswers]
@@ -738,7 +726,6 @@ export function AssignmentProvider({
       await saveAnswers({
         assignment_sources: updated,
         approved_source_ids: nextApproved,
-        approvedSourceIds: nextApproved,
       });
     },
     [sources, approvedSourceIds, saveAnswers]
@@ -763,7 +750,6 @@ export function AssignmentProvider({
 
       await saveAnswers({
         approved_source_ids: nextApproved,
-        approvedSourceIds: nextApproved,
         assignment_sources: nextSources,
       });
     },
@@ -783,7 +769,6 @@ export function AssignmentProvider({
       await saveAnswers({
         assignment_sources: nextSources,
         approved_source_ids: nextApproved,
-        approvedSourceIds: nextApproved,
       });
     },
     [sources, approvedSourceIds, saveAnswers]
@@ -797,7 +782,6 @@ export function AssignmentProvider({
         assignment_user_uploaded_sources: nextUploaded,
         userUploadedSources: nextUploaded,
         approved_source_ids: nextApproved,
-        approvedSourceIds: nextApproved,
       });
     },
     [userUploadedSources, approvedSourceIds, saveAnswers]
@@ -811,7 +795,6 @@ export function AssignmentProvider({
         assignment_user_uploaded_sources: nextUploaded,
         userUploadedSources: nextUploaded,
         approved_source_ids: nextApproved,
-        approvedSourceIds: nextApproved,
       });
     },
     [userUploadedSources, approvedSourceIds, saveAnswers]
@@ -862,7 +845,6 @@ export function AssignmentProvider({
       const generated = structureToInternalSections(structure);
       saveAnswers({
         assignment_internal_sections: generated,
-        assignment_outline: generated,
       });
       if (generated.length > 0) {
         setActiveSectionId((prev) => prev || generated[0].id);
@@ -878,7 +860,6 @@ export function AssignmentProvider({
 
     saveAnswers({
       assignment_internal_sections: generated,
-      assignment_outline: generated,
     });
 
     if (generated.length > 0) {
@@ -915,7 +896,6 @@ export function AssignmentProvider({
 
       await saveAnswers({
         assignment_internal_sections: updated,
-        assignment_outline: updated,
       });
     },
     [latestSections, saveAnswers]
@@ -930,7 +910,6 @@ export function AssignmentProvider({
 
       await saveAnswers({
         assignment_internal_sections: updated,
-        assignment_outline: updated,
       });
     },
     [latestSections, saveAnswers]
@@ -1028,7 +1007,6 @@ export function AssignmentProvider({
     });
     await saveAnswers({
       assignment_internal_sections: updated,
-      assignment_outline: updated,
     });
   }, [latestSections, saveAnswers]);
 

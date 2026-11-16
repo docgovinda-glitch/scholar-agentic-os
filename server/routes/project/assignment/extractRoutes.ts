@@ -2,7 +2,7 @@ import { WORD_LIMIT_MAX } from "../../../../src/domain/assignment/wordLimit.ts";
 import { DEFAULT_CITATION_STYLE } from "../../../../src/domain/assignment/answerKeys.ts";
 import { errorText } from "../../../../src/shared/errorText.ts";
 import { parseBody, AnalyzeBody, OutlineBody } from "./schemas.ts";
-import { routedCompletion } from "../../../src/ai/routerBridge.ts";
+import { routedCompletion } from "../../../src/services/scholarBrain.ts";
 import { sendAiFailure,UnusableAiResponseError } from "../../../src/ai/aiRouteErrors.ts";
 import { structureFromAi } from "../../../../src/domain/assignment/aiAssignmentOutline.ts";
 import { scopeBrief } from "../../../../src/domain/assignment/briefScoping.ts";

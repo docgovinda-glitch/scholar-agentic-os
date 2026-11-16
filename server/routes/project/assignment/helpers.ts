@@ -1,5 +1,5 @@
 import { DEFAULT_CITATION_STYLE } from "../../../../src/domain/assignment/answerKeys.ts";
-import { routedCompletion } from "../../../src/ai/routerBridge.ts";
+import { routedCompletion } from "../../../src/services/scholarBrain.ts";
 import type { ProjectRecord } from "../../../../src/services/store/types.ts";
 import express from "express";
 import { createUploadInstance } from "../../../src/middleware/uploadGuard.ts";

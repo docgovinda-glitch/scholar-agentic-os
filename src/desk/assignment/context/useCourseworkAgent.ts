@@ -144,7 +144,6 @@ export function useCourseworkAgent(d: Deps): CourseworkAgent {
           // The list is written only once the student has made a decision (the
           // reader falls back to prescribed references and uploads until then).
           assignment_structure: bound.structure,
-          structure: bound.structure,
           ...(bound.sections.length ? { assignment_internal_sections: bound.sections, assignment_outline: bound.sections } : {}),
         });
         const useful = analyses.filter((a) => a.relevance !== "low").length;

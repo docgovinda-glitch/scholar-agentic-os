@@ -226,7 +226,6 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
       setLocalTone(targetTone);
       saveAnswers({
         writing_tone: targetTone,
-        writingTone: targetTone,
         academicTone: targetTone,
         academic_tone: targetTone,
       });
@@ -542,14 +541,9 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
           assignment_question: cleanPrompt,
           assignment_brief_text: cleanPrompt,
           assignment_brief_file: file.name,
-          targetWordCount: newWordCount,
-          target_word_count: newWordCount,
-          word_count: newWordCount,
           word_limit: newWordCount,
           academic_level: nextLevel,
-          academicLevel: nextLevel,
           citation_style: nextCitation,
-          citationStyle: nextCitation,
         });
       } catch (persistErr) {
         console.warn("Could not save the extracted brief yet:", persistErr);
@@ -560,10 +554,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
       let dynamicStruct = generateDynamicAssignmentStructure({
         question: cleanPrompt,
         assignmentType: localType,
-        academicLevel: nextLevel,
-        targetWordCount: newWordCount,
         writingTone: localTone,
-        citationStyle: nextCitation,
       });
 
       let serverAnalysis: AssignmentAnalysis | null = null;
@@ -581,7 +572,6 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
             academicLevel: nextLevel,
             targetWordCount: newWordCount,
             citationStyle: nextCitation,
-            writingTone: localTone,
             writing_tone: localTone,
             briefText: cleanPrompt,
           }
@@ -615,28 +605,18 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
         assignment_prompt: cleanPrompt,
         assignment_question: cleanPrompt,
         assignment_brief_text: cleanPrompt,
-        research_topic: cleanPrompt,
         assignment_brief: cleanPrompt,
         assignment_brief_file: file.name,
-        targetWordCount: newWordCount,
-        target_word_count: newWordCount,
-        word_count: newWordCount,
         word_limit: newWordCount,
         assignment_structure: dynamicStruct,
-        structure: dynamicStruct,
-        sectionBudgets: budgets,
         section_budgets: budgets,
         assignment_internal_sections: internalSecs,
-        assignment_outline: internalSecs,
         sections: legacyBreakdown,
         wordBudget: budget,
         word_budget: budget,
         academic_level: nextLevel,
-        academicLevel: nextLevel,
         citation_style: nextCitation,
-        citationStyle: nextCitation,
         writing_tone: localTone,
-        writingTone: localTone,
       };
 
       if (serverAnalysis) {
@@ -999,9 +979,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                   setLocalTone(matchedTone);
                   saveAnswers({
                     assignment_type: val,
-                    assignmentType: val,
                     writing_tone: matchedTone,
-                    writingTone: matchedTone,
                     academicTone: matchedTone,
                     academic_tone: matchedTone,
                   });

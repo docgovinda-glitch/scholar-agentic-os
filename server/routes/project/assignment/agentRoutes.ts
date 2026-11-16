@@ -2,7 +2,7 @@ import { z } from "zod";
 import { countProseWords } from "../../../../src/shared/proseBlocks.ts";
 import { scholarBrain } from "../../../src/services/scholarBrain.ts";
 import express from "express";
-import { routedCompletion } from "../../../src/ai/routerBridge.ts";
+import { routedCompletion } from "../../../src/services/scholarBrain.ts";
 import { sendAiFailure, UnusableAiResponseError } from "../../../src/ai/aiRouteErrors.ts";
 import { getProjectStore } from "../../../../src/services/store/projectStore.ts";
 import {
