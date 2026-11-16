@@ -41,7 +41,7 @@ const VaultSetupScreen = lazy(() => import("./setup/VaultSetupScreen"));
 const VaultScreen = lazy(() => import("./vault/VaultScreen"));
 
 import type { AssignmentStage } from "./assignment/types";
-import { ASSIGNMENT_STAGES } from "./assignment/types";
+import { ASSIGNMENT_PHASES, ASSIGNMENT_STAGES } from "./assignment/types";
 
 const SECTION_IDS: readonly SectionId[] = ["overview", "providers", "subscription", "preferences"];
 
@@ -68,7 +68,8 @@ function isResearchStage(value: string | undefined): value is ResearchStage {
   return !!value && STAGE_MAP.has(value as ResearchStage);
 }
 
-const ASSIGNMENT_STAGE_SET = new Set<string>(ASSIGNMENT_STAGES.map((s) => s.id));
+// Every phase (Phase 01 Extract included) and the legacy stage ids, so a reload keeps the open phase.
+const ASSIGNMENT_STAGE_SET = new Set<string>([...ASSIGNMENT_PHASES.map((p) => p.id), ...ASSIGNMENT_STAGES.map((s) => s.id)]);
 function isAssignmentStage(value: string | undefined): value is AssignmentStage {
   return !!value && ASSIGNMENT_STAGE_SET.has(value);
 }

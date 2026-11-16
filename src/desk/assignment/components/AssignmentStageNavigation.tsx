@@ -53,7 +53,15 @@ export default function AssignmentStageNavigation({
     const p2 = !hasBrief ? 0 : structure?.isConfirmed ? 100 : hasOutline ? 75 : 50;
     const p3 = Math.min(100, Math.round((approvedSourceIds.length / 4) * 100));
     const p4 = Math.min(100, wordCountPercentage || 0);
-    const p5 = submissionReport ? 100 : 0;
+    // The share of submission checks that pass (not 100% just because a check ran).
+    const report = submissionReport as { readinessPercentage?: number; readyForSubmission?: boolean; overallScore?: number } | null;
+    const p5 = !report
+      ? 0
+      : typeof report.readinessPercentage === "number"
+        ? Math.max(0, Math.min(100, Math.round(report.readinessPercentage)))
+        : report.readyForSubmission
+          ? 100
+          : Math.max(0, Math.min(99, Math.round(report.overallScore ?? 0)));
     return {
       extract: p1,
       understand: p2,

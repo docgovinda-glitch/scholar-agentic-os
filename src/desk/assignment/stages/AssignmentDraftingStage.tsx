@@ -1,5 +1,6 @@
 import OutlineByAiPanel from "../components/OutlineByAiPanel";
 import { selectApprovedSources } from "../../../domain/assignment/approvedSources";
+import { clipHeadingWords } from "../../../utils/briefQuestions";
 import { useToast } from "../../../components/ui/FeedbackSystem";
 import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
@@ -293,7 +294,7 @@ export function AssignmentDraftingStage({
       } catch (err) {
         // Keep whatever the section had before; never fill it with stand-in text.
         // One clean toast; no uncaught console stack traces.
-        showError(`"${sec.title}" was not drafted: ${err instanceof Error ? err.message : String(err)}`);
+        showError(`"${clipHeadingWords(sec.title)}" was not ${revisionPrompt ? "revised" : "drafted"}: ${err instanceof Error ? err.message : String(err)}`);
         setStreamingChunk("");
         setActiveStreamingSectionId(null);
         setGeneratingSection(sec.id, false);

@@ -187,3 +187,13 @@ describe("evaluateRubricCompliance: missing sections", () => {
     expect(evaluateRubricCompliance("Introduction. Conclusion.", withRubric).criteria.map((c) => [c.criterion, c.weightPercentage])).toEqual([["Use of evidence", 40]]);
   });
 });
+
+describe("submission phase completion", () => {
+  it("is complete only when the last check left nothing to fix", async () => {
+    const { submissionPasses } = await import("../context/AssignmentContext");
+    expect(submissionPasses(null)).toBe(false);
+    expect(submissionPasses({ missingRequirements: ["1 approved source is not cited"] } as never)).toBe(false);
+    expect(submissionPasses({ missingRequirements: [] } as never)).toBe(true);
+    expect(submissionPasses({ readyForSubmission: false } as never)).toBe(false);
+  });
+});

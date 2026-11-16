@@ -87,6 +87,25 @@ export interface AssignmentSourceOriginRow {
   is_approved: boolean;
 }
 
+/** A full public.project_sources row for one Stage 3 source (every channel). */
+export interface AssignmentSourceRow extends AssignmentSourceOriginRow {
+  project_id: string;
+  title: string;
+  authors: string[];
+  year: number | null;
+  doi: string | null;
+  venue: string | null;
+  url: string | null;
+  abstract: string | null;
+  source_type: string;
+  authority_tier: string;
+  discovered_via: string;
+  discovered_at: string;
+  vault_item_id: string | null;
+  relevance_score: number | null;
+  updated_at: string;
+}
+
 export interface AssignmentRelationalSnapshot {
   project: AssignmentProjectRow;
   files: AssignmentFileRow[];
@@ -94,6 +113,8 @@ export interface AssignmentRelationalSnapshot {
   drafts: AssignmentDraftRevisionRow[];
   submission: AssignmentSubmissionCheckRow | null;
   sourceOrigins: AssignmentSourceOriginRow[];
+  /** Every source in the project's list, for public.project_sources (upserted by project_id, source_id). */
+  sources: AssignmentSourceRow[];
 }
 
 const MAX_PARSED_TEXT = 1_000_000;
@@ -164,6 +185,19 @@ interface SectionLike {
 
 interface SourceLike {
   id?: string;
+  title?: string;
+  authors?: unknown;
+  year?: unknown;
+  doi?: string;
+  url?: string;
+  journal?: string;
+  venue?: string;
+  abstract?: string;
+  type?: string;
+  authorityTier?: string;
+  peerReviewed?: boolean;
+  retrievedAt?: string;
+  relevanceScore?: unknown;
   status?: string;
   isExcluded?: boolean;
   prescribedInBrief?: boolean;
@@ -323,6 +357,32 @@ export function buildAssignmentRelationalSnapshot(
       is_approved: isSourceApproved(s, approvedIds),
     }));
 
+  const sourceRows: AssignmentSourceRow[] = (Array.isArray(sources) ? sources : [])
+    .filter((s): s is SourceLike & { id: string } => typeof s?.id === "string" && s.id.length > 0)
+    .map((s, i) => {
+      const year = parseInt(String(s.year ?? ""), 10);
+      const score = Number(s.relevanceScore);
+      return {
+        project_id: projectId,
+        ...sourceOrigins[i],
+        // A malformed index record (a whole abstract as its title) is clamped, not dropped.
+        title: (str(s.title) ?? "Untitled source").slice(0, 2000),
+        authors: (Array.isArray(s.authors) ? s.authors : []).map((a) => String(a).slice(0, 300)).slice(0, 200),
+        year: Number.isFinite(year) && year > 0 && year < 3000 ? year : null,
+        doi: str(s.doi) ?? null,
+        venue: str(s.journal) ?? str(s.venue) ?? null,
+        url: str(s.url) ?? null,
+        abstract: str(s.abstract) ? s.abstract!.slice(0, 20_000) : null,
+        source_type: str(s.type) ?? "scholarly",
+        authority_tier: str(s.authorityTier) ?? (s.peerReviewed ? "A" : "B"),
+        discovered_via: str(s.retrievalSource) ?? sourceOrigins[i].origin,
+        discovered_at: str(s.retrievedAt) ?? at,
+        vault_item_id: str(s.vaultItemId) ?? null,
+        relevance_score: Number.isFinite(score) ? Math.round(score <= 1 ? score * 100 : score) : null,
+        updated_at: at,
+      };
+    });
+
   const sections = readJson<SectionLike[]>(answers["assignment_internal_sections"], []);
   const drafts: AssignmentDraftRevisionRow[] = (Array.isArray(sections) ? sections : [])
     .filter((s) => typeof s?.draftContent === "string" && s.draftContent.trim().length > 0 && s.id)
@@ -371,5 +431,6 @@ export function buildAssignmentRelationalSnapshot(
     drafts,
     submission,
     sourceOrigins,
+    sources: sourceRows,
   };
 }

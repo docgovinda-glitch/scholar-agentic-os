@@ -60,14 +60,9 @@ export async function writeAssignmentSnapshot(
     await table("assignment_submission_checks").upsert(snap.submission as unknown as Row, "project_id,report_hash");
   }
 
-  // Source rows themselves are written by persistSourcesToSupabase; here only their channel and approval.
-  const sources = table("project_sources");
-  for (const s of snap.sourceOrigins) {
-    await sources.update(`${pid}&source_id=eq.${encodeURIComponent(s.source_id)}`, {
-      origin: s.origin,
-      is_approved: s.is_approved,
-    });
-  }
+  // Every Stage 3 source (live, vault, upload, prescribed) with its channel and
+  // approval. Columns this mirror does not own (citation_status, themes...) are kept.
+  if (snap.sources.length) await table("project_sources").upsert(snap.sources as unknown as Row[], "project_id,source_id");
 }
 
 const chains = new Map<string, Promise<void>>();

@@ -1,5 +1,6 @@
 import { countProseWords } from "../../../shared/proseBlocks";
 import { selectApprovedSources } from "../../../domain/assignment/approvedSources";
+import { clipHeadingWords } from "../../../utils/briefQuestions";
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode, useMemo, useRef } from "react";
 import { purgeLegacyTemplateText } from "../../../domain/assignment/legacyPurge";
 import type { CanonicalDocument, OutputTypeSpec, ProjectView, RubricReport } from "../../types";
@@ -210,6 +211,13 @@ export function useAssignmentWorkspace() {
     throw new Error("useAssignmentWorkspace must be used within an AssignmentProvider");
   }
   return context;
+}
+
+/** A submission phase is complete only when its last check found nothing left to fix. */
+export function submissionPasses(report: RubricScoreReport | SubmissionCheckReport | null): boolean {
+  if (!report) return false;
+  if ("missingRequirements" in report && Array.isArray(report.missingRequirements)) return report.missingRequirements.length === 0;
+  return "readyForSubmission" in report ? Boolean(report.readyForSubmission) : false;
 }
 
 export function AssignmentProvider({
@@ -871,7 +879,12 @@ export function AssignmentProvider({
       // Word counts always come from the text: a stored count can be stale after
       // a write that did not refresh it (server-side revisions, older saves).
       if (Array.isArray(parsed) && parsed.length > 0 && !isCorrupted(parsed)) {
-        return parsed.map((sec) => ({ ...sec, currentWordCount: countProseWords(sec?.draftContent || "") }));
+        return parsed.map((sec) => ({
+          ...sec,
+          // Older saves clipped titles with a trailing "…"; show them cut at a clean word.
+          ...(typeof sec?.title === "string" && /…\s*$/.test(sec.title) ? { title: clipHeadingWords(sec.title) } : {}),
+          currentWordCount: countProseWords(sec?.draftContent || ""),
+        }));
       }
     }
     const rawOutline = answers["assignment_outline"];
@@ -1499,7 +1512,7 @@ export function AssignmentProvider({
     const hasUnderstand = Boolean(structure?.isConfirmed || (hasExtract && analysis?.approvedByUser));
     const hasSources = selectApprovedSources(sources, approvedSourceIds).length > 0;
     const hasDrafting = currentWordCount >= Math.min(200, targetWordCount * 0.3);
-    const hasSubmission = Boolean(submissionReport);
+    const hasSubmission = submissionPasses(submissionReport);
 
     return {
       extract: currentPhase === "extract" ? "active" : hasExtract ? "completed" : "upcoming",
@@ -1531,7 +1544,7 @@ export function AssignmentProvider({
     const hasThinking = Boolean(thinkingMap && (thinkingMap.selectedThesisId || thinkingMap.customThesis));
     const hasStructure = outline.length >= 3;
     const hasDraft = currentWordCount >= Math.min(200, targetWordCount * 0.3);
-    const hasReport = Boolean(submissionReport);
+    const hasReport = submissionPasses(submissionReport);
 
     return {
       // 5 phases
