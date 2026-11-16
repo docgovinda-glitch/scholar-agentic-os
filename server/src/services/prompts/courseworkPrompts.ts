@@ -333,6 +333,17 @@ PARAGRAPH STRUCTURE (mandatory): ${isShortQA ? "write 1-2 paragraphs" : `write $
 Output ONLY the section text in clean academic Markdown prose. Do not print a heading for the section.`;
 }
 
+/** Second attempt when a section draft came back under its word budget. */
+export function streamSectionLongerPrompt({ prompt, draft, draftWords, targetWordCount, budgetRange }: { prompt: string; draft: string; draftWords: number; targetWordCount: number; budgetRange: { min: number; max: number } }): string {
+  return `${prompt}\n\nYOUR PREVIOUS ATTEMPT WAS ${draftWords} WORDS, BELOW THE BUDGET. Rewrite it fully at ${targetWordCount} words (${budgetRange.min}-${budgetRange.max}) in ${paragraphRange(targetWordCount)} paragraphs separated by blank lines, keeping every citation token.\nPREVIOUS ATTEMPT:\n${draft}`;
+}
+
+/** Last step when a draft is still short: continue it, never repeat it. */
+export function streamSectionContinuePrompt({ prompt, draft, missingWords }: { prompt: string; draft: string; missingWords: number }): string {
+  const paragraphs = missingWords > 180 ? "two new paragraphs" : "one new paragraph";
+  return `${prompt}\n\nTHE SECTION BELOW IS ${missingWords} WORDS SHORT OF ITS BUDGET. Write ONLY the continuation: ${paragraphs} of about ${missingWords} words that extend the argument with further analysis of the same question, using the same citation tokens where they apply. Do not repeat, summarise or restate the text below, add no heading, and write only text that follows on from its last sentence.\nSECTION SO FAR:\n${draft}`;
+}
+
 export function streamSectionSystemPrompt({ scholarlyDirectives }: { scholarlyDirectives: unknown }): string {
   return `You are the Scholar Core Grounded Academic Drafting Agent.\n\n${scholarlyDirectives}`;
 }

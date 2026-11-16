@@ -2,8 +2,7 @@ import express from "express";
 import { buildSectionScaffold, type ScaffoldSource } from "../../../src/utils/sectionScaffold.ts";
 import { BrowserAiRequiredError, InvalidLlmChallengeError, LocalModelUnreachableError, NoClientAiProviderError } from "../../../src/ai/aiRouteErrors.ts";
 import { buildSectionContract } from "../../../src/utils/sectionContract.ts";
-import { sectionWordRange, trimToSentenceWithinWords } from "../../../src/utils/sectionBudget.ts";
-import { countExactWords } from "../../../src/utils/wordBudgetAllocator.ts";
+import { fitDraftToBudget, sectionWordRange, trimToSentenceWithinWords } from "../../../src/utils/sectionBudget.ts";
 import { parseDocument } from "../../../../src/document_intelligence/index.ts";
 import {
   buildScholarlyVoiceSystemPrompt,
@@ -14,7 +13,7 @@ import { getProjectStore } from "../../../../src/services/store/projectStore.ts"
 import { callOpenRouterJSON, callOpenRouterText, handOffBeforeStream } from "../../../src/services/scholarBrain.ts";
 import { requestKeyring } from "../../../src/ai/routerBridge.ts";
 import { ensureParagraphBreaks } from "../../../../src/shared/proseParagraphs.ts";
-import { chunkPreservingWhitespace, openSseStream, paragraphRange, SSE_HEARTBEAT_MS, streamErrorMessage } from "../../../src/utils/sectionStream.ts";
+import { chunkPreservingWhitespace, openSseStream, SSE_HEARTBEAT_MS, streamErrorMessage } from "../../../src/utils/sectionStream.ts";
 import { scholarBrain } from "../../../src/services/scholarBrain.ts";
 import { sendAiFailure, UnusableAiResponseError } from "../../../src/ai/aiRouteErrors.ts";
 import {
@@ -378,23 +377,17 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
     let effectiveDraft = draft?.trim() ?? "";
     if (!effectiveDraft) throw new UnusableAiResponseError("section draft");
 
-    // Enforce the budget: ask once for a rewrite when far under, trim to a whole sentence when over.
-    if (!revisionPrompt && countExactWords(effectiveDraft) < budgetRange.min) {
-      try {
-        const longer = await callOpenRouterText(
-          req,
-          res,
-          systemPrompt,
-          `${prompt}\n\nYOUR PREVIOUS ATTEMPT WAS ${countExactWords(effectiveDraft)} WORDS, BELOW THE BUDGET. Rewrite it fully at ${targetWordCount} words (${budgetRange.min}-${budgetRange.max}) in ${paragraphRange(targetWordCount)} paragraphs separated by blank lines, keeping every citation token.\nPREVIOUS ATTEMPT:\n${effectiveDraft}`,
-          undefined,
-          "drafting"
-        );
-        if (longer && countExactWords(longer) > countExactWords(effectiveDraft)) effectiveDraft = longer.trim();
-      } catch {
-        // Keep the first draft rather than fail the whole section.
-      }
+    // Enforce the budget with the app's own word count: when short, one full
+    // rewrite and then one continuation (a revision keeps the student's request).
+    if (!revisionPrompt) {
+      effectiveDraft = await fitDraftToBudget(effectiveDraft, budgetRange, {
+        rewriteLonger: (current, words) =>
+          callOpenRouterText(req, res, systemPrompt, scholarBrain.courseworkPrompts.streamSectionLongerPrompt({ prompt, draft: current, draftWords: words, targetWordCount, budgetRange }), undefined, "drafting"),
+        continueDraft: (current, missingWords) =>
+          callOpenRouterText(req, res, systemPrompt, scholarBrain.courseworkPrompts.streamSectionContinuePrompt({ prompt, draft: current, missingWords }), undefined, "drafting"),
+      });
     }
-    effectiveDraft = trimToSentenceWithinWords(effectiveDraft, budgetRange.max);
+
 
     // Pipe streamed draft through deterministic citation interceptor
     effectiveDraft = replaceBracketTokensWithDeterministicCitations(
@@ -408,6 +401,8 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
     effectiveDraft = normalizeUnicodeNFC(effectiveDraft);
     // Paragraphs survive every step: blank lines kept, a single wall regrouped.
     effectiveDraft = ensureParagraphBreaks(effectiveDraft);
+    // Trim an overrun last: expanding citation tokens and cleaning the prose change the count.
+    effectiveDraft = trimToSentenceWithinWords(effectiveDraft, budgetRange.max);
 
     for (const chunk of chunkPreservingWhitespace(effectiveDraft, 5)) {
       res.write(`data: ${JSON.stringify({ chunk })}\n\n`);

@@ -1,6 +1,7 @@
 import OutlineByAiPanel from "../components/OutlineByAiPanel";
 import { selectApprovedSources } from "../../../domain/assignment/approvedSources";
 import { clipHeadingWords } from "../../../utils/briefQuestions";
+import { countProseWords } from "../../../shared/proseBlocks";
 import { useToast } from "../../../components/ui/FeedbackSystem";
 import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
@@ -283,7 +284,7 @@ export function AssignmentDraftingStage({
             remainingEssayWords: Math.max(
               0,
               (targetWordCount || 0) -
-                internalSections.filter((x) => x.id !== sec.id).reduce((n, x) => n + (x.draftContent ? x.draftContent.trim().split(/\s+/).filter(Boolean).length : 0), 0)
+                internalSections.filter((x) => x.id !== sec.id).reduce((n, x) => n + countProseWords(x.draftContent || ""), 0)
             ),
           },
           writingStyle: writingStyle && typeof writingStyle === "object" ? (writingStyle as { preset?: string; customSampleText?: string }) : undefined,

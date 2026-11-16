@@ -3,6 +3,7 @@
  * failure, never template prose.
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { countProseWords } from "../../../src/shared/proseBlocks";
 
 const TEST_USER_ID = "33333333-3333-4333-8333-333333333333";
 vi.mock("../../src/middleware/auth.ts", () => ({
@@ -149,6 +150,33 @@ describe("Coursework stream-section", () => {
       .send({ sectionTitle: "Introduction", allocatedWords: 50, boundSources: [{ id: "s1", title: "Group decisions", authors: ["Janis, I."], year: 1982 }] });
     expect(res.text).not.toMatch(/Unverified Claim/i);
     expect(res.text).not.toContain("[ev-unknown]");
+  });
+
+  it("lands a short draft inside its ±5% budget (rewrite, then continuation) counting words like the app", async () => {
+    const id = await createProject();
+    const sentence = (topic: string, n: number) => `${Array.from({ length: n - 1 }, (_, i) => `${topic}${i}`).join(" ")} end.`;
+    vi.mocked(callOpenRouterText)
+      .mockResolvedValueOnce(sentence("first", 20)) // first draft: 20 words
+      .mockResolvedValueOnce(sentence("second", 30)) // rewrite: 30 words, still short
+      .mockResolvedValueOnce(sentence("third", 20)); // continuation: new text
+    const res = await request(app).post(`/api/projects/${id}/assignment/stream-section`).send({ sectionTitle: "Body", allocatedWords: 50 });
+    const full = res.text.split("\n\n").filter((l) => l.startsWith("data: {")).map((l) => JSON.parse(l.slice(6))).find((e) => typeof e.fullText === "string")?.fullText as string;
+    const n = countProseWords(full);
+    expect(n).toBeGreaterThanOrEqual(47);
+    expect(n).toBeLessThanOrEqual(53);
+    expect(full).toMatch(/second0[\s\S]*\n\nthird0/);
+  });
+
+  it("trims an overrun created by expanding citation tokens", async () => {
+    const id = await createProject();
+    const body = Array.from({ length: 10 }, (_, i) => `Claim number ${i} holds [1].`).join(" "); // 40 words + 10 tokens
+    vi.mocked(callOpenRouterText).mockResolvedValue(`${body} ${body}`);
+    const res = await request(app)
+      .post(`/api/projects/${id}/assignment/stream-section`)
+      .send({ sectionTitle: "Body", allocatedWords: 80, boundSources: [{ id: "s1", title: "Rates", authors: ["Kuncoro, H."], year: 2020 }] });
+    const full = res.text.split("\n\n").filter((l) => l.startsWith("data: {")).map((l) => JSON.parse(l.slice(6))).find((e) => typeof e.fullText === "string")?.fullText as string;
+    expect(full).toContain("Kuncoro");
+    expect(countProseWords(full)).toBeLessThanOrEqual(84);
   });
 
   it("keeps the blank lines between paragraphs in the streamed chunks and final text", async () => {

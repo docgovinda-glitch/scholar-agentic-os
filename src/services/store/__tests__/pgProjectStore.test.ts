@@ -477,4 +477,29 @@ describe("services/store: pgProjectStore", () => {
     ]);
     expect((await createPgProjectStore(getDb).get("proj-g2"))?.sourceCountOverride).toEqual(sourceCountOverride);
   });
+
+  it("save() keeps Coursework sources, uploads and evidence in answers and never writes columns that do not exist", async () => {
+    const db = fakeDb();
+    const store = createPgProjectStore(db);
+    const record = await store.create("OT-01", "11111111-1111-4111-8111-111111111111");
+    db.calls.length = 0;
+    record.answers = {
+      assignment_sources: [{ id: "s1", title: "Rates", authors: ["Kuncoro, H."], year: "2020" }],
+      assignment_user_uploaded_sources: [{ id: "u1", name: "notes.txt" }],
+      assignment_evidence_items: [{ id: "e1", sourceId: "s1", claim: "x" }],
+    };
+    await store.save(record);
+    expect(db.calls).toHaveLength(1);
+    const saved = JSON.parse(String(db.calls[0].params?.[4]));
+    expect(saved.assignment_sources[0].id).toBe("s1");
+    expect(saved.assignment_user_uploaded_sources[0].id).toBe("u1");
+    expect(saved.assignment_evidence_items[0].id).toBe("e1");
+    expect(db.calls.map((c) => c.text).join(" ")).not.toMatch(/metadata|is_excluded|project_evidence|project_uploaded_sources/);
+  });
+
+  it("get() reads only the projects row (no subqueries on columns the schema lacks)", async () => {
+    const db = fakeDb([]);
+    await createPgProjectStore(db).get("proj-x");
+    expect(db.calls[0].text).not.toMatch(/metadata/);
+  });
 });

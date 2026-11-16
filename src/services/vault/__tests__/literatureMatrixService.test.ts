@@ -82,6 +82,9 @@ describe("literatureMatrixService", () => {
     expect(formatInTextCitation({ authors: ["Alice Walker"], year: "2024" })).toBe("Walker (2024)");
     expect(formatInTextCitation({ authors: ["Alice Walker", "Bob Smith"], year: "2024" })).toBe("Walker & Smith (2024)");
     expect(formatInTextCitation({ authors: ["Alice Walker", "Bob Smith", "Carol Doe"], year: "2024" })).toBe("Walker et al. (2024)");
+    // Inverted names and initials: the family name, never an initial or a given name.
+    expect(formatInTextCitation({ authors: ["Kuncoro, H."], year: "2020" })).toBe("Kuncoro (2020)");
+    expect(formatInTextCitation({ authors: ["Walker, Alice", "Smith, B."], year: "2024" })).toBe("Walker & Smith (2024)");
   });
 
   it("generates a synthesized literature review narrative with in-text citations", () => {
