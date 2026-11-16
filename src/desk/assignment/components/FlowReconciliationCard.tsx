@@ -16,7 +16,6 @@ export function FlowReconciliationCard({ audit, onReRunAudit, isAuditing }: Flow
   if (!audit) return null;
 
   const hasIssues = audit.issues.length > 0;
-  const isOptimal = audit.score >= 90;
 
   return (
     <div className="bg-white dark:bg-ink-750 rounded-2xl border border-neutral-200/80 dark:border-white/10 shadow-xs overflow-hidden flex flex-col h-full">
@@ -26,16 +25,16 @@ export function FlowReconciliationCard({ audit, onReRunAudit, isAuditing }: Flow
             {hasIssues ? <AlertTriangle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
           </div>
           <div>
-            <h3 className="text-[15px] font-semibold text-neutral-900 dark:text-white">Flow & Transitions Audit</h3>
+            <h3 className="text-[15px] font-semibold text-neutral-900 dark:text-white">Links between paragraphs</h3>
             <p className="text-[13px] text-neutral-500 dark:text-neutral-400">
-              Analyzes logical jumps between {audit.totalParagraphs} paragraphs.
+              Paragraphs with no linking word and no key term shared with the one before, across {audit.totalParagraphs} paragraphs.
             </p>
           </div>
         </div>
         <div className="flex flex-col items-end">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 mb-0.5">Flow Score</span>
-          <span className={`text-xl font-bold ${isOptimal ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
-            {audit.score}/100
+          <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 mb-0.5">To look at</span>
+          <span className={`text-xl font-bold tabular-nums ${hasIssues ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`} data-testid="flow-issue-count">
+            {audit.issues.length}
           </span>
         </div>
       </div>
@@ -44,7 +43,7 @@ export function FlowReconciliationCard({ audit, onReRunAudit, isAuditing }: Flow
         {hasIssues ? (
           <div className="space-y-4">
             <div className="text-[13px] font-medium text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/10 border border-amber-200/50 dark:border-amber-700/30 rounded-xl p-4">
-              Detected {audit.issues.length} potential jump(s) in logic. Consider adding transitional sentences to improve coherence.
+              {audit.issues.length} paragraph{audit.issues.length === 1 ? "" : "s"} may not connect to the one before. Read each and, if the step is not clear, open it with a sentence that links back.
             </div>
 
             <div className="space-y-3">
@@ -71,8 +70,8 @@ export function FlowReconciliationCard({ audit, onReRunAudit, isAuditing }: Flow
               <CheckCircle2 className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-sm font-semibold">Perfect Coherence</p>
-              <p className="text-[13px] opacity-80 max-w-[200px] mt-1">Transitions between paragraphs are logical and seamless.</p>
+              <p className="text-sm font-semibold">Nothing flagged</p>
+              <p className="text-[13px] opacity-80 max-w-[220px] mt-1">Every paragraph shares a linking word or key term with the one before. This is a simple check, not a judgement of your argument.</p>
             </div>
           </div>
         )}

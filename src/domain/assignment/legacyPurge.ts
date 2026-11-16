@@ -58,3 +58,22 @@ export function purgeLegacyTemplateText<T extends Record<string, unknown> | null
   }
   return walk(answers) as T;
 }
+
+const ML_TOPIC = /\b(machine learning|deep learning|neural network|reinforcement learning|gradient descent|transformer|foundation model|llm)\b/i;
+const LEAKED_ML_HEADING = /\b(mathematical formulations|loss optimi[sz]ation|optimi[sz]ation landscapes|algorithmic architectures|loss surfaces|empirical risk minimi[sz]ation|convex optimi[sz]ation)\b/i;
+const CLASSROOM_HEADING = /\b(divide yourself|teams of \d+|breakout|discussion timer|class(room)? discussion|icebreaker)\b/i;
+const OLD_GENERIC_HEADING = /Core Concept & Foundational|Empirical Evidence & Contemporary Contextual|^Body Theme 1: Core Concept/;
+
+/**
+ * True when saved outline headings carry text from the old templates: machine-learning
+ * headings in a brief that is not about machine learning, classroom logistics read as
+ * a section, or the old generic body titles. Such an outline is rebuilt from the brief.
+ * One check for the server (on load) and the browser (stored outline, drafting plan).
+ */
+export function hasLeakedTemplateHeadings(titles: Array<string | undefined>, topic: string): boolean {
+  const list = titles.filter((t): t is string => Boolean(t));
+  const mlTopic = ML_TOPIC.test(topic);
+  return list.some(
+    (t) => (!mlTopic && LEAKED_ML_HEADING.test(t)) || CLASSROOM_HEADING.test(t) || OLD_GENERIC_HEADING.test(t)
+  );
+}

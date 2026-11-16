@@ -1,3 +1,4 @@
+import { hasLeakedTemplateHeadings } from "../../../domain/assignment/legacyPurge";
 import type { SectionAnalyticalSynthesis } from "../types";
 import OutlineByAiPanel from "../components/OutlineByAiPanel";
 import { selectApprovedSources } from "../../../domain/assignment/approvedSources";
@@ -111,15 +112,7 @@ export function AssignmentDraftingStage({
   useEffect(() => {
     const briefText = (typeof project?.answers?.["assignment_brief"] === "string" ? project.answers["assignment_brief"] : "") || question;
     if (internalSections.length > 0 && question && question.trim().length > 0) {
-      const isNonML = !/\b(machine learning|deep learning|neural network|transformer|foundation model)\b/i.test(`${question} ${briefText}`);
-      const hasGenericOrLeakedTitles = internalSections.some(
-        (s) =>
-          s.title.includes("Core Concept & Foundational") ||
-          s.title.includes("Empirical Evidence & Contemporary Contextual") ||
-          s.title.startsWith("Body Theme 1: Core Concept") ||
-          (isNonML && /Mathematical Formulations|Loss Optimization Landscapes|Algorithmic Architectures/i.test(s.title)) ||
-          /Divide Yourself in Teams|teams of 2|in classroom discussion/i.test(s.title)
-      );
+      const hasGenericOrLeakedTitles = hasLeakedTemplateHeadings(internalSections.map((s) => s.title), `${question} ${briefText}`);
       if (hasGenericOrLeakedTitles) {
         tuneOutlineWithQuestion();
       }

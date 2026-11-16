@@ -120,7 +120,7 @@ export const ASSIGNMENT_AGENT_CONFIGS: Record<AssignmentPhaseId, AssignmentAgent
     description: "I'll audit your submission against the grading rubric, reconcile citations, and ensure formatting perfection.",
     iconPath: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
     quickActions: [
-      "Explain predicted grade",
+      "Explain the marking criteria",
       "Audit unresolved citations",
       "Check university formatting",
     ],
@@ -624,6 +624,12 @@ export const WRITING_TONE_OPTIONS: { id: string; label: string }[] = [
 ];
 
 export const AGENTIC_THINKING_STAGES = ["Your AI is reading the brief and writing the outline…"];
+
+/**
+ * How long the browser waits for the AI to write an outline before showing the
+ * starter outline. Local and free-tier models often need more than a minute.
+ */
+export const AI_OUTLINE_TIMEOUT_MS = 120_000;
 
 export const COMMON_COMMAND_VERBS: Record<string, { definition: string; keyAction: string }> = {
   "critically discuss": {

@@ -28,7 +28,7 @@ import {
 ACADEMIC_LEVEL_OPTIONS,
 ASSIGNMENT_TYPE_OPTIONS,
 STAGE_CITATION_STYLES as CITATION_STYLES,
-WRITING_TONE_OPTIONS,AGENTIC_THINKING_STAGES
+WRITING_TONE_OPTIONS,AGENTIC_THINKING_STAGES,AI_OUTLINE_TIMEOUT_MS
 } from "../types";
 
 export const ASSIGNMENT_TYPE_TONE_MAP: Record<string, string> = {
@@ -210,7 +210,6 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
   };
   const [isGeneratingStructure, setIsGeneratingStructure] = useState<boolean>(false);
   const [structureError, setStructureError] = useState<string | null>(null);
-  const [agenticStageIndex, setAgenticStageIndex] = useState(0);
   const [uploadingBrief, setUploadingBrief] = useState<boolean>(false);
   const [showCourseDetails, setShowCourseDetails] = useState<boolean>(false);
 
@@ -333,13 +332,6 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
     if (!canGenerate || isGeneratingStructure) return;
     setIsGeneratingStructure(true);
     setStructureError(null);
-    setAgenticStageIndex(0);
-
-    const stageInterval = setInterval(() => {
-      setAgenticStageIndex((prev) =>
-        prev < AGENTIC_THINKING_STAGES.length - 1 ? prev + 1 : prev
-      );
-    }, 600);
 
     let proposedStructure = generateDynamicAssignmentStructure({
       question: localQuestion,
@@ -356,7 +348,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
     try {
       const targetProjectId = await ensurePersisted();
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Structure generation timeout")), 30000)
+        setTimeout(() => reject(new Error("Structure generation timeout")), AI_OUTLINE_TIMEOUT_MS)
       );
 
       const response = await Promise.race([
@@ -390,7 +382,6 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
     } catch (err: unknown) {
       console.warn("Using resilient client question-specific structure decomposition:", err);
     } finally {
-      clearInterval(stageInterval);
       setIsGeneratingStructure(false);
     }
 
@@ -1233,7 +1224,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
             {isGeneratingStructure ? (
               <>
                 <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                <span>{AGENTIC_THINKING_STAGES[agenticStageIndex] || "Thinking through assignment…"}</span>
+                <span>{AGENTIC_THINKING_STAGES[0]}</span>
               </>
             ) : (
               <>

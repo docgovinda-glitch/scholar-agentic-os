@@ -8,7 +8,6 @@ import {
   parseRubricCriteriaSafe,
   stripSlideArtifacts,
   extractSubstantiveBriefQuestions,
-  extractCaseContext,
   isTutorialOrShortQABrief,
 } from "../briefExtractor";
 
@@ -140,9 +139,6 @@ Class Discussion Time: 20 minutes
       expect(questions[0]).toContain("Can culture be changed by changing artifacts alone");
       expect(questions[1]).toContain("which level would you start with to change organizational culture");
       expect(questions[2]).toContain("assess a company's culture during a job interview");
-
-      const caseCtx = extractCaseContext(rawSlideText);
-      expect(caseCtx).toContain("Zappos offers new employees $2,000 to quit");
     });
 
     it("detects tutorial / short Q&A mode", () => {

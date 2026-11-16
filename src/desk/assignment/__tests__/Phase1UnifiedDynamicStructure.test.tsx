@@ -206,7 +206,7 @@ describe("Phase 1 — Unified Assignment Setup Box & Question-Specific Dynamic S
     });
 
     // Edit a subheading title directly
-    const firstSubInput = screen.getByDisplayValue(/^Theoretical Foundations of Cell Therapy$/i);
+    const firstSubInput = screen.getAllByDisplayValue(/The question and how the answer is organised/i)[0];
     fireEvent.change(firstSubInput, { target: { value: "Adoptive Cell Transfer & CAR-T Mechanics" } });
     expect(firstSubInput).toHaveValue("Adoptive Cell Transfer & CAR-T Mechanics");
 

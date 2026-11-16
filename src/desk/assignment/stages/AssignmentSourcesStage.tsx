@@ -38,6 +38,7 @@ import { SourcesFindMore } from "../components/sources/SourcesFindMore";
 import { SourcesCatalog } from "../components/sources/SourcesCatalog";
 import { SourcesQueryBar } from "../components/sources/SourcesQueryBar";
 import { SourcesCourseMaterials } from "../components/sources/SourcesCourseMaterials";
+import { mergeSearchResults } from "../services/sourceMerge";
 
 /** A source's reference entry in the project's style, from the shared formatter. */
 export function formatSourceReference(source: Partial<DiscoveredSource>, style: string): string {
@@ -81,15 +82,10 @@ export default function AssignmentSourcesStage({
   // Active Main View: Unified Evidence Vault vs AI Analysis Workspace
   const [activeMainView, setActiveMainView] = useState<"vault" | "analysis">("vault");
   const projectAnswers = project?.answers || {};
-  const savedSyntheses = (projectAnswers.analyticalSyntheses || projectAnswers.analytical_syntheses || []) as SectionAnalyticalSynthesis[];
+  const savedSyntheses = (projectAnswers.analytical_syntheses || projectAnswers.analyticalSyntheses || []) as SectionAnalyticalSynthesis[];
 
   const handleSaveSyntheses = async (newSyntheses: SectionAnalyticalSynthesis[]) => {
-    if (saveAnswers) {
-      await saveAnswers({
-        analyticalSyntheses: newSyntheses,
-        analytical_syntheses: newSyntheses,
-      });
-    }
+    if (saveAnswers) await saveAnswers({ analytical_syntheses: newSyntheses });
   };
 
   // Outline subheadings & view mode
@@ -111,6 +107,11 @@ export default function AssignmentSourcesStage({
   const [isFindingMore, setIsFindingMore] = useState(false);
   const [isDiscoveringInitial, setIsDiscoveringInitial] = useState(false);
   const [discoverySuccessMsg, setDiscoverySuccessMsg] = useState<string | null>(null);
+  // A notice that clears itself; a failure stays until the student closes it.
+  const flash = (message: string, ms = 5000) => {
+    setDiscoverySuccessMsg(message);
+    setTimeout(() => setDiscoverySuccessMsg((cur) => (cur === message ? null : cur)), ms);
+  };
 
   // AI Literature Discovery & Search state
   const [aiSearchPrompt, setAiSearchPrompt] = useState("");
@@ -147,8 +148,7 @@ export default function AssignmentSourcesStage({
         return s;
       });
       await setSources(updatedSources);
-      setDiscoverySuccessMsg("Reference updated successfully.");
-      setTimeout(() => setDiscoverySuccessMsg(null), 3000);
+      flash("Reference updated successfully.", 3000);
     },
     [sources, setSources]
   );
@@ -162,8 +162,7 @@ export default function AssignmentSourcesStage({
     if (setApprovedSourceIds) {
       await setApprovedSourceIds(Array.from(new Set([...approvedSourceIds, ...fresh.map((s) => s.id)])));
     }
-    setDiscoverySuccessMsg(`Added ${fresh.length} source${fresh.length === 1 ? "" : "s"} from your Knowledge Vault`);
-    setTimeout(() => setDiscoverySuccessMsg(null), 3000);
+    flash(`Added ${fresh.length} source${fresh.length === 1 ? "" : "s"} from your Knowledge Vault`, 3000);
   };
 
   const handleAddCustomSource = async () => {
@@ -215,8 +214,7 @@ export default function AssignmentSourcesStage({
       citation: "",
       roleInAssignment: "Empirical evidence",
     });
-    setDiscoverySuccessMsg("Custom reference added and approved.");
-    setTimeout(() => setDiscoverySuccessMsg(null), 3000);
+    flash("Custom reference added and approved.", 3000);
   };
 
 
@@ -250,14 +248,19 @@ export default function AssignmentSourcesStage({
 
   // Track the question we have already auto-curated for to prevent re-entrant loops
   const lastAutoCuratedQuestionRef = useRef<string | null>(null);
+  // The latest list and approvals, for searches that finish after they changed.
+  const sourcesRef = useRef(sources);
+  sourcesRef.current = sources;
+  const approvedRef = useRef(approvedSourceIds);
+  approvedRef.current = approvedSourceIds;
 
   // Initialize curated sources on first mount or when question topic meaningfully shifts
   // Strict Empty State: If no question/topic and no uploaded materials, render 0 cards.
   useEffect(() => {
     if (!hasTopic && !hasUploadedDocs) {
-      if (sources.length > 0) {
-        setSources([]);
-      }
+      // No brief any more: unreviewed search results go, the student's own sources stay.
+      const { sources: kept } = mergeSearchResults(sources, [], approvedRef.current, "replace");
+      if (kept.length !== sources.length) setSources(kept);
       return;
     }
 
@@ -268,25 +271,22 @@ export default function AssignmentSourcesStage({
     
     lastAutoCuratedQuestionRef.current = currentNormalizedTopic;
 
-    // Try real multi-portal scholarly discovery (OpenAlex, CrossRef, DOAJ, DataCite, arXiv)
-    // Falls back to mock catalog if server is unavailable
+    // Multi-portal scholarly search (OpenAlex, Crossref, DOAJ, DataCite, arXiv). A new
+    // search replaces only unreviewed results; nothing found is approved for the student.
     let cancelled = false;
     setIsDiscoveringInitial(true);
     discoverSourcesForAssignment({ question, briefText: assignmentBriefText, citationStyle })
       .then((discovered) => {
         if (!cancelled) {
-          setSources(discovered);
+          const { sources: next, added } = mergeSearchResults(sourcesRef.current, discovered, approvedRef.current, "replace");
+          setSources(next);
           setIsDiscoveringInitial(false);
-          if (discovered.length > 0 && discovered[0].retrievalSource) {
-            setDiscoverySuccessMsg(`Discovered ${discovered.length} scholarly sources from academic databases.`);
-            setTimeout(() => setDiscoverySuccessMsg(null), 5000);
-          }
+          if (added.length > 0) flash(`Found ${added.length} sources in academic databases. Approve the ones you want to use.`);
         }
       })
       .catch(() => {
         if (!cancelled) {
-          // No invented fallback: leave the list empty and say so.
-          setSources([]);
+          // No invented fallback, and the current list is left as it is.
           setIsDiscoveringInitial(false);
           setDiscoverySuccessMsg("Literature search is unavailable right now. Try again, or add your own sources.");
         }
@@ -312,20 +312,18 @@ export default function AssignmentSourcesStage({
     setIsFindingMore(true);
     try {
       const discovered = await discoverSourcesForAssignment({ question, briefText: assignmentBriefText, citationStyle });
-      await setSources(discovered);
-      if (setApprovedSourceIds && approvedSourceIds.length > 0) {
-        await setApprovedSourceIds(discovered.map((s) => s.id));
-      }
-      setDiscoverySuccessMsg(
-        discovered.length > 0
-          ? `Discovered ${discovered.length} scholarly sources from OpenAlex, CrossRef, DOAJ, DataCite & arXiv.`
-          : "No sources found for this question. Try rewording it, or add your own sources."
+      // Approved, prescribed, Vault and hand-added sources stay; approvals are untouched.
+      const { sources: next, added } = mergeSearchResults(sources, discovered, approvedSourceIds, "replace");
+      await setSources(next);
+      flash(
+        added.length > 0
+          ? `Found ${added.length} new sources from OpenAlex, Crossref, DOAJ, DataCite & arXiv. Your approved and own sources were kept.`
+          : "No new sources found for this question. Try rewording it, or add your own sources."
       );
     } catch {
-      setDiscoverySuccessMsg("Literature search is unavailable right now. Try again, or add your own sources.");
+      setDiscoverySuccessMsg("Literature search is unavailable right now. Nothing was changed. Try again, or add your own sources.");
     }
     setIsFindingMore(false);
-    setTimeout(() => setDiscoverySuccessMsg(null), 5000);
   };
 
   // Progressive Discovery: Find More Literature (uses real API with fallback)
@@ -333,24 +331,20 @@ export default function AssignmentSourcesStage({
     setIsFindingMore(true);
     try {
       const moreBatch = await fetchMoreRealSources(sources, question, 10);
-      const nextSources = [...sources, ...moreBatch];
-      await setSources(nextSources);
-      if (setApprovedSourceIds) {
-        await setApprovedSourceIds(Array.from(new Set([...approvedSourceIds, ...moreBatch.map((s) => s.id)])));
-      }
-      setDiscoverySuccessMsg(
-        moreBatch.length > 0
-          ? `Retrieved and added ${moreBatch.length} additional scholarly sources from academic databases.`
+      const { sources: next, added } = mergeSearchResults(sources, moreBatch, approvedSourceIds, "add");
+      if (added.length > 0) await setSources(next);
+      flash(
+        added.length > 0
+          ? `Found ${added.length} more sources. Approve the ones you want to use.`
           : "No further sources found for this question."
       );
     } catch {
-      setDiscoverySuccessMsg("Literature search is unavailable right now. Try again later.");
+      setDiscoverySuccessMsg("Literature search is unavailable right now. Nothing was changed. Try again later.");
     }
     setIsFindingMore(false);
-    setTimeout(() => setDiscoverySuccessMsg(null), 5000);
   };
 
-  // AI-Powered Targeted Literature Discovery
+  // Targeted search: the student's phrase together with the assignment question.
   const handleAISearchLiterature = async (customQuery?: string) => {
     const queryToRun = (customQuery || aiSearchPrompt).trim();
     if (!queryToRun) return;
@@ -358,55 +352,29 @@ export default function AssignmentSourcesStage({
     setIsAISearching(true);
     try {
       const combinedTopic = question ? `${question} — ${queryToRun}` : queryToRun;
-      let newSources: DiscoveredSource[] = [];
-      try {
-        newSources = await discoverRealScholarlySourcesFromServer(combinedTopic, citationStyle);
-      } catch {
-        newSources = [];
+      const found = await discoverRealScholarlySourcesFromServer(combinedTopic, citationStyle);
+      const { sources: next, added } = mergeSearchResults(
+        sources,
+        found.map((s) => ({ ...s, sourceOrigin: "ai_research", originTag: "ai-research" as const })),
+        approvedSourceIds,
+        "add"
+      );
+      const batch = added.slice(0, 5);
+      if (batch.length > 0) {
+        const keep = new Set(batch.map((s) => s.id));
+        await setSources(next.filter((s) => !added.includes(s) || keep.has(s.id)));
       }
-
-      const existingIds = new Set(sources.map((s) => s.id));
-      const freshBatch = newSources
-        .filter((s) => !existingIds.has(s.id))
-        .slice(0, 5)
-        .map((s, idx) => ({
-          ...s,
-          id: s.id.startsWith("src-") ? s.id : `src-ai-${Date.now()}-${idx}`,
-          sourceOrigin: "ai_research" as const,
-          originTag: "ai-research" as const,
-          status: "kept" as const,
-          roleInAssignment: queryToRun.toLowerCase().includes("counter")
-            ? "Counter-argument"
-            : queryToRun.toLowerCase().includes("theory")
-            ? "Theoretical framework"
-            : "Empirical evidence",
-        }));
-
-      const toAdd = freshBatch.length > 0 ? freshBatch : newSources.slice(0, 4).map((s, idx) => ({
-        ...s,
-        id: `src-ai-${Date.now()}-${idx}`,
-        sourceOrigin: "ai_research" as const,
-        originTag: "ai-research" as const,
-        status: "kept" as const,
-      }));
-
-      const nextSources = [...toAdd, ...sources];
-      await setSources(nextSources);
-
-      // Auto-add newly discovered AI sources into the assignment
-      if (setApprovedSourceIds) {
-        const nextApproved = Array.from(new Set([...approvedSourceIds, ...toAdd.map((s) => s.id)]));
-        await setApprovedSourceIds(nextApproved);
-      }
-
       setAiSearchPrompt("");
-      setDiscoverySuccessMsg(`AI found and added ${toAdd.length} source(s) on "${queryToRun}" to your assignment.`);
+      flash(
+        batch.length > 0
+          ? `Found ${batch.length} new source${batch.length === 1 ? "" : "s"} for "${queryToRun}". Approve the ones you want to use.`
+          : `No new sources for "${queryToRun}": everything found is already in your list. Try other keywords.`
+      );
     } catch (err) {
-      console.error("AI Literature Search error:", err);
-      setDiscoverySuccessMsg("Could not retrieve additional sources for this query. Try another keyword.");
+      console.error("Source search error:", err);
+      setDiscoverySuccessMsg("The search did not run (the databases did not answer). Nothing was changed. Try again.");
     } finally {
       setIsAISearching(false);
-      setTimeout(() => setDiscoverySuccessMsg(null), 5000);
     }
   };
 
@@ -434,10 +402,9 @@ export default function AssignmentSourcesStage({
     );
     if (citing.length === 0) return false;
     const where = citing.map((sec) => `"${sec.title.slice(0, 40)}"`).join(", ");
-    setDiscoverySuccessMsg(
+    flash(
       `${verb} "${source.title.slice(0, 42)}". Your draft still cites it in ${where}: ${fix}, or edit that citation (the submission check will flag it).`
-    );
-    setTimeout(() => setDiscoverySuccessMsg(null), 12000);
+    , 12000);
     return true;
   };
 
@@ -452,8 +419,7 @@ export default function AssignmentSourcesStage({
     const isUserDoc = userUploadedSources.some((doc) => doc.id === sourceId);
     if (isUserDoc) {
       await removeUserUploadedSource(sourceId);
-      setDiscoverySuccessMsg("Removed uploaded material from assignment.");
-      setTimeout(() => setDiscoverySuccessMsg(null), 3000);
+      flash("Removed uploaded material from assignment.", 3000);
       return;
     }
 
@@ -476,8 +442,7 @@ export default function AssignmentSourcesStage({
     await setSources(nextSources);
 
     if (!warnIfCited(removedSource, "Removed", "undo")) {
-      setDiscoverySuccessMsg(`Removed "${removedSource?.title?.slice(0, 42) || "source"}..." from assignment.`);
-      setTimeout(() => setDiscoverySuccessMsg(null), 5000);
+      flash(`Removed "${removedSource?.title?.slice(0, 42) || "source"}..." from assignment.`, 5000);
     }
   };
 
@@ -494,8 +459,7 @@ export default function AssignmentSourcesStage({
       await setApprovedSourceIds(Array.from(new Set([...approvedSourceIds, restoredId])));
     }
     setRecentlyRemovedSource(null);
-    setDiscoverySuccessMsg("Restored source back into assignment.");
-    setTimeout(() => setDiscoverySuccessMsg(null), 3000);
+    flash("Restored source back into assignment.", 3000);
   };
 
   // Restore excluded source
@@ -523,8 +487,7 @@ export default function AssignmentSourcesStage({
         });
       }
     }
-    setDiscoverySuccessMsg(`Added and analyzed ${docs.length} course material(s). Grounded in your assignment.`);
-    setTimeout(() => setDiscoverySuccessMsg(null), 4000);
+    flash(`Added and analyzed ${docs.length} course material(s). Grounded in your assignment.`, 4000);
   };
 
   const handleLectureRemove = async (docId: string) => {

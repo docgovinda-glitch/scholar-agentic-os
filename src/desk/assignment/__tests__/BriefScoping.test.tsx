@@ -66,7 +66,7 @@ describe("Extract reads the brief first and asks only what is missing", () => {
     expect(panel).toHaveTextContent("Referencing:Harvard");
     // Nothing critical is missing, so no questions are asked.
     expect(screen.queryByText("Which subject is this for?")).toBeNull();
-    expect(screen.getByTestId("brief-approach")).toHaveTextContent("case framework");
+    expect(screen.getByTestId("brief-approach")).toHaveTextContent("justified conclusions or recommendations");
     await waitFor(() => expect(lastSaved()).toMatchObject({ word_limit: 2500, citation_style: "harvard", academic_level: "postgraduate", assignment_type: "report", assignment_discipline: "business" }));
     // The five settings collapse into one line of assumptions.
     expect(screen.getByTestId("assignment-settings")).toHaveTextContent(/Assuming: Postgraduate.*Report.*Harvard.*2,500 words/);

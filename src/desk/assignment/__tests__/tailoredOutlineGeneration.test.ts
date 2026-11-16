@@ -30,9 +30,12 @@ describe("Tailored Academic Outline Generation", () => {
       writingTone: "analytical",
     });
 
-    expect(structure.headings[0].title).toContain("Climate Change");
-    expect(structure.headings[0].title).toContain("Global Food Security");
-    expect(structure.headings[1].title).toContain("Global Food Security");
+    // One section per concept the question names, between an introduction and a conclusion.
+    const titles = structure.headings.map((h) => h.title);
+    expect(titles[0]).toMatch(/Introduction/);
+    expect(titles.join(" ")).toContain("Climate Change");
+    expect(titles.join(" ")).toContain("Global Food Security");
+    expect(titles[titles.length - 1]).toMatch(/Conclusion/);
     expect(structure.totalAllocated).toBe(2500);
   });
 

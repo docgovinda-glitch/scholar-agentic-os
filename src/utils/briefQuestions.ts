@@ -301,8 +301,10 @@ function finishCriteria(rows: MarkingCriterionRow[], statedTotal?: number): Mark
 
 /** "Total: 100 marks" / "(100 marks in total)" if the brief states it. */
 export function statedTotalMarks(briefText: string): number | undefined {
+  // The word "marks" must be there: "Total 1000 words" is a length, not a mark total.
   const m =
-    briefText.match(/\btotal\s*(?:marks?|mark\s*available)?\s*[:=\-–]?\s*(\d{2,4})\s*(?:marks?)?\b/i) ||
+    briefText.match(/\btotal\s+(?:marks?|mark\s*available|marks\s*available)\s*[:=\-–]?\s*(\d{2,4})\b(?!\s*(?:words?|%))/i) ||
+    briefText.match(/\btotal\s*[:=\-–]?\s*(\d{2,4})\s*marks?\b/i) ||
     briefText.match(/\btotal\s+(?:assessment|available|score)\s*[:=\-–]?\s*(\d{2,4})\s*marks?\b/i) ||
     briefText.match(/\b(\d{2,4})\s*marks?\s*(?:in\s*total|total)\b/i);
   const n = m ? parseInt(m[1], 10) : NaN;
@@ -432,9 +434,9 @@ export function buildBriefSummary(input: BriefSummaryInput): string {
     sentences.push(input.aiProduce.replace(/\s+/g, " ").trim().replace(/[.\s]*$/, "."));
     if (input.aiApproach) sentences.push(input.aiApproach.replace(/\s+/g, " ").trim().replace(/[.\s]*$/, "."));
   } else {
-    const subject = parts.length
-      ? parts.map((p) => p.name).slice(0, 4).join(", ")
-      : groups[0] ? readableHeading(groups[0].title, acronyms).slice(0, 90) : undefined;
+    // Named parts ("Part A: Monetary transmission") describe the subject; a question's
+    // own wording does not ("covering Explain how …"), and is listed below anyway.
+    const subject = parts.length ? parts.map((p) => p.name).slice(0, 4).join(", ") : undefined;
     sentences.push(
       groups.length
         ? `This ${level}${type} asks you to answer ${groups.length} question${groups.length === 1 ? "" : "s"}${subject ? `, covering ${subject}` : ""}.`

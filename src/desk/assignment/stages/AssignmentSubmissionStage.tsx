@@ -498,7 +498,7 @@ export function AssignmentSubmissionStage({
 
           <div className="p-4 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/60 dark:border-white/5 space-y-1">
             <span className="text-xs text-neutral-500 dark:text-neutral-400 font-medium">
-              Word Budget Margin
+              Length
             </span>
             <div className="text-lg sm:text-xl font-bold text-neutral-900 dark:text-white tabular-nums flex items-center gap-2">
               <span>{currentWordCount.toLocaleString()} / {targetWordCount.toLocaleString()}</span>
@@ -507,7 +507,7 @@ export function AssignmentSubmissionStage({
               </span>
             </div>
             <span className="text-[11px] text-neutral-400 dark:text-neutral-500 block">
-              ±10% institutional threshold
+              Against the brief's {targetWordCount.toLocaleString()} words; check your module's rules on length
             </span>
           </div>
         </div>

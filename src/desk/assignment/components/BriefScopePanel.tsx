@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Check, HelpCircle, Sparkles } from "lucide-react";
 import { DISCIPLINES, disciplineById, scopeBrief, scopingQuestions, type BriefScope, type ScopeQuestion } from "../../../domain/assignment/briefScoping";
+import { groupBriefQuestions, parseBriefQuestions } from "../../../utils/briefQuestions";
 
 const LEVEL: Record<string, string> = { high_school: "High school", undergraduate: "Undergraduate", postgraduate: "Postgraduate", doctoral: "Doctoral" };
 const TYPE: Record<string, string> = {
@@ -36,6 +37,8 @@ export default function BriefScopePanel({
   const scope: BriefScope = useMemo(() => scopeBrief(brief), [brief]);
   const questions = scopingQuestions(scope, { discipline: discipline || undefined, assignmentType: scope.assignmentType ? undefined : assignmentType || undefined });
   const subject = disciplineById(discipline || scope.discipline);
+  // A brief that sets its own questions is answered question by question, whatever the subject.
+  const questionCount = useMemo(() => groupBriefQuestions(parseBriefQuestions(brief)).length, [brief]);
 
   if (brief.trim().length < 10) return null;
 
@@ -96,7 +99,10 @@ export default function BriefScopePanel({
         <p className="text-xs text-neutral-700 dark:text-neutral-300 flex items-start gap-1.5" data-testid="brief-approach">
           <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" aria-hidden="true" />
           <span>
-            The breakdown will follow {subject.approach}. Subject:{" "}
+            {questionCount >= 2
+              ? `The breakdown gives each of your brief's ${questionCount} questions its own section.`
+              : `The breakdown will follow ${subject.approach}.`}{" "}
+            Subject:{" "}
             <label className="inline-flex items-center gap-1 text-neutral-500 dark:text-neutral-400">
               <span className="sr-only">Subject area</span>
               <select

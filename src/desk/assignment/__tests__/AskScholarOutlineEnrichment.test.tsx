@@ -57,7 +57,7 @@ describe("AskScholar Pattern Outline Enrichment", () => {
       expect(isGenericPlaceholderTitle("Antithesis: Counter-Arguments and Dissenting Perspectives")).toBe(false);
     });
 
-    it("sanitizes generic placeholder headings into substantive domain-specific titles", () => {
+    it("gives placeholder headings the topic of the brief and keeps Introduction and Conclusion", () => {
       const genericHeadings: any[] = [
         {
           id: "heading-1",
@@ -91,68 +91,33 @@ describe("AskScholar Pattern Outline Enrichment", () => {
       ];
 
       const sanitized = sanitizeOutlineHeadings(genericHeadings, "Impact of Monetary Policy on Inflation Dynamics", "essay");
-      expect(sanitized[0].title).not.toMatch(/^Introduction$/i);
-      expect(sanitized[0].title).toContain("Monetary Policy");
-      expect(sanitized[1].title).not.toMatch(/^Body Paragraph 1$/i);
-      expect(sanitized[2].title).not.toMatch(/^Conclusion$/i);
+      // Introduction and Conclusion are real headings; placeholders take the brief's topic, with no template wording.
+      expect(sanitized[0].title).toBe("Introduction");
+      expect(sanitized[1].title).toContain("Monetary Policy");
+      expect(sanitized[2].title).toBe("Conclusion");
       expect(sanitized[0].subheadings[0].title).not.toMatch(/^Overview$/i);
+      expect(sanitized.map((h) => h.title).join(" ")).not.toMatch(/Foundational Stakes|Scholarly Horizons|Dimension \d/);
     });
   });
 
   describe("3. Workspace Adaptations: Essay vs Coursework", () => {
-    it("generates substantive analytical argument progression for Essay workspace", () => {
-      const structure = generateDynamicAssignmentStructure({
-        question: "Does Globalization Reduce State Sovereignty?",
-        assignmentType: "essay",
-        academicLevel: "undergraduate",
-        targetWordCount: 2000,
-      });
-
-      expect(structure.headings).toHaveLength(3);
-      // H1: Theoretical & Conceptual Foundations
-      expect(structure.headings[0].title).toMatch(/Theoretical Framing|Foundations/i);
-      expect(structure.headings[0].subheadings[0].title).toMatch(/Conceptual Parameters|Causal Foundations|Sovereignty/i);
-
-      // H2: Substantive Evidence & Competing Explanations
-      expect(structure.headings[1].title).toMatch(/Substantive Evidence|Empirical/i);
-      expect(structure.headings[1].subheadings[0].title).toMatch(/Competing Explanations|Empirical Evidence|Dynamics/i);
-
-      // H3: Analytical Synthesis & Evidentiary Resolution
-      expect(structure.headings[2].title).toMatch(/Analytical Synthesis|Resolution/i);
-      expect(structure.headings[2].subheadings[0].title).toMatch(/Evidentiary Synthesis|Synthesis|Resolution/i);
-      expect(structure.headings[2].subheadings[1].title).toMatch(/Scholarly Contributions|Policy Implications|Implications/i);
-
-      // Structure depth: each subheading has concrete H3 key points
-      expect(structure.headings[0].subheadings[0].keyPoints.length).toBeGreaterThanOrEqual(3);
-      expect(structure.headings[1].subheadings[0].keyPoints.length).toBeGreaterThanOrEqual(3);
-    });
-
-    it("generates problem decomposition and applied intervention structure for Coursework workspace", () => {
-      const structure = generateDynamicAssignmentStructure({
-        question: "Strategic Turnaround Analysis for Marks and Spencer",
-        assignmentType: "coursework",
-        academicLevel: "undergraduate",
-        targetWordCount: 2500,
-      });
-
-      expect(structure.headings).toHaveLength(3);
-      // H1: Problem Formulation & Learning Objectives
-      expect(structure.headings[0].title).toContain("Problem Formulation");
-      expect(structure.headings[0].subheadings[0].title).toContain("Diagnostic Problem Decomposition");
-      expect(structure.headings[0].subheadings[1].title).toContain("Applied Analytical Framework");
-
-      // H2: Applied Empirical Investigation & Diagnostics
-      expect(structure.headings[1].title).toContain("Applied Empirical Investigation");
-      expect(structure.headings[1].subheadings[0].title).toContain("In-Depth Diagnostic Model Application");
-      expect(structure.headings[1].subheadings[1].title).toContain("Critical Evaluation of Institutional Constraints");
-
-      // H3: Strategic Recommendations & Implementation Roadmap
-      expect(structure.headings[2].title).toContain("Strategic Interventions");
-      expect(structure.headings[2].subheadings[0].title).toContain("Prioritized Evidence-Based Recommendations");
-      expect(structure.headings[2].subheadings[1].title).toContain("Implementation Roadmap");
-
-      // Frameworks are never invented locally (Single-Brain Architecture)
-      expect(structure.targetFrameworks ?? []).toEqual([]);
+    it("the offline starter outline is built from the brief, never a subject template (essay or coursework)", () => {
+      for (const assignmentType of ["essay", "coursework"] as const) {
+        const structure = generateDynamicAssignmentStructure({
+          question: assignmentType === "essay" ? "Does Globalization Reduce State Sovereignty?" : "Strategic Turnaround Analysis for Marks and Spencer",
+          assignmentType,
+          academicLevel: "undergraduate",
+          targetWordCount: 2000,
+        });
+        const titles = structure.headings.flatMap((h) => [h.title, ...h.subheadings.map((s) => s.title)]).join(" | ");
+        expect(structure.headings[0].title).toMatch(/Introduction/);
+        expect(structure.headings[structure.headings.length - 1].title).toMatch(/Conclusion/);
+        expect(titles).not.toMatch(/Problem Formulation|Diagnostic|Implementation Roadmap|Risk Mitigation|Strategic Interventions|Endogeneity|Horizons|Applied Analytical Model|Theoretical Explanatory Framework/);
+        // No key points are written for the student, and frameworks are never invented locally.
+        expect(structure.headings.flatMap((h) => h.subheadings.flatMap((s) => s.keyPoints))).toEqual([]);
+        expect(structure.targetFrameworks ?? []).toEqual([]);
+        expect(structure.totalAllocated).toBe(2000);
+      }
     });
   });
 
@@ -167,10 +132,11 @@ describe("AskScholar Pattern Outline Enrichment", () => {
       const tree = assignmentStructureToOutlineTree(structure);
       expect(tree.thesis_statement).toBe(structure.thesisStatement);
       expect(tree.target_frameworks).toEqual(structure.targetFrameworks);
-      expect(tree.sections).toHaveLength(3);
+      expect(tree.sections).toHaveLength(structure.headings.length);
       expect(tree.sections[0].level).toBe("h1");
       expect(tree.sections[0].children?.[0].level).toBe("h2");
-      expect(tree.sections[0].children?.[0].children?.[0].level).toBe("h3");
+      // Key points (h3) appear only where the outline has them; none are written for the student.
+      for (const kp of tree.sections[0].children?.[0].children ?? []) expect(kp.level).toBe("h3");
     });
 
     it("converts AskScholar tree response back to internal AssignmentStructure", () => {

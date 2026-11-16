@@ -120,43 +120,30 @@ export function outlineTreeToAssignmentStructure(
     rationale: "Synthesized from AskScholar structured outline tree.",
   };
 }
-/** Sanitize outline headings to ensure no generic placeholders remain */
+/**
+ * Gives placeholder headings ("Body Paragraph 1", "Section 2", "Overview") the
+ * brief's own topic. "Introduction" and "Conclusion" are real headings and stay.
+ * No template wording is added.
+ */
+const KEEP_AS_IS = /^(?:[\d.]+\s*)?(introduction|conclusions?)$/i;
 
 export function sanitizeOutlineHeadings(
   headings: AssignmentMainHeading[],
   question: string,
-  assignmentType?: string
+  _assignmentType?: string
 ): AssignmentMainHeading[] {
   const deconstructed = deconstructQuestionSemantics(question);
-  const topicA = deconstructed.subjectFormattedA || "Core Subject";
-  const topicB = deconstructed.subjectFormattedB || "";
-  const isCoursework = assignmentType === "coursework" ||
-    assignmentType === "business_assignment" ||
-    assignmentType === "report" ||
-    assignmentType === "case_study";
+  const topics = [deconstructed.subjectFormattedA, deconstructed.subjectFormattedB].filter((t): t is string => Boolean(t));
+  const topicFor = (i: number) => topics[i % Math.max(1, topics.length)] || "Main discussion";
 
+  let placeholderIndex = 0;
   return headings.map((h, hIdx) => {
-    let sanitizedH1Title = h.title;
-    if (isGenericPlaceholderTitle(h.title)) {
-      if (hIdx === 0) {
-        sanitizedH1Title = isCoursework
-          ? `Problem Formulation and Methodological Scope: ${topicA}`
-          : `Foundational Stakes and Theoretical Framing: ${topicA}${topicB ? ` in ${topicB}` : ""}`;
-      } else if (hIdx === 1) {
-        sanitizedH1Title = isCoursework
-          ? `Applied Empirical Investigation & Diagnostic Analysis: ${topicB || topicA}`
-          : `Analytical Evaluation & Evidentiary Findings: ${topicB || topicA}`;
-      } else {
-        sanitizedH1Title = isCoursework
-          ? `Strategic Recommendations, Interventions & Academic Reflection`
-          : `Analytical Synthesis, Critical Evaluation & Scholarly Horizons: ${topicA}`;
-      }
-    }
-
+    const sanitizedH1Title =
+      isGenericPlaceholderTitle(h.title) && !KEEP_AS_IS.test(h.title.trim()) ? topicFor(placeholderIndex++) : h.title;
     const sanitizedSubheadings = (h.subheadings || []).map((sub, sIdx) => {
       let sanitizedSubTitle = sub.title;
       if (isGenericPlaceholderTitle(sub.title)) {
-        sanitizedSubTitle = `${sanitizedH1Title} - Dimension ${sIdx + 1}: ${topicA}`;
+        sanitizedSubTitle = KEEP_AS_IS.test(sub.title.trim()) ? sub.title : `${h.number || hIdx + 1}.${sIdx + 1} Key points and evidence`;
       }
       return {
         ...sub,

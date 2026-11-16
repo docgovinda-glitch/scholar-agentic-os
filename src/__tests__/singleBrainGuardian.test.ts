@@ -65,11 +65,13 @@ describe("Single-Brain Architecture lock", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("permanently bans the Quantum catalog and the Zappos/Schein template in Coursework code", () => {
-    const FORBIDDEN = [/quantumComputingCatalog/, /QUANTUM_COMPUTING_CATALOG/, /zappos/i];
+  it("permanently bans the Quantum catalog and the Zappos/Schein template anywhere in app or server code", () => {
+    // All of src/ and server/: a canned case once hid in src/features (brief sanitizer,
+    // scope classifier, slide generator) where a Coursework-only scan did not look.
+    const FORBIDDEN = [/quantumComputingCatalog/, /QUANTUM_COMPUTING_CATALOG/, /zappos/i, /Schein's 3 Levels/i];
     expect(fs.existsSync(path.join(ROOT, "src/desk/assignment/services/catalogs/quantumComputingCatalog.ts"))).toBe(false);
     const offenders: string[] = [];
-    for (const rel of productionFiles(["src/desk", "server/routes/project/assignment"])) {
+    for (const rel of [...productionFiles(["src", "server"]), "server.ts"]) {
       const text = fs.readFileSync(path.join(ROOT, rel), "utf8");
       if (FORBIDDEN.some((re) => re.test(text))) offenders.push(rel);
     }

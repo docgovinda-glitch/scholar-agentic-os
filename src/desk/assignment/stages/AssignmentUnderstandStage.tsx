@@ -20,6 +20,7 @@ STAGE_CITATION_STYLES as CITATION_STYLES,
 WRITING_TONE_OPTIONS,
 ARCHETYPE_DEFAULT_TONES,
 AGENTIC_THINKING_STAGES,
+AI_OUTLINE_TIMEOUT_MS,
 cleanAnswerString,
 extractStandardizedInstructions,
 structureToInternalSections,
@@ -740,7 +741,7 @@ export default function AssignmentUnderstandStage({
     try {
       const targetProjectId = await ensurePersisted();
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Structure generation timeout")), 15000)
+        setTimeout(() => reject(new Error("Structure generation timeout")), AI_OUTLINE_TIMEOUT_MS)
       );
 
       const response = await Promise.race([

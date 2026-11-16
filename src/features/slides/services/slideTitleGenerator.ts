@@ -19,58 +19,6 @@ const JARGON_REMOVAL_PATTERNS = [
   /^(strategic\s+analysis\s+of\s*)/i,
 ];
 
-const BOTTLENECK_TOPICS: Record<string, string[]> = {
-  zappos: [
-    'Why Zappos Pays New Hires $2,000 to Quit',
-    "Schein's 3 Levels: Artifacts, Espoused Values & Basic Assumptions",
-    'The Limits of Artifacts: Why Changing Perks Fails to Shift Culture',
-    'Leadership Intervention: Targeting Values and Habits to Shift Assumptions',
-    'Assessing Organizational Culture in Candidate Job Interviews',
-  ],
-  culture: [
-    'Why Zappos Pays New Hires $2,000 to Quit',
-    "Schein's 3 Levels: Artifacts, Espoused Values & Basic Assumptions",
-    'The Limits of Artifacts: Why Changing Perks Fails to Shift Culture',
-    'Leadership Intervention: Targeting Values and Habits to Shift Assumptions',
-    'Assessing Organizational Culture in Candidate Job Interviews',
-  ],
-  quantum: [
-    'Why Quantum Cryptography Matters Now',
-    'Where Current Encryption Breaks Down',
-    'How Fault-Tolerant Verification Works',
-    'What the Benchmark Data Proves',
-    'Next Steps for Cryptographic Defense',
-  ],
-  bird: [
-    'Migratory Bird Season: Coastal Haven',
-    'Why 120,000 Birds Choose This Shore',
-    'Core Protected Mudflats vs. Urban Buffers',
-    'Three Pillars of Habitat Conservation',
-    'Walking the Tidal Flats Together',
-  ],
-  plover: [
-    'Qing Plover: Migratory Bird Season',
-    'Seven Days on the Winter Mudflats',
-    'Protecting Irreplaceable Tidal Habitats',
-    'Community Action and Certified Corridors',
-    'Our Shared Coastline Horizon',
-  ],
-  'multi-agent': [
-    'How Multi-Agent Systems Verify Scientific Papers',
-    'Why Unanchored LLMs Drift Over Time',
-    'Deterministic Consensus Architecture',
-    '4.2x Faster Verification in Practice',
-    'The Future of Verified Research',
-  ],
-  autonomous: [
-    'How Autonomous Systems Accelerate Discovery',
-    'The Hidden Fragility of Unchecked Models',
-    'Deterministic Proof Over Guesswork',
-    'Empirical Results Across 10,000 Tests',
-    'What This Means for Real-World AI',
-  ],
-};
-
 /**
  * Cleans raw string, stripping redundant markers and enforcing 8-10 words max.
  */
@@ -107,15 +55,6 @@ export function generateNaturalSlideTitle(
   topic?: string,
   beatIndex = 0
 ): string {
-  const effectiveTopic = (topic || rawInput || '').toLowerCase();
-
-  // Check preset library for well-known topic patterns
-  for (const [key, titles] of Object.entries(BOTTLENECK_TOPICS)) {
-    if (effectiveTopic.includes(key)) {
-      const idx = Math.min(Math.max(beatIndex, 0), titles.length - 1);
-      return titles[idx];
-    }
-  }
 
   // Clean the provided raw input
   const cleaned = cleanHumanTitle(rawInput);

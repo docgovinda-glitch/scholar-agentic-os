@@ -5,6 +5,7 @@
  */
 
 import { countProseWords } from "../../../shared/proseBlocks";
+import { groupBriefQuestions, parseBriefQuestions } from "../../../utils/briefQuestions";
 import type {
 AssignmentBriefState,
 CitationAuditResult,
@@ -227,7 +228,8 @@ export function auditCitations(
 
 /**
  * Rubric Compliance Evaluator
- * Assesses full draft against Phase 1 criteria, computes grade band prediction and readiness percentage.
+ * Checks the draft against what the brief states (length, sections, citations, its own
+ * constraints and criteria). Reports checks passed; never predicts a grade.
  */
 export function evaluateRubricCompliance(
   fullDraftText: string,
@@ -281,33 +283,32 @@ export function evaluateRubricCompliance(
     );
   }
 
-  // 3. Check structural components
-  const hasIntro = /introduction|background|context/i.test(text);
-  const hasConclusion = /conclusion|summary|implications|recommendation/i.test(text);
-
-  if (!hasIntro && wordCount > 200) {
-    missingRequirements.push("Clear introductory overview and contextual statement should be established.");
+  // 3. Introduction and conclusion: only for a piece written as one argument. A brief
+  // that sets its own questions is answered question by question and needs neither.
+  // Read from the section titles when there are sections, else the opening and close.
+  const questionByQuestion = groupBriefQuestions(parseBriefQuestions(prompt)).length >= 2;
+  let hasIntro = true;
+  let hasConclusion = true;
+  if (!questionByQuestion) {
+    const titles = (sections ?? []).map((sec) => sec.title || "").join(" \n ");
+    const paragraphs = text.split(/\n\s*\n/);
+    const opening = titles || paragraphs.slice(0, 1).join(" ");
+    const closing = titles || paragraphs.slice(-1).join(" ");
+    hasIntro = /\b(introduction|background|context|overview)\b/i.test(opening);
+    hasConclusion = /\b(conclusions?|concluding|summary|in sum|to conclude|recommendations?)\b/i.test(closing);
   }
-  if (!hasConclusion && wordCount > 200) {
-    missingRequirements.push("Conclusive synthesis and evaluation of broader implications should be provided.");
-  }
-
-  // 4. Check prompt-specific command verbs and constraints
-  if (prompt) {
-    const isCompare = /\b(?:compare|contrast|differences|similarities)\b/i.test(prompt);
-    const isCritique = /\b(?:critique|evaluate|assess|critical|analyze|analyse)\b/i.test(prompt);
-    const isRecommend = /\b(?:recommend|propose|strategy|solution)\b/i.test(prompt);
-
-    if (isCompare && !/\b(?:whereas|conversely|in contrast|similarly|differs|while)\b/i.test(text)) {
-      missingRequirements.push("Prompt specifies comparison; ensure explicit comparative contrasts between viewpoints.");
+  // Only once there is a real draft are the missing parts listed as to-dos.
+  if (!questionByQuestion && wordCount > 200) {
+    if (!hasIntro) {
+      missingRequirements.push("No introduction found: an essay usually opens by setting out the question and how it will be answered.");
     }
-    if (isCritique && !/\b(?:however|nevertheless|limitations|counterargument|shortcomings|critique)\b/i.test(text)) {
-      missingRequirements.push("Prompt requires critical analysis; address methodological limitations and counter-arguments.");
-    }
-    if (isRecommend && !/\b(?:recommend|propose|implication|strategic|future)\b/i.test(text)) {
-      missingRequirements.push("Prompt requests recommendations; incorporate actionable strategic conclusions.");
+    if (!hasConclusion) {
+      missingRequirements.push("No conclusion found: an essay usually ends by answering the question directly.");
     }
   }
+
+  // What the question asks for (compare, evaluate, recommend) is judged by the AI review,
+  // not by looking for words such as "however" in the text.
 
   // Check explicit constraints from briefLedger or constraints list
   if (Array.isArray(brief.constraints)) {
@@ -336,14 +337,18 @@ export function evaluateRubricCompliance(
   const reconciled = !citationAudit || citationAudit.isReconciled || citationAudit.unresolvedCitations.length === 0;
   const checks: Array<{ name: string; passed: boolean }> = [
     { name: `Length within ±10% of ${targetWords} words`, passed: wordRatio >= 0.9 && wordRatio <= 1.1 },
-    { name: "Introduction present", passed: hasIntro },
-    { name: "Conclusion present", passed: hasConclusion },
+    ...(questionByQuestion
+      ? []
+      : [
+          { name: "Introduction present", passed: hasIntro },
+          { name: "Conclusion present", passed: hasConclusion },
+        ]),
     { name: "Every section has text", passed: emptySections.length === 0 },
     { name: "Every in-text citation is in the reference list", passed: reconciled },
     { name: "Every approved source is cited", passed: !citationCoverage || citationCoverage.orphanedSources === 0 },
     {
-      name: "What the question asks for is addressed",
-      passed: !missingRequirements.some((m) => /^Prompt |^Address explicit constraint/.test(m)),
+      name: "The brief's stated constraints are mentioned",
+      passed: !missingRequirements.some((m) => /^Address explicit constraint/.test(m)),
     },
   ];
   const passed = checks.filter((c) => c.passed).length;

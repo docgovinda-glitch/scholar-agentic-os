@@ -301,16 +301,12 @@ export function DraftingActiveEditor({
     currentWords >= Math.floor(targetWords * 0.9) &&
     currentWords <= Math.ceil(targetWords * 1.1);
 
-  // PEEL Diagnostics
+  // Counted facts about the text
   const citationMatches = liveContent.match(
     /(\([A-Z][A-Za-z\s&.,'–-]+,\s*(?:19|20)\d{2}[a-z]?(?:;\s*[A-Z][A-Za-z\s&.,'–-]+,\s*(?:19|20)\d{2}[a-z]?)*\)|\[\d+(?:,\s*\d+)*\])/g
   );
   const citationCount = citationMatches ? citationMatches.length : 0;
-  const hasAnalyticalDepth = /however|demonstrates|indicates|reveals|trade-off|contrasts|suggests|critique|substantiates|furthermore/i.test(
-    liveContent
-  );
-  const hasPointSentence = liveContent.trim().length > 40;
-  const hasLinkConclusion = splitProseIntoParagraphs(liveContent).length > 1;
+  const paragraphCount = splitProseIntoParagraphs(liveContent).length;
 
   // The shared rich-text editor (src/desk/editor) emits the same light-Markdown text that is stored.
   const handleEditorChange = (next: string) => {
@@ -604,68 +600,20 @@ export function DraftingActiveEditor({
       </div>
       )}
 
-      {/* PEEL Quality & Diagnostic Bar (shows when content exists) */}
+      {/* Facts about the text (shows when content exists): counted, never scored */}
       {liveContent.trim().length > 0 && (
-        <div className="px-5 py-2 border-b border-neutral-100 dark:border-white/5 bg-neutral-50/50 dark:bg-white/[0.02] flex flex-wrap items-center justify-between gap-2 text-[11px]">
-          <div className="flex items-center gap-3">
-            <span className="text-neutral-400 font-medium uppercase tracking-wider text-[10px]">
-              PEEL Framework:
+        <div className="px-5 py-2 border-b border-neutral-100 dark:border-white/5 bg-neutral-50/50 dark:bg-white/[0.02] flex flex-wrap items-center justify-between gap-2 text-xs" data-testid="section-facts">
+          <div className="flex items-center gap-3 text-neutral-600 dark:text-neutral-300 tabular-nums">
+            <span>{paragraphCount} {paragraphCount === 1 ? "paragraph" : "paragraphs"}</span>
+            <span className="text-neutral-300 dark:text-neutral-600" aria-hidden="true">·</span>
+            <span className={citationCount > 0 ? "" : "text-amber-700 dark:text-amber-400"}>
+              {citationCount} {citationCount === 1 ? "citation" : "citations"}
             </span>
-            <div className="flex items-center gap-2 font-mono">
-              <span
-                title="Point: Distinct academic topic claim"
-                className={`flex items-center gap-1 ${
-                  hasPointSentence
-                    ? "text-emerald-600 dark:text-emerald-400"
-                    : "text-neutral-400"
-                }`}
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                <span>P: Point</span>
-              </span>
-              <span className="text-neutral-300 dark:text-neutral-700">·</span>
-              <span
-                title="Evidence: In-text citations grounded in literature"
-                className={`flex items-center gap-1 ${
-                  citationCount > 0
-                    ? "text-emerald-600 dark:text-emerald-400"
-                    : "text-neutral-400"
-                }`}
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                <span>E: {citationCount} {citationCount === 1 ? "Citation" : "Citations"}</span>
-              </span>
-              <span className="text-neutral-300 dark:text-neutral-700">·</span>
-              <span
-                title="Explanation: 70% critical analysis & dialectical rigor"
-                className={`flex items-center gap-1 ${
-                  hasAnalyticalDepth
-                    ? "text-emerald-600 dark:text-emerald-400"
-                    : "text-neutral-400"
-                }`}
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                <span>E: 70% Analysis</span>
-              </span>
-              <span className="text-neutral-300 dark:text-neutral-700">·</span>
-              <span
-                title="Link: Concluding transition connecting to assessment thesis"
-                className={`flex items-center gap-1 ${
-                  hasLinkConclusion
-                    ? "text-emerald-600 dark:text-emerald-400"
-                    : "text-neutral-400"
-                }`}
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                <span>L: Link</span>
-              </span>
-            </div>
           </div>
-
-          <div className="text-[11px] text-neutral-400 dark:text-neutral-500">
+          <div className="text-neutral-500 dark:text-neutral-400">
             {citationCount > 0
-              ? "Click citations in preview to inspect grounded sources"
-              : "Use Insert Citations to anchor arguments"}
+              ? "Click a citation in the preview to see its source"
+              : "No citations yet: use Insert Citation to support your points"}
           </div>
         </div>
       )}
@@ -926,10 +874,6 @@ export function DraftingActiveEditor({
           <ArrowLeft className="w-3 h-3" />
           <span>Previous Section</span>
         </button>
-
-        <span className="text-[11px] text-neutral-400 dark:text-neutral-500">
-          Enforcing 70% Analysis · 30% Description balance
-        </span>
 
         <button
           type="button"

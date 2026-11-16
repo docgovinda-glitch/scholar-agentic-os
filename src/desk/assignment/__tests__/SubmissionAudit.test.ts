@@ -197,3 +197,17 @@ describe("submission phase completion", () => {
     expect(submissionPasses({ readyForSubmission: false } as never)).toBe(false);
   });
 });
+
+import { evaluateRubricCompliance as evaluateQ } from "../services/submissionAuditService";
+describe("evaluateRubricCompliance: question-by-question briefs", () => {
+  it("does not ask for an introduction or conclusion when the brief sets its own questions", () => {
+    const prompt = "Question 1: Explain how a central bank sets its policy rate. [40 marks]\nQuestion 2: Evaluate quantitative easing since 2008. [60 marks]";
+    const draft = Array.from({ length: 60 }, (_, i) => `Central banks set rates through committees and markets ${i}.`).join(" ");
+    const report = evaluateQ(draft, { rawPrompt: prompt, targetWordCount: 500 } as never, undefined, undefined, [
+      { title: "1.0 Policy rate", draftContent: draft },
+      { title: "2.0 Quantitative easing", draftContent: draft },
+    ]);
+    expect(report.missingRequirements.join(" ")).not.toMatch(/introduction|conclusion/i);
+    expect(report.missingRequirements.join(" ")).not.toMatch(/^Prompt /);
+  });
+});

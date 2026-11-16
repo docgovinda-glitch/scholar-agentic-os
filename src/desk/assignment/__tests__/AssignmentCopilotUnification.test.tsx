@@ -140,7 +140,8 @@ describe("Round 5: Context Panel Copilot Unification", () => {
 
       expect(ASSIGNMENT_AGENT_CONFIGS.submission.name).toBe("Examiner");
       expect(ASSIGNMENT_AGENT_CONFIGS.submission.role).toContain("Quality Audit & Final Review");
-      expect(ASSIGNMENT_AGENT_CONFIGS.submission.quickActions).toContain("Explain predicted grade");
+      expect(ASSIGNMENT_AGENT_CONFIGS.submission.quickActions).toContain("Explain the marking criteria");
+      expect(ASSIGNMENT_AGENT_CONFIGS.submission.quickActions.join(" ")).not.toMatch(/predicted|grade/i);
     });
 
     it("getAssignmentAgentConfig retrieves the appropriate persona or defaults safely", () => {

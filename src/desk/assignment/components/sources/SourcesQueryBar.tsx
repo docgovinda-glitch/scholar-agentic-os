@@ -13,7 +13,7 @@ export interface SourcesQueryBarProps {
 export function SourcesQueryBar({ aiSearchPrompt, handleAISearchLiterature, isAISearching, setAiSearchPrompt }: SourcesQueryBarProps) {
   return (
     <>
-            {/* AI Literature Discovery & Query Bar */}
+            {/* Targeted database search: the phrase is searched together with the assignment question */}
             <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-purple-500/[0.07] via-indigo-500/[0.04] to-blue-500/[0.07] dark:from-purple-500/10 dark:via-indigo-500/10 dark:to-blue-500/10 border border-purple-500/20 dark:border-purple-500/30 space-y-3 shadow-2xs">
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                 <div className="relative flex-1">
@@ -28,7 +28,8 @@ export function SourcesQueryBar({ aiSearchPrompt, handleAISearchLiterature, isAI
                         handleAISearchLiterature();
                       }
                     }}
-                    placeholder="Ask AI to find specific sources (e.g. 'empirical studies on...', 'counter-arguments to...', '2024–2026 data')"
+                    aria-label="Search academic databases"
+                    placeholder="Search the databases for more (e.g. 'empirical studies', 'criticism of …', 'recent data')"
                     className="w-full pl-10 pr-4 py-2 rounded-xl text-xs bg-white dark:bg-ink-750 border border-purple-200 dark:border-purple-900/40 focus:border-purple-500 text-neutral-900 dark:text-white placeholder-neutral-400 outline-none shadow-2xs"
                   />
                 </div>
@@ -41,12 +42,12 @@ export function SourcesQueryBar({ aiSearchPrompt, handleAISearchLiterature, isAI
                   {isAISearching ? (
                     <>
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>Discovering...</span>
+                      <span>Searching…</span>
                     </>
                   ) : (
                     <>
                       <Sparkles className="w-3.5 h-3.5" />
-                      <span>Find with AI</span>
+                      <span>Search</span>
                     </>
                   )}
                 </button>
@@ -54,12 +55,12 @@ export function SourcesQueryBar({ aiSearchPrompt, handleAISearchLiterature, isAI
 
               {/* Quick Discovery Topic Chips */}
               <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
-                <span className="text-neutral-500 dark:text-neutral-400 font-medium mr-1">Quick Discovery:</span>
+                <span className="text-neutral-500 dark:text-neutral-400 font-medium mr-1">Quick searches:</span>
                 {[
-                  "Seminal Theoretical Frameworks",
-                  "Recent Empirical Evidence (2024–2026)",
-                  "Counter-Arguments & Critical Perspectives",
-                  "Policy & Institutional Reports",
+                  "Theoretical frameworks",
+                  `Recent evidence (${new Date().getFullYear() - 3}–${new Date().getFullYear()})`,
+                  "Criticism and counter-arguments",
+                  "Policy and institutional reports",
                 ].map((promptChip) => (
                   <button
                     key={promptChip}

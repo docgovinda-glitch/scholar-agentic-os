@@ -84,7 +84,7 @@ export default function ThemeLibraryGrid({
     deck.topic ||
     (deck.title && deck.title !== 'Untitled Presentation'
       ? deck.title
-      : 'Why Zappos Pays New Hires $2,000 to Quit');
+      : 'Your presentation title');
 
   // Unified theme dataset: Custom user themes + 100 Best Royalty-Free Slide Designs + User's favored Warm Clay Quartz
   const allThemesList = useMemo<UnifiedThemeItem[]>(() => {

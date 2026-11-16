@@ -9,38 +9,16 @@ cleanAnswerString
 } from "../../../../src/desk/assignment/types.ts";
 import type { AcademicLevel, AssignmentType } from "../../../../src/desk/assignment/types.ts";
 import { generateDynamicAssignmentStructure } from "../../../../src/desk/assignment/services/dynamicStructure.ts";
-import {
-isClassroomLogisticsLine,
-isTutorialOrShortQABrief
-} from "../../../../src/utils/briefExtractor.ts";
+import { isClassroomLogisticsLine, isTutorialOrShortQABrief } from "../../../../src/utils/briefExtractor.ts";
+import { hasLeakedTemplateHeadings } from "../../../../src/domain/assignment/legacyPurge.ts";
 
 type HeadingLike = { title?: string; subheadings?: Array<{ title?: string }> };
 
+/** Saved headings that carry old template text (see hasLeakedTemplateHeadings). */
 export function isCorruptedOutlineHeadings(headings: HeadingLike[], topic: string): boolean {
-  if (!headings || !Array.isArray(headings) || headings.length === 0) return false;
-  const flatTitles: string[] = [];
-  headings.forEach((h) => {
-    if (h.title) flatTitles.push(h.title);
-    if (h.subheadings && Array.isArray(h.subheadings)) {
-      h.subheadings.forEach((s) => {
-        if (s.title) flatTitles.push(s.title);
-      });
-    }
-  });
-
-  const isAIML = /\b(machine learning|deep learning|neural network|reinforcement learning|gradient descent|transformer model|llm|computer science)\b/i.test(topic);
-  const hasOBOrLeadership = /\b(leadership|culture|schein|human resources|organizational behavior|management|mba|business strategy)\b/i.test(topic);
-
-  const hasLeakedML = (!isAIML || hasOBOrLeadership) && flatTitles.some((t) =>
-    /\b(mathematical formulations|loss optimization|optimization landscapes|erm|loss surfaces|gradient descent|empirical risk|convex optimization)\b/i.test(t)
-  );
-
-  const hasClassroomLogistics = flatTitles.some((t) =>
-    isClassroomLogisticsLine(t) ||
-    /\b(divide yourself|teams of \d+|breakout|discussion timer|class discussion|icebreaker)\b/i.test(t)
-  );
-
-  return hasLeakedML || hasClassroomLogistics;
+  if (!Array.isArray(headings) || headings.length === 0) return false;
+  const titles = headings.flatMap((h) => [h.title, ...(Array.isArray(h.subheadings) ? h.subheadings.map((s) => s.title) : [])]);
+  return hasLeakedTemplateHeadings(titles, topic);
 }
 
 export function healCorruptedProjectStructure(project: { answers?: Record<string, string>; title?: string } | null | undefined): boolean {

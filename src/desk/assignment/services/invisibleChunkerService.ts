@@ -27,7 +27,7 @@ export interface ClaimEvidenceBinding {
  * Enforces PEEL paragraph framework:
  * - Point: Thematic topic sentence
  * - Evidence: Assigned Phase 2 citations
- * - Explanation: 70% critical analysis / 30% description
+ * - Explanation: critical analysis of the evidence, more than description
  * - Link: Explicit transition back to prompt
  */
 export interface StreamSectionOptions {

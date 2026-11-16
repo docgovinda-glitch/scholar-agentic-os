@@ -602,24 +602,6 @@ export function extractSubstantiveBriefQuestions(rawText: string): string[] {
 }
 
 /**
- * Extracts case study prompt/context (e.g. Zappos quit offer) if present in the brief.
- */
-export function extractCaseContext(rawText: string): string | undefined {
-  if (!rawText) return undefined;
-  const clean = stripSlideArtifacts(rawText);
-  const lines = clean.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-
-  for (const line of lines) {
-    if (isClassroomLogisticsLine(line)) continue;
-    if (line.toLowerCase().includes("zappos") && (line.toLowerCase().includes("2,000") || line.toLowerCase().includes("quit"))) {
-      return line.replace(/^["'“”‘’]+|["'“”‘’]+$/g, "").trim();
-    }
-  }
-
-  return undefined;
-}
-
-/**
  * Detects whether a brief represents a tutorial task, seminar activity, worksheet, or short Q&A.
  */
 export function isTutorialOrShortQABrief(rawText: string, targetWordCount?: number): boolean {

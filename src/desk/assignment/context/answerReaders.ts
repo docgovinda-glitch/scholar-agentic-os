@@ -8,18 +8,15 @@ AssignmentBriefRubricCriterion,SectionBudgetItem,WritingStyleConfig,AssignmentSt
 import { cleanAnswerString,AssignmentDraftingSection,structureToSectionBudgets } from "../types";
 import { generateDynamicAssignmentStructure } from "../services/dynamicStructure";
 import { safeParseAnswerField } from "../../../shared/projectStateSchema";
+import { hasLeakedTemplateHeadings } from "../../../domain/assignment/legacyPurge";
 
 export function readInternalSections({ answers, briefText, question }: {
   answers: Record<string, string>;
   briefText: string;
   question: string;
 }): AssignmentDraftingSection[] {
-  const isNonML = !/\b(machine learning|deep learning|neural network|transformer|foundation model)\b/i.test(`${question} ${briefText}`);
   const isCorrupted = (list: Array<{ title?: string }>) =>
-    list.some((sec) =>
-      (isNonML && /Mathematical Formulations|Loss Optimization Landscapes|Algorithmic Architectures/i.test(sec.title || "")) ||
-      /Divide Yourself in Teams|teams of 2|in classroom discussion/i.test(sec.title || "")
-    );
+    hasLeakedTemplateHeadings(list.map((sec) => sec.title), `${question} ${briefText}`);
 
   const rawInternal = answers["assignment_internal_sections"];
   if (rawInternal) {
@@ -81,18 +78,8 @@ export function readStructure({ academicLevel, answers, assignmentType, briefTex
   if (raw) {
     const parsed = safeParseAnswerField<AssignmentStructure | undefined>(raw, undefined);
     if (parsed?.headings && Array.isArray(parsed.headings) && parsed.headings.length > 0) {
-      const isNonMLTopic = !/\b(machine learning|deep learning|neural network|transformer|foundation model)\b/i.test(`${question} ${briefText}`);
-      const hasLeakedML = parsed.headings.some((h) =>
-        /Mathematical Formulations|Loss Optimization Landscapes|Algorithmic Architectures/i.test(h.title || "") ||
-        (h.subheadings || []).some((sub) => /Mathematical Formulations|Loss Optimization Landscapes|empirical risk minimization/i.test(sub.title || sub.guidance || ""))
-      );
-      const hasClassroomLogistics = parsed.headings.some((h) =>
-        /Divide Yourself in Teams|teams of 2|in classroom discussion/i.test(h.title || "")
-      );
-
-      if (!((isNonMLTopic && hasLeakedML) || hasClassroomLogistics)) {
-        return parsed;
-      }
+      const titles = parsed.headings.flatMap((h) => [h.title, ...(h.subheadings || []).map((sub) => sub.title)]);
+      if (!hasLeakedTemplateHeadings(titles, `${question} ${briefText}`)) return parsed;
     }
   }
   return generateDynamicAssignmentStructure({

@@ -96,7 +96,7 @@ export function streamSectionExistingBlock({ existingContent, revisionPrompt }: 
 
 export function streamSectionRevisionInstruction({ revisionPrompt }: { revisionPrompt: unknown }): string {
   return revisionPrompt === "deepen"
-      ? "REVISION FOCUS: Deepen analytical critique. Minimize passive descriptive text and amplify dialectical interrogation of theoretical assumptions (target 70% analysis / 30% description)."
+      ? "REVISION FOCUS: Deepen analytical critique. Minimize passive descriptive text and amplify dialectical interrogation of theoretical assumptions."
       : revisionPrompt === "expand"
       ? "REVISION FOCUS: Expand scholarly elaboration. Introduce detailed comparative nuances while maintaining empirical citation grounding."
       : revisionPrompt === "condense"
@@ -122,7 +122,7 @@ export function streamSectionFrameworkGuidelines({ isShortQA, mappedSources, cit
 - Point: Distinct topic sentence advancing the central thesis.
 - Evidence: Grounded empirical citations referenced SOLELY via bracket tokens like [1], [2], or token IDs like [${mappedSources[0]?.id || "ev-uuid"}].
 - STRICT CITATION CONVENTION: Do NOT format author-year in-text citations or include a "References" section. All citations will be compiled deterministically by the Citation Interceptor according to ${citationStyle}.
-- Explanation: 70% critical analysis & evaluation / 30% descriptive exposition.
+- Explanation: critical analysis and evaluation of the evidence, more than description.
 - Link: Clear concluding transition linking back to the primary assessment prompt.`;
 }
 
@@ -183,13 +183,13 @@ ${outline.map((sec, i) => {
   return `  Section ${i + 1}: "${sec.title}" [Target: ${sec.targetWordCount || 0}w, Current: ${sec.currentWordCount || 0}w]
     - Point: "${peel.point || sec.guidance || "Core assertion"}"
     - Evidence: "${peel.evidence || (sec.linkedEvidenceIds?.length ? `${sec.linkedEvidenceIds.length} linked sources` : "Pending citation")}"
-    - Explanation (70% critique): "${peel.explanation || "Critical analysis & evaluation"}"
+    - Explanation: "${peel.explanation || "Critical analysis & evaluation"}"
     - Link: "${peel.link || "Synthesis back to central thesis"}"
     - Draft Excerpt: "${(sec.draftContent || "").slice(0, 200)}..."`;
 }).join("\n\n") || "  (Outline not yet initialized)"}
 `;
     systemPrompt = `You are the Scribe, the Academic Drafting & Synthesis Copilot in Scholar OS.
-Your role is to assist with sequential section drafting using the rigorous PEEL framework (Point, Evidence, Explanation, Link), maintaining an optimal balance of 70% critical analysis to 30% descriptive summary.
+Your role is to assist with sequential section drafting using the rigorous PEEL framework (Point, Evidence, Explanation, Link), favouring critical analysis over description.
 Help deepen analytical critique, strengthen argumentative transitions, eliminate passive phrasing, and smoothly bind claims to in-text citations.`;
   } else {
     personaName = "Examiner";
@@ -205,8 +205,8 @@ ${unresolvedCitations.map((c, i) => `  [C${i + 1}] "${typeof c === "string" ? c 
 - Word Count Adherence: ${currentTotalWords.toLocaleString()} / ${targetWordCount.toLocaleString()} words (${Math.abs(currentTotalWords - targetWordCount) <= targetWordCount * 0.1 ? "Compliant within ±10%" : "Check word count margin"})
 `;
     systemPrompt = `You are the Examiner, the Quality Audit & Final Review Copilot in Scholar OS.
-Your role is to evaluate draft submissions against university marking criteria (First Class 70%+, 2:1, 2:2), audit citation reconciliation, and ensure submission formatting perfection.
-Explain predicted marks, highlight priority fixes needed to step up to the next grade band, and guide citation resolution.`;
+Your role is to check the draft against the brief's own marking criteria and requirements, reconcile citations with the reference list, and check formatting.
+Never predict a mark or grade, and never assume a grading scale the brief does not state. Explain what each criterion asks for, where the draft meets it or falls short (quote the draft), which fixes matter most, and how to resolve citation problems.`;
   }
   return { personaName, personaRole, scopedContextSummary, systemPrompt };
 }

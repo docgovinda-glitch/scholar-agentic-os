@@ -53,7 +53,7 @@ export default function ThemeScreenshotCloner({
     deck.topic ||
     (deck.title && deck.title !== 'Untitled Presentation'
       ? deck.title
-      : 'Why Zappos Pays New Hires $2,000 to Quit');
+      : 'Your presentation title');
 
   const processFile = useCallback(async (file: File | Blob) => {
     setIsProcessing(true);
