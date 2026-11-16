@@ -1,3 +1,4 @@
+import { DEFAULT_CITATION_STYLE } from "../../domain/assignment/answerKeys";
 import React,{ useState,useRef,useEffect } from "react";
 import { formatSourceInTextCitation } from "./services/citationFormatService";
 import { parsePersonName } from "./services/referenceListGenerator";
@@ -39,7 +40,7 @@ const NUMERIC_STYLES = /^(ieee|vancouver|numeric)/i;
  * In-text citation for a source card, from the shared formatter. A card has no
  * place in the reference order, so numeric styles fall back to author-date.
  */
-export function formatInTextCitation(source: DiscoveredSource, style = "harvard"): string {
+export function formatInTextCitation(source: DiscoveredSource, style = DEFAULT_CITATION_STYLE): string {
   return formatSourceInTextCitation(source, NUMERIC_STYLES.test(style) ? "harvard" : style, 1);
 }
 
@@ -52,7 +53,7 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
   onToggleBookmark,
   onEdit,
   onSaveEdit,
-  citationStyle = "harvard",
+  citationStyle = DEFAULT_CITATION_STYLE,
   className = "",
   showDismiss = true,
 }) => {

@@ -1,3 +1,5 @@
+import { DEFAULT_CITATION_STYLE } from "../../../domain/assignment/answerKeys";
+import { clampWordLimit, WORD_LIMIT_DEFAULT, WORD_LIMIT_MAX, WORD_LIMIT_MIN, WORD_LIMIT_STEP } from "../../../domain/assignment/wordLimit";
 import { safeParseAnswerField } from "../../../shared/projectStateSchema";
 import { tonePresetOf } from "../types";
 import { UnderstandAgentPanel } from "../components/AgentPanels";
@@ -111,7 +113,7 @@ export default function AssignmentUnderstandStage({
     if (raw > 50000) return 2000; // Auto-heal runaway values
     return Math.max(100, Math.min(50000, Math.round(raw)));
   });
-  const [localCitation, setLocalCitation] = useState<string>(citationStyle || "apa7");
+  const [localCitation, setLocalCitation] = useState<string>(citationStyle || DEFAULT_CITATION_STYLE);
   const [localBrief, setLocalBrief] = useState(
     cleanAnswerString(assignmentBriefText) || cleanAnswerString(question)
   );
@@ -184,7 +186,7 @@ export default function AssignmentUnderstandStage({
     if (academicLevel) setLocalLevel((prev) => (prev !== academicLevel ? academicLevel : prev));
     if (assignmentType) setLocalType((prev) => (prev !== assignmentType ? assignmentType : prev));
     if (targetWordCount > 0) {
-      const sanitized = targetWordCount > 50000 ? 2000 : Math.max(100, Math.min(50000, Number(targetWordCount) || 2000));
+      const sanitized = clampWordLimit(targetWordCount);
       setLocalWordCount((prev) => (prev !== sanitized ? sanitized : prev));
     }
     if (citationStyle) setLocalCitation((prev) => (prev !== citationStyle ? citationStyle : prev));
@@ -314,8 +316,7 @@ export default function AssignmentUnderstandStage({
     if (academicLevel) setLocalLevel((prev) => (prev !== academicLevel ? academicLevel : prev));
     if (assignmentType) setLocalType((prev) => (prev !== assignmentType ? assignmentType : prev));
     if (targetWordCount > 0) {
-      const sanitized =
-        targetWordCount > 50000 ? 2000 : Math.max(100, Math.min(50000, Number(targetWordCount) || 2000));
+      const sanitized = clampWordLimit(targetWordCount);
       setLocalWordCount((prev) => (prev !== sanitized ? sanitized : prev));
     }
     if (citationStyle) setLocalCitation((prev) => (prev !== citationStyle ? citationStyle : prev));
@@ -442,8 +443,7 @@ export default function AssignmentUnderstandStage({
   };
 
   const handleTargetWordCountChange = (newCount: number) => {
-    const rawNum = Number(newCount);
-    const validCount = isNaN(rawNum) || rawNum <= 0 ? 2000 : Math.min(50000, Math.max(100, Math.round(rawNum)));
+    const validCount = clampWordLimit(newCount);
     setLocalWordCount(validCount);
 
     if (validCount <= 0) return;

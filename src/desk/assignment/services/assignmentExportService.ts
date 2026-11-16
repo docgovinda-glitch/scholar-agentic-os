@@ -8,6 +8,7 @@
  * - Formatted Bibliography: Auto-generated reference list formatted to citationStyle (Harvard, APA 7, IEEE, MHRA) with hanging indent
  */
 
+import { DEFAULT_CITATION_STYLE } from "../../../domain/assignment/answerKeys";
 import { countProseWords } from "../../../shared/proseBlocks";
 import { clipHeadingWords } from "../../../utils/briefQuestions";
 import { selectCitedSources,inlineMarkdownRuns,inlineMarkdownToHtml,proseToHtml,type StyledRun } from "./exportText";
@@ -207,12 +208,12 @@ export async function generateAssignmentDocx(params: AssignmentExportParams): Pr
   const courseName = params.courseName || params.brief.courseDetails?.courseName || "";
   // Only sources cited in the body plus the brief's prescribed references, once each.
   const bodyText = sections.map((sec) => sec.draftContent || "").join("\n\n");
-  const bibliographyEntries = buildFormattedBibliography(selectCitedSources(sources, bodyText), brief.citationStyle || "harvard");
+  const bibliographyEntries = buildFormattedBibliography(selectCitedSources(sources, bodyText), brief.citationStyle || DEFAULT_CITATION_STYLE);
   const referenceHeading = () =>
     new Paragraph({
       heading: HeadingLevel.HEADING_1,
       spacing: { before: 240, after: 240 },
-      children: [new TextRun({ text: getReferenceListHeading(brief.citationStyle || "harvard"), font: "Times New Roman", size: 28, bold: true })],
+      children: [new TextRun({ text: getReferenceListHeading(brief.citationStyle || DEFAULT_CITATION_STYLE), font: "Times New Roman", size: 28, bold: true })],
     });
   // Hanging indent standard for academic bibliographies (720 dxa = 0.5 in).
   const referenceEntries = () =>
@@ -234,7 +235,7 @@ export async function generateAssignmentDocx(params: AssignmentExportParams): Pr
     year: "numeric",
   });
 
-  const citationStyleLabel = (brief.citationStyle || "harvard").toUpperCase();
+  const citationStyleLabel = (brief.citationStyle || DEFAULT_CITATION_STYLE).toUpperCase();
   const academicLevelLabel = academicLevelName(brief.academicLevel);
 
   // Standard 1-inch margins (1440 twips / dxa)
@@ -599,7 +600,7 @@ export async function downloadAssignmentPdf(projectId: string, params: Assignmen
       studentId: params.studentId || undefined,
       institution: params.institution || undefined,
       courseName: params.courseName || params.brief.courseDetails?.courseName || undefined,
-      citationStyle: params.brief.citationStyle || "harvard",
+      citationStyle: params.brief.citationStyle || DEFAULT_CITATION_STYLE,
       targetWordCount: params.brief.targetWordCount || undefined,
       sections: params.sections.map((s) => ({ title: s.title, draftContent: s.draftContent || "" })),
       sources: params.sources,
@@ -637,10 +638,10 @@ export function exportAssignmentToPdf(params: AssignmentExportParams): void {
     year: "numeric",
   });
 
-  const citationStyleLabel = (brief.citationStyle || "harvard").toUpperCase();
+  const citationStyleLabel = (brief.citationStyle || DEFAULT_CITATION_STYLE).toUpperCase();
   const bibliographyEntries = buildFormattedBibliography(
     selectCitedSources(sources, sections.map((sec) => sec.draftContent || "").join("\n\n")),
-    brief.citationStyle || "harvard"
+    brief.citationStyle || DEFAULT_CITATION_STYLE
   );
 
   const printWindow = window.open("", "_blank");
@@ -798,7 +799,7 @@ export function exportAssignmentToPdf(params: AssignmentExportParams): void {
   </main>
 
   <div class="bib-section">
-    <h2>${getReferenceListHeading(brief.citationStyle || "harvard")}</h2>
+    <h2>${getReferenceListHeading(brief.citationStyle || DEFAULT_CITATION_STYLE)}</h2>
     ${bibliographyHtml}
   </div>
 
@@ -830,13 +831,13 @@ export async function copyAssignmentMarkdown(
 ): Promise<boolean> {
   const referenceBlock = generateReferenceListBlock(
     selectCitedSources(sources, sections.map((sec) => sec.draftContent || "").join("\n\n")),
-    brief.citationStyle || "harvard"
+    brief.citationStyle || DEFAULT_CITATION_STYLE
   );
 
   const fullMarkdown = [
     `# ${title}`,
     "",
-    `> **Target Word Count:** ${brief.targetWordCount} words | **Citation Style:** ${(brief.citationStyle || "harvard").toUpperCase()}`,
+    `> **Target Word Count:** ${brief.targetWordCount} words | **Citation Style:** ${(brief.citationStyle || DEFAULT_CITATION_STYLE).toUpperCase()}`,
     "",
     ...sections.map((s) => `## ${s.title}\n\n${(s.draftContent || "").trim()}`),
     "",

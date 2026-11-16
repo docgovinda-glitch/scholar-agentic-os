@@ -1,3 +1,4 @@
+import { DEFAULT_CITATION_STYLE } from "../../../../src/domain/assignment/answerKeys.ts";
 import { parseBody, CopilotChatBody } from "./schemas.ts";
 import express from "express";
 import { selectApprovedSources } from "../../../../src/domain/assignment/approvedSources.ts";
@@ -127,7 +128,7 @@ router.post("/copilot-chat", async (req: express.Request<{ id: string }>, res) =
   const citationStyle =
     state.brief?.citationStyle ||
     answers["citation_style"] ||
-    "apa7";
+    DEFAULT_CITATION_STYLE;
 
   const assignmentType =
     state.brief?.assignmentType ||

@@ -1,3 +1,4 @@
+import { DEFAULT_CITATION_STYLE } from "../../../domain/assignment/answerKeys";
 import { SourcesAgentPanel } from "../components/AgentPanels";
 import { filterAndSortSources,normalizeRelevance } from "../services/sourceFilters";
 import { useSourceFilters } from "../components/sources/useSourceFilters";
@@ -43,7 +44,7 @@ import { selectApprovedSources } from "../../../domain/assignment/approvedSource
 
 /** A source's reference entry in the project's style, from the shared formatter. */
 export function formatSourceReference(source: Partial<DiscoveredSource>, style: string): string {
-  return formatSourceBibliography(source, style || "harvard");
+  return formatSourceBibliography(source, style || DEFAULT_CITATION_STYLE);
 }
 
 
@@ -845,7 +846,7 @@ export default function AssignmentSourcesStage({
         approvedSources={approvedSourcesList}
         onToggleApproval={handleToggleApproval}
         onProceedToDrafting={handleContinue}
-        citationStyle={citationStyle || "harvard"}
+        citationStyle={citationStyle || DEFAULT_CITATION_STYLE}
         onSaveEditSource={handleSaveSourceUpdates}
       />
     </div>

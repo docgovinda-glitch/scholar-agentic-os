@@ -1,3 +1,4 @@
+import { DEFAULT_CITATION_STYLE } from "../../../domain/assignment/answerKeys";
 import React,{ useState,useEffect,useRef } from "react";
 import SectionTextEditor,{ type SectionEditorHandle } from "../../editor/SectionTextEditor";
 import { inlineMarkdownRuns } from "../../../shared/inlineMarkdown";
@@ -161,7 +162,7 @@ export function DraftingActiveEditor({
   streamingChunk = "",
   boundSources = [],
   allApprovedSources = [],
-  citationStyle = "harvard",
+  citationStyle = DEFAULT_CITATION_STYLE,
   onNavigatePrevious,
   onNavigateNext,
   hasPrevious = false,

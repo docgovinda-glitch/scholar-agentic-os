@@ -1,3 +1,5 @@
+import { WORD_LIMIT_MAX } from "../../../../src/domain/assignment/wordLimit.ts";
+import { DEFAULT_CITATION_STYLE } from "../../../../src/domain/assignment/answerKeys.ts";
 import { errorText } from "../../../../src/shared/errorText.ts";
 import { parseBody, AnalyzeBody, OutlineBody } from "./schemas.ts";
 import { routedCompletion } from "../../../src/ai/routerBridge.ts";
@@ -132,7 +134,7 @@ router.post(
       wordSlice.match(/(?:^|[^\d,])([1-9]\d{0,2}(?:,\d{3})+|[1-9]\d{2,4})\s*words\b/i);
     if (wordMatch) {
       const parsed = parseInt((wordMatch[1] || "").replace(/,/g, ""), 10);
-      if (parsed >= 200 && parsed <= 50000) {
+      if (parsed >= 200 && parsed <= WORD_LIMIT_MAX) {
         detectedWordCount = parsed;
       }
     } else if (isTutorialOrShortQABrief(cleanedText)) {
@@ -235,7 +237,7 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
   const citationStyle =
     cleanAnswerString(req.body?.citationStyle) ||
     cleanAnswerString(project.answers["citation_style"]) ||
-    "apa7";
+    DEFAULT_CITATION_STYLE;
   const rubricText =
     cleanAnswerString(req.body?.rubricText) ||
     cleanAnswerString(project.answers["marking_rubric"]) ||

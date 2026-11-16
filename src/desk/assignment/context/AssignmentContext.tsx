@@ -1,3 +1,5 @@
+import { clampWordLimit, WORD_LIMIT_DEFAULT } from "../../../domain/assignment/wordLimit";
+import { DEFAULT_CITATION_STYLE } from "../../../domain/assignment/answerKeys";
 import { tonePresetOf } from "../types";
 import { generateDynamicAssignmentStructure } from "../services/dynamicStructure";
 import { countProseWords } from "../../../shared/proseBlocks";
@@ -428,38 +430,16 @@ export function AssignmentProvider({
   const answers = project?.answers || {};
   const academicLevel: AcademicLevel =
     (answers["academic_level"] as AcademicLevel) ||
-    (answers["academic_level"] as AcademicLevel) ||
     "undergraduate";
   const assignmentType: AssignmentType =
     (answers["assignment_type"] as AssignmentType) ||
-    (answers["assignment_type"] as AssignmentType) ||
     "essay";
-  const rawTarget =
-    answers["word_limit"] !== undefined
-      ? answers["word_limit"]
-      : answers["word_limit"] !== undefined
-      ? answers["word_limit"]
-      : answers["word_limit"] !== undefined
-      ? answers["word_limit"]
-      : answers["word_limit"];
-  let parsedTarget =
-    rawTarget !== undefined && rawTarget !== null && rawTarget !== ""
-      ? Number(rawTarget)
-      : 2000;
-  if (isNaN(parsedTarget) || parsedTarget <= 0) {
-    parsedTarget = 2000;
-  } else if (parsedTarget > 50000) {
-    // Auto-heal runaway or concatenated values e.g. 2000150 -> 2000
-    parsedTarget = 2000;
-  }
-  const targetWordCount = parsedTarget;
+  // A stored target is clamped into range, never reset (a long dissertation keeps 50,000).
+  const rawTarget = answers["word_limit"];
+  const targetWordCount = rawTarget !== undefined && rawTarget !== null && rawTarget !== "" ? clampWordLimit(rawTarget) : WORD_LIMIT_DEFAULT;
 
-  const rawCitation =
-    answers["citation_style"] !== undefined
-      ? answers["citation_style"]
-      : answers["citation_style"];
-  const citationStyle =
-    rawCitation !== undefined ? cleanAnswerString(rawCitation) : "apa7";
+  const rawCitation = answers["citation_style"];
+  const citationStyle = cleanAnswerString(rawCitation) || DEFAULT_CITATION_STYLE;
 
   const rawSections = answers["sections"];
   const rawSectionsKey =

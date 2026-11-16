@@ -1,3 +1,4 @@
+import { DEFAULT_CITATION_STYLE } from "../../../../domain/assignment/answerKeys";
 import type { AssignmentSubheading } from "../../types";
 import { ReferenceBarItem } from "../../ReferenceBarItem";
 import { CuratedSourceCard } from "../CuratedSourceCard";
@@ -53,7 +54,7 @@ export function SourcesCatalog({ approvedSourceIds, bookmarkedIds, citationStyle
                     />
                   ) : (
                     <ReferenceBarItem
-                      citationStyle={citationStyle || "harvard"}
+                      citationStyle={citationStyle || DEFAULT_CITATION_STYLE}
                       key={source.id}
                       source={source}
                       isApproved={isSourceApproved(source, approvedSourceIds)}

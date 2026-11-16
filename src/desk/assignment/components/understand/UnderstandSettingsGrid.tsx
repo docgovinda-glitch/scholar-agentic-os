@@ -1,3 +1,4 @@
+import { WORD_LIMIT_DEFAULT, WORD_LIMIT_MAX, WORD_LIMIT_STEP } from "../../../../domain/assignment/wordLimit";
 import React from "react";
 import {
 type AcademicLevel,
@@ -177,8 +178,7 @@ export function UnderstandSettingsGrid({ dispatchToneAssistantSuggestions, handl
                 <button
                   type="button"
                   onClick={() => {
-                    const current = Number(localWordCount) || 2000;
-                    handleTargetWordCountChange(Math.max(100, current - 250));
+                    handleTargetWordCountChange((Number(localWordCount) || WORD_LIMIT_DEFAULT) - WORD_LIMIT_STEP);
                   }}
                   aria-label="Decrease target word count"
                   className="h-8 w-8 rounded-lg border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
@@ -201,16 +201,11 @@ export function UnderstandSettingsGrid({ dispatchToneAssistantSuggestions, handl
                         return;
                       }
                       const val = parseInt(raw, 10);
-                      if (!isNaN(val)) {
-                        const clamped = Math.min(50000, Math.max(0, val));
-                        setLocalWordCount(clamped);
-                        handleWordCountChange(clamped);
-                      }
+                      // Typing only edits the box; the structure is rebuilt when the field is left.
+                      if (!isNaN(val)) setLocalWordCount(Math.min(WORD_LIMIT_MAX, val));
                     }}
                     onBlur={() => {
-                      if (!localWordCount || localWordCount < 100) {
-                        handleTargetWordCountChange(2000);
-                      }
+                      handleTargetWordCountChange(localWordCount);
                     }}
                     aria-label="Target Word Count"
                     placeholder="2000"
@@ -220,8 +215,7 @@ export function UnderstandSettingsGrid({ dispatchToneAssistantSuggestions, handl
                 <button
                   type="button"
                   onClick={() => {
-                    const current = Number(localWordCount) || 2000;
-                    handleTargetWordCountChange(Math.min(50000, current + 250));
+                    handleTargetWordCountChange((Number(localWordCount) || WORD_LIMIT_DEFAULT) + WORD_LIMIT_STEP);
                   }}
                   aria-label="Increase target word count"
                   className="h-8 w-8 rounded-lg border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"

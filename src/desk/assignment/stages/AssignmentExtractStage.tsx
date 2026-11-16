@@ -1,3 +1,5 @@
+import { DEFAULT_CITATION_STYLE } from "../../../domain/assignment/answerKeys";
+import { clampWordLimit, WORD_LIMIT_DEFAULT, WORD_LIMIT_MAX, WORD_LIMIT_STEP } from "../../../domain/assignment/wordLimit";
 import { tonePresetOf } from "../types";
 import { ExtractAgentPanel } from "../components/AgentPanels";
 import React,{ useState,useRef,useEffect,useMemo } from "react";
@@ -135,7 +137,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
     if (raw > 50000) return 2000;
     return Math.max(100, Math.min(50000, Math.round(raw)));
   });
-  const [localCitation, setLocalCitation] = useState<string>(citationStyle || "apa7");
+  const [localCitation, setLocalCitation] = useState<string>(citationStyle || DEFAULT_CITATION_STYLE);
   const [localBrief, setLocalBrief] = useState(
     cleanAnswerString(assignmentBriefText) || cleanAnswerString(question)
   );
@@ -245,8 +247,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
     if (academicLevel) setLocalLevel((prev) => (prev !== academicLevel ? academicLevel : prev));
     if (assignmentType) setLocalType((prev) => (prev !== assignmentType ? assignmentType : prev));
     if (targetWordCount > 0) {
-      const sanitized =
-        targetWordCount > 50000 ? 2000 : Math.max(100, Math.min(50000, Number(targetWordCount) || 2000));
+      const sanitized = clampWordLimit(targetWordCount);
       setLocalWordCount((prev) => (prev !== sanitized ? sanitized : prev));
     }
     if (citationStyle) setLocalCitation((prev) => (prev !== citationStyle ? citationStyle : prev));
@@ -916,7 +917,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                 ASSIGNMENT_TYPE_OPTIONS.find((o) => o.id === localType)?.label,
                 CITATION_STYLES.find((o) => o.id === localCitation)?.name,
                 WRITING_TONE_OPTIONS.find((o) => o.id === localTone)?.label,
-                `${(Number(localWordCount) || 2000).toLocaleString()} words`,
+                `${(Number(localWordCount) || WORD_LIMIT_DEFAULT).toLocaleString()} words`,
               ]
                 .filter(Boolean)
                 .join(" · ")}
@@ -1093,10 +1094,9 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
               <button
                 type="button"
                 onClick={() => {
-                  const current = Number(localWordCount) || 2000;
-                  const next = Math.max(100, current - 250);
+                  const next = clampWordLimit((Number(localWordCount) || WORD_LIMIT_DEFAULT) - WORD_LIMIT_STEP);
                   setLocalWordCount(next);
-                  saveAnswers({ word_count: next, word_limit: next, targetWordCount: next });
+                  saveAnswers({ word_limit: next });
                 }}
                 aria-label="Decrease target word count"
                 className="h-8 w-7.5 rounded-lg border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
@@ -1112,7 +1112,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                   value={
                     isWordCountFocused
                       ? (localWordCount > 0 ? String(localWordCount) : "")
-                      : `${(Number(localWordCount) || 2000).toLocaleString()} words`
+                      : `${(Number(localWordCount) || WORD_LIMIT_DEFAULT).toLocaleString()} words`
                   }
                   onFocus={() => setIsWordCountFocused(true)}
                   onChange={(e) => {
@@ -1122,18 +1122,14 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                       return;
                     }
                     const val = parseInt(raw, 10);
-                    if (!isNaN(val)) {
-                      const clamped = Math.min(50000, Math.max(0, val));
-                      setLocalWordCount(clamped);
-                      saveAnswers({ word_count: clamped, word_limit: clamped, targetWordCount: clamped });
-                    }
+                    // Typing only edits the box; the value is saved when the field is left.
+                    if (!isNaN(val)) setLocalWordCount(Math.min(WORD_LIMIT_MAX, val));
                   }}
                   onBlur={() => {
                     setIsWordCountFocused(false);
-                    const cur = Number(localWordCount);
-                    const sanitized = !cur || isNaN(cur) || cur < 100 ? 2000 : cur > 50000 ? 50000 : cur;
+                    const sanitized = clampWordLimit(localWordCount);
                     setLocalWordCount(sanitized);
-                    saveAnswers({ word_count: sanitized, word_limit: sanitized, targetWordCount: sanitized });
+                    saveAnswers({ word_limit: sanitized });
                   }}
                   aria-label="Target Word Count"
                   placeholder="2,000 words"
@@ -1143,10 +1139,9 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
               <button
                 type="button"
                 onClick={() => {
-                  const current = Number(localWordCount) || 2000;
-                  const next = Math.min(50000, current + 250);
+                  const next = clampWordLimit((Number(localWordCount) || WORD_LIMIT_DEFAULT) + WORD_LIMIT_STEP);
                   setLocalWordCount(next);
-                  saveAnswers({ word_count: next, word_limit: next, targetWordCount: next });
+                  saveAnswers({ word_limit: next });
                 }}
                 aria-label="Increase target word count"
                 className="h-8 w-7.5 rounded-lg border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"

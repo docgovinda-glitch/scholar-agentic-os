@@ -9,6 +9,7 @@
  * 5. Guarantees complete project isolation.
  */
 
+import { DEFAULT_CITATION_STYLE } from "../../../domain/assignment/answerKeys";
 import { authedFetch, authedJsonFetch } from "../../api";
 import { formatSourceBibliography, formatSourceInTextCitation } from "./citationFormatService";
 import type { EvidenceExtraction } from "../../../domain/assignment/assignmentAgent";
@@ -163,7 +164,7 @@ function cleanTitle(name: string): string {
 
 /** "APA" / "Harvard" / "apa7" ... to a style id the shared formatters know. */
 function normalizeStyle(style: string): string {
-  const s = (style || "apa7").toLowerCase();
+  const s = (style || DEFAULT_CITATION_STYLE).toLowerCase();
   if (s === "apa") return "apa7";
   if (s === "mla") return "mla9";
   return s;
@@ -205,7 +206,7 @@ export async function extractProjectEvidence(
   document: UploadedSourceDocument;
   evidenceItems: EvidenceItem[];
 }> {
-  const { assignmentQuestion, citationStyle = "apa7", projectId } = options;
+  const { assignmentQuestion, citationStyle = DEFAULT_CITATION_STYLE, projectId } = options;
   const keywords = extractKeywords(assignmentQuestion);
   const segments = segmentDocument(payload.text, payload.sourceType);
   const scored = segments.map((seg) => ({ ...seg, score: scoreSegmentRelevance(seg.text, keywords) })).sort((x, y) => y.score - x.score);
@@ -410,7 +411,7 @@ export interface DerivedTraceability {
 export function deriveSourceTraceability(
   doc: UploadedSourceDocument,
   _assignmentQuestion: string = "",
-  citationStyle: string = "apa7"
+  citationStyle: string = DEFAULT_CITATION_STYLE
 ): DerivedTraceability {
   // Only what the upload actually yielded; empty lists stay empty.
   const relevantEvidences = doc.extractedEvidences ?? [];

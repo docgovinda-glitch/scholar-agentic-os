@@ -13,6 +13,7 @@
  */
 
 import type { DiscoveredSource } from "../types";
+import { DEFAULT_CITATION_STYLE } from "../../../domain/assignment/answerKeys";
 import { parsePersonName } from "./personName";
 import { CitationFormatterFactory } from "../../../citation_compliance/formattingEngine";
 import { discoveredSourceToCanonical } from "./sourceCanonical";
@@ -301,7 +302,7 @@ function buildVolumeIssue(source: DiscoveredSource): string {
 }
 
 function normalizeCitationStyle(style: string): string {
-  return (style || "harvard").toLowerCase().replace(/[^a-z0-9]/g, "");
+  return (style || DEFAULT_CITATION_STYLE).toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
