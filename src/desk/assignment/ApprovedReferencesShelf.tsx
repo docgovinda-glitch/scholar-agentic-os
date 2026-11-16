@@ -1,15 +1,14 @@
-import React, { useState } from "react";
+import React,{ useState } from "react";
 import type { DiscoveredSource } from "./types";
 import { ReferenceBarItem } from "./ReferenceBarItem";
 import { buildFormattedBibliography } from "./services/assignmentExportService";
 import {
-  ChevronUp,
-  ChevronDown,
-  BookOpen,
-  Copy,
-  Check,
-  ArrowRight,
-  Sparkles,
+ChevronUp,
+ChevronDown,
+BookOpen,
+Copy,
+Check,
+ArrowRight
 } from "lucide-react";
 
 export interface ApprovedReferencesShelfProps {

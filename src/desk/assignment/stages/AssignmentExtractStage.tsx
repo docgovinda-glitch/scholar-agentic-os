@@ -1,43 +1,33 @@
 import { ExtractAgentPanel } from "../components/AgentPanels";
-import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import React,{ useState,useRef,useEffect,useMemo } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
-import { authedJsonFetch, authedFetch } from "../../api";
+import { authedJsonFetch,authedFetch } from "../../api";
 import {
-  type AcademicLevel,
-  type AssignmentType,
-  type AssignmentAnalysis,
-  type AssignmentStructure,
-  type SectionBudgetItem,
-  type WritingToneConfig,
-  type WritingStyleConfig,
-  cleanAnswerString,
-  structureToInternalSections,
-  structureToSectionBudgets,
+type AcademicLevel,
+type AssignmentType,
+type AssignmentAnalysis,type SectionBudgetItem,cleanAnswerString,
+structureToInternalSections,
+structureToSectionBudgets
 } from "../types";
 import { deriveHeuristicTitle } from "../../projectNaming";
 import {
-  Upload,
-  ChevronDown,
-  Sparkles,
-  ArrowRight,
-  Check,
-  AlertCircle,
-  FileText,
-  X,
+Upload,
+ChevronDown,
+Sparkles,AlertCircle,
+FileText,
+X
 } from "lucide-react";
 import type { SectionBreakdown } from "../../../components/forms/TargetWordCountInput";
 import { generateDynamicAssignmentStructure } from "../services/dynamicStructure";
-import { stripCircularReferences, safeFormatLabel } from "../../../utils/briefExtractor";
-import { validateBriefFile, BRIEF_MAX_UPLOAD_MB } from "../../../services/documentParser";
+import { stripCircularReferences } from "../../../utils/briefExtractor";
+import { validateBriefFile,BRIEF_MAX_UPLOAD_MB } from "../../../services/documentParser";
 import BriefScopePanel from "../components/BriefScopePanel";
 import { scopeBrief } from "../../../domain/assignment/briefScoping";
 import {
-  ACADEMIC_LEVEL_OPTIONS,
-  ASSIGNMENT_TYPE_OPTIONS,
-  STAGE_CITATION_STYLES as CITATION_STYLES,
-  WRITING_TONE_OPTIONS,
-  ARCHETYPE_DEFAULT_TONES,
-  AGENTIC_THINKING_STAGES,
+ACADEMIC_LEVEL_OPTIONS,
+ASSIGNMENT_TYPE_OPTIONS,
+STAGE_CITATION_STYLES as CITATION_STYLES,
+WRITING_TONE_OPTIONS,AGENTIC_THINKING_STAGES
 } from "../types";
 
 export const ASSIGNMENT_TYPE_TONE_MAP: Record<string, string> = {
@@ -102,7 +92,6 @@ export interface AssignmentExtractStageProps {
 
 export default function AssignmentExtractStage({ onProceed }: AssignmentExtractStageProps) {
   const {
-    projectId,
     project,
     question,
     academicLevel,

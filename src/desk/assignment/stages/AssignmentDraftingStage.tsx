@@ -3,39 +3,29 @@ import { selectApprovedSources } from "../../../domain/assignment/approvedSource
 import { clipHeadingWords } from "../../../utils/briefQuestions";
 import { countProseWords } from "../../../shared/proseBlocks";
 import { useToast } from "../../../components/ui/FeedbackSystem";
-import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { useState,useCallback,useMemo,useEffect,useRef } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
 import { DraftingSectionIndex } from "../components/DraftingSectionIndex";
 import { DraftingActiveEditor } from "../components/DraftingActiveEditor";
 import {
-  streamSectionGeneration,
-  type InternalSectionPlan,
+streamSectionGeneration,
+type InternalSectionPlan,
 } from "../services/invisibleChunkerService";
-import { buildEvidencePack, serializeEvidencePackForPrompt } from "../services/evidencePackService";
-import { buildContextContinuity, updateContextContinuityAfterSection } from "../services/contextContinuityService";
+import { buildEvidencePack,serializeEvidencePackForPrompt } from "../services/evidencePackService";
+import { buildContextContinuity,updateContextContinuityAfterSection } from "../services/contextContinuityService";
 import type { ContextContinuityState } from "../services/evidencePackService";
 import type { AssignmentDraftingSection } from "../types";
 import {
-  PenTool,
-  ArrowRight,
-  ArrowLeft,
-  CheckCircle2,
-  AlertCircle,
-  Sparkles,
-  Layers,
-  FileCheck,
-  RotateCcw,
-  Book,
-  PanelLeftClose,
-  PanelLeftOpen,
+ArrowRight,
+ArrowLeft,
+CheckCircle2,
+AlertCircle,PanelLeftClose,
+PanelLeftOpen
 } from "lucide-react";
-import { SlideCanvas, extractSlidesFromAcademicText, type SlideDeck } from "../../../features/slides";
+import { SlideCanvas,extractSlidesFromAcademicText,type SlideDeck } from "../../../features/slides";
 import { ReferencesCard } from "../components/ReferencesCard";
 import { selectCitedSources } from "../services/exportText";
 import { buildFormattedBibliography } from "../services/assignmentExportService";
-import { formatReferenceHtml } from "../services/referenceListGenerator";
-import { validateSectionUniqueness } from "../../../features/drafting/services/sectionDraftingEngine";
-import { auditAndEnforceCollegiateStyle } from "../../../features/coursework/services/courseworkOrchestrator";
 
 export interface AssignmentDraftingStageProps {
   onProceed?: () => void;
@@ -91,9 +81,7 @@ export function AssignmentDraftingStage({
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [isTuning, setIsTuning] = useState(false);
   const [showPresentation, setShowPresentation] = useState(false);
-  const [showKeynote, setShowKeynote] = useState(false);
   const [presentationDeck, setPresentationDeck] = useState<SlideDeck | null>(null);
-  const [keynoteDeck, setKeynoteDeck] = useState<SlideDeck | null>(null);
   // Beside the editor on wide screens; on phones it would push the writing
   // area off screen, so it starts hidden there (Previous/Next still move).
   const [showOutline, setShowOutline] = useState(() =>
@@ -155,31 +143,8 @@ export function AssignmentDraftingStage({
   }, [activeSectionId, internalSections]);
 
   // Detailed Mode Academic Integrity & Quality Gates
-  const uniquenessValidation = useMemo(() => {
-    return validateSectionUniqueness(
-      internalSections.map((s) => ({
-        id: s.id,
-        title: s.title,
-        content: s.draftContent || "",
-      }))
-    );
-  }, [internalSections]);
 
-  const activeProseAudit = useMemo(() => {
-    if (!activeSection?.draftContent) return null;
-    return auditAndEnforceCollegiateStyle(activeSection.draftContent);
-  }, [activeSection?.draftContent]);
 
-  const detectedCitationTokens = useMemo(() => {
-    if (!activeSection?.draftContent) return [];
-    const regex = /\[([^\[\]\(\)\r\n]+)\](?!\()/g;
-    const tokens: string[] = [];
-    let m;
-    while ((m = regex.exec(activeSection.draftContent)) !== null) {
-      tokens.push(m[1].trim());
-    }
-    return Array.from(new Set(tokens));
-  }, [activeSection?.draftContent]);
 
   const activeIndex = useMemo(() => {
     if (!activeSection) return -1;
@@ -645,16 +610,15 @@ export function AssignmentDraftingStage({
       </footer>
 
       {/* Fullscreen Presentation Overlay */}
-      {(showPresentation || showKeynote) && (presentationDeck || keynoteDeck) && (
+      {showPresentation && presentationDeck && (
         <div
           className="fixed inset-0 z-50 bg-paper-sand dark:bg-ink-850 overflow-auto flex flex-col justify-center animate-in fade-in duration-200"
           data-testid="drafting-keynote-overlay"
         >
           <SlideCanvas
-            deck={presentationDeck || keynoteDeck}
+            deck={presentationDeck}
             onClose={() => {
               setShowPresentation(false);
-              setShowKeynote(false);
             }}
           />
         </div>

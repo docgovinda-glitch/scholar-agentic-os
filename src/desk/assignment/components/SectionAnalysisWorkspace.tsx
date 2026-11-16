@@ -1,35 +1,34 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React,{ useState,useMemo,useEffect } from "react";
 import type {
-  AssignmentStructure,
-  DiscoveredSource,
-  SectionAnalyticalSynthesis,
+AssignmentStructure,
+DiscoveredSource,
+SectionAnalyticalSynthesis,
 } from "../types";
-import { flattenStructureSubheadings, CITATION_STYLES } from "../types";
+import { flattenStructureSubheadings,CITATION_STYLES } from "../types";
 import {
-  generateOrSyncAnalyticalSyntheses,
-  recalculateAllSynthesesCitations,
-  strengthenSynthesisClaim,
-  deepenCounterargument,
+generateOrSyncAnalyticalSyntheses,
+recalculateAllSynthesesCitations,
+strengthenSynthesisClaim,
+deepenCounterargument,
 } from "../services/sectionAnalysisService";
-import { formatSourceInTextCitation, formatSourceBibliography } from "../services/citationFormatService";
+import { formatSourceInTextCitation } from "../services/citationFormatService";
 import {
-  Sparkles,
-  ArrowRight,
-  ArrowLeft,
-  CheckCircle2,
-  BookOpen,
-  Edit2,
-  Check,
-  Plus,
-  Trash2,
-  Quote,
-  Layers,
-  ChevronRight,
-  ExternalLink,
-  ShieldCheck,
-  X,
-  RefreshCw,
-  HelpCircle,
+Sparkles,
+ArrowRight,
+ArrowLeft,
+CheckCircle2,
+BookOpen,
+Edit2,
+Check,
+Plus,
+Trash2,
+Quote,
+Layers,
+ChevronRight,
+ExternalLink,
+ShieldCheck,
+X,
+RefreshCw
 } from "lucide-react";
 
 export interface SectionAnalysisWorkspaceProps {

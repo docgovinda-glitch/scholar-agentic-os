@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from "react";
-import { Book, Check, Copy, Edit2 } from "lucide-react";
+import { useMemo,useState } from "react";
+import { Book,Check,Copy,Edit2 } from "lucide-react";
 import type { DiscoveredSource } from "../types";
 import { buildFormattedBibliography } from "../services/assignmentExportService";
 import { formatReferenceHtml } from "../services/referenceListGenerator";

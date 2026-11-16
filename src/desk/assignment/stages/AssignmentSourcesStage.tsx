@@ -1,7 +1,7 @@
 import { SourcesAgentPanel } from "../components/AgentPanels";
 import { splitAuthorList } from "../services/personName";
 import { formatSourceBibliography } from "../services/citationFormatService";
-import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState,useEffect,useMemo,useCallback,useRef } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
 import { ReferenceBarItem } from "../ReferenceBarItem";
 import { ApprovedReferencesShelf } from "../ApprovedReferencesShelf";
@@ -10,47 +10,36 @@ import { LectureUploadDropzone } from "../components/LectureUploadDropzone";
 import { VaultSourcePicker } from "../components/VaultSourcePicker";
 import { areSourcesRelevantToBrief } from "../../../utils/briefSourceQueries";
 import {
-  discoverRealScholarlySourcesFromServer,
-  discoverSourcesForAssignment,
-  fetchMoreRealSources,
+discoverRealScholarlySourcesFromServer,
+discoverSourcesForAssignment,
+fetchMoreRealSources,
 } from "../services/realScholarlyDiscoveryService";
 import { SectionAnalysisWorkspace } from "../components/SectionAnalysisWorkspace";
 import type {
-  DiscoveredSource,
-  UploadedSourceDocument,
-  EvidenceItem,
-  SourceAcademicType,
-  SectionAnalyticalSynthesis,
+DiscoveredSource,
+UploadedSourceDocument,
+EvidenceItem,
+SourceAcademicType,
+SectionAnalyticalSynthesis,
 } from "../types";
 import { selectCitedSources } from "../services/exportText";
 import { flattenStructureSubheadings } from "../types";
 import {
-  Library,
-  ArrowRight,
-  ArrowLeft,
-  CheckCircle2,
-  Sparkles,
-  Search,
-  Filter,
-  RefreshCw,
-  AlertCircle,
-  FileCheck,
-  Star,
-  SlidersHorizontal,
-  Unlock,
-  RotateCcw,
-  BookOpen,
-  FolderOpen,
-  X,
-  Copy,
-  Edit2,
-  Plus,
-  Trash2,
-  Check,
-  FileUp,
-  Tag,
-  LayoutGrid,
-  List,
+Library,
+ArrowRight,
+ArrowLeft,
+CheckCircle2,
+Sparkles,
+Search,RefreshCw,Star,
+SlidersHorizontal,
+Unlock,
+RotateCcw,
+BookOpen,
+FolderOpen,
+X,
+Copy,Plus,Check,
+FileUp,LayoutGrid,
+List
 } from "lucide-react";
 
 /** A source's reference entry in the project's style, from the shared formatter. */
@@ -88,7 +77,6 @@ export default function AssignmentSourcesStage({
     approvedSourceIds,
     setApprovedSourceIds,
     toggleSourceApproval,
-    dismissSource,
     userUploadedSources,
     addUserUploadedSource,
     removeUserUploadedSource,
@@ -113,7 +101,6 @@ export default function AssignmentSourcesStage({
 
   // Outline subheadings & view mode
   const subheadings = useMemo(() => flattenStructureSubheadings(structure), [structure]);
-  const [selectedSubheadingId, setSelectedSubheadingId] = useState<string | null>(null);
   // Compact list by default; cards are one click away in the view switcher.
   const [viewMode, setViewMode] = useState<"bar" | "card">("bar");
 
@@ -149,25 +136,13 @@ export default function AssignmentSourcesStage({
   const [isFindingMore, setIsFindingMore] = useState(false);
   const [isDiscoveringInitial, setIsDiscoveringInitial] = useState(false);
   const [discoverySuccessMsg, setDiscoverySuccessMsg] = useState<string | null>(null);
-  const [altPoolIndex, setAltPoolIndex] = useState(0);
 
   // AI Literature Discovery & Search state
   const [aiSearchPrompt, setAiSearchPrompt] = useState("");
   const [isAISearching, setIsAISearching] = useState(false);
   const [recentlyRemovedSource, setRecentlyRemovedSource] = useState<DiscoveredSource | null>(null);
 
-  // Reference editing & copy state
-  const [editingSourceId, setEditingSourceId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({
-    title: "",
-    authors: "",
-    year: "",
-    journal: "",
-    volumeIssue: "",
-    doi: "",
-    citation: "",
-    roleInAssignment: "",
-  });
+  // Manual reference entry
   const [isAddingCustom, setIsAddingCustom] = useState(false);
   const [customForm, setCustomForm] = useState({
     title: "",
@@ -180,54 +155,10 @@ export default function AssignmentSourcesStage({
     citation: "",
     roleInAssignment: "Empirical evidence",
   });
-  const [copiedSourceId, setCopiedSourceId] = useState<string | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
 
-  const handleStartEditSource = (source: DiscoveredSource) => {
-    setEditingSourceId(source.id);
-    setEditForm({
-      title: source.title || "",
-      authors: (source.authors || []).join(", "),
-      year: source.year || "",
-      journal: source.journal || source.publisher || "",
-      volumeIssue: source.volumeIssue || "",
-      doi: source.doi || "",
-      citation: formatSourceReference(source, citationStyle),
-      roleInAssignment: source.roleInAssignment || "Empirical evidence",
-    });
-  };
 
-  const handleSaveSourceEdit = async () => {
-    if (!editingSourceId) return;
-
-    const authorsList = editForm.authors
-      .split(",")
-      .map((a) => a.trim())
-      .filter(Boolean);
-
-    const updatedSources = sources.map((s) => {
-      if (s.id === editingSourceId) {
-        return {
-          ...s,
-          title: editForm.title.trim() || s.title,
-          authors: authorsList.length > 0 ? authorsList : s.authors,
-          year: editForm.year.trim() || s.year,
-          journal: editForm.journal.trim() || s.journal,
-          volumeIssue: editForm.volumeIssue.trim() || s.volumeIssue,
-          doi: editForm.doi.trim() || s.doi,
-          citation: editForm.citation.trim() || s.citation,
-          roleInAssignment: editForm.roleInAssignment || s.roleInAssignment,
-        };
-      }
-      return s;
-    });
-
-    await setSources(updatedSources);
-    setEditingSourceId(null);
-    setDiscoverySuccessMsg("Reference updated successfully.");
-    setTimeout(() => setDiscoverySuccessMsg(null), 3000);
-  };
 
   const handleSaveSourceUpdates = useCallback(
     async (sourceId: string, updates: Partial<DiscoveredSource>) => {
@@ -313,13 +244,6 @@ export default function AssignmentSourcesStage({
     setTimeout(() => setDiscoverySuccessMsg(null), 3000);
   };
 
-  const handleCopyCitation = (source: DiscoveredSource) => {
-    // From the source's metadata (edited fields included), in the project's style.
-    const text = formatSourceReference(source, citationStyle);
-    navigator.clipboard?.writeText(text);
-    setCopiedSourceId(source.id);
-    setTimeout(() => setCopiedSourceId(null), 2000);
-  };
 
   const handleCopyAllReferences = () => {
     const approved = allMasterSources.filter((s) => approvedSourceIds.includes(s.id));
@@ -600,20 +524,6 @@ export default function AssignmentSourcesStage({
   };
 
   // Restore excluded source
-  const handleRestoreSource = async (sourceId: string) => {
-    const nextExcluded = excludedIds.filter((id) => id !== sourceId);
-    setExcludedIds(nextExcluded);
-
-    const nextSources = sources.map((s) =>
-      s.id === sourceId ? { ...s, isExcluded: false, status: "kept" as const } : s
-    );
-    await setSources(nextSources);
-    if (setApprovedSourceIds) {
-      await setApprovedSourceIds(Array.from(new Set([...approvedSourceIds, sourceId])));
-    }
-    setDiscoverySuccessMsg("Restored source to assignment.");
-    setTimeout(() => setDiscoverySuccessMsg(null), 3000);
-  };
 
   const handleLectureUpload = async (docs: UploadedSourceDocument[], newEvidences?: EvidenceItem[]) => {
     for (const doc of docs) {
@@ -674,7 +584,7 @@ export default function AssignmentSourcesStage({
     // Only sources actually in state (live discovery results or the user's own).
     const raw = sources && sources.length > 0 ? sources : [];
 
-    return raw.map((s, idx) => ({
+    return raw.map((s) => ({
       ...s,
       // Brief-driven discovery (incl. prescribed references) counts under Ask Scholar;
       // AI-search results under AI Research. Unknown origins never fall out of every tab.
@@ -749,11 +659,6 @@ export default function AssignmentSourcesStage({
   // Filter and sort sources
   const displayedSources = useMemo(() => {
     let list = allMasterSources;
-
-    // 0. Subheading filter
-    if (selectedSubheadingId) {
-      list = getSubheadingSources(selectedSubheadingId, list);
-    }
 
     // 1. Tab status filtering
     if (activeTab === "approved") {
@@ -876,7 +781,6 @@ export default function AssignmentSourcesStage({
     minRelevance,
     openAccessOnly,
     sortBy,
-    selectedSubheadingId,
     getSubheadingSources,
   ]);
 
@@ -917,9 +821,6 @@ export default function AssignmentSourcesStage({
   ).length;
 
   const approvedCount = approvedSourceIds.length > 0 ? approvedSourceIds.length : totalActiveSources;
-  const isExitGateUnlocked = true; // Always unlocked per requirement 5
-  const minimumRequired = 4;
-  const progressPercent = Math.min(100, Math.round((Math.max(approvedCount, totalActiveSources) / minimumRequired) * 100));
 
   return (
     <div className="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8 pb-32 space-y-7 animate-in fade-in duration-200">
@@ -1126,7 +1027,7 @@ export default function AssignmentSourcesStage({
                   <Library className="w-4 h-4 text-neutral-700 dark:text-neutral-300" />
                   <span>Curated Scholarly Literature</span>
                   <span className="text-xs font-mono font-medium text-neutral-400">
-                    ({allMasterSources.length} identified{selectedSubheadingId ? " · filtered" : ""})
+                    ({allMasterSources.length} identified)
                   </span>
                 </h2>
                 <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">

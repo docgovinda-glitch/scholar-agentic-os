@@ -1,13 +1,12 @@
-import React, { useState, useEffect, useRef } from "react";
+import React,{ useState,useEffect,useRef } from "react";
 import type { AssignmentPhaseId } from "./types";
-import { AssignmentProvider, useAssignmentWorkspace } from "./AssignmentContext";
+import { AssignmentProvider,useAssignmentWorkspace } from "./AssignmentContext";
 import AssignmentStageNavigation from "./components/AssignmentStageNavigation";
 import { authedJsonFetch } from "../api";
 import { useUnsavedChangesGuard } from "../../hooks/useUnsavedChangesGuard";
-import { WorkspaceAutosaveBadge } from "../../components/ui/WorkspaceAutosaveBadge";
-import AppleStudioHeader, { type AppleStudioPhaseId } from "../../components/ui/AppleStudioShell";
+import AppleStudioHeader,{ type AppleStudioPhaseId } from "../../components/ui/AppleStudioShell";
 
-import { ASSIGNMENT_AGENT_CONFIGS, ASSIGNMENT_PHASES } from "./types";
+import { ASSIGNMENT_AGENT_CONFIGS,ASSIGNMENT_PHASES } from "./types";
 import { sendAssignmentCopilotMessage } from "./services/assignmentCopilotService";
 
 const ContextPanel = React.lazy(() => import("../workspace/ContextPanel"));
@@ -88,7 +87,6 @@ function AssignmentWorkspaceInner({
     error,
     saveAnswers,
     projectState,
-    executionMode,
     saveStatus,
   } = useAssignmentWorkspace();
 

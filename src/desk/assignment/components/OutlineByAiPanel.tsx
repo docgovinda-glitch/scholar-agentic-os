@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Loader2, RotateCcw, Sparkles, Wand2 } from "lucide-react";
+import { Loader2,RotateCcw,Sparkles } from "lucide-react";
 import type { AssignmentStructure } from "../types";
 
 /**

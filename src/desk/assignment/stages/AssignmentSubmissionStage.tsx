@@ -1,31 +1,25 @@
 import { ReviewAgentPanel } from "../components/AgentPanels";
 import { selectApprovedSources } from "../../../domain/assignment/approvedSources";
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useState,useEffect,useMemo } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
 import { RubricComplianceCard } from "../components/RubricComplianceCard";
 import { CitationReconciliationCard } from "../components/CitationReconciliationCard";
 import { FlowReconciliationCard } from "../components/FlowReconciliationCard";
 import {
-  exportAssignmentToDocx,
-  downloadAssignmentPdf,
-  exportAssignmentToPdf,
-  copyAssignmentMarkdown,
+exportAssignmentToDocx,
+downloadAssignmentPdf,
+exportAssignmentToPdf,
+copyAssignmentMarkdown,
 } from "../services/assignmentExportService";
 import { getCitationCoverage } from "../services/citationAnchoringService";
 import {
-  FileText,
-  Printer,
-  Copy,
-  Check,
-  RotateCw,
-  ArrowLeft,
-  Sparkles,
-  ShieldCheck,
-  AlertTriangle,
-  BookOpen,
-  LinkIcon,
-  Edit2,
-  ChevronDown,
+FileText,
+Printer,
+Copy,
+Check,
+RotateCw,
+ArrowLeft,AlertTriangle,LinkIcon,
+Edit2
 } from "lucide-react";
 
 export interface AssignmentSubmissionStageProps {
@@ -45,7 +39,6 @@ export function AssignmentSubmissionStage({
     sources,
     approvedSourceIds,
     citationStyle,
-    academicLevel,
     question,
     submissionReport,
     runSubmissionAudit,

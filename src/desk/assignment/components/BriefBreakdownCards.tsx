@@ -1,10 +1,10 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Check, Edit2, Trash2, X } from "lucide-react";
+import { useEffect,useMemo,useState } from "react";
+import { Check,Edit2,Trash2,X } from "lucide-react";
 import { allocateWordsByMarks } from "../../../utils/briefExtractor";
 import {
-  parseBriefQuestions,
-  parseMarkingCriteria,
-  type BriefQuestionRow,
+parseBriefQuestions,
+parseMarkingCriteria,
+type BriefQuestionRow,
 } from "../../../utils/briefQuestions";
 
 const card = "bg-white dark:bg-ink-750 rounded-2xl border border-neutral-200/80 dark:border-white/10 p-4 sm:p-5 shadow-xs space-y-3";
@@ -97,7 +97,7 @@ export function SubQuestionsCard({ briefText, fallbackQuestions = [], totalWords
     <section className={card} aria-label="Key sub-questions" data-testid="sub-questions-card">
       <h3 className={heading}>Key sub-questions your essay must answer</h3>
       <ul className="divide-y divide-neutral-100 dark:divide-white/5">
-        {rows.map((row, i) => {
+        {rows.map((row) => {
           const budget = targets[row.id];
           const editing = editingId === row.id;
           return (

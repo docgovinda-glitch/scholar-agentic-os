@@ -1,23 +1,21 @@
-import React, { useState, useRef, useEffect } from "react";
+import React,{ useState,useRef,useEffect } from "react";
 import { formatSourceInTextCitation } from "./services/citationFormatService";
 import { parsePersonName } from "./services/referenceListGenerator";
 import { sourceVenueLabel } from "./services/sourceDisplay";
 import type { DiscoveredSource } from "./types";
 import {
-  Check,
-  Plus,
-  Copy,
-  Edit2,
-  X,
-  FileUp,
-  Bookmark,
-  ExternalLink,
-  BookOpen,
-  Table,
-  Quote,
-  ChevronUp,
-  ChevronDown,
-  Sparkles,
+Check,
+Plus,
+Copy,
+Edit2,
+X,
+FileUp,
+Bookmark,BookOpen,
+Table,
+Quote,
+ChevronUp,
+ChevronDown,
+Sparkles
 } from "lucide-react";
 
 export interface ReferenceBarItemProps {
@@ -142,7 +140,6 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
       .map((a) => a.trim())
       .filter(Boolean);
 
-    const yearNum = parseInt(editYear.trim(), 10) || undefined;
 
     const updates: Partial<DiscoveredSource> = {
       title: editTitle.trim() || source.title,

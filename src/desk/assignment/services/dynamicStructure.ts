@@ -47,12 +47,6 @@ export function generateDynamicAssignmentStructure(
   const hasExplicitBriefDirectives = Boolean(briefText && briefText.trim().length > 20) &&
     (briefInquiries.extractedTasks.length >= 2 || briefInquiries.subQuestions.length >= 2);
 
-  const isCoursework = assignmentType === "coursework" ||
-    assignmentType === "business_assignment" ||
-    assignmentType === "report" ||
-    assignmentType === "case_study" ||
-    qLower.includes("coursework") ||
-    qLower.includes("module assignment");
 
   const isCaseStudyOrBusiness = assignmentType === "case_study" ||
     assignmentType === "business_assignment" ||
@@ -191,7 +185,6 @@ export function generateDynamicAssignmentStructure(
   const askScholarResearch = planBriefInquiries({ question, briefText, assignmentType });
 
   // Calculate word allocations per subheading
-  const allSubheadings = specs.flatMap((h) => h.subheadings);
   let allocatedSoFar = 0;
 
   const rawHeadings: AssignmentMainHeading[] = specs.map((spec, hIdx) => {

@@ -102,7 +102,6 @@ export function buildSynthesisCard(
   citationStyle: string
 ): SectionAnalyticalSynthesis {
   const citation = formatSourceInTextCitation(source, citationStyle);
-  const authorsDisplay = source.authors && source.authors.length > 0 ? source.authors.join(", ") : "Scholar";
   const yearDisplay = source.year || "n.d.";
 
   // Check if source has extracted evidences (from user uploads)

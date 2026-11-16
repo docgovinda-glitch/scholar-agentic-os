@@ -1,17 +1,15 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import type { AssignmentDraftingSection } from "../types";
 import {
-  CheckCircle2,
-  Clock,
-  Sparkles,
-  BookOpen,
-  ArrowRight,
-  Layers,
-  FileText,
-  Loader2,
-  Edit2,
-  Check,
-  X,
+CheckCircle2,
+Clock,
+Sparkles,
+BookOpen,Layers,
+FileText,
+Loader2,
+Edit2,
+Check,
+X
 } from "lucide-react";
 
 export interface DraftingSectionIndexProps {
@@ -34,11 +32,7 @@ export function DraftingSectionIndex({
   activeSectionId,
   onSelectSection,
   onGenerateNext,
-  onGenerateAll,
-  onTuneToQuestion,
   onUpdateSectionTitle,
-  assignmentTopic,
-  isTuning = false,
   isGenerating = false,
   generatingSectionId = null,
   className = "",

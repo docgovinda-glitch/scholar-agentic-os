@@ -14,11 +14,9 @@
  */
 
 import type {
-  DiscoveredSource,
-  AssignmentDraftingSection,
-  UploadedSourceDocument,
-  ExtractedSourceEvidence,
-  SectionAnalyticalSynthesis,
+DiscoveredSource,
+AssignmentDraftingSection,
+UploadedSourceDocument,SectionAnalyticalSynthesis
 } from "../types";
 
 // ─────────────────────────────────────────────────────────────────────────────

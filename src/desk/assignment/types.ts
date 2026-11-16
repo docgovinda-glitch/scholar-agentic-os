@@ -4,7 +4,6 @@
  */
 
 import type { CanonicalReference } from "../../citation_compliance/model/reference";
-import type { CitationStyleType } from "../../services/vault/citationService";
 import type { CanonicalDocument } from "../../domain/document/model";
 import type { EvidenceLedger } from "../../domain/evidence/types";
 
@@ -1008,7 +1007,7 @@ export function structureToInternalSections(structure?: AssignmentStructure | nu
   // MAX_DRAFTING_SECTIONS, draft one section per heading instead.
   const flatCount = structure.headings.reduce((n, h) => n + Math.max(1, h.subheadings?.length ?? 0), 0);
   const mergeSubheadings = flatCount > MAX_DRAFTING_SECTIONS;
-  structure.headings.forEach((h, hIdx) => {
+  structure.headings.forEach((h) => {
     // A heading whose sub-parts would each get a very small budget is drafted as one section.
     const tooSmall = (h.subheadings ?? []).length > 1 && (h.subheadings ?? []).some((x) => x.targetWordCount > 0 && x.targetWordCount < MIN_DRAFTING_SECTION_WORDS);
     if (!mergeSubheadings && !tooSmall && h.subheadings && h.subheadings.length > 0) {

@@ -6,17 +6,15 @@
 
 import { countProseWords } from "../../../shared/proseBlocks";
 import type {
-  AssignmentBriefState,
-  CitationAuditResult,
-  CitationAuditIssue,
-  RubricScoreReport,
-  RubricScoreCriterion,
-  GradingBand,
-  DiscoveredSource,
-  UploadedSourceDocument,
-  AssignmentDraftingSection,
-  FlowAuditResult,
-  FlowAuditIssue,
+AssignmentBriefState,
+CitationAuditResult,
+CitationAuditIssue,
+RubricScoreReport,
+RubricScoreCriterion,DiscoveredSource,
+UploadedSourceDocument,
+AssignmentDraftingSection,
+FlowAuditResult,
+FlowAuditIssue
 } from "../types";
 
 /**
@@ -31,7 +29,6 @@ export function extractInTextCitations(text: string): string[] {
   if (!text || typeof text !== "string") return [];
 
   const found: string[] = [];
-  const seen = new Set<string>();
 
   // 1. Parenthetical author-year: (Smith, 2020) or (Smith et al., 2020, p. 12)
   const parentheticalRegex = /\(([A-Z][A-Za-z\s&.,'-]+?,\s*(?:19|20)\d{2}[a-z]?(?:,\s*p{1,2}\.?\s*\d+(?:-\d+)?)?)\)/g;

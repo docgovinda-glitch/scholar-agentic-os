@@ -1,37 +1,23 @@
-import React, { useState } from "react";
+import React,{ useState } from "react";
 import {
-  Plus,
-  Trash2,
-  ChevronDown,
-  ChevronUp,
-  Sparkles,
-  RotateCcw,
-  Check,
-  AlertCircle,
-  FileText,
-  SlidersHorizontal,
-  ArrowUp,
-  ArrowDown,
-  Layers,
-  StickyNote,
-  X,
-  Edit2,
-  BookOpen,
-  CheckCircle2,
-  BookmarkCheck,
-  ExternalLink,
-  HelpCircle,
-  GripVertical,
+Plus,
+Trash2,Sparkles,
+RotateCcw,
+Check,
+AlertCircle,SlidersHorizontal,
+ArrowUp,
+ArrowDown,
+Layers,
+StickyNote,
+X,
+Edit2,
+BookOpen,BookmarkCheck,GripVertical
 } from "lucide-react";
-import { DndContext, closestCenter, DragEndEvent } from "@dnd-kit/core";
-import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
+import { DndContext,closestCenter,DragEndEvent } from "@dnd-kit/core";
+import { SortableContext,verticalListSortingStrategy,useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type {
-  AssignmentStructure,
-  AssignmentMainHeading,
-  AssignmentSubheading,
-  ResearchSourceReference,
-  QuestionMappingMatrixItem,
+AssignmentStructure
 } from "../types";
 import { generateDynamicAssignmentStructure } from "../services/dynamicStructure";
 import { updateThesisStatement } from "../services/outlineEditing";
@@ -113,7 +99,6 @@ export function DynamicStructurePlanner({
   writingTone,
   citationStyle,
   isConfirmed = false,
-  onConfirmStructure,
   className = "",
 }: DynamicStructurePlannerProps) {
   const [expandedNotes, setExpandedNotes] = useState<Record<string, boolean>>({});
@@ -121,7 +106,6 @@ export function DynamicStructurePlanner({
   const [expandedBlueprintSubheadings, setExpandedBlueprintSubheadings] = useState<Record<string, boolean>>({});
   const [newHeadingTitle, setNewHeadingTitle] = useState("");
   const [isAddingHeading, setIsAddingHeading] = useState(false);
-  const [activeSubheadingId, setActiveSubheadingId] = useState<string | null>(null);
   const [newFramework, setNewFramework] = useState("");
 
   const toggleHeadingBlueprint = (headingId: string) => {
@@ -167,7 +151,6 @@ export function DynamicStructurePlanner({
   const difference = targetWordCount - totalAllocated;
   const isBalanced = totalAllocated === targetWordCount;
   const isOver = totalAllocated > targetWordCount;
-  const allocationPercent = targetWordCount > 0 ? Math.round((totalAllocated / targetWordCount) * 100) : 0;
 
   const toggleNotes = (id: string) => {
     setExpandedNotes((prev) => ({ ...prev, [id]: !prev[id] }));

@@ -1,29 +1,19 @@
-import React, { useState } from "react";
+import React,{ useState } from "react";
 import { sourceVenueLabel } from "../services/sourceDisplay";
 import type { DiscoveredSource } from "../types";
 import {
-  Check,
-  Plus,
-  X,
-  ExternalLink,
-  Sparkles,
-  BookOpen,
-  Star,
-  ShieldCheck,
-  ChevronDown,
-  ChevronUp,
-  Quote,
-  Unlock,
-  FileText,
-  Table,
-  Globe,
-  FileUp,
-  Tag,
-  PenLine,
-  Search,
-  Edit2,
-  Copy,
-  Trash2,
+Check,
+Plus,ExternalLink,
+Sparkles,
+BookOpen,
+Star,
+ShieldCheck,
+ChevronDown,
+ChevronUp,
+Quote,
+Unlock,Table,FileUp,
+Tag,
+PenLine,Trash2
 } from "lucide-react";
 
 export interface CuratedSourceCardProps {
@@ -50,8 +40,6 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
   isReplacing = false,
   isBookmarked = false,
   onToggleBookmark,
-  onEdit,
-  onSaveEdit,
   className = "",
   availableSubheadings = [],
   onUpdateSubheadingMapping,

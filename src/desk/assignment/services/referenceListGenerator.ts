@@ -13,16 +13,15 @@
  */
 
 import type { DiscoveredSource } from "../types";
-import type { CitationAnchor } from "../schemas/sourceSchema";
+import { parsePersonName } from "./personName";
+import { CitationFormatterFactory } from "../../../citation_compliance/formattingEngine";
+import { discoveredSourceToCanonical } from "./sourceCanonical";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Author Formatting Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
 export { parsePersonName, type ParsedPersonName } from "./personName";
-import { parsePersonName } from "./personName";
-import { CitationFormatterFactory } from "../../../citation_compliance/formattingEngine";
-import { discoveredSourceToCanonical } from "./sourceCanonical";
 
 /**
  * Format author name for APA/Harvard: "Surname, F. M."

@@ -10,38 +10,37 @@
 
 import { countProseWords } from "../../../shared/proseBlocks";
 import { clipHeadingWords } from "../../../utils/briefQuestions";
-import { selectCitedSources, inlineMarkdownRuns, inlineMarkdownToHtml, proseToHtml, type StyledRun } from "./exportText";
-import { parseProseBlocks, type ProseAlign } from "../../../shared/proseBlocks";
+import { selectCitedSources,inlineMarkdownRuns,inlineMarkdownToHtml,proseToHtml,type StyledRun } from "./exportText";
+import { parseProseBlocks,type ProseAlign } from "../../../shared/proseBlocks";
 import {
-  Document,
-  Packer,
-  Paragraph,
-  TextRun,
-  HeadingLevel,
-  AlignmentType,
-  Header,
-  Footer,
-  PageNumber,
-  PageBreak,
-  Table,
-  TableRow,
-  TableCell,
-  WidthType,
-  BorderStyle,
+Document,
+Packer,
+Paragraph,
+TextRun,
+HeadingLevel,
+AlignmentType,
+Header,
+Footer,
+PageNumber,
+PageBreak,
+Table,
+TableRow,
+TableCell,
+WidthType,
+BorderStyle,
 } from "docx";
 import type {
-  AssignmentBriefState,
-  AssignmentDraftingSection,
-  DiscoveredSource,
+AssignmentBriefState,
+AssignmentDraftingSection,
+DiscoveredSource,
 } from "../types";
 import {
-  formatReference,
-  generateReferenceList,
-  generateReferenceListBlock,
-  getReferenceListHeading,
+formatReference,
+generateReferenceList,
+generateReferenceListBlock,
+getReferenceListHeading,
 } from "./referenceListGenerator";
 import { isTutorialOrShortQABrief } from "../../../utils/briefExtractor";
-import { splitProseIntoParagraphs } from "../../../shared/proseParagraphs";
 import { authedFetch } from "../../api";
 
 const ACADEMIC_LEVEL_NAMES: Record<string, string> = {

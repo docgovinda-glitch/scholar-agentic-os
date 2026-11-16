@@ -1,4 +1,3 @@
-import React from "react";
 import type { RubricScoreReport } from "../types";
 
 export interface RubricComplianceCardProps {

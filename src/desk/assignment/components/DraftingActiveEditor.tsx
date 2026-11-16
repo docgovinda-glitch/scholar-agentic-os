@@ -1,33 +1,32 @@
-import React, { useState, useEffect, useRef } from "react";
-import SectionTextEditor, { type SectionEditorHandle } from "../../editor/SectionTextEditor";
+import React,{ useState,useEffect,useRef } from "react";
+import SectionTextEditor,{ type SectionEditorHandle } from "../../editor/SectionTextEditor";
 import { inlineMarkdownRuns } from "../../../shared/inlineMarkdown";
 import { formatSourceInTextCitation } from "../services/citationFormatService";
 import { parsePersonName } from "../services/personName";
-import { countProseWords, parseProseBlocks } from "../../../shared/proseBlocks";
-import { showAppToast } from "../../../components/ui/FeedbackSystem";
-import type { AssignmentDraftingSection, DiscoveredSource } from "../types";
+import { countProseWords,parseProseBlocks } from "../../../shared/proseBlocks";
+import type { AssignmentDraftingSection,DiscoveredSource } from "../types";
 import { splitProseIntoParagraphs } from "../../../shared/proseParagraphs";
 import {
-  Sparkles,
-  Edit3,
-  Check,
-  BookOpen,
-  ArrowRight,
-  ArrowLeft,
-  CheckCircle2,
-  Loader2,
-  TrendingUp,
-  FileText,
-  Scissors,
-  PlusCircle,
-  Edit2,
-  X,
-  Copy,
-  ChevronDown,
-  ShieldCheck,
-  Maximize2,
-  Minimize2,
-  Brain,
+Sparkles,
+Edit3,
+Check,
+BookOpen,
+ArrowRight,
+ArrowLeft,
+CheckCircle2,
+Loader2,
+TrendingUp,
+FileText,
+Scissors,
+PlusCircle,
+Edit2,
+X,
+Copy,
+ChevronDown,
+ShieldCheck,
+Maximize2,
+Minimize2,
+Brain,
 } from "lucide-react";
 
 export interface DraftingActiveEditorProps {

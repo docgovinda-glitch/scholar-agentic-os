@@ -1,10 +1,9 @@
-import React from "react";
 import { type FlowAuditResult } from "../types";
-import { 
-  GitCommit, 
-  CheckCircle2, 
-  AlertTriangle,
-  ArrowRight,
+import {
+GitCommit,
+CheckCircle2,
+AlertTriangle,
+ArrowRight,
 } from "lucide-react";
 
 export interface FlowReconciliationCardProps {
