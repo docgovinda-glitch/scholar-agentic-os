@@ -1,5 +1,5 @@
 import { countProseWords } from "../../../shared/proseBlocks";
-import { canonicalizeAssignmentUpdate, normalizeAssignmentAnswers } from "../../../domain/assignment/answerKeys";
+import { canonicalizeAssignmentUpdate,normalizeAssignmentAnswers } from "../../../domain/assignment/answerKeys";
 import { selectApprovedSources } from "../../../domain/assignment/approvedSources";
 import { clipHeadingWords } from "../../../utils/briefQuestions";
 import { createContext,useContext,useState,useCallback,useEffect,ReactNode,useMemo,useRef } from "react";
@@ -17,10 +17,7 @@ authedJsonFetch,
 UnauthenticatedError,
 } from "../../api";
 import type {
-AssignmentPhaseId,
-AssignmentStage,
-StageStatus,
-AcademicLevel,
+AssignmentPhaseId,AcademicLevel,
 AssignmentType,
 AssignmentAnalysis,
 ResearchPlan,
@@ -74,11 +71,6 @@ export interface AssignmentContextValue {
   advancePhase: (nextPhase?: AssignmentPhaseId) => void;
 
   // Backward-compatible Stage Aliases
-  stage: AssignmentStage;
-  currentStage: AssignmentStage;
-  setStage: (stage: AssignmentStage, options?: { replace?: boolean }) => void;
-  stageStatuses: Record<AssignmentStage, StageStatus>;
-  advanceStage: (nextStage?: AssignmentStage) => void;
 
   // Unified 4-Phase Project State Model (Section 4.2)
   projectState: AssignmentProjectState;
@@ -207,8 +199,8 @@ export function AssignmentProvider({
   children,
 }: {
   projectId: string;
-  initialStage: AssignmentStage | null;
-  onStageChangeCallback: (stage: AssignmentStage, options?: { replace?: boolean }) => void;
+  initialStage: AssignmentPhaseId | null;
+  onStageChangeCallback: (phase: AssignmentPhaseId, options?: { replace?: boolean }) => void;
   children: ReactNode;
 }) {
   const [activeProjectId, setActiveProjectId] = useState(projectId);
@@ -264,7 +256,7 @@ export function AssignmentProvider({
     return realProject.projectId;
   }, [activeProjectId]);
 
-  const [activeStage, setActiveStage] = useState<AssignmentStage>(initialStage ?? "understand");
+  const [activeStage, setActiveStage] = useState<AssignmentPhaseId>(initialStage ?? "understand");
 
   useEffect(() => {
     if (initialStage) {
@@ -277,7 +269,6 @@ export function AssignmentProvider({
     return normalizeAssignmentPhase(activeStage);
   }, [activeStage]);
 
-  const currentStage: AssignmentStage = activeStage;
 
 
   // Phase 3 Drafting Engine state
@@ -425,21 +416,6 @@ export function AssignmentProvider({
     [onStageChangeCallback, saveAnswers]
   );
 
-  // Backward-compatible setStage alias
-  const setStage = useCallback(
-    (stage: AssignmentStage, options?: { replace?: boolean }) => {
-      setActiveStage(stage);
-      const mappedPhase = normalizeAssignmentPhase(stage);
-      saveAnswers({
-        assignment_current_phase: mappedPhase,
-        assignment_current_stage: stage,
-      });
-      if (typeof onStageChangeCallback === "function") {
-        onStageChangeCallback(stage, options);
-      }
-    },
-    [onStageChangeCallback, saveAnswers]
-  );
 
   const advancePhase = useCallback(
     (nextPhase?: AssignmentPhaseId) => {
@@ -456,16 +432,6 @@ export function AssignmentProvider({
     [currentPhase, setPhase]
   );
 
-  const advanceStage = useCallback(
-    (nextStage?: AssignmentStage) => {
-      if (nextStage) {
-        setStage(nextStage);
-        return;
-      }
-      advancePhase();
-    },
-    [advancePhase, setStage]
-  );
 
   // Extract core properties from project answers
   const answers = project?.answers || {};
@@ -1304,50 +1270,6 @@ export function AssignmentProvider({
     currentPhase,
   ]);
 
-  // Compute status for all stages (including legacy aliases)
-  const stageStatuses: Record<AssignmentStage, StageStatus> = useMemo(() => {
-    const hasExtract = Boolean(question && targetWordCount > 0 && citationStyle);
-    const hasUnderstand = Boolean(structure?.isConfirmed || (hasExtract && analysis?.approvedByUser));
-    const hasAnalysis = Boolean(analysis && analysis.approvedByUser);
-    const hasPlan = Boolean(researchPlan && researchPlan.approvedByUser);
-    const hasSources = selectApprovedSources(sources, approvedSourceIds).length > 0;
-    const hasEvidence = evidenceItems.filter((e) => e.status === "approved").length >= 2;
-    const hasThinking = Boolean(thinkingMap && (thinkingMap.selectedThesisId || thinkingMap.customThesis));
-    const hasStructure = outline.length >= 3;
-    const hasDraft = currentWordCount >= Math.min(200, targetWordCount * 0.3);
-    const hasReport = submissionPasses(submissionReport);
-
-    return {
-      // 5 phases
-      extract: hasExtract ? "completed" : currentPhase === "extract" ? "active" : "needs_review",
-      understand: hasUnderstand && hasAnalysis ? "completed" : currentPhase === "understand" ? "active" : "needs_review",
-      sources: hasSources ? "completed" : currentPhase === "sources" ? "active" : hasUnderstand ? "available" : "locked",
-      drafting: hasDraft ? "completed" : currentPhase === "drafting" ? "active" : hasSources ? "available" : "locked",
-      submission: hasReport ? "completed" : currentPhase === "submission" ? "active" : hasDraft ? "available" : "locked",
-
-      // 8 legacy stages
-      plan: hasPlan ? "completed" : currentPhase === "understand" ? "active" : hasUnderstand ? "available" : "locked",
-      research: hasSources ? "completed" : currentPhase === "sources" ? "active" : hasPlan ? "available" : "locked",
-      evidence: hasEvidence ? "completed" : currentPhase === "sources" ? "active" : hasSources ? "available" : "locked",
-      think: hasThinking ? "completed" : currentPhase === "drafting" ? "active" : hasEvidence ? "available" : "locked",
-      structure: hasStructure ? "completed" : currentPhase === "drafting" ? "active" : hasThinking ? "available" : "locked",
-      draft: hasDraft ? "completed" : currentPhase === "drafting" ? "active" : hasStructure ? "available" : "locked",
-      final: hasReport ? "completed" : currentPhase === "submission" ? "active" : hasDraft ? "available" : "locked",
-    };
-  }, [
-    question,
-    targetWordCount,
-    citationStyle,
-    analysis,
-    researchPlan,
-    sources,
-    evidenceItems,
-    thinkingMap,
-    outline,
-    currentWordCount,
-    submissionReport,
-    currentPhase,
-  ]);
 
   // Unified 4-Phase Project State Model (Section 4.2)
   const projectState: AssignmentProjectState = useMemo(() => {
@@ -1527,11 +1449,6 @@ export function AssignmentProvider({
         advancePhase,
 
         // Backward-compatible Stage Aliases
-        stage: currentStage,
-        currentStage,
-        setStage,
-        stageStatuses,
-        advanceStage,
 
         // Project State Model
         projectState,

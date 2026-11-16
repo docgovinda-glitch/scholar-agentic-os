@@ -1,22 +1,19 @@
-import { useCallback, useEffect, useState, lazy, Suspense } from "react";
+import { useCallback,useEffect,useState,lazy,Suspense } from "react";
 import { LiveAiStatusDock } from "./ai/LiveAiStatusDock";
-import { Routes, Route, Navigate, Outlet, useNavigate, useLocation, useParams, useOutletContext } from "react-router-dom";
-import { RequireAuth, PublicOnly, RequireRecovery, RequireOnboarding } from "./DeskAuthGate";
+import { Routes,Route,Navigate,Outlet,useNavigate,useLocation,useParams,useOutletContext } from "react-router-dom";
+import { RequireAuth,PublicOnly,RequireRecovery,RequireOnboarding } from "./DeskAuthGate";
 import {
-  LandingRoute,
-  SignInRoute,
-  SignUpRoute,
-  ForgotRoute,
-  RecoverRoute,
-  RegisteredRoute,
-  ResendVerificationRoute,
-  VerifyEmailRoute,
-  OnboardingRoute,
+ForgotRoute,
+RecoverRoute,
+RegisteredRoute,
+ResendVerificationRoute,
+VerifyEmailRoute,
+OnboardingRoute
 } from "./auth/AuthFlow";
 import type { DeskShellView } from "./DeskShell";
 import type { ResearchStage } from "./workspace/types";
 import { STAGE_MAP } from "./workspace/types";
-import { getProject, UnauthenticatedError, getMigratedDraftRealId, createEphemeralProject } from "./api";
+import { getProject,UnauthenticatedError,getMigratedDraftRealId,createEphemeralProject } from "./api";
 import { useAiSetupStatus } from "./setup/useAiSetupStatus";
 import { useVaultSetupStatus } from "./setup/useVaultSetupStatus";
 import { useDeskSession } from "./useDeskSession";
@@ -40,8 +37,8 @@ const ProjectListScreen = lazy(() => import("./ProjectListScreen"));
 const VaultSetupScreen = lazy(() => import("./setup/VaultSetupScreen"));
 const VaultScreen = lazy(() => import("./vault/VaultScreen"));
 
-import type { AssignmentStage } from "./assignment/types";
-import { ASSIGNMENT_PHASES, ASSIGNMENT_STAGES } from "./assignment/types";
+import type { AssignmentPhaseId } from "./assignment/types";
+import { isAssignmentStageId,normalizeAssignmentPhase } from "./assignment/types";
 
 const SECTION_IDS: readonly SectionId[] = ["overview", "providers", "subscription", "preferences"];
 
@@ -68,11 +65,6 @@ function isResearchStage(value: string | undefined): value is ResearchStage {
   return !!value && STAGE_MAP.has(value as ResearchStage);
 }
 
-// Every phase (Phase 01 Extract included) and the legacy stage ids, so a reload keeps the open phase.
-const ASSIGNMENT_STAGE_SET = new Set<string>([...ASSIGNMENT_PHASES.map((p) => p.id), ...ASSIGNMENT_STAGES.map((s) => s.id)]);
-function isAssignmentStage(value: string | undefined): value is AssignmentStage {
-  return !!value && ASSIGNMENT_STAGE_SET.has(value);
-}
 
 /** Where to return to when closing Settings/Vault/AI Access — passed as router state on the way in, since these overlays aren't meant to grow their own history entries. */
 interface CameFrom {
@@ -254,7 +246,7 @@ function ProjectRoute() {
   );
 
   const onAssignmentStageChange = useCallback(
-    (next: AssignmentStage, options?: { replace?: boolean }) => {
+    (next: AssignmentPhaseId, options?: { replace?: boolean }) => {
       const targetId = getMigratedDraftRealId(effectiveProjectId) || effectiveProjectId;
       navigate(`/projects/${targetId}/${next}`, options);
     },
@@ -325,10 +317,15 @@ function ProjectRoute() {
   const targetProjectId = effectiveProjectId || urlProjectId || "";
 
   if (outputTypeId === "OT-01" || outputTypeId === "OT-02") {
+    // Every phase (Extract included) keeps its URL on reload; an old 8-stage id
+    // (/plan, /research, /draft ...) is moved to the phase that replaced it.
+    if (isAssignmentStageId(view) && normalizeAssignmentPhase(view) !== view) {
+      return <Navigate to={`/projects/${targetProjectId}/${normalizeAssignmentPhase(view)}`} replace />;
+    }
     return (
       <AssignmentWorkspace
         projectId={targetProjectId}
-        initialStage={isAssignmentStage(view) ? view : null}
+        initialStage={isAssignmentStageId(view) ? normalizeAssignmentPhase(view) : null}
         onStageChange={onAssignmentStageChange}
         onClose={() => navigate("/projects")}
         onOpenAccountSettings={() => navigate("/settings", { state: { from: location.pathname } })}

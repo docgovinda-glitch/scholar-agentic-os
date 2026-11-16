@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import type { AssignmentStage, AssignmentPhaseId } from "./types";
+import type { AssignmentPhaseId } from "./types";
 import { AssignmentProvider, useAssignmentWorkspace } from "./AssignmentContext";
 import AssignmentStageNavigation from "./components/AssignmentStageNavigation";
 import { authedJsonFetch } from "../api";
@@ -413,8 +413,8 @@ export default function AssignmentWorkspace({
   onOpenAiAccess,
 }: {
   projectId: string;
-  initialStage: AssignmentStage | null;
-  onStageChange: (stage: AssignmentStage, options?: { replace?: boolean }) => void;
+  initialStage: AssignmentPhaseId | null;
+  onStageChange: (phase: AssignmentPhaseId, options?: { replace?: boolean }) => void;
   onClose?: () => void;
   onOpenAccountSettings?: () => void;
   onOpenVault?: () => void;

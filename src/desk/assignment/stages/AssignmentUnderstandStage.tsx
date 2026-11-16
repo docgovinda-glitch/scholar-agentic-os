@@ -265,7 +265,6 @@ export default function AssignmentUnderstandStage({
     setAnalysis,
     advancePhase,
     setPhase,
-    advanceStage,
     ensurePersisted,
     isLoading,
     executionMode,
@@ -1079,12 +1078,8 @@ export default function AssignmentUnderstandStage({
 
     if (onProceed) {
       onProceed();
-    } else if (advancePhase) {
-      advancePhase("sources");
-    } else if (setPhase) {
-      setPhase("sources");
     } else {
-      advanceStage("sources");
+      advancePhase("sources");
     }
   };
 

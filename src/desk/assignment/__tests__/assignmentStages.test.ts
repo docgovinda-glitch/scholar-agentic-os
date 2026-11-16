@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
-  ASSIGNMENT_STAGES,
   ASSIGNMENT_PHASES,
   LEGACY_STAGE_TO_PHASE_MAP,
   normalizeAssignmentPhase,
+  isAssignmentStageId,
   ASSIGNMENT_TYPE_LABELS,
   COMMON_COMMAND_VERBS,
   normalizeProjectAnswers,
@@ -14,15 +14,13 @@ import {
 } from "../types";
 
 describe("Assignment Stages & Domain Taxonomy", () => {
-  it("defines exactly 4 dedicated academic phases in correct progression", () => {
-    expect(ASSIGNMENT_STAGES).toHaveLength(4);
-    const stageIds: AssignmentStage[] = ASSIGNMENT_STAGES.map((s) => s.id);
-    expect(stageIds).toEqual([
-      "understand",
-      "sources",
-      "drafting",
-      "submission",
-    ]);
+  it("defines the five phases in order, and maps every old 8-stage id onto one", () => {
+    expect(ASSIGNMENT_PHASES.map((p) => p.id)).toEqual(["extract", "understand", "sources", "drafting", "submission"]);
+    const legacy: AssignmentStage[] = ["plan", "research", "evidence", "think", "structure", "draft", "final"];
+    expect(legacy.map((s) => normalizeAssignmentPhase(s))).toEqual(["understand", "sources", "sources", "drafting", "drafting", "drafting", "submission"]);
+    expect(isAssignmentStageId("draft")).toBe(true);
+    expect(isAssignmentStageId("drafting")).toBe(true);
+    expect(isAssignmentStageId("nope")).toBe(false);
   });
 
   it("provides comprehensive command verb mappings for academic prompts", () => {

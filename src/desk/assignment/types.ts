@@ -177,19 +177,19 @@ export function normalizeAssignmentPhase(phaseOrStage?: string | null): Assignme
   return "extract";
 }
 
-export type LegacyAssignmentStage =
-  | "understand"
-  | "plan"
-  | "research"
-  | "evidence"
-  | "think"
-  | "structure"
-  | "draft"
-  | "final";
+/**
+ * Stage ids of the old 8-stage flow. They survive only as URL / saved-value
+ * aliases: normalizeAssignmentPhase maps each to one of the five phases.
+ */
+export type LegacyAssignmentStage = "plan" | "research" | "evidence" | "think" | "structure" | "draft" | "final";
 
-export type AssignmentStage =
-  | AssignmentPhaseId
-  | LegacyAssignmentStage;
+/** A stage id as it may appear in a URL: a phase, or a legacy alias for one. */
+export type AssignmentStage = AssignmentPhaseId | LegacyAssignmentStage;
+
+/** True for every id the Coursework URL accepts (the five phases and the legacy aliases). */
+export function isAssignmentStageId(value: string | undefined): value is AssignmentStage {
+  return !!value && value.toLowerCase() in LEGACY_STAGE_TO_PHASE_MAP;
+}
 
 export type AcademicLevel = "high_school" | "undergraduate" | "postgraduate" | "doctoral";
 
@@ -213,14 +213,6 @@ export type AssignmentType =
   | "short_answer"
   | "other";
 
-export interface StageDefinition {
-  id: AssignmentStage;
-  number: number;
-  label: string;
-  shortLabel: string;
-  description: string;
-  icon: string;
-}
 
 export type StageStatus =
   | "completed"
@@ -563,40 +555,6 @@ export interface TutorChatMessage {
   patch?: TutorWorkspacePatch;
 }
 
-export const ASSIGNMENT_STAGES: StageDefinition[] = [
-  {
-    id: "understand",
-    number: 1,
-    label: "Phase 1: Understand",
-    shortLabel: "Understand",
-    description: "Brief intake, word budget, rubric criteria & AI analysis",
-    icon: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
-  },
-  {
-    id: "sources",
-    number: 2,
-    label: "Phase 2: Sources",
-    shortLabel: "Sources",
-    description: "Scholarly discovery, Knowledge Vault integration & evidence ledger",
-    icon: "M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z",
-  },
-  {
-    id: "drafting",
-    number: 3,
-    label: "Phase 3: Drafting",
-    shortLabel: "Drafting",
-    description: "Structured section drafting, real-time word budgets & AI polish",
-    icon: "M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z",
-  },
-  {
-    id: "submission",
-    number: 4,
-    label: "Phase 4: Submission",
-    shortLabel: "Submission",
-    description: "10-point rubric assessment, citation audit & camera-ready export",
-    icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
-  },
-];
 
 
 export const ASSIGNMENT_TYPE_LABELS: Record<AssignmentType, string> = {
