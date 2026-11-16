@@ -4,7 +4,8 @@
  * scholarly index: it matches nothing. Pure and deterministic; every word in a
  * query comes from the brief itself.
  */
-import { parseBriefQuestions, removeCourseCodes } from "./briefQuestions";
+import { parseBriefQuestions } from "./briefQuestions";
+import { stripCourseCodes } from "./briefExtractor";
 
 const STOP = new Set(
   (
@@ -30,7 +31,7 @@ function isBannerLine(line: string): boolean {
 }
 
 function contentWords(text: string): string[] {
-  const cleaned = removeCourseCodes(text)
+  const cleaned = stripCourseCodes(text)
     .replace(/\[?\(?\s*\d+\s*marks?\)?\]?/gi, " ")
     .replace(/[’']s\b/g, "")
     .replace(/[^\p{L}\p{N}\-\s]/gu, " ");

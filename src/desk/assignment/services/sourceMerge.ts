@@ -30,7 +30,8 @@ export function isStudentOwnedSource(source: DiscoveredSource, approvedIds: Read
 export function sourceIdentity(source: Pick<DiscoveredSource, "doi" | "title">): string {
   const doi = (source.doi || "").trim().toLowerCase().replace(/^https?:\/\/(dx\.)?doi\.org\//, "");
   if (doi) return `doi:${doi}`;
-  return `title:${(source.title || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim()}`;
+  // Preserve hyphens in compound terms (COVID-19, Machine-Learning, etc.)
+  return `title:${(source.title || "").toLowerCase().replace(/[^\p{L}\p{N}\s-]/gu, " ").replace(/\s+/g, " ").trim()}`;
 }
 
 /**
