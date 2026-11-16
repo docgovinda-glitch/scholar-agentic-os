@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { formatSourceInTextCitation } from "./services/citationFormatService";
 import { parsePersonName } from "./services/referenceListGenerator";
 import { sourceVenueLabel } from "./services/sourceDisplay";
 import type { DiscoveredSource } from "./types";
@@ -30,33 +31,18 @@ export interface ReferenceBarItemProps {
   onSaveEdit?: (sourceId: string, updates: Partial<DiscoveredSource>) => void;
   className?: string;
   showDismiss?: boolean;
+  /** The project's citation style, for the copied in-text citation. */
+  citationStyle?: string;
 }
 
-export function formatInTextCitation(source: DiscoveredSource): string {
-  const year = source.year || "n.d.";
-  if (!source.authors || source.authors.length === 0) {
-    const fallbackTitle = source.title ? source.title.split(" ").slice(0, 3).join(" ") : "Source";
-    return `(${fallbackTitle}, ${year})`;
-  }
+const NUMERIC_STYLES = /^(ieee|vancouver|numeric)/i;
 
-  const parseLastName = (authorStr: string) => {
-    const trimmed = authorStr.trim();
-    if (trimmed.includes(",")) {
-      return trimmed.split(",")[0].trim();
-    }
-    const parts = trimmed.split(/\s+/);
-    return parts[parts.length - 1];
-  };
-
-  const firstAuthor = parseLastName(source.authors[0]);
-  if (source.authors.length === 1) {
-    return `(${firstAuthor}, ${year})`;
-  }
-  if (source.authors.length === 2) {
-    const secondAuthor = parseLastName(source.authors[1]);
-    return `(${firstAuthor} & ${secondAuthor}, ${year})`;
-  }
-  return `(${firstAuthor} et al., ${year})`;
+/**
+ * In-text citation for a source card, from the shared formatter. A card has no
+ * place in the reference order, so numeric styles fall back to author-date.
+ */
+export function formatInTextCitation(source: DiscoveredSource, style = "harvard"): string {
+  return formatSourceInTextCitation(source, NUMERIC_STYLES.test(style) ? "harvard" : style, 1);
 }
 
 export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
@@ -68,6 +54,7 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
   onToggleBookmark,
   onEdit,
   onSaveEdit,
+  citationStyle = "harvard",
   className = "",
   showDismiss = true,
 }) => {
@@ -127,12 +114,15 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
 
   const handleCopyInText = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const citation = formatInTextCitation(source);
-    if (navigator?.clipboard?.writeText) {
-      navigator.clipboard.writeText(citation).catch(() => {});
-    }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1600);
+    const citation = formatInTextCitation(source, citationStyle);
+    // "Copied" only when the clipboard actually took it.
+    void navigator?.clipboard
+      ?.writeText(citation)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1600);
+      })
+      .catch((err: unknown) => console.warn("Copy citation failed:", err));
   };
 
   const handleOpenEdit = (e: React.MouseEvent) => {
@@ -253,7 +243,7 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
           type="button"
           onClick={handleCopyInText}
           aria-label="Copy citation"
-          title={`Copy in-text citation: ${formatInTextCitation(source)}`}
+          title={`Copy in-text citation: ${formatInTextCitation(source, citationStyle)}`}
           className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer relative"
         >
           {copied ? (

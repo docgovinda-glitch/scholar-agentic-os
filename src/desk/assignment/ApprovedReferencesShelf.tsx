@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import type { DiscoveredSource } from "./types";
-import { ReferenceBarItem, formatInTextCitation } from "./ReferenceBarItem";
+import { ReferenceBarItem } from "./ReferenceBarItem";
+import { buildFormattedBibliography } from "./services/assignmentExportService";
 import {
   ChevronUp,
   ChevronDown,
@@ -19,6 +20,8 @@ export interface ApprovedReferencesShelfProps {
   onSaveEditSource?: (sourceId: string, updates: Partial<DiscoveredSource>) => void;
   onProceedToDrafting?: () => void;
   className?: string;
+  /** The project's citation style (copied references and in-text citations use it). */
+  citationStyle?: string;
 }
 
 export const ApprovedReferencesShelf: React.FC<ApprovedReferencesShelfProps> = ({
@@ -29,6 +32,7 @@ export const ApprovedReferencesShelf: React.FC<ApprovedReferencesShelfProps> = (
   onSaveEditSource,
   onProceedToDrafting,
   className = "",
+  citationStyle = "harvard",
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [copiedAll, setCopiedAll] = useState(false);
@@ -38,22 +42,15 @@ export const ApprovedReferencesShelf: React.FC<ApprovedReferencesShelfProps> = (
 
   const handleCopyAll = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const bibliography = approvedSources
-      .map((s, idx) => {
-        const inText = formatInTextCitation(s);
-        const authors = s.authors?.join(", ") || "Unknown Author";
-        const year = s.year || "n.d.";
-        const title = s.title;
-        const venue = s.journal || s.publisher || "Academic Press";
-        return `${idx + 1}. ${authors} (${year}). ${title}. ${venue}. In-text: ${inText}`;
+    // The same reference entries as the exports, in the project's style.
+    const bibliography = buildFormattedBibliography(approvedSources, citationStyle).join("\n\n");
+    void navigator?.clipboard
+      ?.writeText(bibliography)
+      .then(() => {
+        setCopiedAll(true);
+        setTimeout(() => setCopiedAll(false), 2000);
       })
-      .join("\n\n");
-
-    if (navigator?.clipboard?.writeText) {
-      navigator.clipboard.writeText(bibliography).catch(() => {});
-    }
-    setCopiedAll(true);
-    setTimeout(() => setCopiedAll(false), 2000);
+      .catch((err: unknown) => console.warn("Copy references failed:", err));
   };
 
   return (
@@ -115,6 +112,7 @@ export const ApprovedReferencesShelf: React.FC<ApprovedReferencesShelfProps> = (
                 onEdit={onEditSource}
                 onSaveEdit={onSaveEditSource}
                 showDismiss={true}
+                citationStyle={citationStyle}
               />
             ))}
           </div>

@@ -1839,6 +1839,7 @@ export default function AssignmentSourcesStage({
                     />
                   ) : (
                     <ReferenceBarItem
+                      citationStyle={citationStyle || "harvard"}
                       key={source.id}
                       source={source}
                       isApproved={approvedSourceIds.includes(source.id)}
@@ -1955,6 +1956,7 @@ export default function AssignmentSourcesStage({
         recommendedCount={4}
         onToggleApproval={handleToggleApproval}
         onProceedToDrafting={handleContinue}
+        citationStyle={citationStyle || "harvard"}
         onSaveEditSource={handleSaveSourceUpdates}
       />
     </div>
