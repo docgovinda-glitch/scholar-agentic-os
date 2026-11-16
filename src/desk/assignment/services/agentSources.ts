@@ -62,11 +62,6 @@ export function applyAnalyses(sources: DiscoveredSource[], analyses: SourceAnaly
   });
 }
 
-/** Sources the AI judged high or medium relevance, added to those already approved. */
-export function approveRelevant(approved: string[], analyses: SourceAnalysis[]): string[] {
-  return Array.from(new Set([...approved, ...analyses.filter((a) => a.relevance !== "low").map((a) => a.id)]));
-}
-
 /** Links sources to outline sections (structure and drafting sections), keeping drafts untouched. */
 export function bindToSections(
   structure: AssignmentStructure,

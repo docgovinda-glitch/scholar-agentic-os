@@ -3,6 +3,7 @@
  * shows, in which order. Pure (no React), so the list logic is testable on its own.
  */
 import type { DiscoveredSource } from "../types";
+import { isSourceApproved } from "../../../domain/assignment/approvedSources";
 
 export type SourceTab = "all" | "curated" | "ask_scholar" | "ai_research" | "uploaded" | "approved" | "bookmarked" | "excluded";
 export type SourceSort = "relevance" | "citations" | "year" | "title" | "role";
@@ -61,7 +62,7 @@ export function filterAndSortSources(
 
   // 1. Tab status filtering
   if (activeTab === "approved") {
-    list = list.filter((s) => approvedSourceIds.includes(s.id));
+    list = list.filter((s) => isSourceApproved(s, approvedSourceIds));
   } else if (activeTab === "uploaded") {
     list = list.filter((s) => s.isUserUploaded || s.sourceOrigin === "user");
   } else if (activeTab === "ask_scholar") {

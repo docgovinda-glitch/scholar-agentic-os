@@ -3,7 +3,7 @@ import { authedJsonFetch } from "../../api";
 import type { DraftReview, Extraction, SourceAnalysis, Understanding } from "../../../domain/assignment/assignmentAgent";
 import { safeParseAnswerField } from "../../../shared/projectStateSchema";
 import { discoverRealScholarlySourcesFromServer } from "../services/realScholarlyDiscoveryService";
-import { applyAnalyses, approveRelevant, bindToSections, forAnalysis, mergeDiscovered } from "../services/agentSources";
+import { applyAnalyses, bindToSections, forAnalysis, mergeDiscovered } from "../services/agentSources";
 import type { AssignmentDraftingSection, AssignmentStructure, DiscoveredSource } from "../types";
 
 export type AgentStepId = "extract" | "understand" | "sources" | "review";
@@ -120,7 +120,6 @@ export function useCourseworkAgent(d: Deps): CourseworkAgent {
         const a0 = await dd.reload();
         const u = safeParseAnswerField<Understanding | null>(a0["assignment_understanding"], null);
         const existing = safeParseAnswerField<DiscoveredSource[]>(a0["assignment_sources"], []) ?? [];
-        const approved = safeParseAnswerField<string[]>(a0["approved_source_ids"] ?? a0["approved_source_ids"], []) ?? [];
         const queries = u?.searchQueries?.length ? u.searchQueries.slice(0, 3) : [dd.question];
         let found: DiscoveredSource[] = [];
         for (const q of queries) {
@@ -134,21 +133,22 @@ export function useCourseworkAgent(d: Deps): CourseworkAgent {
         const analyses = data.analyses as SourceAnalysis[];
         // The server saved the analysis; reload, then save the sources and links on top.
         const a1 = await dd.reload();
-        const structure = safeParseAnswerField<AssignmentStructure | null>(a1["assignment_structure"] ?? a1["assignment_structure"], null) ?? dd.structure;
+        const structure = safeParseAnswerField<AssignmentStructure | null>(a1["assignment_structure"], null) ?? dd.structure;
         const sections = safeParseAnswerField<AssignmentDraftingSection[]>(a1["assignment_internal_sections"], []) ?? [];
         const titles: Record<string, string> = {};
         for (const h of structure.headings ?? []) for (const s of h.subheadings ?? []) titles[s.id] = `${s.numberStr} ${s.title}`;
         const bound = bindToSections(structure, Array.isArray(sections) ? sections : [], analyses);
         await dd.saveAnswers({
           assignment_sources: applyAnalyses(merged, analyses, titles),
-          approved_source_ids: approveRelevant(Array.isArray(approved) ? approved : [], analyses),
-          approvedSourceIds: approveRelevant(Array.isArray(approved) ? approved : [], analyses),
+          // The student decides what is approved: the search only ranks and links.
+          // The list is written only once the student has made a decision (the
+          // reader falls back to prescribed references and uploads until then).
           assignment_structure: bound.structure,
           structure: bound.structure,
           ...(bound.sections.length ? { assignment_internal_sections: bound.sections, assignment_outline: bound.sections } : {}),
         });
         const useful = analyses.filter((a) => a.relevance !== "low").length;
-        return `Read ${analyses.length} sources; ${useful} look useful and are approved and linked to your outline. Check them before drafting.`;
+        return `Read ${analyses.length} sources; ${useful} look useful and are linked to your outline. Approve the ones you want to cite before drafting.`;
       }),
     [guard]
   );

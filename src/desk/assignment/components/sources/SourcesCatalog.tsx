@@ -7,6 +7,7 @@ DiscoveredSource
 import {
 RotateCcw
 } from "lucide-react";
+import { isSourceApproved } from "../../../../domain/assignment/approvedSources";
 
 export interface SourcesCatalogProps {
   approvedSourceIds: string[];
@@ -36,7 +37,7 @@ export function SourcesCatalog({ approvedSourceIds, bookmarkedIds, citationStyle
                     <CuratedSourceCard
                       key={source.id}
                       source={source}
-                      isApproved={approvedSourceIds.includes(source.id)}
+                      isApproved={isSourceApproved(source, approvedSourceIds)}
                       isBookmarked={bookmarkedIds.includes(source.id)}
                       onToggleApproval={handleToggleApproval}
                       onDismiss={handleDismissSource}
@@ -55,7 +56,7 @@ export function SourcesCatalog({ approvedSourceIds, bookmarkedIds, citationStyle
                       citationStyle={citationStyle || "harvard"}
                       key={source.id}
                       source={source}
-                      isApproved={approvedSourceIds.includes(source.id)}
+                      isApproved={isSourceApproved(source, approvedSourceIds)}
                       isBookmarked={bookmarkedIds.includes(source.id)}
                       onToggleApproval={handleToggleApproval}
                       onDismiss={handleDismissSource}
