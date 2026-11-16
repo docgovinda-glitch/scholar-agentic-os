@@ -27,24 +27,24 @@ export function SourcesCourseMaterials({ citationStyle, handleAddVaultSources, h
   return (
     <>
           {/* Section 1: Course Materials & Syllabus Upload (Sleek Collapsible Card) */}
-          <div className="rounded-2xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-750 p-4 transition-all shadow-2xs">
+          <div className="rounded-2xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-4 transition-all shadow-2xs">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <span className="p-2.5 rounded-xl bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-300 shrink-0">
+                <span className="p-2.5 rounded-xl bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] shrink-0">
                   <FileUp className="w-4 h-4" />
                 </span>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h2 className="text-xs font-semibold text-neutral-900 dark:text-white">
+                    <h2 className="text-xs font-semibold text-[color:var(--text-primary)]">
                       Course Materials & Syllabus Upload
                     </h2>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-white/10 text-neutral-500 font-medium">
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-[color:var(--surface-inset)] text-[color:var(--text-muted)] font-medium">
                       Optional
                     </span>
                   </div>
-                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">
+                  <p className="text-xs text-[color:var(--text-muted)] mt-0.5">
                     {userUploadedSources.length > 0
-                      ? `${userUploadedSources.length} course material(s) uploaded and anchored into evidence.`
+                      ? `${userUploadedSources.length} course material(s) uploaded; used as evidence when you draft.`
                       : "Upload lecture slides, reading packs, or syllabus notes to anchor specific citations."}
                   </p>
                 </div>
@@ -53,13 +53,13 @@ export function SourcesCourseMaterials({ citationStyle, handleAddVaultSources, h
               <button
                 type="button"
                 onClick={() => setIsUploadOpen(!isUploadOpen)}
-                className="px-3.5 py-1.5 rounded-full text-xs font-medium border border-neutral-200 dark:border-white/10 hover:bg-neutral-50 dark:hover:bg-white/5 transition-colors cursor-pointer text-neutral-700 dark:text-neutral-300 self-start sm:self-auto shrink-0"
+                className="px-3.5 py-1.5 rounded-full text-xs font-medium border border-[color:var(--border-subtle)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer text-[color:var(--text-secondary)] self-start sm:self-auto shrink-0"
               >
                 {isUploadOpen ? "Hide Dropzone" : userUploadedSources.length > 0 ? "Manage Files" : "+ Upload Files"}
               </button>
             </div>
 
-            <div className={isUploadOpen || userUploadedSources.length > 0 ? "mt-4 pt-4 border-t border-neutral-100 dark:border-white/5" : "hidden"}>
+            <div className={isUploadOpen || userUploadedSources.length > 0 ? "mt-4 pt-4 border-t border-[color:var(--border-subtle)]" : "hidden"}>
               <LectureUploadDropzone
                 uploadedFiles={userUploadedSources}
                 onUpload={handleLectureUpload}

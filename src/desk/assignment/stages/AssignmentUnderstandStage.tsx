@@ -948,26 +948,26 @@ export default function AssignmentUnderstandStage({
   }, [localQuestion]);
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6 sm:px-6 space-y-6 text-neutral-900 dark:text-neutral-100 font-sans">
-      {/* Hidden screen-reader headings for test compatibility */}
+    <div className="max-w-4xl mx-auto px-4 py-6 sm:px-6 space-y-6 text-[color:var(--text-primary)] font-sans">
+      {/* Older names of this step, kept for links and tests; hidden from screen readers. */}
       {understandStep !== "brief_input" && (
         <>
-          <span className="sr-only">Phase 1: Understand the Assignment Brief</span>
-          <span className="sr-only">Phase 1: Understand the Assignment</span>
+          <span className="sr-only" aria-hidden="true">Phase 1: Understand the Assignment Brief</span>
+          <span className="sr-only" aria-hidden="true">Phase 1: Understand the Assignment</span>
         </>
       )}
-      <span className="sr-only">Understand Your Brief</span>
-      <span className="sr-only">Coursework &amp; Essay</span>
+      <span className="sr-only" aria-hidden="true">Understand Your Brief</span>
+      <span className="sr-only" aria-hidden="true">Coursework &amp; Essay</span>
 
       {understandStep === "brief_input" ? (
         /* Unified Assignment Setup Box (Fallback Intake Mode) */
-        <div className="bg-white dark:bg-ink-750 rounded-2xl border border-neutral-200/80 dark:border-white/10 p-5 sm:p-7 shadow-xs space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-100 dark:border-white/5 pb-3">
+        <div className="bg-[color:var(--surface-raised)] rounded-2xl border border-[color:var(--border-subtle)] p-5 sm:p-7 shadow-xs space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[color:var(--border-subtle)] pb-3">
             <div>
-              <h2 className="text-base sm:text-lg font-semibold text-neutral-900 dark:text-white">
+              <h2 className="text-base sm:text-lg font-semibold text-[color:var(--text-primary)]">
                 Phase 1: Understand the Assignment Brief
               </h2>
-              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+              <p className="text-xs text-[color:var(--text-muted)] mt-0.5">
                 Paste your essay prompt or upload your module syllabus to extract research parameters.
               </p>
             </div>
@@ -983,6 +983,12 @@ export default function AssignmentUnderstandStage({
       ) : (
         /* Step 2: Understand 4 Human-Centered Cards */
         <div className="space-y-6 animate-in fade-in duration-200">
+          <div>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold tracking-wider uppercase bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]">
+              Phase 02 · Understand
+            </span>
+            <h1 className="mt-1 text-xl sm:text-2xl font-semibold tracking-tight text-[color:var(--text-primary)]">What your brief asks for</h1>
+          </div>
           <UnderstandAgentPanel minimal />
           <UnderstandBriefSummaryBar briefSummary={briefSummary} localCitation={localCitation} localLevel={localLevel} localTone={localTone} localType={localType} localWordCount={localWordCount} onBack={onBack} setPhase={setPhase} setUnderstandStep={setUnderstandStep} userOverrideStepRef={userOverrideStepRef} />
 
@@ -1005,19 +1011,19 @@ export default function AssignmentUnderstandStage({
           <UnderstandAngleAndVoice activeThesis={activeThesis} coreTopic={coreTopic} dispatchToneAssistantSuggestions={dispatchToneAssistantSuggestions} handleToneChange={handleToneChange} localStyle={localStyle} localTone={localTone} saveAnswers={saveAnswers} setActiveThesis={setActiveThesis} setLocalStyle={setLocalStyle} setWritingStyle={setWritingStyle} thesisStances={thesisStances} toneSectionRef={toneSectionRef} />
 
             {/* Collapsed-by-default Fine-Tune Accordion */}
-            <details className="rounded-xl border border-neutral-200/80 dark:border-white/10 bg-neutral-50/50 dark:bg-white/[0.02] group">
-              <summary className="p-3.5 flex items-center justify-between cursor-pointer list-none select-none hover:bg-neutral-100/50 dark:hover:bg-white/5 transition-colors rounded-xl">
+            <details className="rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]/50 group">
+              <summary className="p-3.5 flex items-center justify-between cursor-pointer list-none select-none hover:bg-[color:var(--surface-hover)] transition-colors rounded-xl">
                 <div className="flex items-center gap-2">
-                  <ChevronDown className="w-4 h-4 text-neutral-500 group-open:rotate-180 transition-transform" />
-                  <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">
+                  <ChevronDown className="w-4 h-4 text-[color:var(--text-muted)] group-open:rotate-180 transition-transform" />
+                  <span className="text-xs font-semibold text-[color:var(--text-primary)]">
                     Fine-Tune Section Headings &amp; Word Budgets (Optional)
                   </span>
                 </div>
-                <span className="text-[11px] font-medium text-neutral-400">
+                <span className="text-xs font-medium text-[color:var(--text-muted)]">
                   Section word steppers &amp; H1-H3 ledger
                 </span>
               </summary>
-              <div className="p-4 pt-1 border-t border-neutral-200/60 dark:border-white/5">
+              <div className="p-4 pt-1 border-t border-[color:var(--border-subtle)]">
                 <DynamicStructurePlanner
                   structure={localStructure}
                   targetWordCount={localWordCount}
@@ -1037,7 +1043,7 @@ export default function AssignmentUnderstandStage({
           {/* ========================================================
               BOTTOM NAVIGATION BAR & PHASE 3 CONNECTION
              ======================================================== */}
-          <div className="p-4 sm:p-5 rounded-2xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-750 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="p-4 sm:p-5 rounded-2xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
             <div>
               <button
                 type="button"
@@ -1047,7 +1053,7 @@ export default function AssignmentUnderstandStage({
                   if (onBack) onBack();
                   else if (setPhase) setPhase("extract");
                 }}
-                className="text-xs font-semibold text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                className="text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-colors cursor-pointer inline-flex items-center gap-1.5"
               >
                 <span>← Back to Phase 1: Extract</span>
               </button>
@@ -1059,7 +1065,7 @@ export default function AssignmentUnderstandStage({
                 disabled={isGeneratingStructure}
                 onClick={handleGenerateStructure}
                 aria-label="Regenerate Outline (Generate Structure)"
-                className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-neutral-300 dark:border-white/15 hover:bg-neutral-100 dark:hover:bg-white/5 text-xs font-semibold text-neutral-800 dark:text-neutral-200 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-[color:var(--border-default)] hover:bg-[color:var(--surface-hover)] text-xs font-semibold text-[color:var(--text-primary)] transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
               >
                 {isGeneratingStructure ? (
                   <>
@@ -1079,7 +1085,7 @@ export default function AssignmentUnderstandStage({
                 disabled={!canProceedToSources || isGeneratingStructure}
                 onClick={handleProceedToSources}
                 aria-label="Proceed (Approve Outline & Proceed / Confirm Structure & Proceed to Sources / Proceed to Sources)"
-                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 active:scale-[0.99] font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 active:scale-[0.99] font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <span>Proceed to Sources</span>
                 <ArrowRight className="w-4 h-4" />

@@ -21,11 +21,11 @@ export function UnderstandAngleAndVoice({ activeThesis, coreTopic, dispatchToneA
   return (
     <>
           {/* Core topic, working angle and writing voice */}
-          <section className="bg-white dark:bg-ink-750 rounded-2xl border border-neutral-200/80 dark:border-white/10 p-4 sm:p-5 shadow-xs space-y-3" aria-label="Core topic and working angle">
-            <h3 className="text-xs font-semibold text-neutral-900 dark:text-white uppercase tracking-wider">
+          <section className="bg-[color:var(--surface-raised)] rounded-2xl border border-[color:var(--border-subtle)] p-4 sm:p-5 shadow-xs space-y-3" aria-label="Core topic and working angle">
+            <h3 className="text-xs font-semibold text-[color:var(--text-primary)] uppercase tracking-wider">
               Topic &amp; Core Angle
             </h3>
-            <p className="text-sm text-neutral-800 dark:text-neutral-200" data-testid="core-topic">
+            <p className="text-sm text-[color:var(--text-primary)]" data-testid="core-topic">
               {coreTopic}
             </p>
 
@@ -44,8 +44,8 @@ export function UnderstandAngleAndVoice({ activeThesis, coreTopic, dispatchToneA
                     }}
                     className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-colors cursor-pointer ${
                       isSelected
-                        ? "border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900"
-                        : "border-neutral-200 dark:border-white/15 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5"
+                        ? "border-neutral-900 bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] dark:border-white"
+                        : "border-[color:var(--border-subtle)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)]"
                     }`}
                   >
                     {st.title}
@@ -55,7 +55,7 @@ export function UnderstandAngleAndVoice({ activeThesis, coreTopic, dispatchToneA
             </div>
 
             <div className="space-y-1.5">
-              <label htmlFor="assignment_thesis_input" className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
+              <label htmlFor="assignment_thesis_input" className="text-xs font-medium text-[color:var(--text-secondary)]">
                 Working thesis
               </label>
               <textarea
@@ -67,7 +67,7 @@ export function UnderstandAngleAndVoice({ activeThesis, coreTopic, dispatchToneA
                 }}
                 rows={2}
                 placeholder="Pick an angle above or write your own working thesis…"
-                className="w-full bg-transparent border border-neutral-200/80 dark:border-white/10 rounded-xl p-3 text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-400 resize-y"
+                className="w-full bg-transparent border border-[color:var(--border-subtle)] rounded-xl p-3 text-sm text-[color:var(--text-primary)] placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-400 resize-y"
               />
             </div>
 
@@ -78,7 +78,7 @@ export function UnderstandAngleAndVoice({ activeThesis, coreTopic, dispatchToneA
               onClickCapture={dispatchToneAssistantSuggestions}
               className="space-y-1.5"
             >
-              <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Writing style</span>
+              <span className="text-xs font-medium text-[color:var(--text-secondary)]">Writing style</span>
               <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Writing style">
                 {WRITING_VOICE_OPTIONS.map((opt) => {
                   const active = localTone === opt.value || (opt.value === "natural" && !WRITING_VOICE_OPTIONS.some((o) => o.value === localTone));
@@ -91,8 +91,8 @@ export function UnderstandAngleAndVoice({ activeThesis, coreTopic, dispatchToneA
                       onClick={() => handleToneChange(opt.value)}
                       className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-colors cursor-pointer ${
                         active
-                          ? "border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900"
-                          : "border-neutral-200 dark:border-white/15 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5"
+                          ? "border-neutral-900 bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] dark:border-white"
+                          : "border-[color:var(--border-subtle)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)]"
                       }`}
                     >
                       {opt.label}
@@ -112,7 +112,7 @@ export function UnderstandAngleAndVoice({ activeThesis, coreTopic, dispatchToneA
                   }}
                   rows={2}
                   placeholder="Paste a paragraph or two of your own writing; Scholar will mirror its voice when drafting."
-                  className="w-full bg-transparent border border-neutral-200/80 dark:border-white/10 rounded-xl p-3 text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-400 resize-y"
+                  className="w-full bg-transparent border border-[color:var(--border-subtle)] rounded-xl p-3 text-sm text-[color:var(--text-primary)] placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-400 resize-y"
                 />
               )}
             </div>

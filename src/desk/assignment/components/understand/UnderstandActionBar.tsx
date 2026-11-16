@@ -15,18 +15,18 @@ export function UnderstandActionBar({ canGenerate, canProceedToSources, handleGe
   return (
     <>
           {/* Action Button Bar */}
-          <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-neutral-100 dark:border-white/5">
+          <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[color:var(--border-subtle)]">
             <div className="text-xs">
               {!canProceedToSources ? (
-                <p className="text-neutral-500 dark:text-neutral-400 flex items-start gap-1.5">
+                <p className="text-[color:var(--text-muted)] flex items-start gap-1.5">
                   <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" aria-hidden="true" />
                   <span>
                     Please provide the assignment question, word count, and citation style to continue.
-                    {missingFields.length > 0 && <span className="block text-[11px] mt-0.5">Still needed: {missingFields.join(", ")}.</span>}
+                    {missingFields.length > 0 && <span className="block text-xs mt-0.5">Still needed: {missingFields.join(", ")}.</span>}
                   </span>
                 </p>
               ) : (
-                <p className="text-neutral-500 dark:text-neutral-400">
+                <p className="text-[color:var(--text-muted)]">
                   Ready to analyze assignment brief and build tone-tailored outline.
                 </p>
               )}
@@ -39,7 +39,7 @@ export function UnderstandActionBar({ canGenerate, canProceedToSources, handleGe
                 disabled={!canGenerate || isGeneratingStructure}
                 onClick={handleGenerateStructure}
                 aria-label="Save & Build Outline (Save & Build / Generate Structure / Analyze Assignment Brief)"
-                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 active:scale-[0.99] font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-xs flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 active:scale-[0.99] font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-xs flex items-center justify-center gap-2 cursor-pointer"
               >
                 {isGeneratingStructure ? (
                   <>

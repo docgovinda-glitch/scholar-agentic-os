@@ -30,11 +30,11 @@ export function SourcesFilterDrawer({ activeFilterCount, minRelevance, openAcces
     <>
             {/* Expandable Advanced Filtering Drawer */}
             {showAdvancedFilters && (
-              <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-white/[0.02] border border-neutral-200/80 dark:border-white/10 space-y-3 animate-in fade-in duration-150">
+              <div className="p-4 rounded-2xl bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)] space-y-3 animate-in fade-in duration-150">
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 text-xs">
                   {/* Filter 1: Source Type */}
                   <div className="space-y-1">
-                    <label htmlFor="filter-source-type" className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
+                    <label htmlFor="filter-source-type" className="text-xs font-semibold text-[color:var(--text-secondary)]">
                       Source Type
                     </label>
                     <select
@@ -42,7 +42,7 @@ export function SourcesFilterDrawer({ activeFilterCount, minRelevance, openAcces
                       aria-label="Source Type"
                       value={selectedType}
                       onChange={(e) => setSelectedType(e.target.value)}
-                      className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-ink-750 border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
+                      className="w-full px-2.5 py-1.5 rounded-xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] text-[color:var(--text-primary)] outline-none cursor-pointer"
                     >
                       <option value="all">All Source Types</option>
                       <option value="journal">Peer-Reviewed Journals</option>
@@ -55,7 +55,7 @@ export function SourcesFilterDrawer({ activeFilterCount, minRelevance, openAcces
 
                   {/* Filter 2: Role in Assignment */}
                   <div className="space-y-1">
-                    <label htmlFor="filter-assignment-role" className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
+                    <label htmlFor="filter-assignment-role" className="text-xs font-semibold text-[color:var(--text-secondary)]">
                       Role in Assignment
                     </label>
                     <select
@@ -63,7 +63,7 @@ export function SourcesFilterDrawer({ activeFilterCount, minRelevance, openAcces
                       aria-label="Role in Assignment"
                       value={selectedRole}
                       onChange={(e) => setSelectedRole(e.target.value)}
-                      className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-ink-750 border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
+                      className="w-full px-2.5 py-1.5 rounded-xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] text-[color:var(--text-primary)] outline-none cursor-pointer"
                     >
                       <option value="all">All Assignment Roles</option>
                       <option value="Empirical evidence">Empirical Evidence</option>
@@ -77,7 +77,7 @@ export function SourcesFilterDrawer({ activeFilterCount, minRelevance, openAcces
 
                   {/* Filter 3: Research Methodology */}
                   <div className="space-y-1">
-                    <label htmlFor="filter-methodology" className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
+                    <label htmlFor="filter-methodology" className="text-xs font-semibold text-[color:var(--text-secondary)]">
                       Research Methodology
                     </label>
                     <select
@@ -85,7 +85,7 @@ export function SourcesFilterDrawer({ activeFilterCount, minRelevance, openAcces
                       aria-label="Research Methodology"
                       value={selectedMethodology}
                       onChange={(e) => setSelectedMethodology(e.target.value)}
-                      className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-ink-750 border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
+                      className="w-full px-2.5 py-1.5 rounded-xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] text-[color:var(--text-primary)] outline-none cursor-pointer"
                     >
                       <option value="all">All Methodologies</option>
                       <option value="Empirical Study">Empirical Study</option>
@@ -101,7 +101,7 @@ export function SourcesFilterDrawer({ activeFilterCount, minRelevance, openAcces
 
                   {/* Filter 4: Publication Year */}
                   <div className="space-y-1">
-                    <label htmlFor="filter-publication-year" className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
+                    <label htmlFor="filter-publication-year" className="text-xs font-semibold text-[color:var(--text-secondary)]">
                       Publication Year
                     </label>
                     <select
@@ -109,7 +109,7 @@ export function SourcesFilterDrawer({ activeFilterCount, minRelevance, openAcces
                       aria-label="Publication Year"
                       value={selectedYearRange}
                       onChange={(e) => setSelectedYearRange(e.target.value)}
-                      className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-ink-750 border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
+                      className="w-full px-2.5 py-1.5 rounded-xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] text-[color:var(--text-primary)] outline-none cursor-pointer"
                     >
                       <option value="all">All Publication Years</option>
                       <option value="2026">Latest (2026)</option>
@@ -121,7 +121,7 @@ export function SourcesFilterDrawer({ activeFilterCount, minRelevance, openAcces
 
                   {/* Filter 5: Sort Order */}
                   <div className="space-y-1">
-                    <label htmlFor="filter-sort-order" className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
+                    <label htmlFor="filter-sort-order" className="text-xs font-semibold text-[color:var(--text-secondary)]">
                       Sort Order
                     </label>
                     <select
@@ -129,7 +129,7 @@ export function SourcesFilterDrawer({ activeFilterCount, minRelevance, openAcces
                       aria-label="Sort Order"
                       value={sortBy}
                       onChange={(e) => setSortBy(e.target.value as SourceSort)}
-                      className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-ink-750 border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
+                      className="w-full px-2.5 py-1.5 rounded-xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] text-[color:var(--text-primary)] outline-none cursor-pointer"
                     >
                       <option value="relevance">Question Alignment & Recency (Default)</option>
                       <option value="year">Newest First (2026 First)</option>
@@ -141,14 +141,14 @@ export function SourcesFilterDrawer({ activeFilterCount, minRelevance, openAcces
                 </div>
 
                 {/* Row 2: Toggles and Reset */}
-                <div className="flex items-center justify-between gap-4 pt-2 border-t border-neutral-200/50 dark:border-white/5 flex-wrap">
+                <div className="flex items-center justify-between gap-4 pt-2 border-t border-[color:var(--border-subtle)] flex-wrap">
                   <div className="flex items-center gap-4 flex-wrap">
-                    <label className="flex items-center gap-2 cursor-pointer text-xs text-neutral-700 dark:text-neutral-300">
+                    <label className="flex items-center gap-2 cursor-pointer text-xs text-[color:var(--text-secondary)]">
                       <input
                         type="checkbox"
                         checked={openAccessOnly}
                         onChange={(e) => setOpenAccessOnly(e.target.checked)}
-                        className="w-4 h-4 rounded text-neutral-900 focus:ring-0 cursor-pointer"
+                        className="w-4 h-4 rounded text-[color:var(--text-primary)] focus:ring-0 cursor-pointer"
                       />
                       <span className="flex items-center gap-1 font-medium">
                         <Unlock className="w-3 h-3 text-amber-500" />
@@ -156,17 +156,17 @@ export function SourcesFilterDrawer({ activeFilterCount, minRelevance, openAcces
                       </span>
                     </label>
 
-                    <div className="flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-400">
+                    <div className="flex items-center gap-1.5 text-xs text-[color:var(--text-secondary)]">
                       <span>Min Relevance:</span>
                       {[0, 85, 90, 95].map((thresh) => (
                         <button
                           key={thresh}
                           type="button"
                           onClick={() => setMinRelevance(thresh)}
-                          className={`px-2 py-0.5 rounded text-[11px] font-mono cursor-pointer transition-colors ${
+                          className={`px-2 py-0.5 rounded text-xs font-mono cursor-pointer transition-colors ${
                             minRelevance === thresh
-                              ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-bold"
-                              : "bg-neutral-200/60 dark:bg-white/10 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200"
+                              ? "bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] font-bold"
+                              : "bg-[color:var(--surface-sunken)]/60 text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)]"
                           }`}
                         >
                           {thresh === 0 ? "Any" : `${thresh}%+`}

@@ -15,25 +15,25 @@ export function SourcesExitGate({ approvedCount, handleContinue, handleReturn }:
   return (
     <>
       {/* Phase 2 Exit Gate Banner & Actions */}
-      <div className="rounded-2xl p-6 bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs dark:shadow-none flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-5">
+      <div className="rounded-2xl p-6 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-xs dark:shadow-none flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-5">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">
+            <h3 className="text-sm font-semibold text-[color:var(--text-primary)]">
               Evidence Grounding
             </h3>
             {approvedCount > 0 ? (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 flex items-center gap-1 border border-emerald-500/20">
+              <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 flex items-center gap-1 border border-emerald-500/20">
                 <CheckCircle2 className="w-3 h-3" />
                 <span>{approvedCount} Approved</span>
               </span>
             ) : (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-400 flex items-center gap-1 border border-neutral-200 dark:border-white/10">
-                <Sparkles className="w-3 h-3 text-neutral-500" />
+              <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] flex items-center gap-1 border border-[color:var(--border-subtle)]">
+                <Sparkles className="w-3 h-3 text-[color:var(--text-muted)]" />
                 <span>Optional Grounding</span>
               </span>
             )}
           </div>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">
+          <p className="text-xs text-[color:var(--text-muted)]">
             {approvedCount >= 4
               ? `You have approved ${approvedCount} sources. You are fully grounded to proceed to Phase 3 drafting.`
               : approvedCount > 0
@@ -46,7 +46,7 @@ export function SourcesExitGate({ approvedCount, handleContinue, handleReturn }:
           <button
             type="button"
             onClick={handleReturn}
-            className="px-4 py-2.5 rounded-full text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer flex items-center gap-1.5"
+            className="px-4 py-2.5 rounded-full text-xs font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer flex items-center gap-1.5"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Back to Understand</span>
@@ -56,7 +56,7 @@ export function SourcesExitGate({ approvedCount, handleContinue, handleReturn }:
             type="button"
             onClick={handleContinue}
             data-testid="proceed-to-drafting-btn"
-            className="px-7 py-2.5 rounded-full text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 active:scale-[0.99] transition-all cursor-pointer flex items-center gap-2 shadow-xs dark:shadow-none"
+            className="px-7 py-2.5 rounded-full text-xs font-semibold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 active:scale-[0.99] transition-all cursor-pointer flex items-center gap-2 shadow-xs dark:shadow-none"
           >
             <span>Proceed to Drafting</span>
             <ArrowRight className="w-4 h-4" />

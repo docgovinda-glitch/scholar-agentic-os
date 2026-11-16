@@ -204,11 +204,11 @@ export default function WritingStyleSelector({
       <div>
         <label
           htmlFor="writing-tone-select"
-          className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 block"
+          className="text-sm font-semibold text-[color:var(--text-primary)] block"
         >
           Writing Tone
         </label>
-        <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+        <p className="text-xs text-[color:var(--text-muted)] mt-0.5">
           Select an academic voice or match your personal writing style.
         </p>
       </div>
@@ -221,47 +221,47 @@ export default function WritingStyleSelector({
           value={currentPreset}
           onChange={(e) => handleSelect(e.target.value as WritingStylePreset)}
           onFocus={handleFocus}
-          className="w-full max-w-lg bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 rounded-xl px-4 py-3 pr-10 text-sm text-neutral-900 dark:text-neutral-100 shadow-xs dark:shadow-none hover:border-neutral-300 dark:hover:border-white/20 transition-all cursor-pointer focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white appearance-none"
+          className="w-full max-w-lg bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-xl px-4 py-3 pr-10 text-sm text-[color:var(--text-primary)] shadow-xs dark:shadow-none hover:border-neutral-300 dark:hover:border-white/20 transition-all cursor-pointer focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white appearance-none"
         >
           {WRITING_STYLE_OPTIONS.map((opt) => (
             <option
               key={opt.id}
               value={opt.id}
-              className="bg-white dark:bg-ink-750 text-neutral-900 dark:text-neutral-100 py-1"
+              className="bg-[color:var(--surface-raised)] text-[color:var(--text-primary)] py-1"
             >
               {opt.title} — {opt.description}
             </option>
           ))}
         </select>
-        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5 text-neutral-400 dark:text-neutral-500">
+        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5 text-[color:var(--text-muted)]">
           <ChevronDown className="w-4 h-4" />
         </div>
       </div>
 
       {/* Single-line descriptor of active selection */}
-      <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-2">
+      <p className="text-xs text-[color:var(--text-muted)] mt-2">
         {currentOption.description}
       </p>
 
       {/* Voice Cloning: Match My Writing Input Area */}
       {currentPreset === "custom" && (
-        <div className="p-5 rounded-2xl border border-neutral-300/80 dark:border-white/15 bg-neutral-50/70 dark:bg-white/[0.02] space-y-4 animate-in fade-in slide-in-from-top-2 duration-200 mt-3">
-          <div className="flex items-center justify-between border-b border-neutral-200/60 dark:border-white/5 pb-3">
+        <div className="p-5 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-inset)]/70 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200 mt-3">
+          <div className="flex items-center justify-between border-b border-[color:var(--border-subtle)] pb-3">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-neutral-200/80 dark:bg-white/10 flex items-center justify-center text-neutral-800 dark:text-neutral-200">
+              <div className="w-7 h-7 rounded-lg bg-[color:var(--surface-sunken)]/80 flex items-center justify-center text-[color:var(--text-primary)]">
                 <Wand2 className="w-4 h-4" />
               </div>
               <div>
-                <h4 className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">
+                <h4 className="text-xs font-semibold text-[color:var(--text-primary)]">
                   Clone Your Academic Voice
                 </h4>
-                <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                <p className="text-xs text-[color:var(--text-muted)]">
                   Provide an excerpt from a previous paper or upload an essay file (`.docx`, `.pdf`, `.txt`).
                 </p>
               </div>
             </div>
 
-            <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-neutral-200/60 dark:bg-white/10 text-neutral-700 dark:text-neutral-300">
+            <span className="text-xs font-mono px-2 py-0.5 rounded-md bg-[color:var(--surface-sunken)]/60 text-[color:var(--text-secondary)]">
               {wordCount} words {wordCount >= 200 && wordCount <= 500 ? "✓ Optimal" : "(200–500 ideal)"}
             </span>
           </div>
@@ -270,29 +270,29 @@ export default function WritingStyleSelector({
             {/* Option 1: Paste Textarea */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5">
-                  <FileText className="w-3 h-3 text-neutral-400" />
+                <label className="text-xs font-semibold text-[color:var(--text-secondary)] flex items-center gap-1.5">
+                  <FileText className="w-3 h-3 text-[color:var(--text-muted)]" />
                   <span>Option A: Paste Past Writing Sample</span>
                 </label>
-                <span className="text-[10px] text-neutral-400">200–500 words</span>
+                <span className="text-xs text-[color:var(--text-muted)]">200–500 words</span>
               </div>
               <textarea
                 value={customText.startsWith("[Sample document attached:") ? "" : customText}
                 onChange={(e) => handleTextChange(e.target.value)}
                 rows={5}
                 placeholder="Paste an excerpt from an essay or paper you have previously written. The drafting engine will analyze your syntactic rhythm, transition words, and vocabulary choice..."
-                className="w-full bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 rounded-xl p-3 text-xs text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all resize-y leading-relaxed font-sans"
+                className="w-full bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-xl p-3 text-xs text-[color:var(--text-primary)] placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all resize-y leading-relaxed font-sans"
               />
             </div>
 
             {/* Option 2: Upload Document Dropzone */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5">
-                  <Upload className="w-3 h-3 text-neutral-400" />
+                <label className="text-xs font-semibold text-[color:var(--text-secondary)] flex items-center gap-1.5">
+                  <Upload className="w-3 h-3 text-[color:var(--text-muted)]" />
                   <span>Option B: Upload Previous Essay</span>
                 </label>
-                <span className="text-[10px] text-neutral-400">.docx, .pdf, .txt</span>
+                <span className="text-xs text-[color:var(--text-muted)]">.docx, .pdf, .txt</span>
               </div>
 
               <div
@@ -304,8 +304,8 @@ export default function WritingStyleSelector({
                 onDrop={handleDrop}
                 className={`border border-dashed rounded-xl p-4 flex flex-col items-center justify-center text-center transition-all h-[126px] ${
                   isDragOver
-                    ? "border-neutral-900 dark:border-white bg-neutral-100 dark:bg-white/10"
-                    : "border-neutral-300 dark:border-white/15 bg-white dark:bg-ink-750 hover:border-neutral-400"
+                    ? "border-neutral-900 dark:border-white bg-[color:var(--surface-inset)]"
+                    : "border-[color:var(--border-default)] bg-[color:var(--surface-raised)] hover:border-neutral-400"
                 }`}
               >
                 {customFileName ? (
@@ -322,24 +322,24 @@ export default function WritingStyleSelector({
                         <X className="w-3 h-3" />
                       </button>
                     </div>
-                    <p className="text-[10px] text-neutral-400">
+                    <p className="text-xs text-[color:var(--text-muted)]">
                       Sample loaded and ready for Phase 3 voice calibration
                     </p>
                   </div>
                 ) : (
                   <>
-                    <Upload className="w-5 h-5 text-neutral-400 mb-1" />
-                    <p className="text-xs font-medium text-neutral-800 dark:text-neutral-200">
+                    <Upload className="w-5 h-5 text-[color:var(--text-muted)] mb-1" />
+                    <p className="text-xs font-medium text-[color:var(--text-primary)]">
                       Drag & drop your sample essay here
                     </p>
-                    <p className="text-[10px] text-neutral-400 mb-2">
+                    <p className="text-xs text-[color:var(--text-muted)] mb-2">
                       or click to browse files
                     </p>
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={isReadingFile}
-                      className="px-3 py-1 rounded-lg text-[11px] font-semibold bg-neutral-100 dark:bg-white/10 hover:bg-neutral-200 dark:hover:bg-white/15 text-neutral-800 dark:text-neutral-200 transition-colors cursor-pointer"
+                      className="px-3 py-1 rounded-lg text-xs font-semibold bg-[color:var(--surface-inset)] hover:bg-[color:var(--surface-hover)] text-[color:var(--text-primary)] transition-colors cursor-pointer"
                     >
                       {isReadingFile ? "Reading..." : "Select File"}
                     </button>
@@ -358,10 +358,10 @@ export default function WritingStyleSelector({
           </div>
 
           {/* Voice calibration tip */}
-          <div className="p-3 rounded-xl bg-neutral-100 dark:bg-white/5 border border-neutral-200/60 dark:border-white/5 flex items-start gap-2.5 text-[11px] text-neutral-600 dark:text-neutral-400">
-            <Sparkles className="w-3.5 h-3.5 text-neutral-700 dark:text-neutral-300 shrink-0 mt-0.5" />
+          <div className="p-3 rounded-xl bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)] flex items-start gap-2.5 text-xs text-[color:var(--text-secondary)]">
+            <Sparkles className="w-3.5 h-3.5 text-[color:var(--text-secondary)] shrink-0 mt-0.5" />
             <div>
-              <span className="font-semibold text-neutral-800 dark:text-neutral-200">
+              <span className="font-semibold text-[color:var(--text-primary)]">
                 How voice calibration works:{" "}
               </span>
               The AI Scribe studies your typical sentence structures, paragraph transition styles, and balance between passive and active voice to preserve your authentic student persona.

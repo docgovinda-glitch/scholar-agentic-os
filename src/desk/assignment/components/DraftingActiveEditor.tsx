@@ -72,7 +72,7 @@ function renderAcademicProseWithCitations(
             key={i}
             data-testid="citation-anchor"
             onClick={(e) => onCitationClick?.(part, e)}
-            className="inline-flex items-center px-1.5 py-0.5 mx-0.5 rounded text-[11px] font-mono font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200/80 dark:border-blue-700/40 transition-all hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:border-blue-400 dark:hover:border-blue-500 cursor-pointer shadow-2xs select-none active:scale-[0.98]"
+            className="inline-flex items-center px-1.5 py-0.5 mx-0.5 rounded text-xs font-mono font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200/80 dark:border-blue-700/40 transition-all hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:border-blue-400 dark:hover:border-blue-500 cursor-pointer shadow-2xs select-none active:scale-[0.98]"
             title="Verified Grounded Citation — Click to view source metadata"
           >
             {part}
@@ -92,13 +92,13 @@ function renderAcademicProseWithCitations(
       );
     });
 
-  const textClass = "text-[14px] sm:text-[15px] leading-relaxed text-neutral-800 dark:text-neutral-200";
+  const textClass = "text-[14px] sm:text-[15px] leading-relaxed text-[color:var(--text-primary)]";
 
   // One element per block; a single long paragraph is regrouped every 3-4 sentences.
   return parseProseBlocks(prose).map((b, idx) => {
     if (b.kind === "heading") {
       return (
-        <h4 key={idx} style={b.align ? { textAlign: b.align } : undefined} className="text-sm font-semibold tracking-tight text-neutral-900 dark:text-white mt-5 mb-2">
+        <h4 key={idx} style={b.align ? { textAlign: b.align } : undefined} className="text-sm font-semibold tracking-tight text-[color:var(--text-primary)] mt-5 mb-2">
           {inline(b.text)}
         </h4>
       );
@@ -274,13 +274,13 @@ export function DraftingActiveEditor({
 
   if (!section) {
     return (
-      <div className="flex-1 flex items-center justify-center p-12 text-center bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 rounded-2xl shadow-xs">
+      <div className="flex-1 flex items-center justify-center p-12 text-center bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-2xl shadow-xs">
         <div className="space-y-2 max-w-sm">
-          <FileText className="w-8 h-8 text-neutral-400 mx-auto" />
-          <h3 className="text-base font-semibold text-neutral-900 dark:text-white">
+          <FileText className="w-8 h-8 text-[color:var(--text-muted)] mx-auto" />
+          <h3 className="text-base font-semibold text-[color:var(--text-primary)]">
             Select a Section to Begin
           </h3>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">
+          <p className="text-xs text-[color:var(--text-muted)]">
             Choose a section from the left outline to inspect, stream prose, or edit manually.
           </p>
         </div>
@@ -379,13 +379,13 @@ export function DraftingActiveEditor({
 
   if (isZenMode) {
     return (
-      <div className="fixed inset-0 z-50 bg-white dark:bg-ink-750 flex flex-col items-center py-12 overflow-y-auto animate-in fade-in duration-300">
+      <div className="fixed inset-0 z-50 bg-[color:var(--surface-raised)] flex flex-col items-center py-12 overflow-y-auto animate-in fade-in duration-300">
         <div className="w-full max-w-3xl px-6">
-          <div className="flex items-center justify-between mb-8 text-neutral-400">
+          <div className="flex items-center justify-between mb-8 text-[color:var(--text-muted)]">
             <h2 className="text-sm font-medium tracking-wide">FOCUS MODE</h2>
             <button
               onClick={() => setIsZenMode(false)}
-              className="p-2 hover:bg-neutral-100 dark:hover:bg-white/5 rounded-lg transition-colors flex items-center gap-2 text-xs"
+              className="p-2 hover:bg-[color:var(--surface-hover)] rounded-lg transition-colors flex items-center gap-2 text-xs"
             >
               <Minimize2 className="w-4 h-4" />
               Exit Focus Mode
@@ -407,12 +407,12 @@ export function DraftingActiveEditor({
                 if (e.key === "Enter") e.currentTarget.blur();
               }}
               autoFocus
-              className="text-4xl font-bold text-neutral-900 dark:text-white bg-transparent border-none outline-none w-full mb-8 font-serif"
+              className="text-4xl font-bold text-[color:var(--text-primary)] bg-transparent border-none outline-none w-full mb-8 font-serif"
             />
           ) : (
             <h1 
               onClick={() => setIsEditingTitle(true)}
-              className="text-4xl font-bold text-neutral-900 dark:text-white mb-8 font-serif cursor-text"
+              className="text-4xl font-bold text-[color:var(--text-primary)] mb-8 font-serif cursor-text"
             >
               {section.title}
             </h1>
@@ -455,25 +455,31 @@ export function DraftingActiveEditor({
   return (
     <article
       aria-label="Active Section Editor"
-      className={`flex flex-col bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 rounded-2xl shadow-xs overflow-hidden transition-colors ${className}`}
+      className={`flex flex-col bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-2xl shadow-xs overflow-hidden transition-colors ${className}`}
     >
       {/* Header Bar */}
-      <header className="px-5 py-4 border-b border-neutral-100 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-neutral-50/50 dark:bg-white/[0.02]">
+      <header className="px-5 py-4 border-b border-[color:var(--border-subtle)] flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[color:var(--surface-inset)]/50">
         <div className="space-y-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[11px] font-mono font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-              {section.academicFunction || "Academic Section"}
-            </span>
+            {/* The section's role, only when it says something the title does not. */}
+            {(() => {
+              const label = (section.academicFunction || "").trim();
+              const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/…/g, "").trim();
+              const repeatsTitle = label && (norm(section.title).startsWith(norm(label).slice(0, 40)) || norm(label).startsWith(norm(section.title).slice(0, 40)));
+              return label && !repeatsTitle ? (
+                <span className="text-xs font-medium text-[color:var(--text-muted)] uppercase tracking-wider">{label}</span>
+              ) : null;
+            })()}
 
             {section.status === "completed" && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
                 <CheckCircle2 className="w-3 h-3" />
                 <span>Drafted</span>
               </span>
             )}
 
             {isStreaming && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full animate-pulse">
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full animate-pulse">
                 <Loader2 className="w-3 h-3 animate-spin" />
                 <span>Streaming Prose</span>
               </span>
@@ -495,12 +501,12 @@ export function DraftingActiveEditor({
                 type="text"
                 value={titleInput}
                 onChange={(e) => setTitleInput(e.target.value)}
-                className="text-sm sm:text-base font-semibold px-2 py-0.5 rounded bg-white dark:bg-ink-600 border border-neutral-300 dark:border-white/20 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-400"
+                className="text-sm sm:text-base font-semibold px-2 py-0.5 rounded bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-neutral-400"
                 autoFocus
               />
               <button
                 type="submit"
-                className="p-1.5 rounded bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 cursor-pointer"
+                className="p-1.5 rounded bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 cursor-pointer"
                 title="Save title"
               >
                 <Check className="w-3.5 h-3.5" />
@@ -511,7 +517,7 @@ export function DraftingActiveEditor({
                   setTitleInput(section.title);
                   setIsEditingTitle(false);
                 }}
-                className="p-1.5 rounded hover:bg-neutral-200/60 dark:hover:bg-white/10 text-neutral-500 cursor-pointer"
+                className="p-1.5 rounded hover:bg-[color:var(--surface-hover)] text-[color:var(--text-muted)] cursor-pointer"
                 title="Cancel"
               >
                 <X className="w-3.5 h-3.5" />
@@ -520,11 +526,11 @@ export function DraftingActiveEditor({
           ) : (
             <div className="flex items-center gap-2 group/title">
               <div className="min-w-0">
-                <h2 className="text-base sm:text-lg font-semibold tracking-tight text-neutral-900 dark:text-white truncate" title={section.title}>
+                <h2 className="text-base sm:text-lg font-semibold tracking-tight text-[color:var(--text-primary)] truncate" title={section.title}>
                   {headingWords.length > 10 ? `${headingWords.slice(0, 10).join(" ")}…` : section.title}
                 </h2>
                 {headingWords.length > 10 && (
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400 line-clamp-2" data-testid="section-full-prompt">
+                  <p className="text-xs text-[color:var(--text-muted)] line-clamp-2" data-testid="section-full-prompt">
                     {section.title}
                   </p>
                 )}
@@ -536,7 +542,7 @@ export function DraftingActiveEditor({
                     setTitleInput(section.title);
                     setIsEditingTitle(true);
                   }}
-                  className="opacity-0 group-hover/title:opacity-100 transition-opacity p-1 rounded hover:bg-neutral-200/60 dark:hover:bg-white/10 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 cursor-pointer"
+                  className="opacity-0 group-hover/title:opacity-100 transition-opacity p-1 rounded hover:bg-[color:var(--surface-hover)] text-[color:var(--text-muted)] hover:text-neutral-700 dark:hover:text-neutral-200 cursor-pointer"
                   title="Edit section title"
                 >
                   <Edit2 className="w-3.5 h-3.5" />
@@ -549,14 +555,14 @@ export function DraftingActiveEditor({
         {/* Live Word Count Metric */}
         <div className="flex items-center gap-3 shrink-0">
           <div className="text-right">
-            <div className="text-xs font-semibold text-neutral-900 dark:text-white tabular-nums">
+            <div className="text-xs font-semibold text-[color:var(--text-primary)] tabular-nums">
               {currentWords.toLocaleString()} / {targetWords.toLocaleString()} words
             </div>
             <div
-              className={`text-[11px] tabular-nums font-medium ${
+              className={`text-xs tabular-nums font-medium ${
                 isBudgetMet
                   ? "text-emerald-600 dark:text-emerald-400"
-                  : "text-neutral-400 dark:text-neutral-500"
+                  : "text-[color:var(--text-muted)]"
               }`}
             >
               {wordDiff === 0
@@ -571,10 +577,10 @@ export function DraftingActiveEditor({
 
       {/* Section Guidance & Bound Citations Strip */}
       {(section.guidance || boundSources.length > 0) && (
-        <div className="px-5 py-3 border-b border-neutral-100 dark:border-white/5 bg-neutral-50/30 dark:bg-white/[0.01] flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="px-5 py-3 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]/30 flex flex-wrap items-center justify-between gap-3 text-xs">
           {section.guidance && (
-            <p className="text-neutral-600 dark:text-neutral-400 max-w-xl text-[12px] leading-relaxed line-clamp-2">
-              <strong className="font-medium text-neutral-800 dark:text-neutral-200">
+            <p className="text-[color:var(--text-secondary)] max-w-xl text-[12px] leading-relaxed line-clamp-2">
+              <strong className="font-medium text-[color:var(--text-primary)]">
                 Focus:
               </strong>{" "}
               {section.guidance.replace(/^Academic\s+Lens:\s*/i, "").replace(/^Focus:\s*/i, "")}
@@ -583,13 +589,13 @@ export function DraftingActiveEditor({
 
         {boundSources.length > 0 && (
           <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
-            <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+            <span className="text-xs text-[color:var(--text-muted)]">
               Assigned Evidence:
             </span>
             {boundSources.map((s) => (
               <span
                 key={s.id}
-                className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-neutral-100 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 border border-neutral-200/60 dark:border-white/5"
+                className="px-2 py-0.5 rounded-md text-xs font-medium bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] border border-[color:var(--border-subtle)]"
                 title={s.title}
               >
                 {citeLabel(s)}
@@ -602,15 +608,15 @@ export function DraftingActiveEditor({
 
       {/* Facts about the text (shows when content exists): counted, never scored */}
       {liveContent.trim().length > 0 && (
-        <div className="px-5 py-2 border-b border-neutral-100 dark:border-white/5 bg-neutral-50/50 dark:bg-white/[0.02] flex flex-wrap items-center justify-between gap-2 text-xs" data-testid="section-facts">
-          <div className="flex items-center gap-3 text-neutral-600 dark:text-neutral-300 tabular-nums">
+        <div className="px-5 py-2 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]/50 flex flex-wrap items-center justify-between gap-2 text-xs" data-testid="section-facts">
+          <div className="flex items-center gap-3 text-[color:var(--text-secondary)] tabular-nums">
             <span>{paragraphCount} {paragraphCount === 1 ? "paragraph" : "paragraphs"}</span>
             <span className="text-neutral-300 dark:text-neutral-600" aria-hidden="true">·</span>
             <span className={citationCount > 0 ? "" : "text-amber-700 dark:text-amber-400"}>
               {citationCount} {citationCount === 1 ? "citation" : "citations"}
             </span>
           </div>
-          <div className="text-neutral-500 dark:text-neutral-400">
+          <div className="text-[color:var(--text-muted)]">
             {citationCount > 0
               ? "Click a citation in the preview to see its source"
               : "No citations yet: use Insert Citation to support your points"}
@@ -628,17 +634,17 @@ export function DraftingActiveEditor({
                 <span className="font-semibold text-blue-900 dark:text-blue-200">
                   {inspectedCitation.text}
                 </span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-mono">
+                <span className="text-xs px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-mono">
                   Verified Literature
                 </span>
               </div>
               {inspectedCitation.source ? (
-                <p className="text-[11px] text-blue-800/90 dark:text-blue-300/90 truncate max-w-xl">
+                <p className="text-xs text-blue-800/90 dark:text-blue-300/90 truncate max-w-xl">
                   {inspectedCitation.source.title} ({inspectedCitation.source.year || "n.d."}) —{" "}
                   {inspectedCitation.source.journal || inspectedCitation.source.type || "Peer-Reviewed"}
                 </p>
               ) : (
-                <p className="text-[11px] text-blue-700/80 dark:text-blue-400/80">
+                <p className="text-xs text-blue-700/80 dark:text-blue-400/80">
                   Recognized scholarly citation anchor in active academic prose.
                 </p>
               )}
@@ -649,7 +655,7 @@ export function DraftingActiveEditor({
             <button
               type="button"
               onClick={handleCopyCitation}
-              className="px-2.5 py-1 rounded-md text-[11px] font-medium bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-800/60 transition-colors flex items-center gap-1 cursor-pointer"
+              className="px-2.5 py-1 rounded-md text-xs font-medium bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-800/60 transition-colors flex items-center gap-1 cursor-pointer"
             >
               {copiedCitation ? (
                 <>
@@ -676,7 +682,7 @@ export function DraftingActiveEditor({
       )}
 
       {/* Toolbar: refinement actions appear only once the section has text */}
-      <div className="px-5 py-2.5 border-b border-neutral-100 dark:border-white/5 flex flex-wrap items-center justify-between gap-2 bg-white dark:bg-ink-750">
+      <div className="px-5 py-2.5 border-b border-[color:var(--border-subtle)] flex flex-wrap items-center justify-between gap-2 bg-[color:var(--surface-raised)]">
         <div className="flex items-center gap-1.5 flex-wrap">
           {liveContent.trim().length > 0 && (<>
           {[
@@ -691,7 +697,7 @@ export function DraftingActiveEditor({
               onClick={() => onStreamSection?.(key)}
               disabled={isStreaming}
               title={title}
-              className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white bg-neutral-100 dark:bg-white/5 hover:bg-neutral-200/70 dark:hover:bg-white/10 disabled:opacity-40 transition-colors flex items-center gap-1.5 cursor-pointer"
+              className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] bg-[color:var(--surface-inset)] hover:bg-[color:var(--surface-hover)] disabled:opacity-40 transition-colors flex items-center gap-1.5 cursor-pointer"
             >
               <Icon className="w-3.5 h-3.5" />
               <span>{label}</span>
@@ -706,7 +712,7 @@ export function DraftingActiveEditor({
             <button
               type="button"
               onClick={handleSaveManualEdit}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer shadow-xs"
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer shadow-xs"
             >
               <Check className="w-3.5 h-3.5" />
               <span>Done</span>
@@ -716,7 +722,7 @@ export function DraftingActiveEditor({
               type="button"
               onClick={() => setIsEditingManually(true)}
               disabled={isStreaming}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white bg-neutral-100 dark:bg-white/5 hover:bg-neutral-200/70 dark:hover:bg-white/10 transition-colors flex items-center gap-1.5 cursor-pointer"
+              className="px-3 py-1.5 rounded-lg text-xs font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] bg-[color:var(--surface-inset)] hover:bg-[color:var(--surface-hover)] transition-colors flex items-center gap-1.5 cursor-pointer"
             >
               <Edit3 className="w-3.5 h-3.5" />
               <span>Edit text</span>
@@ -734,12 +740,12 @@ export function DraftingActiveEditor({
         {isEditingManually ? (
           <div className="space-y-3 h-full flex flex-col">
             {/* Insert bar: focus mode and citations (formatting lives in the editor toolbar) */}
-            <div className="flex flex-wrap items-center justify-between gap-2 p-2 rounded-xl bg-neutral-100/70 dark:bg-white/5 border border-neutral-200/60 dark:border-white/5 text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2 p-2 rounded-xl bg-[color:var(--surface-inset)]/70 border border-[color:var(--border-subtle)] text-xs">
               <div className="flex items-center gap-1">
                 <button
                   type="button"
                   onClick={() => setIsZenMode(true)}
-                  className="p-1.5 rounded hover:bg-neutral-200 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-300 cursor-pointer"
+                  className="p-1.5 rounded hover:bg-[color:var(--surface-hover)] text-[color:var(--text-secondary)] cursor-pointer"
                   title="Enter Focus Mode"
                 >
                   <Maximize2 className="w-3.5 h-3.5" />
@@ -759,8 +765,8 @@ export function DraftingActiveEditor({
                 </button>
 
                 {showCitationDropdown && (
-                  <div className="absolute right-0 mt-1 w-72 max-h-56 overflow-y-auto rounded-xl bg-white dark:bg-ink-650 border border-neutral-200 dark:border-white/15 shadow-xl z-30 p-1.5 space-y-1 animate-in fade-in zoom-in-95 duration-150">
-                    <div className="px-2 py-1 text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">
+                  <div className="absolute right-0 mt-1 w-72 max-h-56 overflow-y-auto rounded-xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-xl z-30 p-1.5 space-y-1 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="px-2 py-1 text-xs font-semibold text-[color:var(--text-muted)] uppercase tracking-wider">
                       Select Source to Cite:
                     </div>
                     {availableSources.length > 0 ? (
@@ -770,19 +776,19 @@ export function DraftingActiveEditor({
                             key={s.id}
                             type="button"
                             onClick={() => handleInsertCitation(s)}
-                            className="w-full text-left p-2 rounded-lg text-xs hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer group"
+                            className="w-full text-left p-2 rounded-lg text-xs hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer group"
                           >
-                            <div className="font-medium text-neutral-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                            <div className="font-medium text-[color:var(--text-primary)] truncate group-hover:text-blue-600 dark:group-hover:text-blue-400">
                               {citeLabel(s)}
                             </div>
-                            <div className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate">
+                            <div className="text-xs text-[color:var(--text-muted)] truncate">
                               {s.title}
                             </div>
                           </button>
                         );
                       })
                     ) : (
-                      <div className="p-3 text-center text-xs text-neutral-400">
+                      <div className="p-3 text-center text-xs text-[color:var(--text-muted)]">
                         No approved sources found.
                       </div>
                     )}
@@ -802,7 +808,7 @@ export function DraftingActiveEditor({
               contentClassName="section-editor min-h-[60vh] p-5 sm:p-8 text-base leading-relaxed font-serif text-[color:var(--text-primary)] focus:outline-none"
             />
 
-            <div className="flex justify-between items-center text-xs text-neutral-500 dark:text-neutral-400 px-1 pt-1">
+            <div className="flex justify-between items-center text-xs text-[color:var(--text-muted)] px-1 pt-1">
               <span>Saved as you type. Enter starts a new paragraph.</span>
               <span className="tabular-nums font-mono">
                 {currentWords.toLocaleString()} / {targetWords.toLocaleString()} words
@@ -820,14 +826,14 @@ export function DraftingActiveEditor({
         ) : (
           /* Empty Section State Call-to-action */
           <div className="h-full min-h-[300px] flex flex-col items-center justify-center text-center p-8 space-y-4">
-            <div className="p-3 rounded-2xl bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-300">
+            <div className="p-3 rounded-2xl bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]">
               <Sparkles className="w-6 h-6 text-amber-500" />
             </div>
             <div className="max-w-md space-y-1.5">
-              <h3 className="text-base font-semibold text-neutral-900 dark:text-white">
+              <h3 className="text-base font-semibold text-[color:var(--text-primary)]">
                 This section is empty
               </h3>
-              <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
+              <p className="text-xs text-[color:var(--text-muted)] leading-relaxed">
                 Write it yourself, or let your AI draft it from your approved sources and edit the result.
               </p>
             </div>
@@ -836,7 +842,7 @@ export function DraftingActiveEditor({
                 type="button"
                 onClick={() => onStreamSection?.()}
                 disabled={isStreaming}
-                className="px-4 py-2.5 rounded-xl text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 active:scale-[0.99] transition-all flex items-center gap-2 cursor-pointer shadow-xs"
+                className="px-4 py-2.5 rounded-xl text-xs font-semibold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 active:scale-[0.99] transition-all flex items-center gap-2 cursor-pointer shadow-xs"
               >
                 {isStreaming ? (
                   <>
@@ -854,7 +860,7 @@ export function DraftingActiveEditor({
               <button
                 type="button"
                 onClick={() => setIsEditingManually(true)}
-                className="px-4 py-2.5 rounded-xl text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                className="px-4 py-2.5 rounded-xl text-xs font-medium text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer"
               >
                 Write it myself
               </button>
@@ -864,12 +870,12 @@ export function DraftingActiveEditor({
       </section>
 
       {/* Footer Navigation Bar */}
-      <footer className="px-5 py-3 border-t border-neutral-100 dark:border-white/5 flex items-center justify-between gap-3 bg-neutral-50/30 dark:bg-white/[0.01]">
+      <footer className="px-5 py-3 border-t border-[color:var(--border-subtle)] flex items-center justify-between gap-3 bg-[color:var(--surface-inset)]/30">
         <button
           type="button"
           onClick={onNavigatePrevious}
           disabled={!hasPrevious}
-          className="px-3 py-1.5 rounded-lg text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5 cursor-pointer"
+          className="px-3 py-1.5 rounded-lg text-xs font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5 cursor-pointer"
         >
           <ArrowLeft className="w-3 h-3" />
           <span>Previous Section</span>
@@ -879,7 +885,7 @@ export function DraftingActiveEditor({
           type="button"
           onClick={onNavigateNext}
           disabled={!hasNext}
-          className="px-3 py-1.5 rounded-lg text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5 cursor-pointer"
+          className="px-3 py-1.5 rounded-lg text-xs font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5 cursor-pointer"
         >
           <span>Next Section</span>
           <ArrowRight className="w-3 h-3" />

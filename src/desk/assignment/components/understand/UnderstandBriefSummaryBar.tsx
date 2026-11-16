@@ -20,15 +20,15 @@ export function UnderstandBriefSummaryBar({ briefSummary, localCitation, localLe
   return (
     <>
           {/* Top Locked Brief Summary Bar */}
-          <div className="bg-white dark:bg-ink-750 rounded-2xl border border-neutral-200/80 dark:border-white/10 p-4 sm:p-5 shadow-xs space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-neutral-100 dark:border-white/5">
+          <div className="bg-[color:var(--surface-raised)] rounded-2xl border border-[color:var(--border-subtle)] p-4 sm:p-5 shadow-xs space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-[color:var(--border-subtle)]">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                <span className="text-xs font-semibold text-neutral-900 dark:text-white uppercase tracking-wider">
+                <span className="text-xs font-semibold text-[color:var(--text-primary)] uppercase tracking-wider">
                   Assignment Brief Summary
                 </span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                  Locked &amp; Calibrated
+                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  From your brief
                 </span>
               </div>
 
@@ -41,7 +41,7 @@ export function UnderstandBriefSummaryBar({ briefSummary, localCitation, localLe
                   else if (setPhase) setPhase("extract");
                 }}
                 aria-label="Edit Brief"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer w-fit border border-neutral-200/60 dark:border-white/10"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer w-fit border border-[color:var(--border-subtle)]"
               >
                 <Edit2 className="w-3.5 h-3.5" />
                 <span>← Edit Brief in Phase 1</span>
@@ -49,26 +49,26 @@ export function UnderstandBriefSummaryBar({ briefSummary, localCitation, localLe
             </div>
 
             {/* Executive summary (never the pasted brief) */}
-            <p className="text-sm text-neutral-800 dark:text-neutral-200 leading-relaxed" data-testid="brief-summary-text">
+            <p className="text-sm text-[color:var(--text-primary)] leading-relaxed" data-testid="brief-summary-text">
               {briefSummary}
             </p>
 
             {/* Parameter Badges */}
-            <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-              <span className="px-2.5 py-1 rounded-lg bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-300">
-                Level: <strong className="font-semibold capitalize text-neutral-900 dark:text-white">{safeFormatLabel(localLevel)}</strong>
+            <div className="flex flex-wrap items-center gap-1.5 text-xs">
+              <span className="px-2.5 py-1 rounded-lg bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]">
+                Level: <strong className="font-semibold capitalize text-[color:var(--text-primary)]">{safeFormatLabel(localLevel)}</strong>
               </span>
-              <span className="px-2.5 py-1 rounded-lg bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-300">
-                Type: <strong className="font-semibold capitalize text-neutral-900 dark:text-white">{safeFormatLabel(localType)}</strong>
+              <span className="px-2.5 py-1 rounded-lg bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]">
+                Type: <strong className="font-semibold capitalize text-[color:var(--text-primary)]">{safeFormatLabel(localType)}</strong>
               </span>
-              <span className="px-2.5 py-1 rounded-lg bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-300">
-                Citation: <strong className="font-semibold uppercase text-neutral-900 dark:text-white">{localCitation}</strong>
+              <span className="px-2.5 py-1 rounded-lg bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]">
+                Citation: <strong className="font-semibold uppercase text-[color:var(--text-primary)]">{localCitation}</strong>
               </span>
               <span className="px-2.5 py-1 rounded-lg bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20">
                 Tone: <strong className="font-semibold capitalize">{safeFormatLabel(localTone)}</strong>
               </span>
-              <span className="px-2.5 py-1 rounded-lg bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-300">
-                Target: <strong className="font-semibold text-neutral-900 dark:text-white">{localWordCount.toLocaleString()} words</strong>
+              <span className="px-2.5 py-1 rounded-lg bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]">
+                Target: <strong className="font-semibold text-[color:var(--text-primary)]">{localWordCount.toLocaleString()} words</strong>
               </span>
             </div>
           </div>

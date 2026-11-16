@@ -100,9 +100,11 @@ describe("Evidence & Knowledge Panel Traceability", () => {
     expect(within(panel).getAllByText(/PDF Document/i).length).toBeGreaterThan(0);
 
     // 2. Engine Extracted Layer
-    expect(within(panel).getByText(/2. Engine Extracted/i)).toBeInTheDocument();
-    expect(within(panel).getByText(/Abstract:/i)).toBeInTheDocument();
-    expect(within(panel).getByText(/Key Findings:/i)).toBeInTheDocument();
+    expect(within(panel).getByText(/2\. What was read/i)).toBeInTheDocument();
+    expect(within(panel).getByText(/Summary:/i)).toBeInTheDocument();
+    expect(within(panel).getByText(/Key passages:/i)).toBeInTheDocument();
+    // Nothing is claimed that did not happen (no "References formatted", no "Synthesized").
+    expect(within(panel).queryByText(/References formatted|Synthesized/i)).toBeNull();
     expect(within(panel).getAllByText(/Material:/i).length).toBeGreaterThan(0);
 
     // 3. Used in Assignment Layer

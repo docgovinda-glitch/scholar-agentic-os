@@ -26,13 +26,13 @@ export function SourcesEmptyState({ citationStyle, handleAddVaultSources, handle
     <>
         <div
           data-testid="sources-empty-state"
-          className="bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 rounded-2xl p-8 sm:p-12 shadow-xs dark:shadow-none space-y-6"
+          className="bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-2xl p-8 sm:p-12 shadow-xs dark:shadow-none space-y-6"
         >
           <div className="max-w-xl space-y-2">
-            <h2 className="text-lg font-semibold tracking-tight text-neutral-900 dark:text-white">
+            <h2 className="text-lg font-semibold tracking-tight text-[color:var(--text-primary)]">
               Ground Your Assignment in Sources
             </h2>
-            <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 leading-relaxed">
+            <p className="text-xs sm:text-sm text-[color:var(--text-muted)] leading-relaxed">
               Upload your course slides, syllabus, or readings to ground your citations, or proceed to drafting directly.
             </p>
           </div>
@@ -52,8 +52,8 @@ export function SourcesEmptyState({ citationStyle, handleAddVaultSources, handle
             onAdd={handleAddVaultSources}
           />
 
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-neutral-200/60 dark:border-white/10">
-            <p className="text-xs text-neutral-500 dark:text-neutral-400">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-[color:var(--border-subtle)]">
+            <p className="text-xs text-[color:var(--text-muted)]">
               Citing sources is optional. You can draft freely and add citations at any time.
             </p>
             <div className="flex items-center gap-3">
@@ -61,7 +61,7 @@ export function SourcesEmptyState({ citationStyle, handleAddVaultSources, handle
                 type="button"
                 onClick={handleContinue}
                 data-testid="proceed-to-drafting-btn"
-                className="px-6 py-2.5 rounded-full text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 active:scale-[0.99] transition-all cursor-pointer flex items-center gap-2 shadow-xs dark:shadow-none"
+                className="px-6 py-2.5 rounded-full text-xs font-semibold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 active:scale-[0.99] transition-all cursor-pointer flex items-center gap-2 shadow-xs dark:shadow-none"
               >
                 <span>Proceed to Drafting</span>
                 <ArrowRight className="w-4 h-4" />

@@ -13,15 +13,15 @@ export function RubricComplianceCard({
 }: RubricComplianceCardProps) {
   if (isLoading) {
     return (
-      <div className="rounded-2xl p-6 bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-4 animate-pulse">
-        <div className="flex items-center justify-between border-b border-neutral-100 dark:border-white/5 pb-4">
-          <div className="h-5 w-44 bg-neutral-200 dark:bg-white/10 rounded" />
-          <div className="h-6 w-24 bg-neutral-200 dark:bg-white/10 rounded-full" />
+      <div className="rounded-2xl p-6 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-xs space-y-4 animate-pulse">
+        <div className="flex items-center justify-between border-b border-[color:var(--border-subtle)] pb-4">
+          <div className="h-5 w-44 bg-[color:var(--surface-sunken)] rounded" />
+          <div className="h-6 w-24 bg-[color:var(--surface-sunken)] rounded-full" />
         </div>
-        <div className="h-3 w-full bg-neutral-100 dark:bg-white/5 rounded-full" />
+        <div className="h-3 w-full bg-[color:var(--surface-inset)] rounded-full" />
         <div className="space-y-3 pt-2">
-          <div className="h-16 bg-neutral-100 dark:bg-white/5 rounded-xl" />
-          <div className="h-16 bg-neutral-100 dark:bg-white/5 rounded-xl" />
+          <div className="h-16 bg-[color:var(--surface-inset)] rounded-xl" />
+          <div className="h-16 bg-[color:var(--surface-inset)] rounded-xl" />
         </div>
       </div>
     );
@@ -29,17 +29,17 @@ export function RubricComplianceCard({
 
   if (!report) {
     return (
-      <div className="rounded-2xl p-6 bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs text-center space-y-4">
-        <div className="w-12 h-12 rounded-full bg-neutral-100 dark:bg-white/5 text-neutral-400 dark:text-neutral-500 mx-auto flex items-center justify-center">
+      <div className="rounded-2xl p-6 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-xs text-center space-y-4">
+        <div className="w-12 h-12 rounded-full bg-[color:var(--surface-inset)] text-[color:var(--text-muted)] mx-auto flex items-center justify-center">
           <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
         </div>
         <div className="space-y-1">
-          <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">
+          <h3 className="text-sm font-semibold text-[color:var(--text-primary)]">
             Not checked yet
           </h3>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400 max-w-sm mx-auto">
+          <p className="text-xs text-[color:var(--text-muted)] max-w-sm mx-auto">
             Check your draft against your brief: length, introduction, conclusion and what the question asks for.
           </p>
         </div>
@@ -47,7 +47,7 @@ export function RubricComplianceCard({
           <button
             type="button"
             onClick={onReRunAudit}
-            className="px-4 py-2 rounded-xl text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 transition-opacity cursor-pointer inline-flex items-center gap-1.5"
+            className="px-4 py-2 rounded-xl text-xs font-semibold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 transition-opacity cursor-pointer inline-flex items-center gap-1.5"
           >
             <span>Check my draft</span>
           </button>
@@ -64,10 +64,10 @@ export function RubricComplianceCard({
   const missing = report.missingRequirements ?? [];
 
   return (
-    <div className="rounded-2xl p-6 sm:p-7 bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-5">
-      <div className="space-y-1 border-b border-neutral-100 dark:border-white/5 pb-4">
-        <h2 className="text-base sm:text-lg font-semibold tracking-tight text-neutral-900 dark:text-white">Checks against your brief</h2>
-        <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+    <div className="rounded-2xl p-6 sm:p-7 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-xs space-y-5">
+      <div className="space-y-1 border-b border-[color:var(--border-subtle)] pb-4">
+        <h2 className="text-base sm:text-lg font-semibold tracking-tight text-[color:var(--text-primary)]">Checks against your brief</h2>
+        <p className="text-xs text-[color:var(--text-muted)]">
           Scholar doesn&apos;t predict marks. These are things it can check; your marker decides the grade.
         </p>
       </div>
@@ -89,12 +89,12 @@ export function RubricComplianceCard({
 
       {criteria.length > 0 && (
         <div className="space-y-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">Marking criteria</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-[color:var(--text-muted)]">Marking criteria</h3>
           <ul className="space-y-1.5">
             {criteria.map((crit, idx) => (
-              <li key={crit.criterion || idx} className="flex items-center justify-between gap-2 text-xs px-3 py-2 rounded-lg bg-neutral-50/70 dark:bg-white/[0.02] border border-neutral-200/70 dark:border-white/5">
-                <span className="text-neutral-900 dark:text-white">{crit.criterion}</span>
-                {crit.weightPercentage ? <span className="text-[11px] text-neutral-500 dark:text-neutral-400 shrink-0">{crit.weightPercentage}%</span> : null}
+              <li key={crit.criterion || idx} className="flex items-center justify-between gap-2 text-xs px-3 py-2 rounded-lg bg-[color:var(--surface-inset)]/70 border border-[color:var(--border-subtle)]">
+                <span className="text-[color:var(--text-primary)]">{crit.criterion}</span>
+                {crit.weightPercentage ? <span className="text-xs text-[color:var(--text-muted)] shrink-0">{crit.weightPercentage}%</span> : null}
               </li>
             ))}
           </ul>
@@ -102,7 +102,7 @@ export function RubricComplianceCard({
       )}
 
       {onReRunAudit && (
-        <button type="button" onClick={onReRunAudit} className="text-xs font-semibold underline text-neutral-700 dark:text-neutral-300 cursor-pointer">
+        <button type="button" onClick={onReRunAudit} className="text-xs font-semibold underline text-[color:var(--text-secondary)] cursor-pointer">
           Check again
         </button>
       )}

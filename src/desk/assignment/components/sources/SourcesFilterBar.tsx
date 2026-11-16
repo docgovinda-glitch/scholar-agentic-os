@@ -44,8 +44,8 @@ export function SourcesFilterBar({ activeFilterCount, activeTab, aiResearchCount
                   onClick={() => setActiveTab("all")}
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
                     activeTab === "all"
-                      ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-xs dark:shadow-none"
-                      : "bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                      ? "bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] shadow-xs dark:shadow-none"
+                      : "bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
                   }`}
                 >
                   All Sources ({totalActiveSources})
@@ -57,12 +57,12 @@ export function SourcesFilterBar({ activeFilterCount, activeTab, aiResearchCount
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                     activeTab === "ask_scholar"
                       ? "bg-purple-600 text-white shadow-xs dark:shadow-none"
-                      : "bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                      : "bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
                   }`}
                 >
                   <BookOpen className="w-3.5 h-3.5" />
                   <span>Ask Scholar</span>
-                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-black/15 text-current">
+                  <span className="px-1.5 py-0.2 rounded-full text-xs bg-black/15 text-current">
                     {askScholarCount}
                   </span>
                 </button>
@@ -73,12 +73,12 @@ export function SourcesFilterBar({ activeFilterCount, activeTab, aiResearchCount
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                     activeTab === "ai_research"
                       ? "bg-indigo-600 text-white shadow-xs dark:shadow-none"
-                      : "bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                      : "bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
                   }`}
                 >
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>AI Research</span>
-                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-black/15 text-current">
+                  <span className="px-1.5 py-0.2 rounded-full text-xs bg-black/15 text-current">
                     {aiResearchCount}
                   </span>
                 </button>
@@ -88,8 +88,8 @@ export function SourcesFilterBar({ activeFilterCount, activeTab, aiResearchCount
                   onClick={() => setActiveTab("curated")}
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
                     activeTab === "curated"
-                      ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-xs dark:shadow-none"
-                      : "bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                      ? "bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] shadow-xs dark:shadow-none"
+                      : "bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
                   }`}
                 >
                   Curated Literature ({totalCuratedCount})
@@ -101,12 +101,12 @@ export function SourcesFilterBar({ activeFilterCount, activeTab, aiResearchCount
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                     activeTab === "uploaded"
                       ? "bg-blue-600 text-white shadow-xs dark:shadow-none"
-                      : "bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                      : "bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
                   }`}
                 >
                   <FolderOpen className="w-3.5 h-3.5" />
                   <span>My Uploads</span>
-                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-black/15 text-current">
+                  <span className="px-1.5 py-0.2 rounded-full text-xs bg-black/15 text-current">
                     {mappedUserSources.length}
                   </span>
                 </button>
@@ -117,12 +117,12 @@ export function SourcesFilterBar({ activeFilterCount, activeTab, aiResearchCount
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                     activeTab === "approved"
                       ? "bg-emerald-600 text-white shadow-xs dark:shadow-none"
-                      : "bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                      : "bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
                   }`}
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   <span>Approved</span>
-                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-black/15 text-current">
+                  <span className="px-1.5 py-0.2 rounded-full text-xs bg-black/15 text-current">
                     {approvedSourceIds.length}
                   </span>
                 </button>
@@ -133,12 +133,12 @@ export function SourcesFilterBar({ activeFilterCount, activeTab, aiResearchCount
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                     activeTab === "bookmarked"
                       ? "bg-amber-500 text-white shadow-xs dark:shadow-none"
-                      : "bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                      : "bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
                   }`}
                 >
                   <Star className="w-3.5 h-3.5 fill-current" />
                   <span>Bookmarked</span>
-                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-black/15 text-current">
+                  <span className="px-1.5 py-0.2 rounded-full text-xs bg-black/15 text-current">
                     {bookmarkedIds.length}
                   </span>
                 </button>
@@ -150,7 +150,7 @@ export function SourcesFilterBar({ activeFilterCount, activeTab, aiResearchCount
                     className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                       activeTab === "excluded"
                         ? "bg-neutral-700 text-white shadow-xs dark:shadow-none"
-                        : "bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                        : "bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
                     }`}
                   >
                     <span>Excluded ({excludedIds.length})</span>
@@ -163,27 +163,27 @@ export function SourcesFilterBar({ activeFilterCount, activeTab, aiResearchCount
                 <button
                   type="button"
                   onClick={() => setIsAddingCustom(true)}
-                  className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer shadow-xs whitespace-nowrap"
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer shadow-xs whitespace-nowrap"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>+ Add Reference</span>
                 </button>
 
                 <div className="relative flex-1 sm:w-60">
-                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--text-muted)]" />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search authors, title, keyword..."
                     aria-label="Search curated literature"
-                    className="w-full pl-8 pr-3 py-1.5 rounded-xl text-xs bg-neutral-100 dark:bg-white/5 border border-transparent focus:border-neutral-300 dark:focus:border-white/20 text-neutral-900 dark:text-white placeholder-neutral-400 outline-none transition-colors"
+                    className="w-full pl-8 pr-3 py-1.5 rounded-xl text-xs bg-[color:var(--surface-inset)] border border-transparent focus:border-neutral-300 dark:focus:border-white/20 text-[color:var(--text-primary)] placeholder-neutral-400 outline-none transition-colors"
                   />
                   {searchQuery && (
                     <button
                       type="button"
                       onClick={() => setSearchQuery("")}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[color:var(--text-muted)] hover:text-neutral-600 dark:hover:text-neutral-200"
                     >
                       <X className="w-3 h-3" />
                     </button>
@@ -196,14 +196,14 @@ export function SourcesFilterBar({ activeFilterCount, activeTab, aiResearchCount
                   aria-label="Toggle advanced filters"
                   className={`px-3 py-1.5 rounded-xl text-xs font-medium border flex items-center gap-1.5 transition-colors cursor-pointer ${
                     showAdvancedFilters || activeFilterCount > 0
-                      ? "border-neutral-900 dark:border-white bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-semibold"
-                      : "border-neutral-200 dark:border-white/10 bg-white dark:bg-ink-750 text-neutral-600 dark:text-neutral-300 hover:border-neutral-300"
+                      ? "border-neutral-900 dark:border-white bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] font-semibold"
+                      : "border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] hover:border-neutral-300"
                   }`}
                 >
                   <SlidersHorizontal className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Filters</span>
                   {activeFilterCount > 0 && (
-                    <span className="w-4 h-4 rounded-full bg-blue-500 text-white text-[10px] flex items-center justify-center font-bold">
+                    <span className="w-4 h-4 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center font-bold">
                       {activeFilterCount}
                     </span>
                   )}
@@ -214,7 +214,7 @@ export function SourcesFilterBar({ activeFilterCount, activeTab, aiResearchCount
                   onClick={handleReCurateForPrompt}
                   disabled={isFindingMore}
                   title="Re-curate literature specifically for your active assignment prompt"
-                  className="px-2.5 py-1.5 rounded-xl text-xs font-medium border border-neutral-200 dark:border-white/10 bg-white dark:bg-ink-750 text-neutral-600 dark:text-neutral-300 hover:border-neutral-300 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="px-2.5 py-1.5 rounded-xl text-xs font-medium border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] hover:border-neutral-300 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isFindingMore ? "animate-spin" : ""}`} />
                   <span className="hidden sm:inline">Re-curate</span>

@@ -93,7 +93,7 @@ describe("Unified Assignment Brief & 2-Step Outline Review Progression", () => {
 
     // 2. Step 2 Outline Review: Locked/collapsed brief summary appears
     await waitFor(() => {
-      expect(screen.getByText(/Locked & Calibrated/i)).toBeInTheDocument();
+      expect(screen.getByText(/From your brief/i)).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /Edit Brief/i })).toBeInTheDocument();
     });
 

@@ -11,13 +11,13 @@ export function SourcesFindMore({ handleFindMoreLiterature, isFindingMore }: Sou
   return (
     <>
             {/* Find More Literature Action Section */}
-            <div className="pt-4 flex flex-col items-center justify-center gap-2 border-t border-neutral-100 dark:border-white/5">
+            <div className="pt-4 flex flex-col items-center justify-center gap-2 border-t border-[color:var(--border-subtle)]">
               <button
                 type="button"
                 onClick={handleFindMoreLiterature}
                 disabled={isFindingMore}
                 data-testid="find-more-literature-btn"
-                className="px-6 py-3 rounded-full text-xs font-semibold border border-neutral-300 dark:border-white/20 bg-white dark:bg-ink-750 text-neutral-800 dark:text-white hover:bg-neutral-50 dark:hover:bg-white/5 hover:border-neutral-400 transition-all cursor-pointer flex items-center gap-2 shadow-xs dark:shadow-none disabled:opacity-50"
+                className="px-6 py-3 rounded-full text-xs font-semibold border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] hover:border-neutral-400 transition-all cursor-pointer flex items-center gap-2 shadow-xs dark:shadow-none disabled:opacity-50"
               >
                 {isFindingMore ? (
                   <>
@@ -26,12 +26,12 @@ export function SourcesFindMore({ handleFindMoreLiterature, isFindingMore }: Sou
                   </>
                 ) : (
                   <>
-                    <Sparkles className="w-3.5 h-3.5 text-neutral-500" />
+                    <Sparkles className="w-3.5 h-3.5 text-[color:var(--text-muted)]" />
                     <span>Find More Literature (+10 Sources)</span>
                   </>
                 )}
               </button>
-              <p className="text-[11px] text-neutral-400 dark:text-neutral-500">
+              <p className="text-xs text-[color:var(--text-muted)]">
                 Progressively discovers additional peer-reviewed articles, books, and reports without duplicating existing sources.
               </p>
             </div>

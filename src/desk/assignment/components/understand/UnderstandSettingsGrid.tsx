@@ -31,10 +31,10 @@ export function UnderstandSettingsGrid({ dispatchToneAssistantSuggestions, handl
   return (
     <>
           {/* Academic Level, Assignment Type, Citation, Tone, and Target Word Count */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_1.35fr] gap-3 pt-2 border-t border-neutral-100 dark:border-white/5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_1.35fr] gap-3 pt-2 border-t border-[color:var(--border-subtle)]">
             {/* Academic Level */}
             <div className="space-y-1">
-              <label htmlFor="academic_level" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
+              <label htmlFor="academic_level" className="text-xs font-semibold text-[color:var(--text-primary)] flex items-center gap-1">
                 <span>Academic Level</span>
                 <span className="text-rose-500 text-xs">*</span>
               </label>
@@ -45,7 +45,7 @@ export function UnderstandSettingsGrid({ dispatchToneAssistantSuggestions, handl
                   aria-label="Academic Level"
                   value={localLevel}
                   onChange={(e) => handleLevelChange(e.target.value as AcademicLevel)}
-                  className="w-full h-8 bg-white dark:bg-ink-500 border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
+                  className="w-full h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-3 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
                 >
                   {ACADEMIC_LEVEL_OPTIONS.map((opt) => (
                     <option key={opt.id} value={opt.id}>
@@ -53,7 +53,7 @@ export function UnderstandSettingsGrid({ dispatchToneAssistantSuggestions, handl
                     </option>
                   ))}
                 </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-neutral-400">
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-[color:var(--text-muted)]">
                   <ChevronDown className="w-3.5 h-3.5" />
                 </div>
               </div>
@@ -63,14 +63,14 @@ export function UnderstandSettingsGrid({ dispatchToneAssistantSuggestions, handl
                 <button
                   type="button"
                   onClick={() => handleLevelChange("undergraduate")}
-                  className={localLevel === "undergraduate" ? "bg-white" : ""}
+                  className={localLevel === "undergraduate" ? "bg-[color:var(--surface-raised)]" : ""}
                 >
                   Undergraduate
                 </button>
                 <button
                   type="button"
                   onClick={() => handleLevelChange("postgraduate")}
-                  className={localLevel === "postgraduate" ? "bg-white" : ""}
+                  className={localLevel === "postgraduate" ? "bg-[color:var(--surface-raised)]" : ""}
                 >
                   Postgraduate / Masters
                 </button>
@@ -79,7 +79,7 @@ export function UnderstandSettingsGrid({ dispatchToneAssistantSuggestions, handl
 
             {/* Assignment Type */}
             <div className="space-y-1">
-              <label htmlFor="assignment_type" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
+              <label htmlFor="assignment_type" className="text-xs font-semibold text-[color:var(--text-primary)] flex items-center gap-1">
                 <span>Assignment Type</span>
                 <span className="text-rose-500 text-xs">*</span>
               </label>
@@ -90,7 +90,7 @@ export function UnderstandSettingsGrid({ dispatchToneAssistantSuggestions, handl
                   aria-label="Assignment Type"
                   value={localType}
                   onChange={(e) => handleTypeChange(e.target.value as AssignmentType)}
-                  className="w-full h-8 bg-white dark:bg-ink-500 border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
+                  className="w-full h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-3 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
                 >
                   {ASSIGNMENT_TYPE_OPTIONS.map((t) => (
                     <option key={t.id} value={t.id}>
@@ -98,7 +98,7 @@ export function UnderstandSettingsGrid({ dispatchToneAssistantSuggestions, handl
                     </option>
                   ))}
                 </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-neutral-400">
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-[color:var(--text-muted)]">
                   <ChevronDown className="w-3.5 h-3.5" />
                 </div>
               </div>
@@ -106,7 +106,7 @@ export function UnderstandSettingsGrid({ dispatchToneAssistantSuggestions, handl
 
             {/* Citation Style */}
             <div className="space-y-1">
-              <label htmlFor="citation_style" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
+              <label htmlFor="citation_style" className="text-xs font-semibold text-[color:var(--text-primary)] flex items-center gap-1">
                 <span>Citation Style</span>
                 <span className="text-rose-500 text-xs">*</span>
               </label>
@@ -117,7 +117,7 @@ export function UnderstandSettingsGrid({ dispatchToneAssistantSuggestions, handl
                   aria-label="Citation Style"
                   value={localCitation}
                   onChange={(e) => handleCitationChange(e.target.value)}
-                  className="w-full h-8 bg-white dark:bg-ink-500 border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs"
+                  className="w-full h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-3 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs"
                 >
                   {CITATION_STYLES.map((st) => (
                     <option key={st.id} value={st.id}>
@@ -125,7 +125,7 @@ export function UnderstandSettingsGrid({ dispatchToneAssistantSuggestions, handl
                     </option>
                   ))}
                 </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-neutral-400">
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-[color:var(--text-muted)]">
                   <ChevronDown className="w-3.5 h-3.5" />
                 </div>
               </div>
@@ -139,7 +139,7 @@ export function UnderstandSettingsGrid({ dispatchToneAssistantSuggestions, handl
               onClickCapture={dispatchToneAssistantSuggestions}
               className="space-y-1"
             >
-              <label htmlFor="writing_tone" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
+              <label htmlFor="writing_tone" className="text-xs font-semibold text-[color:var(--text-primary)] flex items-center gap-1">
                 <span>Writing Tone</span>
                 <span className="text-rose-500 text-xs">*</span>
               </label>
@@ -151,7 +151,7 @@ export function UnderstandSettingsGrid({ dispatchToneAssistantSuggestions, handl
                   value={localTone}
                   onChange={(e) => handleToneChange(e.target.value)}
                   onFocus={dispatchToneAssistantSuggestions}
-                  className="w-full h-8 bg-white dark:bg-ink-500 border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
+                  className="w-full h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-3 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
                 >
                   {WRITING_TONE_OPTIONS.map((tn) => (
                     <option key={tn.id} value={tn.id}>
@@ -159,7 +159,7 @@ export function UnderstandSettingsGrid({ dispatchToneAssistantSuggestions, handl
                     </option>
                   ))}
                 </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-neutral-400">
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-[color:var(--text-muted)]">
                   <ChevronDown className="w-3.5 h-3.5" />
                 </div>
               </div>
@@ -167,7 +167,7 @@ export function UnderstandSettingsGrid({ dispatchToneAssistantSuggestions, handl
 
             {/* Target Words Stepper / Input */}
             <div className="space-y-1 min-w-[130px]">
-              <label htmlFor="target_word_count" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center justify-between whitespace-nowrap">
+              <label htmlFor="target_word_count" className="text-xs font-semibold text-[color:var(--text-primary)] flex items-center justify-between whitespace-nowrap">
                 <span className="flex items-center gap-1">
                   <span>Target Word Count</span>
                   <span className="text-rose-500 text-xs">*</span>
@@ -181,7 +181,7 @@ export function UnderstandSettingsGrid({ dispatchToneAssistantSuggestions, handl
                     handleTargetWordCountChange(Math.max(100, current - 250));
                   }}
                   aria-label="Decrease target word count"
-                  className="h-8 w-8 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-500 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
+                  className="h-8 w-8 rounded-lg border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
                   title="Decrease by 250 words"
                 >
                   −
@@ -214,7 +214,7 @@ export function UnderstandSettingsGrid({ dispatchToneAssistantSuggestions, handl
                     }}
                     aria-label="Target Word Count"
                     placeholder="2000"
-                    className="w-full min-w-[115px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none whitespace-nowrap h-8 bg-white dark:bg-ink-500 border border-neutral-200/80 dark:border-white/10 rounded-lg px-2 text-center text-xs font-semibold text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white tabular-nums shadow-2xs"
+                    className="w-full min-w-[115px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none whitespace-nowrap h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-2 text-center text-xs font-semibold text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white tabular-nums shadow-2xs"
                   />
                 </div>
                 <button
@@ -224,7 +224,7 @@ export function UnderstandSettingsGrid({ dispatchToneAssistantSuggestions, handl
                     handleTargetWordCountChange(Math.min(50000, current + 250));
                   }}
                   aria-label="Increase target word count"
-                  className="h-8 w-8 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-500 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
+                  className="h-8 w-8 rounded-lg border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
                   title="Increase by 250 words"
                 >
                   +

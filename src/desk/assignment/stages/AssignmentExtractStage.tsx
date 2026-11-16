@@ -69,14 +69,14 @@ class DropzoneErrorBoundary extends React.Component<
   render() {
     if (this.state.hasError) {
       return (
-        <div className="border border-neutral-200 dark:border-white/10 rounded-xl p-6 bg-neutral-50/50 dark:bg-white/[0.02] text-center space-y-3 font-sans">
-          <p className="text-xs text-neutral-600 dark:text-neutral-400">
+        <div className="border border-[color:var(--border-subtle)] rounded-xl p-6 bg-[color:var(--surface-inset)]/50 text-center space-y-3 font-sans">
+          <p className="text-xs text-[color:var(--text-secondary)]">
             Could not parse this document. Please verify the file format or paste the brief text manually.
           </p>
           <button
             type="button"
             onClick={() => this.setState({ hasError: false })}
-            className="px-4 py-1.5 rounded-full text-xs font-medium bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 cursor-pointer"
+            className="px-4 py-1.5 rounded-full text-xs font-medium bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] cursor-pointer"
           >
             Try Again
           </button>
@@ -675,22 +675,23 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6 sm:px-6 space-y-6 text-neutral-900 dark:text-neutral-100 font-sans">
+    <div className="max-w-4xl mx-auto px-4 py-6 sm:px-6 space-y-6 text-[color:var(--text-primary)] font-sans">
       {/* Clean Apple-Grade Header for Part 1: Extract */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wider uppercase bg-neutral-100 dark:bg-white/10 text-neutral-700 dark:text-neutral-300">
-              Phase 1 · Extract
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold tracking-wider uppercase bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]">
+              Phase 01 · Extract
             </span>
-            <span className="text-xs text-neutral-400 font-medium hidden sm:inline-block">· Coursework &amp; Essay</span>
+            <span className="text-xs text-[color:var(--text-muted)] font-medium hidden sm:inline-block">· Coursework &amp; Essay</span>
           </div>
-          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-neutral-900 dark:text-white">
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-[color:var(--text-primary)]">
             Extract Your Brief
-            <span className="sr-only">Understand Your Brief</span>
-            <span className="sr-only">Phase 1: Understand the Assignment Brief</span>
           </h1>
-          <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-0.5 leading-relaxed">
+          {/* Older names of this step, kept for links and tests; hidden from screen readers too. */}
+          <span className="sr-only" aria-hidden="true">Understand Your Brief</span>
+          <span className="sr-only" aria-hidden="true">Phase 1: Understand the Assignment Brief</span>
+          <p className="text-xs sm:text-sm text-[color:var(--text-muted)] mt-0.5 leading-relaxed">
             Upload your assignment brief or paste prompts to extract parameters, questions, and grading criteria.
           </p>
         </div>
@@ -710,18 +711,18 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
       />
 
       {/* Unified Assignment Setup Box (Step 1: Brief Input) */}
-      <div className="bg-white dark:bg-ink-750 rounded-2xl border border-neutral-200/80 dark:border-white/10 p-5 sm:p-7 shadow-xs space-y-5">
+      <div className="bg-[color:var(--surface-raised)] rounded-2xl border border-[color:var(--border-subtle)] p-5 sm:p-7 shadow-xs space-y-5">
         {/* Assignment Question Section */}
         <div className="space-y-2.5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div className="inline-flex p-1 rounded-xl bg-neutral-100 dark:bg-white/5 border border-neutral-200/60 dark:border-white/10 w-fit">
+            <div className="inline-flex p-1 rounded-xl bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)] w-fit">
               <button
                 type="button"
                 onClick={() => setIntakeTab("paste")}
                 className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                   intakeTab === "paste"
-                    ? "bg-white dark:bg-ink-500 text-neutral-900 dark:text-white shadow-2xs font-semibold"
-                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                    ? "bg-[color:var(--surface-raised)] text-[color:var(--text-primary)] shadow-2xs font-semibold"
+                    : "text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
                 }`}
               >
                 Paste Prompt
@@ -731,8 +732,8 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                 onClick={() => setIntakeTab("upload")}
                 className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
                   intakeTab === "upload"
-                    ? "bg-white dark:bg-ink-500 text-neutral-900 dark:text-white shadow-2xs font-semibold"
-                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                    ? "bg-[color:var(--surface-raised)] text-[color:var(--text-primary)] shadow-2xs font-semibold"
+                    : "text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
                 }`}
               >
                 <Upload className="w-3 h-3" />
@@ -742,7 +743,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
 
             <div className="flex items-center gap-2">
               {promptWordCount > 0 && intakeTab === "paste" && (
-                <span className="text-[11px] font-mono text-neutral-400 dark:text-neutral-500">
+                <span className="text-xs font-mono text-[color:var(--text-muted)]">
                   {promptWordCount} words entered
                 </span>
               )}
@@ -779,7 +780,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
               }}
               rows={4}
               placeholder="Paste your assignment prompt, essay title, or question here..."
-              className="w-full bg-neutral-50/70 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 rounded-xl p-3.5 text-xs sm:text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all leading-relaxed resize-y"
+              className="w-full bg-[color:var(--surface-inset)]/70 border border-[color:var(--border-subtle)] rounded-xl p-3.5 text-xs sm:text-sm text-[color:var(--text-primary)] placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all leading-relaxed resize-y"
             />
           ) : (
             <DropzoneErrorBoundary onError={() => setParseNotice("Could not parse this document. Please verify the file format or paste the brief text manually.")}>
@@ -811,36 +812,36 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                 onClick={() => fileInputRef.current?.click()}
                 className={`relative border border-dashed rounded-xl p-6 sm:p-8 text-center transition-all cursor-pointer ${
                   isDraggingOver
-                    ? "border-neutral-900 bg-neutral-100/50 dark:border-white dark:bg-white/5"
-                    : "border-neutral-200 dark:border-white/15 bg-neutral-50/50 dark:bg-white/[0.02] hover:bg-neutral-100/40 dark:hover:bg-white/[0.04]"
+                    ? "border-neutral-900 bg-[color:var(--surface-inset)]/50 dark:border-white"
+                    : "border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]/50 hover:bg-[color:var(--surface-hover)]"
                 }`}
               >
 
                 {uploadingBrief ? (
                   <div className="flex flex-col items-center justify-center space-y-2.5">
                     <div className="w-5 h-5 border-2 border-neutral-900 dark:border-white border-t-transparent rounded-full animate-spin" />
-                    <p className="text-xs font-medium text-neutral-800 dark:text-neutral-200">
+                    <p className="text-xs font-medium text-[color:var(--text-primary)]">
                       Extracting assignment questions, word limits &amp; criteria...
                     </p>
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center space-y-3">
-                    <div className="w-8 h-8 rounded-full bg-neutral-200/60 dark:bg-white/10 flex items-center justify-center text-neutral-700 dark:text-neutral-300">
+                    <div className="w-8 h-8 rounded-full bg-[color:var(--surface-sunken)]/60 flex items-center justify-center text-[color:var(--text-secondary)]">
                       <Upload className="w-4 h-4" />
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-neutral-900 dark:text-white">
+                      <p className="text-xs font-semibold text-[color:var(--text-primary)]">
                         Upload your assignment brief or module handbook
                       </p>
-                      <p className="text-[11px] text-neutral-400 dark:text-neutral-500 mt-0.5">
+                      <p className="text-xs text-[color:var(--text-muted)] mt-0.5">
                         Supports PDF, DOCX, DOC, or TXT (up to {BRIEF_MAX_UPLOAD_MB} MB)
                       </p>
                     </div>
 
                     {uploadedFileName && (
-                      <div className="w-full flex items-center justify-between p-2.5 rounded-lg bg-neutral-100 dark:bg-white/5 border border-neutral-200/80 dark:border-white/10 text-xs text-left">
-                        <div className="flex items-center gap-2 text-neutral-800 dark:text-neutral-200 min-w-0">
-                          <FileText className="w-4 h-4 text-neutral-500 shrink-0" />
+                      <div className="w-full flex items-center justify-between p-2.5 rounded-lg bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)] text-xs text-left">
+                        <div className="flex items-center gap-2 text-[color:var(--text-primary)] min-w-0">
+                          <FileText className="w-4 h-4 text-[color:var(--text-muted)] shrink-0" />
                           <span className="font-medium truncate">{uploadedFileName}</span>
                         </div>
                         <button
@@ -851,7 +852,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                             setLocalQuestion("");
                             setLocalBrief("");
                           }}
-                          className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 p-1 rounded-md"
+                          className="text-[color:var(--text-muted)] hover:text-neutral-600 dark:hover:text-neutral-200 p-1 rounded-md"
                           title="Remove file"
                         >
                           <X className="w-3.5 h-3.5" />
@@ -860,11 +861,11 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                     )}
 
                     {localQuestion && (
-                      <div className="w-full text-left pt-3 border-t border-neutral-200/60 dark:border-white/5">
-                        <span className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wider block mb-1">
+                      <div className="w-full text-left pt-3 border-t border-[color:var(--border-subtle)]">
+                        <span className="text-xs font-semibold text-[color:var(--text-muted)] uppercase tracking-wider block mb-1">
                           Extracted Brief Question / Prompt:
                         </span>
-                        <p className="text-xs text-neutral-700 dark:text-neutral-300 line-clamp-3 bg-white dark:bg-ink-500 p-3 rounded-lg border border-neutral-200/60 dark:border-white/10 font-mono">
+                        <p className="text-xs text-[color:var(--text-secondary)] line-clamp-3 bg-[color:var(--surface-raised)] p-3 rounded-lg border border-[color:var(--border-subtle)] font-mono">
                           {localQuestion.length > 600 ? `${localQuestion.slice(0, 600)}…` : localQuestion}
                         </p>
                       </div>
@@ -904,12 +905,12 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
         <details
           open={settingsOpen}
           onToggle={(e) => setSettingsOpen((e.currentTarget as HTMLDetailsElement).open)}
-          className="rounded-xl border border-neutral-200/80 dark:border-white/10"
+          className="rounded-xl border border-[color:var(--border-subtle)]"
           data-testid="assignment-settings"
         >
-          <summary className="cursor-pointer select-none px-3.5 py-2.5 text-xs text-neutral-600 dark:text-neutral-300 flex items-center justify-between gap-2">
+          <summary className="cursor-pointer select-none px-3.5 py-2.5 text-xs text-[color:var(--text-secondary)] flex items-center justify-between gap-2">
             <span>
-              <span className="font-semibold text-neutral-900 dark:text-neutral-100">Assuming: </span>
+              <span className="font-semibold text-[color:var(--text-primary)]">Assuming: </span>
               {[
                 ACADEMIC_LEVEL_OPTIONS.find((o) => o.id === localLevel)?.label,
                 ASSIGNMENT_TYPE_OPTIONS.find((o) => o.id === localType)?.label,
@@ -925,7 +926,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-[1fr_1fr_1fr_1fr_1.35fr] gap-3.5 px-3.5 pb-3.5 pt-1">
           {/* Academic Level */}
           <div className="space-y-1">
-            <label htmlFor="academic_level" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
+            <label htmlFor="academic_level" className="text-xs font-semibold text-[color:var(--text-primary)] flex items-center gap-1">
               <span>Academic Level</span>
               <span className="text-rose-500 text-xs">*</span>
             </label>
@@ -940,7 +941,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                   setLocalLevel(val);
                   saveAnswers({ academic_level: val, academicLevel: val });
                 }}
-                className="w-full h-8 bg-white dark:bg-ink-500 border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
+                className="w-full h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-3 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
               >
                 {ACADEMIC_LEVEL_OPTIONS.map((lvl) => (
                   <option key={lvl.id} value={lvl.id}>
@@ -948,7 +949,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                   </option>
                 ))}
               </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-neutral-400">
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-[color:var(--text-muted)]">
                 <ChevronDown className="w-3.5 h-3.5" />
               </div>
             </div>
@@ -961,7 +962,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                   setLocalLevel("undergraduate");
                   saveAnswers({ academic_level: "undergraduate", academicLevel: "undergraduate" });
                 }}
-                className={localLevel === "undergraduate" ? "bg-white" : ""}
+                className={localLevel === "undergraduate" ? "bg-[color:var(--surface-raised)]" : ""}
               >
                 Undergraduate
               </button>
@@ -971,7 +972,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                   setLocalLevel("postgraduate");
                   saveAnswers({ academic_level: "postgraduate", academicLevel: "postgraduate" });
                 }}
-                className={localLevel === "postgraduate" ? "bg-white" : ""}
+                className={localLevel === "postgraduate" ? "bg-[color:var(--surface-raised)]" : ""}
               >
                 Postgraduate / Masters
               </button>
@@ -980,7 +981,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
 
           {/* Assignment Type */}
           <div className="space-y-1">
-            <label htmlFor="assignment_type" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
+            <label htmlFor="assignment_type" className="text-xs font-semibold text-[color:var(--text-primary)] flex items-center gap-1">
               <span>Assignment Type</span>
               <span className="text-rose-500 text-xs">*</span>
             </label>
@@ -1004,7 +1005,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                     academic_tone: matchedTone,
                   });
                 }}
-                className="w-full h-8 bg-white dark:bg-ink-500 border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
+                className="w-full h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-3 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
               >
                 {ASSIGNMENT_TYPE_OPTIONS.map((t) => (
                   <option key={t.id} value={t.id}>
@@ -1012,7 +1013,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                   </option>
                 ))}
               </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-neutral-400">
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-[color:var(--text-muted)]">
                 <ChevronDown className="w-3.5 h-3.5" />
               </div>
             </div>
@@ -1020,7 +1021,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
 
           {/* Citation Style */}
           <div className="space-y-1">
-            <label htmlFor="citation_style" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
+            <label htmlFor="citation_style" className="text-xs font-semibold text-[color:var(--text-primary)] flex items-center gap-1">
               <span>Citation Style</span>
               <span className="text-rose-500 text-xs">*</span>
             </label>
@@ -1035,7 +1036,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                   setLocalCitation(val);
                   saveAnswers({ citation_style: val, citationStyle: val });
                 }}
-                className="w-full h-8 bg-white dark:bg-ink-500 border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs"
+                className="w-full h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-3 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs"
               >
                 {CITATION_STYLES.map((st) => (
                   <option key={st.id} value={st.id}>
@@ -1043,7 +1044,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                   </option>
                 ))}
               </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-neutral-400">
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-[color:var(--text-muted)]">
                 <ChevronDown className="w-3.5 h-3.5" />
               </div>
             </div>
@@ -1051,7 +1052,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
 
           {/* Writing Tone */}
           <div className="space-y-1">
-            <label htmlFor="writing_tone" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
+            <label htmlFor="writing_tone" className="text-xs font-semibold text-[color:var(--text-primary)] flex items-center gap-1">
               <span>Writing Tone</span>
               <span className="text-rose-500 text-xs">*</span>
             </label>
@@ -1066,7 +1067,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                   setLocalTone(val);
                   saveAnswers({ writing_tone: val, writingTone: val });
                 }}
-                className="w-full h-8 bg-white dark:bg-ink-500 border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
+                className="w-full h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-3 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
               >
                 {WRITING_TONE_OPTIONS.map((tn) => (
                   <option key={tn.id} value={tn.id}>
@@ -1074,7 +1075,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                   </option>
                 ))}
               </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-neutral-400">
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-[color:var(--text-muted)]">
                 <ChevronDown className="w-3.5 h-3.5" />
               </div>
             </div>
@@ -1082,7 +1083,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
 
           {/* Target Words Stepper / Input */}
           <div className="space-y-1 min-w-[130px]">
-            <label htmlFor="target_word_count" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center justify-between whitespace-nowrap">
+            <label htmlFor="target_word_count" className="text-xs font-semibold text-[color:var(--text-primary)] flex items-center justify-between whitespace-nowrap">
               <span className="flex items-center gap-1">
                 <span>Target Word Count</span>
                 <span className="text-rose-500 text-xs">*</span>
@@ -1098,7 +1099,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                   saveAnswers({ word_count: next, word_limit: next, targetWordCount: next });
                 }}
                 aria-label="Decrease target word count"
-                className="h-8 w-7.5 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-500 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
+                className="h-8 w-7.5 rounded-lg border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
                 title="Decrease by 250 words"
               >
                 −
@@ -1136,7 +1137,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                   }}
                   aria-label="Target Word Count"
                   placeholder="2,000 words"
-                  className="w-full min-w-[115px] whitespace-nowrap h-8 bg-white dark:bg-ink-500 border border-neutral-200/80 dark:border-white/10 rounded-lg px-2 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all font-semibold shadow-2xs text-center tabular-nums"
+                  className="w-full min-w-[115px] whitespace-nowrap h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-2 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all font-semibold shadow-2xs text-center tabular-nums"
                 />
               </div>
               <button
@@ -1148,7 +1149,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                   saveAnswers({ word_count: next, word_limit: next, targetWordCount: next });
                 }}
                 aria-label="Increase target word count"
-                className="h-8 w-7.5 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-500 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
+                className="h-8 w-7.5 rounded-lg border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
                 title="Increase by 250 words"
               >
                 +
@@ -1159,11 +1160,11 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
         </details>
 
         {/* Optional Course & Rubric Accordion */}
-        <div className="pt-2 border-t border-neutral-100 dark:border-white/5">
+        <div className="pt-2 border-t border-[color:var(--border-subtle)]">
           <button
             type="button"
             onClick={() => setShowCourseDetails(!showCourseDetails)}
-            className="text-xs text-neutral-500 hover:text-neutral-900 dark:hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
+            className="text-xs text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] flex items-center gap-1.5 transition-colors cursor-pointer"
           >
             <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showCourseDetails ? "rotate-180" : ""}`} />
             <span>+ Course Details &amp; Rubric (Optional)</span>
@@ -1176,38 +1177,38 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                 defaultValue={courseName}
                 onBlur={(e) => saveAnswers({ course_name: e.target.value, courseCode: e.target.value })}
                 placeholder="Course code (e.g. ECON201)"
-                className="bg-neutral-50/70 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 rounded-xl px-3 py-2 text-xs text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                className="bg-[color:var(--surface-inset)]/70 border border-[color:var(--border-subtle)] rounded-xl px-3 py-2 text-xs text-[color:var(--text-primary)] placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-900"
               />
               <input
                 type="text"
                 defaultValue={institutionName}
                 onBlur={(e) => saveAnswers({ institution: e.target.value })}
                 placeholder="Institution (e.g. Oxford)"
-                className="bg-neutral-50/70 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 rounded-xl px-3 py-2 text-xs text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                className="bg-[color:var(--surface-inset)]/70 border border-[color:var(--border-subtle)] rounded-xl px-3 py-2 text-xs text-[color:var(--text-primary)] placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-900"
               />
               <input
                 type="date"
                 defaultValue={deadlineDate}
                 onBlur={(e) => saveAnswers({ deadline: e.target.value })}
-                className="bg-neutral-50/70 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 rounded-xl px-3 py-2 text-xs text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                className="bg-[color:var(--surface-inset)]/70 border border-[color:var(--border-subtle)] rounded-xl px-3 py-2 text-xs text-[color:var(--text-primary)] placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-900"
               />
             </div>
           )}
         </div>
 
         {/* Primary CTA Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-neutral-100 dark:border-white/5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-[color:var(--border-subtle)]">
           <div className="text-xs">
             {!canGenerate ? (
-              <p className="text-neutral-500 dark:text-neutral-400 flex items-start gap-1.5">
+              <p className="text-[color:var(--text-muted)] flex items-start gap-1.5">
                 <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" aria-hidden="true" />
                 <span>
                   Please provide the assignment question, word count, and citation style to continue.
-                  {missingFields.length > 0 && <span className="block text-[11px] mt-0.5">Still needed: {missingFields.join(", ")}.</span>}
+                  {missingFields.length > 0 && <span className="block text-xs mt-0.5">Still needed: {missingFields.join(", ")}.</span>}
                 </span>
               </p>
             ) : (
-              <p className="text-neutral-500 dark:text-neutral-400">
+              <p className="text-[color:var(--text-muted)]">
                 Ready to extract assignment brief and proceed to thesis &amp; outline calibration.
               </p>
             )}
@@ -1219,7 +1220,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
             disabled={!canGenerate || isGeneratingStructure}
             onClick={handleGenerateStructure}
             aria-label="Save & Build Outline (Save & Build / Generate Structure / Analyze Assignment Brief)"
-            className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 active:scale-[0.99] font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-xs flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 active:scale-[0.99] font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-xs flex items-center justify-center gap-2 cursor-pointer"
           >
             {isGeneratingStructure ? (
               <>

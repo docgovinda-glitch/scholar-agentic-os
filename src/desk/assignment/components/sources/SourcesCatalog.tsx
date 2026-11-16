@@ -67,17 +67,17 @@ export function SourcesCatalog({ approvedSourceIds, bookmarkedIds, citationStyle
                 )}
               </div>
             ) : (
-              <div className="p-10 text-center rounded-2xl border border-dashed border-neutral-200 dark:border-white/10 space-y-3">
-                <p className="text-sm font-medium text-neutral-600 dark:text-neutral-400">
+              <div className="p-10 text-center rounded-2xl border border-dashed border-[color:var(--border-subtle)] space-y-3">
+                <p className="text-sm font-medium text-[color:var(--text-secondary)]">
                   No literature sources match your current filter parameters.
                 </p>
-                <p className="text-xs text-neutral-400 dark:text-neutral-500">
+                <p className="text-xs text-[color:var(--text-muted)]">
                   Try clearing active filters or searching for broader conceptual keywords.
                 </p>
                 <button
                   type="button"
                   onClick={resetAllFilters}
-                  className="px-4 py-2 rounded-full text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 transition-opacity cursor-pointer inline-flex items-center gap-1.5 shadow-xs dark:shadow-none"
+                  className="px-4 py-2 rounded-full text-xs font-semibold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 transition-opacity cursor-pointer inline-flex items-center gap-1.5 shadow-xs dark:shadow-none"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                   <span>Reset all filters to view all literature</span>

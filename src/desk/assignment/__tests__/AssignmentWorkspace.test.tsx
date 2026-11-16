@@ -316,7 +316,8 @@ describe("Scholar Core Assignment Workspace", () => {
     });
     render(<AssignmentWorkspace projectId="proj-empty" initialStage="understand" onStageChange={vi.fn()} />);
     const nav = await screen.findByRole("navigation", { name: /Assignment Workflow Phases/i });
-    expect(within(nav).getByRole("button", { name: /Phase 1: Extract/i })).toHaveTextContent("0%");
+    // No made-up progress: an empty brief shows no fact on the Extract step.
+    expect(within(nav).getByRole("button", { name: /Phase 1: Extract/i })).not.toHaveTextContent(/%|brief added/);
     expect(await screen.findByRole("button", { name: /Proceed to Sources/i })).toBeDisabled();
     expect(screen.getByText(/Still needed: .*the assignment question/i)).toBeInTheDocument();
     // No Minimal/Detailed choice: the five-stage flow is the only one.
@@ -332,7 +333,7 @@ describe("Scholar Core Assignment Workspace", () => {
     await new Promise((r) => setTimeout(r, 50));
     expect(saveIntakeAnswers).not.toHaveBeenCalledWith("proj-123", expect.objectContaining({ assignment_submission_report: expect.anything() }));
     const nav = screen.getByRole("navigation", { name: /Assignment Workflow Phases/i });
-    expect(within(nav).getByRole("button", { name: /Phase \d: Submission/i })).toHaveTextContent("0%");
+    expect(within(nav).getByRole("button", { name: /Phase \d: Submission/i })).not.toHaveTextContent(/checks|%/);
   });
 
   it("Drafting asks for the brief instead of showing a generic outline", async () => {

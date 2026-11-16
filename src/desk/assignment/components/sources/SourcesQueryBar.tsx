@@ -30,7 +30,7 @@ export function SourcesQueryBar({ aiSearchPrompt, handleAISearchLiterature, isAI
                     }}
                     aria-label="Search academic databases"
                     placeholder="Search the databases for more (e.g. 'empirical studies', 'criticism of …', 'recent data')"
-                    className="w-full pl-10 pr-4 py-2 rounded-xl text-xs bg-white dark:bg-ink-750 border border-purple-200 dark:border-purple-900/40 focus:border-purple-500 text-neutral-900 dark:text-white placeholder-neutral-400 outline-none shadow-2xs"
+                    className="w-full pl-10 pr-4 py-2 rounded-xl text-xs bg-[color:var(--surface-raised)] border border-purple-200 dark:border-purple-900/40 focus:border-purple-500 text-[color:var(--text-primary)] placeholder-neutral-400 outline-none shadow-2xs"
                   />
                 </div>
                 <button
@@ -54,8 +54,8 @@ export function SourcesQueryBar({ aiSearchPrompt, handleAISearchLiterature, isAI
               </div>
 
               {/* Quick Discovery Topic Chips */}
-              <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
-                <span className="text-neutral-500 dark:text-neutral-400 font-medium mr-1">Quick searches:</span>
+              <div className="flex items-center gap-1.5 flex-wrap text-xs">
+                <span className="text-[color:var(--text-muted)] font-medium mr-1">Quick searches:</span>
                 {[
                   "Theoretical frameworks",
                   `Recent evidence (${new Date().getFullYear() - 3}–${new Date().getFullYear()})`,
@@ -67,7 +67,7 @@ export function SourcesQueryBar({ aiSearchPrompt, handleAISearchLiterature, isAI
                     type="button"
                     disabled={isAISearching}
                     onClick={() => handleAISearchLiterature(promptChip)}
-                    className="px-2.5 py-1 rounded-lg bg-white/90 dark:bg-white/10 hover:bg-purple-100 dark:hover:bg-purple-950/40 text-neutral-700 dark:text-neutral-200 border border-neutral-200/80 dark:border-white/10 text-[11px] font-medium transition-colors cursor-pointer disabled:opacity-50"
+                    className="px-2.5 py-1 rounded-lg bg-white/90 dark:bg-white/10 hover:bg-purple-100 dark:hover:bg-purple-950/40 text-[color:var(--text-secondary)] border border-[color:var(--border-subtle)] text-xs font-medium transition-colors cursor-pointer disabled:opacity-50"
                   >
                     + {promptChip}
                   </button>
