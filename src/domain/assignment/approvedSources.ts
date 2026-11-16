@@ -14,8 +14,15 @@ export interface ApprovableSource {
   isExcluded?: boolean;
 }
 
+/** Statuses that allow a source to be approved (must be in approvedIds). */
+const APPROVALABLE_STATUSES = new Set(["kept", "discovered", null, undefined]);
+
 export function isSourceApproved(source: ApprovableSource, approvedIds: Iterable<string>): boolean {
+  // Explicit rejections: removed sources and excluded items are never approved
   if (source.status === "removed" || source.isExcluded) return false;
+  // Status must be one that permits approval
+  if (!APPROVALABLE_STATUSES.has(source.status)) return false;
+  // Finally, check if it's in the approved list
   const ids = approvedIds instanceof Set ? (approvedIds as Set<string>) : new Set(approvedIds);
   return ids.has(source.id);
 }

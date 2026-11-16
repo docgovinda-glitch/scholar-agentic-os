@@ -5,12 +5,7 @@
  * every value comes from the brief text.
  */
 
-/** Hyphenated course/module codes such as "QNT-4020". */
-const COURSE_CODE = /\b[A-Z]{2,5}-\d{3,5}\b/gi;
-
-export function removeCourseCodes(text: string): string {
-  return text.replace(COURSE_CODE, " ");
-}
+import { stripCourseCodes } from "./briefExtractor";
 
 // "mK" (millikelvin) is not "marks": only full words count.
 const MARKS_RE = /\[?\(?\s*(\d{1,3})\s*(?:marks?|pts|points?)\b\s*\)?\]?/i;
@@ -153,7 +148,7 @@ export function parseBriefQuestions(briefText: string): BriefQuestionRow[] {
   const rows: BriefQuestionRow[] = [];
   let currentMain: string | undefined;
   let currentPart: string | undefined;
-  const lines = removeCourseCodes(stripPageFurniture(normalizeBriefLayout(briefText.slice(0, 60000)))).split(/\r?\n/);
+  const lines = stripCourseCodes(stripPageFurniture(normalizeBriefLayout(briefText.slice(0, 60000)))).split(/\r?\n/);
 
   const push = (label: string, body: string) => {
     const { text, marks } = pullMarks(body);

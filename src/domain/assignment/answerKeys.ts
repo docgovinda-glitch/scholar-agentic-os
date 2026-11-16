@@ -55,7 +55,12 @@ export function normalizeAssignmentAnswers<T extends Record<string, unknown>>(an
   for (const [k, v] of Object.entries(src)) if (!(k in CANONICAL_OF)) out[k] = v;
   for (const [canonical, aliases] of Object.entries(ASSIGNMENT_SETTING_ALIASES) as Array<[AssignmentSettingKey, readonly string[]]>) {
     const candidates = [canonical, ...aliases].map((k) => src[k]);
-    const value = candidates.find(hasValue) ?? src[canonical];
+    const matches = candidates.filter(hasValue);
+    // Log if multiple values found (data quality issue from old saves)
+    if (matches.length > 1) {
+      console.warn(`[normalizeAssignmentAnswers] Multiple values found for "${canonical}"; keeping first`);
+    }
+    const value = matches.find(hasValue) ?? src[canonical];
     if (value !== undefined) out[canonical] = value;
     else delete out[canonical];
   }

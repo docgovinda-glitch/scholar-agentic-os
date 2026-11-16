@@ -1,18 +1,21 @@
 import { countProseWords } from "../../../src/shared/proseBlocks.ts";
 
-/** Words allowed either side of a section's allocated budget. */
-export const SECTION_BUDGET_TOLERANCE = 0.05;
+/** A complete sentence ends here: terminal punctuation plus any closing quote/bracket. */
+export const SENTENCE_END = /[.!?]["'"')\]]?\s*$/;
+
+/** Regex to find sentence boundaries (period, exclamation, or question mark followed by optional closing punctuation). */
+const SENTENCE_BOUNDARY = /[.!?]["'"')\]]?(?=\s)/;
 
 export function sectionWordRange(allocatedWords: number): { min: number; max: number } {
   const target = Math.max(50, Math.round(allocatedWords));
+  // Wider tolerance for very small sections (<100 words): ±10%
+  // Standard tolerance for normal sections: ±5%
+  const tolerance = target < 100 ? 0.1 : 0.05;
   return {
-    min: Math.floor(target * (1 - SECTION_BUDGET_TOLERANCE)),
-    max: Math.ceil(target * (1 + SECTION_BUDGET_TOLERANCE)),
+    min: Math.floor(target * (1 - tolerance)),
+    max: Math.ceil(target * (1 + tolerance)),
   };
 }
-
-/** A complete sentence ends here: terminal punctuation plus any closing quote/bracket. */
-export const SENTENCE_END = /[.!?]["'”’)\]]?\s*$/;
 
 /**
  * Cut a draft that overran its budget back to the last complete sentence that
@@ -35,7 +38,7 @@ export function trimToSentenceWithinWords(text: string, maxWords: number): strin
   const head = tokens.slice(0, cutAt).join("").trimEnd();
   if (SENTENCE_END.test(head)) return head;
   // Last sentence end inside the kept words (followed by whitespace).
-  const re = /[.!?]["'”’)\]]?(?=\s)/g;
+  const re = new RegExp(SENTENCE_BOUNDARY.source, "g");
   let lastEnd = -1;
   let m: RegExpExecArray | null;
   while ((m = re.exec(head))) {

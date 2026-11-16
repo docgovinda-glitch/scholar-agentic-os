@@ -14,17 +14,54 @@ export type AssignmentPhase = "extract" | "understand" | "sources" | "drafting" 
 
 const PHASES: AssignmentPhase[] = ["extract", "understand", "sources", "drafting", "submission"];
 const LEGACY_PHASE: Record<string, AssignmentPhase> = {
+  // Phase 1: Extract
   extract: "extract",
+  extraction: "extract",
+  extract_phase: "extract",
+  upload: "extract",
+
+  // Phase 2: Understand
   understand: "understand",
+  understanding: "understand",
   plan: "understand",
+  planning: "understand",
+  plan_phase: "understand",
+  outline: "understand",
+  outline_phase: "understand",
+  outline_creation: "understand",
+  structure: "understand",
+
+  // Phase 3: Sources
   sources: "sources",
+  source_phase: "sources",
   research: "sources",
+  research_phase: "sources",
+  discovery: "sources",
+  literature_discovery: "sources",
+  source_discovery: "sources",
+  analysis: "sources",
+  source_analysis: "sources",
+
+  // Phase 4: Drafting
   drafting: "drafting",
+  drafting_phase: "drafting",
   draft: "drafting",
+  draft_phase: "drafting",
   write: "drafting",
+  writing: "drafting",
+  write_phase: "drafting",
+  writing_phase: "drafting",
+  pre_draft: "drafting",
+  predraft: "drafting",
+
+  // Phase 5: Submission
   submission: "submission",
+  submission_phase: "submission",
   submit: "submission",
+  submit_phase: "submission",
   review: "submission",
+  review_phase: "submission",
+  export: "submission",
 };
 
 export type StageStatus = "not_started" | "in_progress" | "complete";
@@ -149,11 +186,6 @@ function num(value: unknown): number | null {
   return Number.isFinite(n) && n >= 0 ? Math.round(n) : null;
 }
 
-/** Same count the app shows (markup, table rules and list markers are not words). */
-function words(text: string): number {
-  return countProseWords(text);
-}
-
 /** Stable, browser-safe 53-bit string hash (cyrb53), hex-encoded. */
 export function contentHash(text: string): string {
   let h1 = 0xdeadbeef;
@@ -171,6 +203,20 @@ export function contentHash(text: string): string {
 export function normalizePhase(value: unknown): AssignmentPhase {
   const key = typeof value === "string" ? value.trim().toLowerCase() : "";
   return LEGACY_PHASE[key] ?? "extract";
+}
+
+/** Valid phase transitions in the coursework workflow. */
+const VALID_TRANSITIONS: Record<AssignmentPhase, readonly AssignmentPhase[]> = {
+  extract: ["understand"],
+  understand: ["sources"],
+  sources: ["drafting"],
+  drafting: ["submission"],
+  submission: [],
+};
+
+/** Check if a transition from one phase to another is allowed. */
+export function isValidPhaseTransition(from: AssignmentPhase, to: AssignmentPhase): boolean {
+  return VALID_TRANSITIONS[from]?.includes(to) ?? false;
 }
 
 interface SectionLike {
@@ -395,7 +441,7 @@ export function buildAssignmentRelationalSnapshot(
       section_id: String(s.id),
       content_hash: contentHash(s.draftContent!),
       content: s.draftContent!,
-      word_count: words(s.draftContent!),
+      word_count: countProseWords(s.draftContent!),
       cited_source_ids: Array.isArray(s.boundSourceIds) ? s.boundSourceIds.map(String) : [],
     }));
 
