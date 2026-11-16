@@ -301,8 +301,10 @@ function finishCriteria(rows: MarkingCriterionRow[], statedTotal?: number): Mark
 
 /** "Total: 100 marks" / "(100 marks in total)" if the brief states it. */
 export function statedTotalMarks(briefText: string): number | undefined {
+  // The word "marks" must be there: "Total 1000 words" is a length, not a mark total.
   const m =
-    briefText.match(/\btotal\s*(?:marks?|mark\s*available)?\s*[:=\-–]?\s*(\d{2,4})\s*(?:marks?)?\b/i) ||
+    briefText.match(/\btotal\s+(?:marks?|mark\s*available|marks\s*available)\s*[:=\-–]?\s*(\d{2,4})\b(?!\s*(?:words?|%))/i) ||
+    briefText.match(/\btotal\s*[:=\-–]?\s*(\d{2,4})\s*marks?\b/i) ||
     briefText.match(/\btotal\s+(?:assessment|available|score)\s*[:=\-–]?\s*(\d{2,4})\s*marks?\b/i) ||
     briefText.match(/\b(\d{2,4})\s*marks?\s*(?:in\s*total|total)\b/i);
   const n = m ? parseInt(m[1], 10) : NaN;
@@ -432,9 +434,9 @@ export function buildBriefSummary(input: BriefSummaryInput): string {
     sentences.push(input.aiProduce.replace(/\s+/g, " ").trim().replace(/[.\s]*$/, "."));
     if (input.aiApproach) sentences.push(input.aiApproach.replace(/\s+/g, " ").trim().replace(/[.\s]*$/, "."));
   } else {
-    const subject = parts.length
-      ? parts.map((p) => p.name).slice(0, 4).join(", ")
-      : groups[0] ? readableHeading(groups[0].title, acronyms).slice(0, 90) : undefined;
+    // Named parts ("Part A: Monetary transmission") describe the subject; a question's
+    // own wording does not ("covering Explain how …"), and is listed below anyway.
+    const subject = parts.length ? parts.map((p) => p.name).slice(0, 4).join(", ") : undefined;
     sentences.push(
       groups.length
         ? `This ${level}${type} asks you to answer ${groups.length} question${groups.length === 1 ? "" : "s"}${subject ? `, covering ${subject}` : ""}.`
@@ -497,14 +499,33 @@ export function extractPrescribedReferences(briefText: string): PrescribedRefere
   return out.slice(0, 20);
 }
 
+/** Words a clipped heading must not end on ("…policy rate and how", "…since 2008, using at"). */
+const DANGLING_HEADING_WORD =
+  /^(?:a|an|the|and|or|but|nor|of|to|in|on|at|by|for|from|with|within|into|onto|as|via|using|how|why|what|which|who|whom|whose|that|this|these|those|its|their|his|her|our|your|is|are|was|were|be|been|whether|if|than|then|so|such|including|e\.g\.?|i\.e\.?)$/i;
+
+/**
+ * At most `maxWords` words of a heading, cut at a clean point: no trailing "…",
+ * dangling function word or punctuation, so the heading reads as written in a
+ * submitted document. A heading already clipped with "…" (older saves) is tidied the same way.
+ */
+export function clipHeadingWords(text: string, maxWords = Number.POSITIVE_INFINITY): string {
+  const clipped = /…\s*$/.test(text);
+  let w = text.replace(/\s*…\s*$/, "").trim().split(/\s+/).filter(Boolean);
+  const cut = clipped || w.length > maxWords;
+  if (w.length > maxWords) w = w.slice(0, maxWords);
+  if (cut) {
+    while (w.length > 1 && DANGLING_HEADING_WORD.test(w[w.length - 1].replace(/[,;:–—-]+$/, ""))) w.pop();
+  }
+  return w.join(" ").replace(/[\s,;:–—-]+$/, "");
+}
+
 /** A short (about 8 word) label for a question: drops the leading command verb. */
 export function shortQuestionLabel(text: string, maxWords = 8): string {
   const stripped = text
     .replace(/^(?:critically\s+)?(?:compare|contrast|evaluate|analy[sz]e|assess|discuss|explain|describe|examine|derive|justify|propose|recommend|explore|investigate|identify|outline|define|apply|develop|design|calculate|show)\s+/i, "")
     .replace(/[?.:]+$/, "")
     .trim();
-  const w = stripped.split(/\s+/);
-  return w.length > maxWords ? `${w.slice(0, maxWords).join(" ")}…` : stripped;
+  return clipHeadingWords(stripped, maxWords);
 }
 
 export interface BriefQuestionGroup {
@@ -561,7 +582,7 @@ export interface PrescribedBibliographyEntry {
   raw: string;
 }
 
-const BIB_HEADER = /\b(bibliography|references?|reference\s+list|reading\s+list|prescribed\s+(?:texts?|reading))\b/i;
+const BIB_HEADER = /\b(bibliography|references?|reference\s+list|reading\s+list|prescribed\s+(?:texts?|reading)|(?:required|essential|core|key|set|recommended)\s+(?:readings?|texts?))\b/i;
 const ENTRY_START = /^[\p{Lu}][\p{L}'’\-]+(?:\s[\p{Lu}][\p{L}'’\-]+)?,\s*(?:[\p{Lu}]\.?\s?-?){1,4}/u;
 
 /**
@@ -611,20 +632,28 @@ export function parsePrescribedBibliography(briefText: string): PrescribedBiblio
     if (doiMatch) rest = rest.slice(0, doiMatch.index).trim().replace(/[.,]$/, "");
     let title = "";
     let after = "";
+    // APA puts a full stop after the year: "(2020). Title. Journal, 110(4), 943-983."
+    rest = rest.replace(/^\.\s*/, "");
     const quoted = rest.match(/^['‘"“](.+?)['’"”],?\s*(.*)$/);
     if (quoted) {
       title = quoted[1];
       after = quoted[2];
     } else {
-      const dot = rest.search(/\.\s/);
+      const dot = rest.search(/[.?!]\s/);
       title = dot > 0 ? rest.slice(0, dot) : rest;
       after = dot > 0 ? rest.slice(dot + 1).trim() : "";
     }
-    const isBook = !quoted;
+    // A journal article: quoted title (Harvard), or an unquoted title followed by
+    // "Journal, volume(issue), pages" (APA). Anything else is treated as a book.
+    const apaArticle = !quoted && /^[^,]+,\s*\d+\s*(?:\(\d+\))?\s*,\s*(?:pp?\.\s*)?[\d]+/.test(after);
+    const isBook = !quoted && !apaArticle;
     const venue = isBook ? undefined : after.split(/,\s*(?=\d|pp?\.|vol)/i)[0].replace(/[.,]\s*$/, "").trim() || undefined;
     const vi = after.match(/\b(\d+)\s*\((\d+)\)/);
     const volOnly = !vi ? after.match(/,\s*(\d+)\s*,/) : null;
-    const pages = after.match(/\bpp?\.\s*([\d]+(?:\s*[–-]\s*\d+)?)/)?.[1]?.replace(/\s/g, "") ?? after.match(/,\s*(\d{5,7})\b/)?.[1];
+    const pages =
+      after.match(/\bpp?\.\s*([\d]+(?:\s*[–-]\s*\d+)?)/)?.[1]?.replace(/\s/g, "") ??
+      (apaArticle ? after.match(/\)?\s*,\s*(\d+\s*[–-]\s*\d+)/)?.[1]?.replace(/\s/g, "") : undefined) ??
+      after.match(/,\s*(\d{5,7})\b/)?.[1];
     const publisher = isBook ? after.match(/:\s*([^.:]+?)\.?\s*$/)?.[1]?.trim() : undefined;
     const year = parseInt(m[2], 10);
     const fam = (a: string) => a.split(",")[0];

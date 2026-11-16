@@ -65,11 +65,13 @@ describe("Single-Brain Architecture lock", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("permanently bans the Quantum catalog and the Zappos/Schein template in Coursework code", () => {
-    const FORBIDDEN = [/quantumComputingCatalog/, /QUANTUM_COMPUTING_CATALOG/, /zappos/i];
+  it("permanently bans the Quantum catalog and the Zappos/Schein template anywhere in app or server code", () => {
+    // All of src/ and server/: a canned case once hid in src/features (brief sanitizer,
+    // scope classifier, slide generator) where a Coursework-only scan did not look.
+    const FORBIDDEN = [/quantumComputingCatalog/, /QUANTUM_COMPUTING_CATALOG/, /zappos/i, /Schein's 3 Levels/i];
     expect(fs.existsSync(path.join(ROOT, "src/desk/assignment/services/catalogs/quantumComputingCatalog.ts"))).toBe(false);
     const offenders: string[] = [];
-    for (const rel of productionFiles(["src/desk", "server/routes/project/assignment"])) {
+    for (const rel of [...productionFiles(["src", "server"]), "server.ts"]) {
       const text = fs.readFileSync(path.join(ROOT, rel), "utf8");
       if (FORBIDDEN.some((re) => re.test(text))) offenders.push(rel);
     }
@@ -101,11 +103,11 @@ describe("Single-Brain Architecture lock", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("Coursework routes hold no prompt text: prompts live in scholarBrain.courseworkPrompts", () => {
+  it("Coursework routes, domain and UI hold no prompt text: prompts live in scholarBrain.courseworkPrompts", () => {
     const offenders: string[] = [];
-    for (const rel of productionFiles(["server/routes/project/assignment"])) {
+    for (const rel of productionFiles(["server/routes/project/assignment", "src/domain/assignment", "src/desk/assignment"])) {
       const text = fs.readFileSync(path.join(ROOT, rel), "utf8");
-      if (/You are (the|a|an) /.test(text) || /Return ONLY valid JSON/.test(text)) offenders.push(rel);
+      if (/You are (the|a|an) /.test(text) || /Return ONLY valid JSON|Respond with ONLY JSON/.test(text)) offenders.push(rel);
     }
     expect(offenders).toEqual([]);
     expect(fs.readFileSync(path.join(ROOT, "server/src/services/scholarBrain.ts"), "utf8")).toMatch(/courseworkPrompts/);

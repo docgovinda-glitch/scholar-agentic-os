@@ -195,11 +195,14 @@ describe("Assignment Phase 3: Drafting Engine Components & Flow", () => {
     it("edits the section in the shared rich-text editor and saves each change", async () => {
       const onUpdate = vi.fn();
       const source = { id: "src-9", title: "Governing algorithms", authors: ["Smith, J."], year: "2024", type: "journal_article", mainFinding: "", suggestedUse: "", citation: "", status: "kept" } as const;
+      // OpenAlex gives names as "Given Family": the citation must use the family name.
+      const given = { ...source, id: "src-10", title: "Policy rates", authors: ["Haryo Kuncoro"], year: "2020" } as const;
       render(
         <DraftingActiveEditor
           section={{ ...mockSections[1], draftContent: "Existing *prose* here." }}
           onUpdateContent={onUpdate}
-          allApprovedSources={[source]}
+          allApprovedSources={[source, given]}
+          citationStyle="apa7"
         />
       );
 
@@ -217,6 +220,9 @@ describe("Assignment Phase 3: Drafting Engine Components & Flow", () => {
       fireEvent.click(screen.getByText("(Smith, 2024)"));
       await waitFor(() => expect(onUpdate).toHaveBeenLastCalledWith(expect.stringContaining("(Smith, 2024)")));
       expect(onUpdate.mock.calls.at(-1)?.[0]).toContain("*prose*");
+      fireEvent.click(screen.getByRole("button", { name: /^\+ Insert Citation$/ }));
+      expect(screen.getByText("(Kuncoro, 2020)")).toBeInTheDocument();
+      expect(screen.queryByText(/Haryo Kuncoro, 2020/)).toBeNull();
     });
 
     it("stays open while saves change the section, and a different section opens fresh", async () => {

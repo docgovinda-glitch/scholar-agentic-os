@@ -1,30 +1,26 @@
+import { errorText } from "../../../shared/errorText";
 import { ReviewAgentPanel } from "../components/AgentPanels";
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { selectApprovedSources } from "../../../domain/assignment/approvedSources";
+import { useState,useEffect,useMemo } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
 import { RubricComplianceCard } from "../components/RubricComplianceCard";
 import { CitationReconciliationCard } from "../components/CitationReconciliationCard";
 import { FlowReconciliationCard } from "../components/FlowReconciliationCard";
 import {
-  exportAssignmentToDocx,
-  downloadAssignmentPdf,
-  exportAssignmentToPdf,
-  copyAssignmentMarkdown,
+exportAssignmentToDocx,
+downloadAssignmentPdf,
+exportAssignmentToPdf,
+copyAssignmentMarkdown,
 } from "../services/assignmentExportService";
 import { getCitationCoverage } from "../services/citationAnchoringService";
 import {
-  FileText,
-  Printer,
-  Copy,
-  Check,
-  RotateCw,
-  ArrowLeft,
-  Sparkles,
-  ShieldCheck,
-  AlertTriangle,
-  BookOpen,
-  LinkIcon,
-  Edit2,
-  ChevronDown,
+FileText,
+Printer,
+Copy,
+Check,
+RotateCw,
+ArrowLeft,AlertTriangle,LinkIcon,
+Edit2
 } from "lucide-react";
 
 export interface AssignmentSubmissionStageProps {
@@ -44,7 +40,6 @@ export function AssignmentSubmissionStage({
     sources,
     approvedSourceIds,
     citationStyle,
-    academicLevel,
     question,
     submissionReport,
     runSubmissionAudit,
@@ -100,7 +95,6 @@ export function AssignmentSubmissionStage({
   }));
 
   const assignmentTitle =
-    project?.answers?.["assignment_title"] ||
     project?.answers?.["title"] ||
     question ||
     "Academic Assignment";
@@ -125,11 +119,11 @@ export function AssignmentSubmissionStage({
         institution: institutionName || undefined,
         brief: projectState.brief,
         sections: activeSections,
-        sources: projectState.sources.curated,
+        sources: approvedSources,
         actualWordCount: currentWordCount,
       });
-    } catch (err: any) {
-      setExportError(err?.message || "Failed to generate Word document (.docx).");
+    } catch (err: unknown) {
+      setExportError(errorText(err) || "Failed to generate Word document (.docx).");
     } finally {
       setIsExportingDocx(false);
     }
@@ -155,18 +149,18 @@ export function AssignmentSubmissionStage({
       institution: institutionName || undefined,
       brief: projectState.brief,
       sections: activeSections,
-      sources: projectState.sources.curated,
+      sources: approvedSources,
       actualWordCount: currentWordCount,
     };
     try {
       await downloadAssignmentPdf(projectId, params);
-    } catch (err: any) {
+    } catch (err: unknown) {
       // The PDF service is unreachable: fall back to the printable view.
       try {
         exportAssignmentToPdf(params);
-        setExportError(`${err?.message || "PDF export failed."} Opened the printable view instead (use Save as PDF).`);
+        setExportError(`${errorText(err) || "PDF export failed."} Opened the printable view instead (use Save as PDF).`);
       } catch {
-        setExportError(err?.message || "Failed to export PDF.");
+        setExportError(errorText(err) || "Failed to export PDF.");
       }
     } finally {
       setIsExportingPdf(false);
@@ -188,11 +182,11 @@ export function AssignmentSubmissionStage({
 
   // Citation Coverage Statistics (Production Spec §5)
   const approvedSources = useMemo(
-    () => sources.filter((s) => s.status === "kept" || (approvedSourceIds && approvedSourceIds.includes(s.id))),
+    () => selectApprovedSources(sources, approvedSourceIds),
     [sources, approvedSourceIds]
   );
   const citationCoverage = useMemo(
-    () => getCitationCoverage(activeSections as any, approvedSources),
+    () => getCitationCoverage(activeSections, approvedSources),
     [activeSections, approvedSources]
   );
 
@@ -210,7 +204,7 @@ export function AssignmentSubmissionStage({
       {/* Left Column: Rubric Compliance Card */}
       <div className="lg:col-span-1 min-h-[400px]">
         <RubricComplianceCard
-          report={submissionReport as any}
+          report={submissionReport && "missingRequirements" in submissionReport ? submissionReport : null}
           isLoading={isAuditingSubmission}
           onReRunAudit={runSubmissionAudit}
         />
@@ -238,11 +232,11 @@ export function AssignmentSubmissionStage({
 
   const renderCitationCoverage = () => (
     approvedSources.length > 0 ? (
-      <div className="rounded-2xl p-6 sm:p-7 bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-4">
+      <div className="rounded-2xl p-6 sm:p-7 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-xs space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <LinkIcon className="w-4 h-4 text-teal-500" />
-            <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">
+            <h3 className="text-sm font-semibold text-[color:var(--text-primary)]">
               Citation Anchor Coverage
             </h3>
           </div>
@@ -256,25 +250,25 @@ export function AssignmentSubmissionStage({
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="p-3 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/60 dark:border-white/5">
-            <div className="text-lg font-bold text-neutral-900 dark:text-white tabular-nums">{citationCoverage.totalAnchors}</div>
-            <div className="text-[10px] text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">Total Anchors</div>
+          <div className="p-3 rounded-xl bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)]">
+            <div className="text-lg font-bold text-[color:var(--text-primary)] tabular-nums">{citationCoverage.totalAnchors}</div>
+            <div className="text-xs text-[color:var(--text-muted)] uppercase tracking-wider">Total Anchors</div>
           </div>
-          <div className="p-3 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/60 dark:border-white/5">
-            <div className="text-lg font-bold text-neutral-900 dark:text-white tabular-nums">{citationCoverage.sourcesWithCitations}</div>
-            <div className="text-[10px] text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">Sources Cited</div>
+          <div className="p-3 rounded-xl bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)]">
+            <div className="text-lg font-bold text-[color:var(--text-primary)] tabular-nums">{citationCoverage.sourcesWithCitations}</div>
+            <div className="text-xs text-[color:var(--text-muted)] uppercase tracking-wider">Sources Cited</div>
           </div>
-          <div className="p-3 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/60 dark:border-white/5">
+          <div className="p-3 rounded-xl bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)]">
             <div className={`text-lg font-bold tabular-nums ${citationCoverage.orphanedSources > 0 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>
               {citationCoverage.orphanedSources}
             </div>
-            <div className="text-[10px] text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">Orphaned</div>
+            <div className="text-xs text-[color:var(--text-muted)] uppercase tracking-wider">Orphaned</div>
           </div>
-          <div className="p-3 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/60 dark:border-white/5">
-            <div className="text-lg font-bold text-neutral-900 dark:text-white tabular-nums">
+          <div className="p-3 rounded-xl bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)]">
+            <div className="text-lg font-bold text-[color:var(--text-primary)] tabular-nums">
               {citationCoverage.sectionCoverage.filter((s) => s.anchorCount > 0).length}/{citationCoverage.sectionCoverage.length}
             </div>
-            <div className="text-[10px] text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">Sections w/ Cites</div>
+            <div className="text-xs text-[color:var(--text-muted)] uppercase tracking-wider">Sections w/ Cites</div>
           </div>
         </div>
 
@@ -291,13 +285,13 @@ export function AssignmentSubmissionStage({
   );
 
   const renderPackagingControls = () => (
-    <div className="rounded-2xl p-6 sm:p-7 bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-100 dark:border-white/5 pb-4">
+    <div className="rounded-2xl p-6 sm:p-7 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-xs space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[color:var(--border-subtle)] pb-4">
         <div className="space-y-1">
-          <h3 className="text-sm sm:text-base font-semibold text-neutral-900 dark:text-white">
+          <h3 className="text-sm sm:text-base font-semibold text-[color:var(--text-primary)]">
             Download
           </h3>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">
+          <p className="text-xs text-[color:var(--text-muted)]">
             Formatted with standard 1-inch margins, title sheet, running headers, and formatted bibliography according to {citationStyle.toUpperCase()}.
           </p>
         </div>
@@ -308,52 +302,52 @@ export function AssignmentSubmissionStage({
         <button
           type="button"
           onClick={() => setShowMetadataForm(!showMetadataForm)}
-          className="text-xs font-medium text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200 inline-flex items-center gap-1.5 transition-colors cursor-pointer py-1"
+          className="text-xs font-medium text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] inline-flex items-center gap-1.5 transition-colors cursor-pointer py-1"
         >
           <Edit2 className="w-3.5 h-3.5" />
           <span>{showMetadataForm ? "Hide Cover Sheet Metadata" : "Customize Cover Page Metadata (Student Name, ID, Course, University)"}</span>
         </button>
 
         {showMetadataForm && (
-          <div className="mt-3 p-4 rounded-xl border border-neutral-200/60 dark:border-white/10 bg-neutral-50/50 dark:bg-white/[0.02] grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 animate-in fade-in duration-150">
+          <div className="mt-3 p-4 rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]/50 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 animate-in fade-in duration-150">
             <div className="space-y-1">
-              <label className="text-[11px] font-medium text-neutral-600 dark:text-neutral-400">Student Name</label>
+              <label className="text-xs font-medium text-[color:var(--text-secondary)]">Student Name</label>
               <input
                 type="text"
                 value={studentName}
                 onChange={(e) => setStudentName(e.target.value)}
                 placeholder="Candidate Name"
-                className="w-full bg-white dark:bg-ink-600 border border-neutral-200/80 dark:border-white/10 rounded-lg px-2.5 py-1 text-xs text-neutral-900 dark:text-white"
+                className="w-full bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-2.5 py-1 text-xs text-[color:var(--text-primary)]"
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[11px] font-medium text-neutral-600 dark:text-neutral-400">Candidate / Student ID</label>
+              <label className="text-xs font-medium text-[color:var(--text-secondary)]">Candidate / Student ID</label>
               <input
                 type="text"
                 value={studentId}
                 onChange={(e) => setStudentId(e.target.value)}
                 placeholder="e.g. SCH-2026-X01"
-                className="w-full bg-white dark:bg-ink-600 border border-neutral-200/80 dark:border-white/10 rounded-lg px-2.5 py-1 text-xs text-neutral-900 dark:text-white"
+                className="w-full bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-2.5 py-1 text-xs text-[color:var(--text-primary)]"
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[11px] font-medium text-neutral-600 dark:text-neutral-400">Course / Module</label>
+              <label className="text-xs font-medium text-[color:var(--text-secondary)]">Course / Module</label>
               <input
                 type="text"
                 value={courseName}
                 onChange={(e) => setCourseName(e.target.value)}
                 placeholder="e.g. POLI3002 International Security"
-                className="w-full bg-white dark:bg-ink-600 border border-neutral-200/80 dark:border-white/10 rounded-lg px-2.5 py-1 text-xs text-neutral-900 dark:text-white"
+                className="w-full bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-2.5 py-1 text-xs text-[color:var(--text-primary)]"
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[11px] font-medium text-neutral-600 dark:text-neutral-400">University / Institution</label>
+              <label className="text-xs font-medium text-[color:var(--text-secondary)]">University / Institution</label>
               <input
                 type="text"
                 value={institutionName}
                 onChange={(e) => setInstitutionName(e.target.value)}
                 placeholder="e.g. University Faculty"
-                className="w-full bg-white dark:bg-ink-600 border border-neutral-200/80 dark:border-white/10 rounded-lg px-2.5 py-1 text-xs text-neutral-900 dark:text-white"
+                className="w-full bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-2.5 py-1 text-xs text-[color:var(--text-primary)]"
               />
             </div>
           </div>
@@ -369,7 +363,7 @@ export function AssignmentSubmissionStage({
             disabled={isExportingDocx || sectionsWritten === 0}
             title={sectionsWritten === 0 ? "Write at least one section first" : undefined}
             data-testid="export-docx-button"
-            className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 transition-opacity cursor-pointer inline-flex items-center gap-2 shadow-xs disabled:opacity-50"
+            className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 transition-opacity cursor-pointer inline-flex items-center gap-2 shadow-xs disabled:opacity-50"
           >
             <FileText className="w-4 h-4" />
             <span>{isExportingDocx ? "Compiling Word Doc..." : "Download Formatted Word Document (.docx)"}</span>
@@ -382,7 +376,7 @@ export function AssignmentSubmissionStage({
             disabled={isExportingPdf || sectionsWritten === 0}
             title={sectionsWritten === 0 ? "Write at least one section first" : undefined}
             data-testid="export-pdf-button"
-            className="disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2.5 rounded-xl text-xs font-semibold bg-neutral-100 dark:bg-white/5 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-200/70 dark:hover:bg-white/10 transition-colors cursor-pointer inline-flex items-center gap-2"
+            className="disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2.5 rounded-xl text-xs font-semibold bg-[color:var(--surface-inset)] text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer inline-flex items-center gap-2"
           >
             <Printer className="w-4 h-4" />
             <span>{isExportingPdf ? "Rendering PDF..." : "Download PDF Document"}</span>
@@ -393,7 +387,7 @@ export function AssignmentSubmissionStage({
             type="button"
             onClick={handleCopyMarkdown}
             disabled={sectionsWritten === 0}
-            className="disabled:opacity-50 disabled:cursor-not-allowed px-3.5 py-2.5 rounded-xl text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer inline-flex items-center gap-1.5"
+            className="disabled:opacity-50 disabled:cursor-not-allowed px-3.5 py-2.5 rounded-xl text-xs font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer inline-flex items-center gap-1.5"
             title="Copy clean markdown text to clipboard"
           >
             {copiedMarkdown ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
@@ -409,7 +403,7 @@ export function AssignmentSubmissionStage({
               if (onBack) onBack();
               else setPhase("drafting");
             }}
-            className="px-4 py-2 rounded-xl text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer inline-flex items-center gap-1.5"
+            className="px-4 py-2 rounded-xl text-xs font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer inline-flex items-center gap-1.5"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Back to Drafting</span>
@@ -420,38 +414,38 @@ export function AssignmentSubmissionStage({
   );
 
   return (
-    <div className="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6 text-neutral-900 dark:text-neutral-100">
+    <div className="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6 text-[color:var(--text-primary)]">
       {/* Minimal Step Guidance Banner */}
-      <div className="p-3.5 sm:p-4 rounded-xl bg-neutral-100/60 dark:bg-white/[0.02] border border-neutral-200/60 dark:border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+      <div className="p-3.5 sm:p-4 rounded-xl bg-[color:var(--surface-inset)]/60 border border-[color:var(--border-subtle)] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-2.5">
-          <div className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center font-mono font-bold text-[10px] shrink-0">
+          <div className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center font-mono font-bold text-xs shrink-0">
             4
           </div>
-          <p className="text-neutral-600 dark:text-neutral-400 text-xs leading-relaxed">
+          <p className="text-[color:var(--text-secondary)] text-xs leading-relaxed">
             Check your draft against the brief, check that every citation matches a source, and download it with a title page and reference list.
           </p>
         </div>
-        <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 shrink-0 self-start sm:self-auto">
+        <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 shrink-0 self-start sm:self-auto">
           Before you submit
         </span>
       </div>
 
       {/* Phase 4 Header / Overview Bar */}
-      <div className="rounded-2xl p-6 sm:p-7 bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-neutral-100 dark:border-white/5 pb-5">
+      <div className="rounded-2xl p-6 sm:p-7 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-xs space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[color:var(--border-subtle)] pb-5">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wide uppercase bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide uppercase bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                 Phase 05 · Submission & Review
               </span>
-              <span className="text-xs text-neutral-400 dark:text-neutral-500 font-mono">
+              <span className="text-xs text-[color:var(--text-muted)] font-mono">
                 Before you submit
               </span>
             </div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[color:var(--text-primary)]">
               Check and download
             </h1>
-            <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 max-w-2xl">
+            <p className="text-xs sm:text-sm text-[color:var(--text-muted)] max-w-2xl">
               Check length, structure and what the question asks for, match each citation to a source, then download Word, PDF or plain text.
             </p>
           </div>
@@ -461,7 +455,7 @@ export function AssignmentSubmissionStage({
               type="button"
               onClick={() => runSubmissionAudit?.()}
               disabled={isAuditingSubmission || !hasDraft}
-              className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-neutral-100 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200/60 dark:hover:bg-white/10 transition-colors cursor-pointer inline-flex items-center gap-2 disabled:opacity-50"
+              className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer inline-flex items-center gap-2 disabled:opacity-50"
               title="Re-run Rubric & Citation Audit"
             >
               <RotateCw className={`w-3.5 h-3.5 ${isAuditingSubmission ? "animate-spin" : ""}`} />
@@ -471,14 +465,14 @@ export function AssignmentSubmissionStage({
         </div>
 
         {!hasDraft ? (
-          <div data-testid="submission-nothing-drafted" className="p-4 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/60 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <p className="text-sm text-neutral-600 dark:text-neutral-300">
+          <div data-testid="submission-nothing-drafted" className="p-4 rounded-xl bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <p className="text-sm text-[color:var(--text-secondary)]">
               Nothing to check yet. Write at least one section and the checks against your brief and the citation check appear here.
             </p>
             <button
               type="button"
               onClick={() => (setPhase ? setPhase("drafting") : onBack?.())}
-              className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 cursor-pointer shrink-0"
+              className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 cursor-pointer shrink-0"
             >
               Go to Drafting
             </button>
@@ -486,34 +480,34 @@ export function AssignmentSubmissionStage({
         ) : (
         /* Status Metrics Ribbon */
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="p-4 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/60 dark:border-white/5 space-y-1">
-            <span className="text-xs text-neutral-500 dark:text-neutral-400 font-medium">Sections written</span>
-            <div className="text-lg sm:text-xl font-bold text-neutral-900 dark:text-white tabular-nums" data-testid="sections-written">
+          <div className="p-4 rounded-xl bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)] space-y-1">
+            <span className="text-xs text-[color:var(--text-muted)] font-medium">Sections written</span>
+            <div className="text-lg sm:text-xl font-bold text-[color:var(--text-primary)] tabular-nums" data-testid="sections-written">
               {sectionsWritten} / {activeSections.length}
             </div>
-            <span className="text-[11px] text-neutral-400 dark:text-neutral-500 block">Sections with text in them</span>
+            <span className="text-xs text-[color:var(--text-muted)] block">Sections with text in them</span>
           </div>
 
-          <div className="p-4 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/60 dark:border-white/5 space-y-1">
-            <span className="text-xs text-neutral-500 dark:text-neutral-400 font-medium">To do before submitting</span>
-            <div className="text-lg sm:text-xl font-bold text-neutral-900 dark:text-white tabular-nums" data-testid="todo-count">
+          <div className="p-4 rounded-xl bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)] space-y-1">
+            <span className="text-xs text-[color:var(--text-muted)] font-medium">To do before submitting</span>
+            <div className="text-lg sm:text-xl font-bold text-[color:var(--text-primary)] tabular-nums" data-testid="todo-count">
               {submissionReport ? (toDoCount === 0 ? "Nothing found" : toDoCount) : "Not checked"}
             </div>
-            <span className="text-[11px] text-neutral-400 dark:text-neutral-500 block">From the checks against your brief</span>
+            <span className="text-xs text-[color:var(--text-muted)] block">From the checks against your brief</span>
           </div>
 
-          <div className="p-4 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/60 dark:border-white/5 space-y-1">
-            <span className="text-xs text-neutral-500 dark:text-neutral-400 font-medium">
-              Word Budget Margin
+          <div className="p-4 rounded-xl bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)] space-y-1">
+            <span className="text-xs text-[color:var(--text-muted)] font-medium">
+              Length
             </span>
-            <div className="text-lg sm:text-xl font-bold text-neutral-900 dark:text-white tabular-nums flex items-center gap-2">
+            <div className="text-lg sm:text-xl font-bold text-[color:var(--text-primary)] tabular-nums flex items-center gap-2">
               <span>{currentWordCount.toLocaleString()} / {targetWordCount.toLocaleString()}</span>
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${isWordCountCompliant ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-amber-500/10 text-amber-600 dark:text-amber-400"}`}>
                 {Number(wordDiffPercentage) > 0 ? `+${wordDiffPercentage}%` : `${wordDiffPercentage}%`}
               </span>
             </div>
-            <span className="text-[11px] text-neutral-400 dark:text-neutral-500 block">
-              ±10% institutional threshold
+            <span className="text-xs text-[color:var(--text-muted)] block">
+              Against the brief's {targetWordCount.toLocaleString()} words; check your module's rules on length
             </span>
           </div>
         </div>

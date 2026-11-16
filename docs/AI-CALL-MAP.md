@@ -30,7 +30,7 @@ A user's own key reaches the server only on AI routes (`routeUsesClientAi` in `s
 
 | File | Layer |
 | :--- | :--- |
-| `src/desk/ProjectListScreen.tsx` (prompt bar), `src/desk/assignment/services/sourceEvidenceExtractionService.ts` | `executeAgenticLLM` |
+| `src/desk/ProjectListScreen.tsx` (prompt bar) | `executeAgenticLLM` |
 | `src/desk/regions/StudioPanel.tsx` | `refine` with `browserCompleter` |
 | `src/desk/api/studioGenerationApi.ts` (`postAi`) | Server routes, running 426 hand-off prompts in the browser |
 

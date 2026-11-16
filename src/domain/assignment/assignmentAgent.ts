@@ -17,7 +17,6 @@ import { z } from "zod";
 
 /* ----------------------------- shared helpers ---------------------------- */
 
-const clip = (s: string | undefined, n: number) => (s ?? "").replace(/\s+/g, " ").trim().slice(0, n);
 
 /** Lower-cased, punctuation-light form used to compare quotes with texts. */
 export function normalizeForQuote(s: string): string {
@@ -78,23 +77,6 @@ export interface Extraction {
   missing: Array<{ question: string; why: string }>;
 }
 
-export function extractPrompt(): string {
-  return [
-    "You read a student's assignment brief and any materials they added, and record what the assignment asks for.",
-    "Quote the brief word for word for every question, requirement and marking criterion (the exact words, at least a few words long). Never add a requirement the brief does not state.",
-    "List what is missing that the student must decide or ask their tutor (for example no word count, no referencing style, an unclear question), with why it matters. Do not invent answers to these.",
-    "For each added material, say in one sentence what it contains, from its text only.",
-    'Respond with ONLY JSON: {"task": "<one sentence: what must be produced>", "questions": [{"text": "...", "quote": "<exact words>"}], "requirements": [{"text": "...", "quote": "<exact words>", "kind": "content|format|length|referencing|submission|other"}], "objectives": ["..."], "constraints": {"wordCount": <number or omit>, "citationStyle": "...", "deadline": "...", "format": "...", "level": "..."}, "criteria": [{"criterion": "...", "weight": <percent or omit>, "quote": "<exact words>"}], "materials": [{"name": "...", "summary": "..."}], "missing": [{"question": "...", "why": "..."}]}',
-  ].join("\n");
-}
-
-export function extractUserPrompt(i: ExtractInput): string {
-  const parts = [`Assignment brief:\n${clip(i.brief, 12000) || "(empty)"}`];
-  for (const m of (i.materials ?? []).slice(0, 6)) parts.push(`Material "${clip(m.name, 120)}":\n${clip(m.text, 4000)}`);
-  if (i.clarifications?.trim()) parts.push(`The student's clarifications:\n${clip(i.clarifications, 2000)}`);
-  return parts.join("\n\n");
-}
-
 const extractSchema = z.object({
   task: str(400).catch(""),
   questions: list(z.object({ text: str(600), quote: str(800) }), 12),
@@ -149,30 +131,6 @@ export interface Understanding {
   blockers: string[];
 }
 
-export function understandPrompt(): string {
-  return [
-    "You are planning a piece of student coursework before any writing starts. From the brief's extraction, work out what must be produced and how.",
-    "Be specific to this assignment: its subject, its question, its marking criteria. Do not state facts, findings or sources; those come from research later.",
-    "knowledgeGaps are what the student must find evidence about. searchQueries are 2 to 5 short scholarly search queries (keywords, not sentences) that would find that evidence.",
-    "thesisDirection is a provisional line of argument to test, phrased tentatively. blockers are things that must be settled before writing (from the missing information), or empty.",
-    'Respond with ONLY JSON: {"discipline": "...", "assignmentType": "...", "produce": "<what the finished piece is>", "approach": "<how to tackle it>", "structure": "<the shape the piece should take>", "criteria": [{"criterion": "...", "howToMeet": "..."}], "knowledgeGaps": ["..."], "searchQueries": ["..."], "thesisDirection": "...", "blockers": ["..."]}',
-  ].join("\n");
-}
-
-export function understandUserPrompt(e: Extraction, brief: string, extra?: { level?: string; citationStyle?: string; words?: number }): string {
-  return [
-    `Brief (for reference):\n${clip(brief, 6000)}`,
-    `Task: ${e.task}`,
-    e.questions.length ? `Questions:\n- ${e.questions.map((q) => q.text).join("\n- ")}` : "",
-    e.requirements.length ? `Requirements:\n- ${e.requirements.map((r) => `${r.text} [${r.kind}]`).join("\n- ")}` : "",
-    e.criteria.length ? `Marking criteria:\n- ${e.criteria.map((c) => `${c.criterion}${c.weight ? ` (${c.weight}%)` : ""}`).join("\n- ")}` : "No marking criteria were given.",
-    e.missing.length ? `Missing information:\n- ${e.missing.map((m) => m.question).join("\n- ")}` : "",
-    `Level: ${extra?.level || e.constraints.level || "not stated"}. Length: ${extra?.words || e.constraints.wordCount || "not stated"} words. Referencing: ${extra?.citationStyle || e.constraints.citationStyle || "not stated"}.`,
-  ]
-    .filter(Boolean)
-    .join("\n\n");
-}
-
 const understandSchema = z.object({
   discipline: str(120).catch(""),
   assignmentType: str(120).catch(""),
@@ -214,29 +172,6 @@ export interface SourceAnalysis {
   mainPoint: string;
   evidence: Array<{ claim: string; quote: string }>;
   sections: string[];
-}
-
-export function sourcesPrompt(): string {
-  return [
-    "You assess real search results for a student's coursework. You see each source's title, authors, year, venue and abstract only, not the full text; say nothing beyond what these show.",
-    "For each source: relevance to this assignment (high, medium or low); credibility in one short phrase based on the venue, peer review and citations shown; its main point from the abstract; up to 2 pieces of evidence, each a claim with an exact quote from the abstract; and which outline sections (by id) it supports.",
-    "If a source has no abstract, give no evidence and judge relevance from the title only.",
-    'Respond with ONLY JSON: {"sources": [{"id": "...", "relevance": "high|medium|low", "credibility": "...", "mainPoint": "...", "evidence": [{"claim": "...", "quote": "<exact words from the abstract>"}], "sections": ["<section id>"]}]}',
-  ].join("\n");
-}
-
-export function sourcesUserPrompt(task: string, sections: Array<{ id: string; title: string }>, sources: SourceForAnalysis[]): string {
-  return [
-    `Assignment: ${clip(task, 800)}`,
-    `Outline sections:\n${sections.slice(0, 30).map((s) => `- ${s.id}: ${clip(s.title, 140)}`).join("\n") || "(none yet)"}`,
-    `Sources:\n${sources
-      .slice(0, 20)
-      .map(
-        (s) =>
-          `[${s.id}] ${clip(s.title, 300)} — ${clip((s.authors ?? []).slice(0, 4).join(", "), 160)} (${s.year || "n.d."}). ${clip(s.venue, 160)}${s.peerReviewed ? ", peer-reviewed" : ""}${typeof s.citationCount === "number" ? `, cited ${s.citationCount} times` : ""}\nAbstract: ${clip(s.abstract, 1500) || "(none)"}`
-      )
-      .join("\n\n")}`,
-  ].join("\n\n");
 }
 
 const sourceSchema = z.object({
@@ -297,28 +232,6 @@ export interface DraftReview {
   summary: string;
 }
 
-export function reviewPrompt(): string {
-  return [
-    "You review a student's draft before submission against their brief. Be specific and fair; do not predict a mark.",
-    "For each numbered requirement: met, partly or missing, with an exact quote from the draft that shows it (omit the quote if missing) and what to fix.",
-    "unsupportedClaims: sentences stating facts or findings without a citation, quoted exactly. argument: weaknesses in reasoning or evidence use. structure: problems with order, flow or balance. language: grammar, clarity or register problems, each an exact quote and a corrected version.",
-    "Every quote must be copied exactly from the draft. Give at most 8 items per list.",
-    'Respond with ONLY JSON: {"summary": "<two sentences>", "requirements": [{"index": <number>, "status": "met|partly|missing", "quote": "...", "fix": "..."}], "unsupportedClaims": [{"quote": "...", "why": "..."}], "argument": [{"comment": "...", "quote": "..."}], "structure": [{"comment": "...", "quote": "..."}], "language": [{"quote": "...", "suggestion": "..."}]}',
-  ].join("\n");
-}
-
-export function reviewUserPrompt(i: ReviewInput): string {
-  return [
-    i.question ? `Question: ${clip(i.question, 1000)}` : "",
-    `Requirements:\n${i.requirements.map((r, n) => `${n + 1}. ${clip(r.text, 300)}`).join("\n") || "(none extracted)"}`,
-    i.criteria.length ? `Marking criteria: ${i.criteria.map((c) => `${c.criterion}${c.weight ? ` (${c.weight}%)` : ""}`).join("; ")}` : "",
-    `Referencing style: ${i.citationStyle || "not stated"}. Target length: ${i.targetWords || "not stated"} words.`,
-    `Draft:\n${clip(i.draft, 30000)}`,
-  ]
-    .filter(Boolean)
-    .join("\n\n");
-}
-
 const reviewSchema = z.object({
   summary: str(800).catch(""),
   requirements: list(z.object({ index: z.coerce.number().int(), status: z.enum(["met", "partly", "missing"]).catch("partly"), quote: optStr(800), fix: optStr(500) }), 40),
@@ -352,4 +265,57 @@ export function parseReview(text: string, input: ReviewInput): DraftReview | und
   };
   if (!review.summary && review.requirements.length === 0 && review.argument.length === 0) return undefined;
   return review;
+}
+
+/* ------------------------- Evidence from an upload ------------------------- */
+
+export interface EvidencePassage {
+  location: string;
+  text: string;
+}
+
+export interface EvidenceInput {
+  question: string;
+  title: string;
+  sourceType: string;
+  passages: EvidencePassage[];
+}
+
+export interface EvidenceExtraction {
+  title?: string;
+  author?: string;
+  year?: string;
+  mainFinding?: string;
+  excerpts: Array<{ excerpt: string; context?: string; sourceLocation?: string; claim?: string }>;
+}
+
+const EvidenceSchema = z.object({
+  title: optStr(300),
+  author: optStr(200),
+  year: z.union([z.string(), z.number()]).optional().catch(undefined),
+  mainFinding: optStr(600),
+  excerpts: list(
+    z.object({ excerpt: str(1200), context: optStr(1200), sourceLocation: optStr(120), claim: optStr(400) }),
+    6
+  ),
+});
+
+/**
+ * The AI's reading of an uploaded document, kept only where it can be checked:
+ * an excerpt must appear word for word in the passages it was given, and a year
+ * must be a plain four-digit year. Nothing else is filled in.
+ */
+export function parseEvidenceExtraction(text: string, input: EvidenceInput): EvidenceExtraction | null {
+  const parsed = EvidenceSchema.safeParse(jsonIn(text));
+  if (!parsed.success) return null;
+  const all = input.passages.map((p) => p.text).join("\n\n");
+  const year = parsed.data.year !== undefined ? String(parsed.data.year).trim() : "";
+  const blank = (s?: string) => (s && s.trim() && !/^(null|unknown|n\/?a)$/i.test(s.trim()) ? s.trim() : undefined);
+  return {
+    title: blank(parsed.data.title),
+    author: blank(parsed.data.author),
+    year: /^(1[5-9]|20)\d{2}$/.test(year) ? year : undefined,
+    mainFinding: blank(parsed.data.mainFinding),
+    excerpts: parsed.data.excerpts.filter((e) => quotedIn(e.excerpt, all)).slice(0, 4),
+  };
 }

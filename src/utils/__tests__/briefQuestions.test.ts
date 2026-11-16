@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  clipHeadingWords,
   parseBriefQuestions,
   parseBriefParts,
   parseMarkingCriteria,
@@ -179,5 +180,29 @@ describe("QNT-4020 brief (7 questions, rubric part, prescribed bibliography, pag
 
   it("reads the rubric part as the grading criteria (30/30/20/20)", () => {
     expect(parseMarkingCriteria(QNT).map((r) => r.weightPercent)).toEqual([30, 30, 20, 20]);
+  });
+});
+
+import { parsePrescribedBibliography as parseBib } from "../briefQuestions";
+describe("parsePrescribedBibliography: APA entries and 'Required reading' headings", () => {
+  it("reads an APA journal entry on a 'Required reading:' line", () => {
+    const [e] = parseBib("Brief text.\n\nRequired reading: Bernanke, B. S. (2020). The New Tools of Monetary Policy. American Economic Review, 110(4), 943-983.");
+    expect(e).toMatchObject({ authors: ["Bernanke, B.S."], year: 2020, title: "The New Tools of Monetary Policy", venue: "American Economic Review", volume: "110", issue: "4", pages: "943-983", isBook: false });
+  });
+  it("keeps an APA book as a book", () => {
+    const [e] = parseBib("Essential reading\nMishkin, F. S. (2019). The Economics of Money, Banking and Financial Markets. Pearson.");
+    expect(e).toMatchObject({ title: "The Economics of Money, Banking and Financial Markets", isBook: true });
+  });
+});
+
+describe("clipHeadingWords", () => {
+  it("cuts a long heading at a clean word, never with a trailing ellipsis or dangling word", () => {
+    expect(clipHeadingWords("1.0 Explain how a central bank sets its policy interest rate and how it reaches", 12)).toBe(
+      "1.0 Explain how a central bank sets its policy interest rate"
+    );
+    expect(clipHeadingWords("2.0 Evaluate the effect of quantitative easing on inflation since 2008, using at…")).toBe(
+      "2.0 Evaluate the effect of quantitative easing on inflation since 2008"
+    );
+    expect(clipHeadingWords("Short heading", 8)).toBe("Short heading");
   });
 });

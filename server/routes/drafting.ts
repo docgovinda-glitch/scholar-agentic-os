@@ -61,9 +61,7 @@ router.post("/section", async (req: express.Request, res: express.Response) => {
       }
       if (!effectiveQuestion && project.answers) {
         effectiveQuestion =
-          project.answers["assignment_question"] ||
-          project.answers["research_topic"] ||
-          project.answers["instructions"] ||
+          project.answers["assignment_brief"] ||
           "";
       }
     } catch (err: unknown) {

@@ -49,7 +49,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("Brief Upload Flow, Recursion Prevention & Role-Based Limiter", () => {
+describe("Brief Upload Flow, Recursion Prevention & Upload Limits", () => {
   beforeEach(() => {
     getProject.mockResolvedValue({
       projectId: "proj-brief-1",
@@ -79,7 +79,6 @@ describe("Brief Upload Flow, Recursion Prevention & Role-Based Limiter", () => {
   });
 
   it("Stress Test: Uploading a heavy multi-page handbook parses into Extracted Brief Question without call stack recursion crash", async () => {
-    // Free user profile but file within 5MB limit
     getProfile.mockResolvedValue({
       success: true,
       profile: {
@@ -157,128 +156,29 @@ describe("Brief Upload Flow, Recursion Prevention & Role-Based Limiter", () => {
     expect(saveIntakeAnswers).toHaveBeenCalled();
   }, 15000);
 
-  it("Admin Verification: Admin users bypass all limits and upload without paywall modals", async () => {
-    getProfile.mockResolvedValue({
-      success: true,
-      profile: {
-        username: "system_admin",
-        fullName: "System Admin",
-        email: "admin@scholar.edu",
-        phone: "",
-        phoneCountryCode: "",
-        phoneE164: "",
-        affiliation: "Scholar Admin",
-        userType: "administrator",
-        educationLevel: "faculty_academic",
-      },
-    });
-
-    authedFetch.mockImplementation(async (url: string) => {
-      if (typeof url === "string" && url.includes("/assignment/parse-brief")) {
-        return {
-          ok: true,
-          json: async () => ({
-            success: true,
-            text: "Advanced Institutional Policy Review 2026",
-            detectedWordCount: 5000,
-            detectedLevel: "postgraduate",
-          }),
-        };
-      }
-      return { ok: true, json: async () => ({}) };
-    });
-
+  it("One upload limit for everyone: a file over 10 MB gets an inline message, never a paywall", async () => {
     render(<AssignmentWorkspace projectId="proj-brief-1" initialStage="extract" />);
+    await waitFor(() => expect(screen.getByText("Understand Your Brief")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /Upload Brief Document/i }));
+    await waitFor(() => expect(screen.getByText(/up to 10 MB/i)).toBeInTheDocument());
 
-    await waitFor(() => {
-      expect(screen.getByText("Understand Your Brief")).toBeInTheDocument();
-    });
-
-    const uploadTabButton = screen.getByRole("button", {
-      name: /Upload Brief Document/i,
-    });
-    fireEvent.click(uploadTabButton);
-
-    await waitFor(() => {
-      expect(screen.getByText(/Unlimited size · Admin/i)).toBeInTheDocument();
-    });
-
-    // Large file exceeding standard free limits (e.g. 15MB)
-    const largeFile = new File([new ArrayBuffer(15 * 1024 * 1024)], "Institutional_Audit.pdf", {
-      type: "application/pdf",
-    });
-
+    const oversized = new File([new ArrayBuffer(12 * 1024 * 1024)], "Huge_Handbook.pdf", { type: "application/pdf" });
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-    fireEvent.change(fileInput, { target: { files: [largeFile] } });
+    fireEvent.change(fileInput, { target: { files: [oversized] } });
 
-    // Confirm NO UpgradeModal dialog appears for admin
-    await waitFor(() => {
-      expect(screen.queryByRole("dialog")).toBeNull();
-      expect(screen.queryByText("Unlock Unlimited Document Analysis")).toBeNull();
-    });
+    await waitFor(() => expect(screen.getByText(/upload limit is 10 MB/i)).toBeInTheDocument());
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.queryByText(/Upgrade|Pro\b/)).toBeNull();
+    expect(authedFetch).not.toHaveBeenCalledWith(expect.stringContaining("/assignment/parse-brief"), expect.anything());
+  });
 
-    // Admin should see parsed output
-    await waitFor(() => {
-      expect(
-        screen.getByText(/Advanced Institutional Policy Review 2026/i)
-      ).toBeInTheDocument();
-    }, { timeout: 10000 });
-  }, 15000);
-
-  it("Free User Paywall Verification: Free user exceeding 5MB limit receives the styled Upgrade Modal", async () => {
-    getProfile.mockResolvedValue({
-      success: true,
-      profile: {
-        username: "free_student",
-        fullName: "Free Student",
-        email: "free@scholar.edu",
-        phone: "",
-        phoneCountryCode: "",
-        phoneE164: "",
-        affiliation: "College",
-        userType: "student",
-        educationLevel: "undergraduate",
-      },
-    });
-
+  it("An empty file is refused with a clear message", async () => {
     render(<AssignmentWorkspace projectId="proj-brief-1" initialStage="extract" />);
-
-    await waitFor(() => {
-      expect(screen.getByText("Understand Your Brief")).toBeInTheDocument();
-    });
-
-    const uploadTabButton = screen.getByRole("button", {
-      name: /Upload Brief Document/i,
-    });
-    fireEvent.click(uploadTabButton);
-
-    // Create a 8MB file (exceeds free 5MB limit)
-    const oversizedFile = new File([new ArrayBuffer(8 * 1024 * 1024)], "Huge_Handbook.pdf", {
-      type: "application/pdf",
-    });
-
+    await waitFor(() => expect(screen.getByText("Understand Your Brief")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /Upload Brief Document/i }));
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-    fireEvent.change(fileInput, { target: { files: [oversizedFile] } });
-
-    // The action must be intercepted: UpgradeModal must be displayed
-    await waitFor(() => {
-      expect(screen.getByRole("dialog")).toBeInTheDocument();
-      expect(
-        screen.getByText("Unlock Unlimited Document Analysis")
-      ).toBeInTheDocument();
-    });
-
-    // Verify upgrade action buttons
-    const upgradeBtn = screen.getByRole("button", { name: "Upgrade to Pro" });
-    const cancelBtn = screen.getByRole("button", { name: "Cancel" });
-    expect(upgradeBtn).toBeInTheDocument();
-    expect(cancelBtn).toBeInTheDocument();
-
-    // Clicking Cancel closes the modal
-    fireEvent.click(cancelBtn);
-    await waitFor(() => {
-      expect(screen.queryByRole("dialog")).toBeNull();
-    });
+    fireEvent.change(fileInput, { target: { files: [new File([], "empty.txt", { type: "text/plain" })] } });
+    await waitFor(() => expect(screen.getByText(/This file is empty/i)).toBeInTheDocument());
   });
 
   it("Inline Notice & Error Boundary: Corrupted file yields dismissible notice without global crash", async () => {

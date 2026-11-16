@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from "react";
-import { Book, Check, Copy, Edit2 } from "lucide-react";
+import { useMemo,useState } from "react";
+import { Book,Check,Copy,Edit2 } from "lucide-react";
 import type { DiscoveredSource } from "../types";
 import { buildFormattedBibliography } from "../services/assignmentExportService";
 import { formatReferenceHtml } from "../services/referenceListGenerator";
@@ -34,14 +34,14 @@ export function ReferencesCard({ sources, style, savedEdit = "", onSaveEdit }: R
   };
 
   return (
-    <section aria-label="References" data-testid="references-card" className="mt-5 rounded-2xl bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs overflow-hidden">
-      <header className="px-5 py-3 flex items-center justify-between gap-2 bg-neutral-50/50 dark:bg-white/[0.02] border-b border-neutral-100 dark:border-white/5">
-        <h3 className="text-sm font-semibold text-neutral-900 dark:text-white flex items-center gap-2">
+    <section aria-label="References" data-testid="references-card" className="mt-5 rounded-2xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-xs overflow-hidden">
+      <header className="px-5 py-3 flex items-center justify-between gap-2 bg-[color:var(--surface-inset)]/50 border-b border-[color:var(--border-subtle)]">
+        <h3 className="text-sm font-semibold text-[color:var(--text-primary)] flex items-center gap-2">
           <Book className="w-4 h-4 text-emerald-500" aria-hidden="true" />
-          References <span className="text-xs font-normal text-neutral-500">({entries.length})</span>
+          References <span className="text-xs font-normal text-[color:var(--text-muted)]">({entries.length})</span>
         </h3>
         <div className="flex items-center gap-1.5">
-          <button type="button" onClick={copy} className="px-2.5 py-1 rounded-lg text-xs font-medium border border-neutral-200 dark:border-white/15 hover:bg-neutral-100 dark:hover:bg-white/5 cursor-pointer inline-flex items-center gap-1.5">
+          <button type="button" onClick={copy} className="px-2.5 py-1 rounded-lg text-xs font-medium border border-[color:var(--border-subtle)] hover:bg-[color:var(--surface-hover)] cursor-pointer inline-flex items-center gap-1.5">
             {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
             {copied ? "Copied" : "Copy"}
           </button>
@@ -52,7 +52,7 @@ export function ReferencesCard({ sources, style, savedEdit = "", onSaveEdit }: R
                 setDraft(text);
                 setEditing(true);
               }}
-              className="px-2.5 py-1 rounded-lg text-xs font-medium border border-neutral-200 dark:border-white/15 hover:bg-neutral-100 dark:hover:bg-white/5 cursor-pointer inline-flex items-center gap-1.5"
+              className="px-2.5 py-1 rounded-lg text-xs font-medium border border-[color:var(--border-subtle)] hover:bg-[color:var(--surface-hover)] cursor-pointer inline-flex items-center gap-1.5"
             >
               <Edit2 className="w-3.5 h-3.5" /> Edit
             </button>
@@ -67,10 +67,10 @@ export function ReferencesCard({ sources, style, savedEdit = "", onSaveEdit }: R
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             rows={Math.min(14, Math.max(5, draft.split("\n").length + 1))}
-            className="w-full bg-transparent border border-neutral-200/80 dark:border-white/10 rounded-xl p-3 text-[13px] leading-relaxed text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-400"
+            className="w-full bg-transparent border border-[color:var(--border-subtle)] rounded-xl p-3 text-[13px] leading-relaxed text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-neutral-400"
           />
           <div className="flex gap-2 justify-end">
-            <button type="button" onClick={() => setEditing(false)} className="px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-neutral-100 dark:hover:bg-white/5 cursor-pointer">
+            <button type="button" onClick={() => setEditing(false)} className="px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-[color:var(--surface-hover)] cursor-pointer">
               Cancel
             </button>
             <button
@@ -79,14 +79,14 @@ export function ReferencesCard({ sources, style, savedEdit = "", onSaveEdit }: R
                 onSaveEdit?.(draft);
                 setEditing(false);
               }}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 cursor-pointer"
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] cursor-pointer"
             >
               Save
             </button>
           </div>
         </div>
       ) : (
-        <div className="p-5 text-[13px] text-neutral-700 dark:text-neutral-300 leading-relaxed space-y-3">
+        <div className="p-5 text-[13px] text-[color:var(--text-secondary)] leading-relaxed space-y-3">
           {savedEdit.trim()
             ? savedEdit.split(/\n{2,}/).map((p, i) => (
                 <p key={i} className="pl-6 -indent-6 whitespace-pre-wrap">

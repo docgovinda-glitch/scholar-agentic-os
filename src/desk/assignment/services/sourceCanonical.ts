@@ -10,7 +10,7 @@ import { parsePersonName } from "./personName";
  */
 export function parseAuthorStringToCanonical(authorStr: string, order: number): ReferenceAuthor {
   const parsed = parsePersonName(authorStr || "");
-  if (!parsed.family) return { firstName: "", lastName: "[Author unknown]", order };
+  if (!parsed.family) return { firstName: "", lastName: (authorStr || "").trim(), order };
   return { firstName: parsed.given, lastName: parsed.family, order };
 }
 
@@ -18,7 +18,7 @@ export function parseAuthorStringToCanonical(authorStr: string, order: number): 
  * Maps DiscoveredSource or partial source data to CanonicalReference
  */
 export function discoveredSourceToCanonical(source: Partial<DiscoveredSource>): CanonicalReference {
-  const rawAuthors = (source as any).authors;
+  const rawAuthors: unknown = source.authors; // older saves may hold one string
   const authorStrings: string[] = Array.isArray(rawAuthors)
     ? rawAuthors
     : typeof rawAuthors === "string" && rawAuthors.trim()
@@ -28,7 +28,7 @@ export function discoveredSourceToCanonical(source: Partial<DiscoveredSource>): 
   const authors: ReferenceAuthor[] =
     authorStrings.length > 0
       ? authorStrings.map((a, idx) => parseAuthorStringToCanonical(a, idx + 1))
-      : [{ firstName: "", lastName: source.isUserUploaded ? "Course Materials" : "[Author unknown]", order: 1 }];
+      : []; // No author is printed as none (the formatters move the title forward), never a stand-in.
 
   let kind: ReferenceKind = "JournalArticle";
   if (source.type === "book") kind = "Book";

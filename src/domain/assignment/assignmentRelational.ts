@@ -6,6 +6,10 @@
  * writes these rows after every save; the project row stays the source the app reads.
  */
 
+import { isSourceApproved } from "./approvedSources";
+import { countProseWords } from "../../shared/proseBlocks";
+import { normalizeAssignmentAnswers } from "./answerKeys";
+
 export type AssignmentPhase = "extract" | "understand" | "sources" | "drafting" | "submission";
 
 const PHASES: AssignmentPhase[] = ["extract", "understand", "sources", "drafting", "submission"];
@@ -85,6 +89,25 @@ export interface AssignmentSourceOriginRow {
   is_approved: boolean;
 }
 
+/** A full public.project_sources row for one Stage 3 source (every channel). */
+export interface AssignmentSourceRow extends AssignmentSourceOriginRow {
+  project_id: string;
+  title: string;
+  authors: string[];
+  year: number | null;
+  doi: string | null;
+  venue: string | null;
+  url: string | null;
+  abstract: string | null;
+  source_type: string;
+  authority_tier: string;
+  discovered_via: string;
+  discovered_at: string;
+  vault_item_id: string | null;
+  relevance_score: number | null;
+  updated_at: string;
+}
+
 export interface AssignmentRelationalSnapshot {
   project: AssignmentProjectRow;
   files: AssignmentFileRow[];
@@ -92,6 +115,8 @@ export interface AssignmentRelationalSnapshot {
   drafts: AssignmentDraftRevisionRow[];
   submission: AssignmentSubmissionCheckRow | null;
   sourceOrigins: AssignmentSourceOriginRow[];
+  /** Every source in the project's list, for public.project_sources (upserted by project_id, source_id). */
+  sources: AssignmentSourceRow[];
 }
 
 const MAX_PARSED_TEXT = 1_000_000;
@@ -124,9 +149,9 @@ function num(value: unknown): number | null {
   return Number.isFinite(n) && n >= 0 ? Math.round(n) : null;
 }
 
+/** Same count the app shows (markup, table rules and list markers are not words). */
 function words(text: string): number {
-  const t = text.replace(/<[^>]+>/g, " ").trim();
-  return t ? t.split(/\s+/).length : 0;
+  return countProseWords(text);
 }
 
 /** Stable, browser-safe 53-bit string hash (cyrb53), hex-encoded. */
@@ -162,6 +187,19 @@ interface SectionLike {
 
 interface SourceLike {
   id?: string;
+  title?: string;
+  authors?: unknown;
+  year?: unknown;
+  doi?: string;
+  url?: string;
+  journal?: string;
+  venue?: string;
+  abstract?: string;
+  type?: string;
+  authorityTier?: string;
+  peerReviewed?: boolean;
+  retrievedAt?: string;
+  relevanceScore?: unknown;
   status?: string;
   isExcluded?: boolean;
   prescribedInBrief?: boolean;
@@ -264,13 +302,15 @@ export function sourceOrigin(s: SourceLike): AssignmentSourceOriginRow["origin"]
 /** Build every normalized row for one Coursework project. */
 export function buildAssignmentRelationalSnapshot(
   projectId: string,
-  answers: Record<string, unknown>,
+  rawAnswers: Record<string, unknown>,
   now: Date = new Date()
 ): AssignmentRelationalSnapshot {
+  // Saved records are already normalized; a raw one (older save, test) is read the same way.
+  const answers = normalizeAssignmentAnswers(rawAnswers);
   const at = now.toISOString();
-  const briefText = str(answers["assignment_brief_text"]) ?? str(answers["assignment_question"]);
-  const targetWords = num(answers["target_word_count"] ?? answers["word_count"]);
-  const phase = normalizePhase(answers["assignment_current_phase"] ?? answers["assignment_current_stage"]);
+  const briefText = str(answers["assignment_brief"]);
+  const targetWords = num(answers["word_limit"]);
+  const phase = normalizePhase(answers["assignment_current_phase"]);
 
   const files: AssignmentFileRow[] = [];
   const briefFile = str(answers["assignment_brief_file"]);
@@ -308,14 +348,44 @@ export function buildAssignmentRelationalSnapshot(
   const outline = outlineRows(projectId, answers, at);
 
   const sources = readJson<SourceLike[]>(answers["assignment_sources"], []);
-  const approvedIds = new Set(readJson<string[]>(answers["approved_source_ids"], []).map(String));
+  const approvedRaw = readJson<string[] | null>(answers["approved_source_ids"], null);
+  // Before any decision only the brief's prescribed references count (see approvedSources.ts).
+  const approvedIds = Array.isArray(approvedRaw)
+    ? new Set(approvedRaw.map(String))
+    : new Set((Array.isArray(sources) ? sources : []).filter((s) => s?.prescribedInBrief && typeof s.id === "string").map((s) => s.id as string));
   const sourceOrigins: AssignmentSourceOriginRow[] = (Array.isArray(sources) ? sources : [])
     .filter((s): s is SourceLike & { id: string } => typeof s?.id === "string")
     .map((s) => ({
       source_id: s.id,
       origin: sourceOrigin(s),
-      is_approved: approvedIds.has(s.id) || (s.status === "kept" && !s.isExcluded) || Boolean(s.prescribedInBrief),
+      is_approved: isSourceApproved(s, approvedIds),
     }));
+
+  const sourceRows: AssignmentSourceRow[] = (Array.isArray(sources) ? sources : [])
+    .filter((s): s is SourceLike & { id: string } => typeof s?.id === "string" && s.id.length > 0)
+    .map((s, i) => {
+      const year = parseInt(String(s.year ?? ""), 10);
+      const score = Number(s.relevanceScore);
+      return {
+        project_id: projectId,
+        ...sourceOrigins[i],
+        // A malformed index record (a whole abstract as its title) is clamped, not dropped.
+        title: (str(s.title) ?? "Untitled source").slice(0, 2000),
+        authors: (Array.isArray(s.authors) ? s.authors : []).map((a) => String(a).slice(0, 300)).slice(0, 200),
+        year: Number.isFinite(year) && year > 0 && year < 3000 ? year : null,
+        doi: str(s.doi) ?? null,
+        venue: str(s.journal) ?? str(s.venue) ?? null,
+        url: str(s.url) ?? null,
+        abstract: str(s.abstract) ? s.abstract!.slice(0, 20_000) : null,
+        source_type: str(s.type) ?? "scholarly",
+        authority_tier: str(s.authorityTier) ?? (s.peerReviewed ? "A" : "B"),
+        discovered_via: str(s.retrievalSource) ?? sourceOrigins[i].origin,
+        discovered_at: str(s.retrievedAt) ?? at,
+        vault_item_id: str(s.vaultItemId) ?? null,
+        relevance_score: Number.isFinite(score) ? Math.round(score <= 1 ? score * 100 : score) : null,
+        updated_at: at,
+      };
+    });
 
   const sections = readJson<SectionLike[]>(answers["assignment_internal_sections"], []);
   const drafts: AssignmentDraftRevisionRow[] = (Array.isArray(sections) ? sections : [])
@@ -344,7 +414,7 @@ export function buildAssignmentRelationalSnapshot(
     project: {
       project_id: projectId,
       current_phase: phase,
-      title: str(answers["assignment_title"]) ?? str(answers["title"]),
+      title: str(answers["title"]),
       brief_text: briefText ? briefText.slice(0, MAX_PARSED_TEXT) : null,
       target_word_count: targetWords,
       citation_style: str(answers["citation_style"]),
@@ -365,5 +435,6 @@ export function buildAssignmentRelationalSnapshot(
     drafts,
     submission,
     sourceOrigins,
+    sources: sourceRows,
   };
 }

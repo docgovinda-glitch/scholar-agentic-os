@@ -16,6 +16,9 @@
  */
 
 import type { DiscoveredSource, AssignmentDraftingSection } from "../types";
+
+/** What the citation checks read from a section. */
+type CitedSection = Pick<AssignmentDraftingSection, "id" | "title" | "draftContent">;
 import type { CitationAnchor } from "../schemas/sourceSchema";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -165,7 +168,7 @@ function extractSurroundingClaim(content: string, startOffset: number, endOffset
  * @returns Array of citation anchors found in this section
  */
 export function extractCitationAnchors(
-  section: AssignmentDraftingSection,
+  section: CitedSection,
   sources: DiscoveredSource[]
 ): CitationAnchor[] {
   const content = section.draftContent;
@@ -204,7 +207,7 @@ export function extractCitationAnchors(
  * @returns Map from sourceId → array of anchors
  */
 export function buildCitationMap(
-  sections: AssignmentDraftingSection[],
+  sections: CitedSection[],
   sources: DiscoveredSource[]
 ): Map<string, CitationAnchor[]> {
   const map = new Map<string, CitationAnchor[]>();
@@ -225,7 +228,7 @@ export function buildCitationMap(
  * Detect orphaned sources: sources that are approved but never cited.
  */
 export function findOrphanedSources(
-  sections: AssignmentDraftingSection[],
+  sections: CitedSection[],
   approvedSources: DiscoveredSource[]
 ): DiscoveredSource[] {
   const citationMap = buildCitationMap(sections, approvedSources);
@@ -239,7 +242,7 @@ export function findOrphanedSources(
  * Get citation coverage statistics.
  */
 export function getCitationCoverage(
-  sections: AssignmentDraftingSection[],
+  sections: CitedSection[],
   approvedSources: DiscoveredSource[]
 ): {
   totalAnchors: number;

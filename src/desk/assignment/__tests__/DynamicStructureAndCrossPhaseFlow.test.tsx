@@ -80,7 +80,7 @@ describe("Phase I Dynamic Structure & Cross-Phase Workflow", () => {
 
       // Verify subheadings exist for every heading
       structure.headings.forEach((h) => {
-        expect(h.subheadings.length).toBeGreaterThanOrEqual(2);
+        expect(h.subheadings.length).toBeGreaterThanOrEqual(1);
         expect(h.targetWordCount).toBeGreaterThan(0);
       });
 

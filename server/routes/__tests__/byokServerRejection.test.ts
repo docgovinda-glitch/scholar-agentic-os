@@ -65,9 +65,9 @@ describe("Server Ingress Protection — BYOK Credential Rejection", () => {
     expect(res.body.error).toContain("User BYOK API keys are client-held");
   });
 
-  it("rejects POST /api/projects/:id/assignment/plan with 400 when api_key is submitted", async () => {
+  it("rejects POST /api/projects/:id/assignment/outline with 400 when api_key is submitted", async () => {
     const res = await request(app)
-      .post("/api/projects/test-proj-id/assignment/plan")
+      .post("/api/projects/test-proj-id/assignment/outline")
       .send({
         question: "Analyze modern macroeconomic policies",
         api_key: "sk-user-byok-secret-123",

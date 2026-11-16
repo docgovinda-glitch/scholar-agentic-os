@@ -131,8 +131,10 @@ describe("Submission Audit Services", () => {
       const citationResult = auditCitations(mockCompliantText, sampleSources, [], ["src-1", "src-2"]);
       const report = evaluateRubricCompliance(mockCompliantText, sampleBrief, citationResult);
 
-      expect(report.predictedGrade).toMatch(/First Class|Upper Second/);
+      // No grade is predicted; readiness is the share of checks that pass.
+      expect(report.predictedGrade).toBe("Not graded");
       expect(report.readinessPercentage).toBeGreaterThanOrEqual(70);
+      expect(report.criteria?.every((c) => c.score === 0 && c.maxScore === 0)).toBe(true);
       expect(report.criteriaFeedback).toBeDefined();
       expect(report.criteriaFeedback["Critical Evaluation & Dialectical Rigor"]).toBeDefined();
       expect(report.criteriaFeedback["Scholarly Evidence & Sourcing"]).toBeDefined();
@@ -146,7 +148,66 @@ describe("Submission Audit Services", () => {
 
       expect(report.missingRequirements.length).toBeGreaterThan(0);
       expect(report.readinessPercentage).toBeLessThan(70);
-      expect(report.predictedGrade).toMatch(/Lower Second|Third Class|Fail/);
+      expect(report.predictedGrade).toBe("Not graded");
+      expect(report.bandLabel).toMatch(/^\d+ of \d+ checks passed$/);
     });
+  });
+});
+
+import { auditFlowAndTransitions } from "../services/submissionAuditService";
+describe("auditFlowAndTransitions (deterministic, no arbitrary flags)", () => {
+  const p = (t: string) => t.padEnd(60, " .");
+  it("flags only a paragraph with no linking word and no shared key terms", () => {
+    const text = [
+      p("Central banks influence lending through the policy interest rate they set."),
+      p("The policy rate shapes commercial lending decisions across the banking system."),
+      p("Volcanic eruptions shaped medieval agriculture in northern Europe dramatically."),
+      p("Furthermore, quantitative easing changes long-term yields on government bonds."),
+    ].join("\n\n");
+    const r = auditFlowAndTransitions([{ id: "a", title: "A", draftContent: text } as never]);
+    expect(r.issues.map((i) => i.paragraphIndex)).toEqual([2]);
+  });
+});
+
+describe("evaluateRubricCompliance: missing sections", () => {
+  it("reports sections that have no text", () => {
+    const brief = { targetWordCount: 10, rawPrompt: "", instructions: "" } as never;
+    const report = evaluateRubricCompliance("Introduction text. Conclusion text.", brief, undefined, undefined, [
+      { title: "Introduction", draftContent: "Introduction text." },
+      { title: "Analysis", draftContent: "" },
+    ]);
+    expect(report.missingRequirements.join(" ")).toMatch(/1 section\(s\) have no text yet: Analysis/);
+    expect(report.strengths).not.toContain("Every section has text");
+  });
+
+  it("lists only the brief's own marking criteria and invents none when it has none", () => {
+    const brief = { targetWordCount: 10, rawPrompt: "", instructions: "", rubricCriteria: [] } as never;
+    expect(evaluateRubricCompliance("Introduction. Conclusion.", brief).criteria).toEqual([]);
+    const withRubric = { targetWordCount: 10, rawPrompt: "", instructions: "", rubricCriteria: [{ id: "c1", criterion: "Use of evidence", weightPercentage: 40 }] } as never;
+    expect(evaluateRubricCompliance("Introduction. Conclusion.", withRubric).criteria.map((c) => [c.criterion, c.weightPercentage])).toEqual([["Use of evidence", 40]]);
+  });
+});
+
+describe("submission phase completion", () => {
+  it("is complete only when the last check left nothing to fix", async () => {
+    const { submissionPasses } = await import("../context/assignmentState");
+    expect(submissionPasses(null)).toBe(false);
+    expect(submissionPasses({ missingRequirements: ["1 approved source is not cited"] } as never)).toBe(false);
+    expect(submissionPasses({ missingRequirements: [] } as never)).toBe(true);
+    expect(submissionPasses({ readyForSubmission: false } as never)).toBe(false);
+  });
+});
+
+import { evaluateRubricCompliance as evaluateQ } from "../services/submissionAuditService";
+describe("evaluateRubricCompliance: question-by-question briefs", () => {
+  it("does not ask for an introduction or conclusion when the brief sets its own questions", () => {
+    const prompt = "Question 1: Explain how a central bank sets its policy rate. [40 marks]\nQuestion 2: Evaluate quantitative easing since 2008. [60 marks]";
+    const draft = Array.from({ length: 60 }, (_, i) => `Central banks set rates through committees and markets ${i}.`).join(" ");
+    const report = evaluateQ(draft, { rawPrompt: prompt, targetWordCount: 500 } as never, undefined, undefined, [
+      { title: "1.0 Policy rate", draftContent: draft },
+      { title: "2.0 Quantitative easing", draftContent: draft },
+    ]);
+    expect(report.missingRequirements.join(" ")).not.toMatch(/introduction|conclusion/i);
+    expect(report.missingRequirements.join(" ")).not.toMatch(/^Prompt /);
   });
 });

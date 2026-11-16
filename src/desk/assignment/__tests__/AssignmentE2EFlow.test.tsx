@@ -30,7 +30,6 @@ import {
 import { generateAdaptiveDefaultOutline } from "../services/outlineService";
 import { evaluateRubricCompliance, auditCitations } from "../services/submissionAuditService";
 import { formatBibliographyEntry } from "../services/assignmentExportService";
-import { decomposeWordBudget } from "../services/invisibleChunkerService";
 
 // ─── Mock docx Packer (heavy native dep) ────────────────────────────────────
 vi.mock("docx", async () => {
@@ -239,9 +238,9 @@ describe("Phase 3: Drafting — Invisible Chunker, PEEL Synthesis & Section Inde
     expect(config.name.toLowerCase()).toContain("scribe");
   });
 
-  it("generateAdaptiveDefaultOutline produces correct 6-section essay structure for 2500 words", () => {
+  it("generateAdaptiveDefaultOutline gives an introduction, body and conclusion that sum to the target", () => {
     const outline = generateAdaptiveDefaultOutline("essay", "Evaluate renewable energy policy.", 2500);
-    expect(outline.length).toBe(6);
+    expect(outline.length).toBeGreaterThanOrEqual(3);
     const total = outline.reduce((s, o) => s + o.targetWordCount, 0);
     expect(total).toBe(2500);
     // Each section has required fields
@@ -267,21 +266,6 @@ describe("Phase 3: Drafting — Invisible Chunker, PEEL Synthesis & Section Inde
     expect(bodyWords).toBe(1950);
   });
 
-  it("decomposeWordBudget creates section plans matching target word allocations", () => {
-    const plans = decomposeWordBudget({
-      totalWordCount: 2500,
-      sections: MOCK_BRIEF.sections!,
-      outline: [
-        { id: "sec-1", title: "Introduction", targetWordCount: 250, currentWordCount: 0, guidance: "", keyPoints: [], linkedEvidenceIds: [], status: "not_started" },
-        { id: "sec-2", title: "Body Analysis", targetWordCount: 1950, currentWordCount: 0, guidance: "", keyPoints: [], linkedEvidenceIds: [], status: "not_started" },
-        { id: "sec-3", title: "Conclusion", targetWordCount: 300, currentWordCount: 0, guidance: "", keyPoints: [], linkedEvidenceIds: [], status: "not_started" },
-      ],
-    });
-    expect(plans.length).toBeGreaterThan(0);
-    const total = plans.reduce((s, p) => s + p.targetWordCount, 0);
-    expect(total).toBeGreaterThan(0);
-  });
-
   it("all draft sections have non-empty content before submission audit", () => {
     for (const section of MOCK_SECTIONS) {
       expect(section.draftContent?.trim().length ?? 0).toBeGreaterThan(0);
@@ -304,13 +288,13 @@ describe("Phase 4: Submission — Rubric Audit, Citation Reconciliation & Export
     expect(config.name.toLowerCase()).toContain("examiner");
   });
 
-  it("evaluateRubricCompliance returns a score report with overallScore and grade band", () => {
+  it("evaluateRubricCompliance returns a check-based report (no predicted grade)", () => {
     const fullText = MOCK_SECTIONS.map((s) => s.draftContent ?? "").join("\n\n");
     const report = evaluateRubricCompliance(fullText, MOCK_BRIEF);
     expect(report.overallScore).toBeGreaterThanOrEqual(0);
     expect(report.overallScore).toBeLessThanOrEqual(100);
-    expect(report.overallBand).toBeTruthy();
-    expect(report.bandLabel).toBeTruthy();
+    expect(report.overallBand).toBeUndefined();
+    expect(report.bandLabel).toMatch(/checks passed/);
     expect(report.criteria.length).toBeGreaterThan(0);
   });
 

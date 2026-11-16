@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Loader2, RotateCcw, Sparkles, Wand2 } from "lucide-react";
+import { Loader2,RotateCcw,Sparkles } from "lucide-react";
 import type { AssignmentStructure } from "../types";
 
 /**
@@ -43,9 +43,9 @@ export default function OutlineByAiPanel({
   if (!fromAi) return null;
 
   return (
-    <section aria-label="Outline" className="mb-3 rounded-2xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-750 p-3 space-y-2" data-testid="outline-by-ai">
+    <section aria-label="Outline" className="mb-3 rounded-2xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-3 space-y-2" data-testid="outline-by-ai">
       {fromAi ? (
-        <p className="text-[11px] text-neutral-600 dark:text-neutral-400 flex items-center gap-1.5">
+        <p className="text-xs text-[color:var(--text-secondary)] flex items-center gap-1.5">
           <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" aria-hidden="true" />
           {structure?.rationale || "Written by your AI from your brief."}
         </p>
@@ -68,12 +68,12 @@ export default function OutlineByAiPanel({
             onChange={(e) => setRequest(e.target.value)}
             placeholder="Ask for a change, e.g. add a section on ethics"
             maxLength={600}
-            className="flex-1 min-w-0 rounded-lg border border-neutral-200 dark:border-white/10 bg-transparent px-2.5 py-1.5 text-xs text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500"
+            className="flex-1 min-w-0 rounded-lg border border-[color:var(--border-subtle)] bg-transparent px-2.5 py-1.5 text-xs text-[color:var(--text-primary)] placeholder:text-neutral-500"
           />
           <button
             type="submit"
             disabled={busy || !request.trim()}
-            className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 px-2.5 py-1.5 text-xs font-semibold cursor-pointer disabled:opacity-50"
+            className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] px-2.5 py-1.5 text-xs font-semibold cursor-pointer disabled:opacity-50"
           >
             {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : null}
             Change
@@ -89,14 +89,14 @@ export default function OutlineByAiPanel({
             setPrevious(null);
             await onRestore(p);
           }}
-          className="inline-flex items-center gap-1 text-[11px] text-neutral-600 dark:text-neutral-400 underline cursor-pointer"
+          className="inline-flex items-center gap-1 text-xs text-[color:var(--text-secondary)] underline cursor-pointer"
         >
           <RotateCcw className="w-3 h-3" aria-hidden="true" /> Undo the last outline change
         </button>
       )}
 
       {error && (
-        <p role="alert" className="text-[11px] text-red-700 dark:text-red-400">
+        <p role="alert" className="text-xs text-red-700 dark:text-red-400">
           {error}
         </p>
       )}

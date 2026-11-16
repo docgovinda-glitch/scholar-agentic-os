@@ -1,38 +1,33 @@
+import { hasLeakedTemplateHeadings } from "../../../domain/assignment/legacyPurge";
+import type { SectionAnalyticalSynthesis } from "../types";
 import OutlineByAiPanel from "../components/OutlineByAiPanel";
+import { selectApprovedSources } from "../../../domain/assignment/approvedSources";
+import { clipHeadingWords } from "../../../utils/briefQuestions";
+import { countProseWords } from "../../../shared/proseBlocks";
 import { useToast } from "../../../components/ui/FeedbackSystem";
-import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { useState,useCallback,useMemo,useEffect,useRef } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
 import { DraftingSectionIndex } from "../components/DraftingSectionIndex";
 import { DraftingActiveEditor } from "../components/DraftingActiveEditor";
 import {
-  streamSectionGeneration,
-  type InternalSectionPlan,
+streamSectionGeneration,
+type InternalSectionPlan,
 } from "../services/invisibleChunkerService";
-import { buildEvidencePack, serializeEvidencePackForPrompt } from "../services/evidencePackService";
-import { buildContextContinuity, updateContextContinuityAfterSection } from "../services/contextContinuityService";
+import { buildEvidencePack,serializeEvidencePackForPrompt } from "../services/evidencePackService";
+import { buildContextContinuity,updateContextContinuityAfterSection } from "../services/contextContinuityService";
 import type { ContextContinuityState } from "../services/evidencePackService";
 import type { AssignmentDraftingSection } from "../types";
 import {
-  PenTool,
-  ArrowRight,
-  ArrowLeft,
-  CheckCircle2,
-  AlertCircle,
-  Sparkles,
-  Layers,
-  FileCheck,
-  RotateCcw,
-  Book,
-  PanelLeftClose,
-  PanelLeftOpen,
+ArrowRight,
+ArrowLeft,
+CheckCircle2,
+AlertCircle,PanelLeftClose,
+PanelLeftOpen
 } from "lucide-react";
-import { SlideCanvas, extractSlidesFromAcademicText, type SlideDeck } from "../../../features/slides";
+import { SlideCanvas,extractSlidesFromAcademicText,type SlideDeck } from "../../../features/slides";
 import { ReferencesCard } from "../components/ReferencesCard";
 import { selectCitedSources } from "../services/exportText";
 import { buildFormattedBibliography } from "../services/assignmentExportService";
-import { formatReferenceHtml } from "../services/referenceListGenerator";
-import { validateSectionUniqueness } from "../../../features/drafting/services/sectionDraftingEngine";
-import { auditAndEnforceCollegiateStyle } from "../../../features/coursework/services/courseworkOrchestrator";
 
 export interface AssignmentDraftingStageProps {
   onProceed?: () => void;
@@ -88,9 +83,7 @@ export function AssignmentDraftingStage({
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [isTuning, setIsTuning] = useState(false);
   const [showPresentation, setShowPresentation] = useState(false);
-  const [showKeynote, setShowKeynote] = useState(false);
   const [presentationDeck, setPresentationDeck] = useState<SlideDeck | null>(null);
-  const [keynoteDeck, setKeynoteDeck] = useState<SlideDeck | null>(null);
   // Beside the editor on wide screens; on phones it would push the writing
   // area off screen, so it starts hidden there (Previous/Next still move).
   const [showOutline, setShowOutline] = useState(() =>
@@ -99,7 +92,7 @@ export function AssignmentDraftingStage({
 
   const draftMarkdown = useMemo(() => {
     const body = internalSections.map((sec) => `## ${sec.title}\n\n${sec.draftContent || ""}`).join("\n\n");
-    const approved = sources.filter((s) => s.status === "kept" || (approvedSourceIds && approvedSourceIds.includes(s.id)));
+    const approved = selectApprovedSources(sources, approvedSourceIds);
     // The compiled draft lists only what the text cites, plus the brief's prescribed references.
     const refs = buildFormattedBibliography(selectCitedSources(approved, body), citationStyle || "harvard");
     return refs.length ? `${body}\n\n## References\n\n${refs.join("\n\n")}` : body;
@@ -117,17 +110,9 @@ export function AssignmentDraftingStage({
 
   // Auto-tune generic placeholder titles to question if question is present
   useEffect(() => {
-    const briefText = (typeof project?.answers?.["assignment_brief_text"] === "string" ? project.answers["assignment_brief_text"] : "") || question;
+    const briefText = (typeof project?.answers?.["assignment_brief"] === "string" ? project.answers["assignment_brief"] : "") || question;
     if (internalSections.length > 0 && question && question.trim().length > 0) {
-      const isNonML = !/\b(machine learning|deep learning|neural network|transformer|foundation model)\b/i.test(`${question} ${briefText}`);
-      const hasGenericOrLeakedTitles = internalSections.some(
-        (s) =>
-          s.title.includes("Core Concept & Foundational") ||
-          s.title.includes("Empirical Evidence & Contemporary Contextual") ||
-          s.title.startsWith("Body Theme 1: Core Concept") ||
-          (isNonML && /Mathematical Formulations|Loss Optimization Landscapes|Algorithmic Architectures/i.test(s.title)) ||
-          /Divide Yourself in Teams|teams of 2|in classroom discussion/i.test(s.title)
-      );
+      const hasGenericOrLeakedTitles = hasLeakedTemplateHeadings(internalSections.map((s) => s.title), `${question} ${briefText}`);
       if (hasGenericOrLeakedTitles) {
         tuneOutlineWithQuestion();
       }
@@ -152,31 +137,8 @@ export function AssignmentDraftingStage({
   }, [activeSectionId, internalSections]);
 
   // Detailed Mode Academic Integrity & Quality Gates
-  const uniquenessValidation = useMemo(() => {
-    return validateSectionUniqueness(
-      internalSections.map((s) => ({
-        id: s.id,
-        title: s.title,
-        content: s.draftContent || "",
-      }))
-    );
-  }, [internalSections]);
 
-  const activeProseAudit = useMemo(() => {
-    if (!activeSection?.draftContent) return null;
-    return auditAndEnforceCollegiateStyle(activeSection.draftContent);
-  }, [activeSection?.draftContent]);
 
-  const detectedCitationTokens = useMemo(() => {
-    if (!activeSection?.draftContent) return [];
-    const regex = /\[([^\[\]\(\)\r\n]+)\](?!\()/g;
-    const tokens: string[] = [];
-    let m;
-    while ((m = regex.exec(activeSection.draftContent)) !== null) {
-      tokens.push(m[1].trim());
-    }
-    return Array.from(new Set(tokens));
-  }, [activeSection?.draftContent]);
 
   const activeIndex = useMemo(() => {
     if (!activeSection) return -1;
@@ -188,7 +150,7 @@ export function AssignmentDraftingStage({
 
   // Filter approved sources
   const approvedSources = useMemo(() => {
-    return sources.filter((s) => s.status === "kept" || (approvedSourceIds && approvedSourceIds.includes(s.id)));
+    return selectApprovedSources(sources, approvedSourceIds);
   }, [sources, approvedSourceIds]);
 
   // Stream single section (or revision)
@@ -212,7 +174,7 @@ export function AssignmentDraftingStage({
 
       // Get analytical syntheses from project answers
       const projectAnswers = project?.answers || {};
-      const syntheses = (projectAnswers.analyticalSyntheses || projectAnswers.analytical_syntheses || []) as any[];
+      const syntheses = (projectAnswers.analyticalSyntheses || projectAnswers.analytical_syntheses || []) as SectionAnalyticalSynthesis[];
 
       // Build evidence pack for this section
       const evidencePack = buildEvidencePack(
@@ -281,7 +243,7 @@ export function AssignmentDraftingStage({
             remainingEssayWords: Math.max(
               0,
               (targetWordCount || 0) -
-                internalSections.filter((x) => x.id !== sec.id).reduce((n, x) => n + (x.draftContent ? x.draftContent.trim().split(/\s+/).filter(Boolean).length : 0), 0)
+                internalSections.filter((x) => x.id !== sec.id).reduce((n, x) => n + countProseWords(x.draftContent || ""), 0)
             ),
           },
           writingStyle: writingStyle && typeof writingStyle === "object" ? (writingStyle as { preset?: string; customSampleText?: string }) : undefined,
@@ -292,7 +254,7 @@ export function AssignmentDraftingStage({
       } catch (err) {
         // Keep whatever the section had before; never fill it with stand-in text.
         // One clean toast; no uncaught console stack traces.
-        showError(`"${sec.title}" was not drafted: ${err instanceof Error ? err.message : String(err)}`);
+        showError(`"${clipHeadingWords(sec.title)}" was not ${revisionPrompt ? "revised" : "drafted"}: ${err instanceof Error ? err.message : String(err)}`);
         setStreamingChunk("");
         setActiveStreamingSectionId(null);
         setGeneratingSection(sec.id, false);
@@ -379,19 +341,19 @@ export function AssignmentDraftingStage({
   // particular. Ask for the brief instead, unless the student already wrote.
   if (!isLoading && project && !question?.trim() && currentWordCount === 0) {
     return (
-      <div className="max-w-3xl mx-auto p-4 sm:p-6 lg:p-8 text-neutral-900 dark:text-neutral-100">
+      <div className="max-w-3xl mx-auto p-4 sm:p-6 lg:p-8 text-[color:var(--text-primary)]">
         <section
           data-testid="drafting-needs-brief"
-          className="rounded-2xl p-6 sm:p-8 bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-3 text-center"
+          className="rounded-2xl p-6 sm:p-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-xs space-y-3 text-center"
         >
           <h1 className="text-lg sm:text-xl font-semibold tracking-tight">Add your assignment brief first</h1>
-          <p className="text-sm text-neutral-500 dark:text-neutral-400 max-w-md mx-auto">
+          <p className="text-sm text-[color:var(--text-muted)] max-w-md mx-auto">
             Drafting builds its sections from your assignment question, word count and citation style. Enter them in Extract and the outline appears here.
           </p>
           <button
             type="button"
             onClick={() => setPhase("extract")}
-            className="mt-2 px-4 py-2 rounded-xl text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 cursor-pointer"
+            className="mt-2 px-4 py-2 rounded-xl text-xs font-semibold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 cursor-pointer"
           >
             Go to Extract
           </button>
@@ -401,9 +363,9 @@ export function AssignmentDraftingStage({
   }
 
   return (
-    <div className="max-w-[1600px] mx-auto p-3 sm:p-5 space-y-4 text-neutral-900 dark:text-neutral-100">
+    <div className="max-w-[1600px] mx-auto p-3 sm:p-5 space-y-4 text-[color:var(--text-primary)]">
       {/* Compact header: progress and actions in one row, so the page is mostly writing space */}
-      <header className="rounded-2xl px-4 sm:px-5 py-3 bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs flex flex-col lg:flex-row lg:items-center gap-3">
+      <header className="rounded-2xl px-4 sm:px-5 py-3 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-xs flex flex-col lg:flex-row lg:items-center gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <button
             type="button"
@@ -411,28 +373,28 @@ export function AssignmentDraftingStage({
             aria-pressed={showOutline}
             aria-label={showOutline ? "Hide outline" : "Show outline"}
             title={showOutline ? "Hide the outline for more writing space" : "Show the outline"}
-            className="p-2 rounded-lg border border-neutral-200/80 dark:border-white/10 hover:bg-neutral-50 dark:hover:bg-white/5 cursor-pointer shrink-0"
+            className="p-2 rounded-lg border border-[color:var(--border-subtle)] hover:bg-[color:var(--surface-hover)] cursor-pointer shrink-0"
           >
             {showOutline ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
           </button>
           <div className="min-w-0">
-            <h1 className="text-base sm:text-lg font-semibold tracking-tight text-neutral-900 dark:text-white">Drafting</h1>
-            <p className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate">
+            <h1 className="text-base sm:text-lg font-semibold tracking-tight text-[color:var(--text-primary)]">Drafting</h1>
+            <p className="text-xs text-[color:var(--text-muted)] truncate">
               Draft or stream each section. Changes auto-save.
             </p>
           </div>
         </div>
 
         <div className="flex-1 min-w-0 lg:px-4" aria-label="Overall progress">
-          <div className="flex items-center justify-between text-[11px] text-neutral-600 dark:text-neutral-300 mb-1 gap-2">
+          <div className="flex items-center justify-between text-xs text-[color:var(--text-secondary)] mb-1 gap-2">
             <span className="font-semibold tabular-nums">
               {currentWordCount.toLocaleString()} / {targetWordCount.toLocaleString()} words
             </span>
-            <span className="text-neutral-400 dark:text-neutral-500 tabular-nums">
+            <span className="text-[color:var(--text-muted)] tabular-nums">
               aim for {minRequiredWords.toLocaleString()}–{maxAllowedWords.toLocaleString()}
             </span>
           </div>
-          <div className="w-full bg-neutral-200 dark:bg-white/10 h-1.5 rounded-full overflow-hidden">
+          <div className="w-full bg-[color:var(--surface-sunken)] h-1.5 rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-300 ${isWordCountCompliant ? "bg-emerald-500" : "bg-neutral-900 dark:bg-white"}`}
               style={{ width: `${Math.min(100, wordCountPercentage)}%` }}
@@ -454,7 +416,7 @@ export function AssignmentDraftingStage({
               }
             }}
             aria-label="Present Presentation"
-            className="rounded-xl px-3 py-2 text-xs font-medium border border-neutral-200/80 bg-white hover:bg-neutral-50 text-neutral-900 dark:border-white/10 dark:bg-ink-750 dark:hover:bg-neutral-800 dark:text-neutral-100 transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="rounded-xl px-3 py-2 text-xs font-medium border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] hover:bg-[color:var(--surface-hover)] text-[color:var(--text-primary)] transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             <span aria-hidden="true">📽️</span>
             <span>Present</span>
@@ -467,8 +429,8 @@ export function AssignmentDraftingStage({
             title={canProceed ? undefined : "Draft every section and reach the word range first"}
             className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
               canProceed
-                ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 cursor-pointer"
-                : "bg-neutral-100 dark:bg-white/5 text-neutral-400 dark:text-neutral-500 cursor-not-allowed border border-neutral-200/60 dark:border-white/5"
+                ? "bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 cursor-pointer"
+                : "bg-[color:var(--surface-inset)] text-[color:var(--text-muted)] cursor-not-allowed border border-[color:var(--border-subtle)]"
             }`}
           >
             <span>Proceed to Submission Audit</span>
@@ -478,12 +440,12 @@ export function AssignmentDraftingStage({
       </header>
 
       {offlineNotice && (
-        <div role="status" className="text-xs text-neutral-600 dark:text-neutral-400 px-1 space-y-2" data-testid="offline-draft-notice">
+        <div role="status" className="text-xs text-[color:var(--text-secondary)] px-1 space-y-2" data-testid="offline-draft-notice">
           <p>{offlineNotice}</p>
           {offlineScaffold && (
-            <details className="rounded-xl border border-neutral-200/80 dark:border-white/10 bg-neutral-50/70 dark:bg-white/[0.03] px-3 py-2">
-              <summary className="cursor-pointer font-medium text-neutral-800 dark:text-neutral-200">Scaffold for "{offlineScaffold.title}"</summary>
-              <pre className="mt-2 whitespace-pre-wrap font-sans text-[12px] leading-relaxed text-neutral-700 dark:text-neutral-300">{offlineScaffold.text}</pre>
+            <details className="rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]/70 px-3 py-2">
+              <summary className="cursor-pointer font-medium text-[color:var(--text-primary)]">Scaffold for "{offlineScaffold.title}"</summary>
+              <pre className="mt-2 whitespace-pre-wrap font-sans text-[12px] leading-relaxed text-[color:var(--text-secondary)]">{offlineScaffold.text}</pre>
               <div className="mt-2 flex gap-2">
                 <button
                   type="button"
@@ -491,7 +453,7 @@ export function AssignmentDraftingStage({
                     const target = internalSections.find((x) => x.id === offlineScaffold.sectionId);
                     if (target) handleStreamSection(target);
                   }}
-                  className="px-3 py-1 rounded-full bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-medium cursor-pointer"
+                  className="px-3 py-1 rounded-full bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] font-medium cursor-pointer"
                 >
                   Try AI again
                 </button>
@@ -502,7 +464,7 @@ export function AssignmentDraftingStage({
                     setOfflineScaffold(null);
                     setOfflineNotice(null);
                   }}
-                  className="px-3 py-1 rounded-full border border-neutral-300 dark:border-white/15 font-medium cursor-pointer"
+                  className="px-3 py-1 rounded-full border border-[color:var(--border-default)] font-medium cursor-pointer"
                 >
                   Insert scaffold into section
                 </button>
@@ -516,7 +478,7 @@ export function AssignmentDraftingStage({
         <div role="alert" className="flex items-start gap-2 text-xs text-[var(--text-primary)] bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl px-3 py-2">
           <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
           <span className="flex-1">{draftError}</span>
-          <button type="button" onClick={() => setDraftError(null)} className="text-[11px] underline cursor-pointer shrink-0">
+          <button type="button" onClick={() => setDraftError(null)} className="text-xs underline cursor-pointer shrink-0">
             Dismiss
           </button>
         </div>
@@ -562,6 +524,7 @@ export function AssignmentDraftingStage({
             streamingChunk={activeStreamingSectionId === activeSection?.id ? streamingChunk : ""}
             boundSources={approvedSources.filter((s) => activeSection?.boundSourceIds?.includes(s.id))}
             allApprovedSources={approvedSources}
+            citationStyle={citationStyle || "harvard"}
             hasPrevious={hasPrevious}
             hasNext={hasNext}
             onNavigatePrevious={() => {
@@ -591,11 +554,11 @@ export function AssignmentDraftingStage({
       </div>
 
       {/* Phase 3 Exit Gate Bottom Card */}
-      <footer className="rounded-2xl p-5 bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <footer className="rounded-2xl p-5 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <button
           type="button"
           onClick={handleBack}
-          className="px-4 py-2 rounded-xl text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 self-start sm:self-auto"
+          className="px-4 py-2 rounded-xl text-xs font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 self-start sm:self-auto"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>← Back to Sources & Evidence</span>
@@ -612,7 +575,7 @@ export function AssignmentDraftingStage({
               </span>
             </div>
           ) : (
-            <div className="flex items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400">
+            <div className="flex items-center gap-2 text-xs text-[color:var(--text-muted)]">
               <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" />
               <span>
                 {!allSectionsCompleted
@@ -631,8 +594,8 @@ export function AssignmentDraftingStage({
           disabled={!canProceed}
           className={`px-5 py-2.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 shrink-0 self-end sm:self-auto ${
             canProceed
-              ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 active:scale-[0.99] cursor-pointer shadow-xs"
-              : "bg-neutral-100 dark:bg-white/5 text-neutral-400 dark:text-neutral-500 cursor-not-allowed border border-neutral-200/60 dark:border-white/5"
+              ? "bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 active:scale-[0.99] cursor-pointer shadow-xs"
+              : "bg-[color:var(--surface-inset)] text-[color:var(--text-muted)] cursor-not-allowed border border-[color:var(--border-subtle)]"
           }`}
         >
           <span>Proceed to Submission Audit</span>
@@ -641,16 +604,15 @@ export function AssignmentDraftingStage({
       </footer>
 
       {/* Fullscreen Presentation Overlay */}
-      {(showPresentation || showKeynote) && (presentationDeck || keynoteDeck) && (
+      {showPresentation && presentationDeck && (
         <div
           className="fixed inset-0 z-50 bg-paper-sand dark:bg-ink-850 overflow-auto flex flex-col justify-center animate-in fade-in duration-200"
           data-testid="drafting-keynote-overlay"
         >
           <SlideCanvas
-            deck={presentationDeck || keynoteDeck}
+            deck={presentationDeck}
             onClose={() => {
               setShowPresentation(false);
-              setShowKeynote(false);
             }}
           />
         </div>

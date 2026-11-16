@@ -75,8 +75,8 @@ describe("buildAssignmentRelationalSnapshot", () => {
 
   it("tags each source with its channel and approval (Stage 3)", () => {
     expect(snap.sourceOrigins).toEqual([
-      { source_id: "s1", origin: "live", is_approved: true },
-      { source_id: "s2", origin: "prescribed", is_approved: true },
+      { source_id: "s1", origin: "live", is_approved: false },
+      { source_id: "s2", origin: "prescribed", is_approved: false },
       { source_id: "s3", origin: "upload", is_approved: false },
       { source_id: "s4", origin: "vault", is_approved: true },
     ]);

@@ -9,6 +9,7 @@
  */
 
 import type { RawSourceInput } from "../../../citation_compliance/cslEngine";
+import { formatSourceBibliography } from "./citationFormatService";
 import { searchCrossref, searchOpenAlex, searchSemanticScholar } from "../../../shared/retrieval/providers";
 import type { DiscoveredSource, SourceVerificationStatus } from "../types";
 import { authedJsonFetch } from "../../api";
@@ -82,15 +83,12 @@ function determineVerificationStatus(draft: ServerDiscoveredDraft): SourceVerifi
   return "unverified";
 }
 
+/** Reference entry from the shared formatter: no stand-in author when the index lists none. */
 function generateCitationString(draft: ServerDiscoveredDraft): string {
-  const authorStr = draft.authors.length > 0
-    ? draft.authors.length > 2
-      ? `${draft.authors[0]} et al.`
-      : draft.authors.join(" & ")
-    : "Unknown Author";
-  const yearStr = draft.year ? `(${draft.year})` : "(n.d.)";
-  const venue = draft.venue || "";
-  return `${authorStr} ${yearStr}. ${draft.title}.${venue ? ` ${venue}.` : ""}${draft.doi ? ` https://doi.org/${draft.doi}` : ""}`;
+  return formatSourceBibliography(
+    { title: draft.title, authors: draft.authors, year: draft.year ? String(draft.year) : "n.d.", journal: draft.venue, doi: draft.doi, url: draft.url },
+    "apa7"
+  );
 }
 
 // Words in assignment prompts that say what to do, not what it is about.

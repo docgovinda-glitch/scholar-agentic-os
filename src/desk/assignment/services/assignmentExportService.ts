@@ -8,38 +8,39 @@
  * - Formatted Bibliography: Auto-generated reference list formatted to citationStyle (Harvard, APA 7, IEEE, MHRA) with hanging indent
  */
 
-import { selectCitedSources, inlineMarkdownRuns, inlineMarkdownToHtml, proseToHtml, type StyledRun } from "./exportText";
-import { parseProseBlocks, type ProseAlign } from "../../../shared/proseBlocks";
+import { countProseWords } from "../../../shared/proseBlocks";
+import { clipHeadingWords } from "../../../utils/briefQuestions";
+import { selectCitedSources,inlineMarkdownRuns,inlineMarkdownToHtml,proseToHtml,type StyledRun } from "./exportText";
+import { parseProseBlocks,type ProseAlign } from "../../../shared/proseBlocks";
 import {
-  Document,
-  Packer,
-  Paragraph,
-  TextRun,
-  HeadingLevel,
-  AlignmentType,
-  Header,
-  Footer,
-  PageNumber,
-  PageBreak,
-  Table,
-  TableRow,
-  TableCell,
-  WidthType,
-  BorderStyle,
+Document,
+Packer,
+Paragraph,
+TextRun,
+HeadingLevel,
+AlignmentType,
+Header,
+Footer,
+PageNumber,
+PageBreak,
+Table,
+TableRow,
+TableCell,
+WidthType,
+BorderStyle,
 } from "docx";
 import type {
-  AssignmentBriefState,
-  AssignmentDraftingSection,
-  DiscoveredSource,
+AssignmentBriefState,
+AssignmentDraftingSection,
+DiscoveredSource,
 } from "../types";
 import {
-  formatReference,
-  generateReferenceList,
-  generateReferenceListBlock,
-  getReferenceListHeading,
+formatReference,
+generateReferenceList,
+generateReferenceListBlock,
+getReferenceListHeading,
 } from "./referenceListGenerator";
 import { isTutorialOrShortQABrief } from "../../../utils/briefExtractor";
-import { splitProseIntoParagraphs } from "../../../shared/proseParagraphs";
 import { authedFetch } from "../../api";
 
 const ACADEMIC_LEVEL_NAMES: Record<string, string> = {
@@ -197,20 +198,35 @@ export function downloadBlob(blob: Blob, filename: string): void {
  */
 export async function generateAssignmentDocx(params: AssignmentExportParams): Promise<Blob> {
   const { brief, sections, sources, actualWordCount } = params;
-  // Everything interpolated into the print window is escaped (titles and cover
-  // details can come from an uploaded brief).
-  const title = escapeHtmlText(params.title);
+  // docx escapes text itself: these stay raw (HTML-escaping them would print "&amp;" in Word).
+  const title = params.title;
   // Cover details are the student's own; a missing one is shown as missing, never invented.
-  const studentName = escapeHtmlText(params.studentName || "—");
-  const studentId = escapeHtmlText(params.studentId || "—");
-  const institution = escapeHtmlText(params.institution || "");
-  const courseName = escapeHtmlText(params.courseName || params.brief.courseDetails?.courseName || "");
+  const studentName = params.studentName || "—";
+  const studentId = params.studentId || "—";
+  const institution = params.institution || "";
+  const courseName = params.courseName || params.brief.courseDetails?.courseName || "";
+  // Only sources cited in the body plus the brief's prescribed references, once each.
+  const bodyText = sections.map((sec) => sec.draftContent || "").join("\n\n");
+  const bibliographyEntries = buildFormattedBibliography(selectCitedSources(sources, bodyText), brief.citationStyle || "harvard");
+  const referenceHeading = () =>
+    new Paragraph({
+      heading: HeadingLevel.HEADING_1,
+      spacing: { before: 240, after: 240 },
+      children: [new TextRun({ text: getReferenceListHeading(brief.citationStyle || "harvard"), font: "Times New Roman", size: 28, bold: true })],
+    });
+  // Hanging indent standard for academic bibliographies (720 dxa = 0.5 in).
+  const referenceEntries = () =>
+    bibliographyEntries.map(
+      (refText) =>
+        new Paragraph({
+          indent: { left: 720, hanging: 720 },
+          spacing: { line: 360, after: 140 },
+          children: inlineMarkdownRuns(refText).map((r) => docxRun(r)),
+        })
+    );
 
   const computedWordCount = actualWordCount ??
-    sections.reduce((acc, s) => {
-      const words = (s.draftContent || "").trim().split(/\s+/).filter(Boolean).length;
-      return acc + words;
-    }, 0);
+    sections.reduce((acc, s) => acc + countProseWords(s.draftContent || ""), 0);
 
   const formattedDate = new Date().toLocaleDateString("en-GB", {
     day: "numeric",
@@ -257,7 +273,7 @@ export async function generateAssignmentDocx(params: AssignmentExportParams): Pr
           spacing: { before: idx === 0 ? 100 : 300, after: 120 },
           children: [
             new TextRun({
-              text: sec.title,
+              text: clipHeadingWords(sec.title),
               font: "Times New Roman",
               size: 26, // 13pt
               bold: true,
@@ -268,6 +284,9 @@ export async function generateAssignmentDocx(params: AssignmentExportParams): Pr
 
       qnaChildren.push(...proseToDocxBlocks(sec.draftContent || "", 320, 140));
     });
+
+    // A short answer that cites sources still carries its reference list.
+    if (bibliographyEntries.length > 0) qnaChildren.push(referenceHeading(), ...referenceEntries());
 
     const doc = new Document({
       sections: [
@@ -429,7 +448,7 @@ export async function generateAssignmentDocx(params: AssignmentExportParams): Pr
         spacing: { before: idx === 0 ? 0 : 360, after: 180 },
         children: [
           new TextRun({
-            text: sec.title,
+            text: clipHeadingWords(sec.title),
             font: "Times New Roman",
             size: 28, // 14pt
             bold: true,
@@ -462,56 +481,16 @@ export async function generateAssignmentDocx(params: AssignmentExportParams): Pr
   });
 
   // Bibliography / Reference List
-  // Only sources cited in the body plus the brief's prescribed references, once each.
-  const bodyText = sections.map((sec) => sec.draftContent || "").join("\n\n");
-  const bibliographyEntries = buildFormattedBibliography(selectCitedSources(sources, bodyText), brief.citationStyle || "harvard");
-
-  bodyChildren.push(
-    new Paragraph({
-      children: [new PageBreak()],
-    })
-  );
-
-  bodyChildren.push(
-    new Paragraph({
-      heading: HeadingLevel.HEADING_1,
-      spacing: { before: 240, after: 240 },
-      children: [
-        new TextRun({
-          text: getReferenceListHeading(brief.citationStyle || "harvard"),
-          font: "Times New Roman",
-          size: 28, // 14pt
-          bold: true,
-        }),
-      ],
-    })
-  );
-
+  bodyChildren.push(new Paragraph({ children: [new PageBreak()] }), referenceHeading());
   if (bibliographyEntries.length === 0) {
     bodyChildren.push(
       new Paragraph({
         spacing: { line: 360, after: 120 },
-        children: [
-          new TextRun({
-            text: "No references cited.",
-            font: "Times New Roman",
-            size: 24,
-            italics: true,
-          }),
-        ],
+        children: [new TextRun({ text: "No references cited.", font: "Times New Roman", size: 24, italics: true })],
       })
     );
   } else {
-    bibliographyEntries.forEach((refText) => {
-      bodyChildren.push(
-        new Paragraph({
-          // Hanging indent standard for academic bibliographies (720 dxa = 0.5 in)
-          indent: { left: 720, hanging: 720 },
-          spacing: { line: 360, after: 140 },
-          children: inlineMarkdownRuns(refText).map((r) => docxRun(r)),
-        })
-      );
-    });
+    bodyChildren.push(...referenceEntries());
   }
 
   // Construct complete docx Document
@@ -650,10 +629,7 @@ export function exportAssignmentToPdf(params: AssignmentExportParams): void {
   const courseName = escapeHtmlText(params.courseName || params.brief.courseDetails?.courseName || "");
 
   const computedWordCount = actualWordCount ??
-    sections.reduce((acc, s) => {
-      const words = (s.draftContent || "").trim().split(/\s+/).filter(Boolean).length;
-      return acc + words;
-    }, 0);
+    sections.reduce((acc, s) => acc + countProseWords(s.draftContent || ""), 0);
 
   const formattedDate = new Date().toLocaleDateString("en-GB", {
     day: "numeric",

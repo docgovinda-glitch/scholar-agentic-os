@@ -8,7 +8,8 @@ import type { Block, CanonicalDocument } from "../../types";
 import type { DiscoveredSource } from "../types";
 import { selectCitedSources } from "./exportText";
 import { generateReferenceList, getReferenceListHeading } from "./referenceListGenerator";
-import { parseProseBlocks } from "../../../shared/proseBlocks";
+import { countProseWords, parseProseBlocks } from "../../../shared/proseBlocks";
+import { clipHeadingWords } from "../../../utils/briefQuestions";
 
 const MAX_TEXT = 400_000;
 
@@ -27,9 +28,11 @@ export const AssignmentPdfRequestSchema = z.object({
     .array(
       z
         .object({
+          // A malformed index record (e.g. a whole abstract as its title) is clamped,
+          // never allowed to fail the student's export.
           id: z.string().max(300),
-          title: z.string().max(2000),
-          authors: z.array(z.string().max(300)).max(200).default([]),
+          title: z.string().transform((t) => t.slice(0, 2000)),
+          authors: z.array(z.string().transform((a) => a.slice(0, 300))).transform((a) => a.slice(0, 200)).default([]),
           year: z.union([z.string(), z.number()]).optional(),
         })
         .passthrough()
@@ -40,7 +43,8 @@ export const AssignmentPdfRequestSchema = z.object({
 
 export type AssignmentPdfRequest = z.infer<typeof AssignmentPdfRequestSchema>;
 
-const words = (t: string) => (t.trim() ? t.trim().split(/\s+/).length : 0);
+// Same count as the app (markup, table rules and list markers are not words).
+const words = (t: string) => countProseWords(t);
 
 export function buildAssignmentCanonicalDocument(input: AssignmentPdfRequest, id = "assignment"): CanonicalDocument {
   const blocks: Block[] = [];
@@ -61,7 +65,7 @@ export function buildAssignmentCanonicalDocument(input: AssignmentPdfRequest, id
   for (const line of cover) push("paragraph", line);
 
   for (const s of input.sections) {
-    push("heading1", s.title || "Untitled section");
+    push("heading1", clipHeadingWords(s.title || "") || "Untitled section");
     for (const b of parseProseBlocks(s.draftContent || "")) {
       if (b.kind === "paragraph") push("paragraph", b.text, b.align);
       else if (b.kind === "heading") push("heading2", b.text, b.align);

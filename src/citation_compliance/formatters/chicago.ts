@@ -36,14 +36,14 @@ export class ChicagoFormatter implements CitationStyle {
     const year = authorDateYear(reference);
     const link = doiUrl(reference);
     const parts: string[] = [];
-    if (authors) parts.push(endSentence(authors));
-    parts.push(`${year}.`);
+    const title = reference.kind === "Book" ? endSentence(`*${reference.title}*`) : quotedTitle(reference.title, ".");
+    // Chicago 15.37: with no author, the title leads the entry.
+    if (authors) parts.push(endSentence(authors), `${year}.`, title);
+    else parts.push(title, `${year}.`);
     if (reference.kind === "Book") {
-      parts.push(endSentence(`*${reference.title}*`));
       const pub = publisherOf(reference);
       if (pub) parts.push(endSentence(pub));
     } else {
-      parts.push(quotedTitle(reference.title, "."));
       const journal = journalOf(reference);
       if (journal) {
         let c = `*${journal}*`;

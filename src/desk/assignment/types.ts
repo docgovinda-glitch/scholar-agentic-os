@@ -4,7 +4,6 @@
  */
 
 import type { CanonicalReference } from "../../citation_compliance/model/reference";
-import type { CitationStyleType } from "../../services/vault/citationService";
 import type { CanonicalDocument } from "../../domain/document/model";
 import type { EvidenceLedger } from "../../domain/evidence/types";
 
@@ -121,7 +120,7 @@ export const ASSIGNMENT_AGENT_CONFIGS: Record<AssignmentPhaseId, AssignmentAgent
     description: "I'll audit your submission against the grading rubric, reconcile citations, and ensure formatting perfection.",
     iconPath: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
     quickActions: [
-      "Explain predicted grade",
+      "Explain the marking criteria",
       "Audit unresolved citations",
       "Check university formatting",
     ],
@@ -177,19 +176,19 @@ export function normalizeAssignmentPhase(phaseOrStage?: string | null): Assignme
   return "extract";
 }
 
-export type LegacyAssignmentStage =
-  | "understand"
-  | "plan"
-  | "research"
-  | "evidence"
-  | "think"
-  | "structure"
-  | "draft"
-  | "final";
+/**
+ * Stage ids of the old 8-stage flow. They survive only as URL / saved-value
+ * aliases: normalizeAssignmentPhase maps each to one of the five phases.
+ */
+export type LegacyAssignmentStage = "plan" | "research" | "evidence" | "think" | "structure" | "draft" | "final";
 
-export type AssignmentStage =
-  | AssignmentPhaseId
-  | LegacyAssignmentStage;
+/** A stage id as it may appear in a URL: a phase, or a legacy alias for one. */
+export type AssignmentStage = AssignmentPhaseId | LegacyAssignmentStage;
+
+/** True for every id the Coursework URL accepts (the five phases and the legacy aliases). */
+export function isAssignmentStageId(value: string | undefined): value is AssignmentStage {
+  return !!value && value.toLowerCase() in LEGACY_STAGE_TO_PHASE_MAP;
+}
 
 export type AcademicLevel = "high_school" | "undergraduate" | "postgraduate" | "doctoral";
 
@@ -213,14 +212,6 @@ export type AssignmentType =
   | "short_answer"
   | "other";
 
-export interface StageDefinition {
-  id: AssignmentStage;
-  number: number;
-  label: string;
-  shortLabel: string;
-  description: string;
-  icon: string;
-}
 
 export type StageStatus =
   | "completed"
@@ -563,40 +554,6 @@ export interface TutorChatMessage {
   patch?: TutorWorkspacePatch;
 }
 
-export const ASSIGNMENT_STAGES: StageDefinition[] = [
-  {
-    id: "understand",
-    number: 1,
-    label: "Phase 1: Understand",
-    shortLabel: "Understand",
-    description: "Brief intake, word budget, rubric criteria & AI analysis",
-    icon: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
-  },
-  {
-    id: "sources",
-    number: 2,
-    label: "Phase 2: Sources",
-    shortLabel: "Sources",
-    description: "Scholarly discovery, Knowledge Vault integration & evidence ledger",
-    icon: "M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z",
-  },
-  {
-    id: "drafting",
-    number: 3,
-    label: "Phase 3: Drafting",
-    shortLabel: "Drafting",
-    description: "Structured section drafting, real-time word budgets & AI polish",
-    icon: "M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z",
-  },
-  {
-    id: "submission",
-    number: 4,
-    label: "Phase 4: Submission",
-    shortLabel: "Submission",
-    description: "10-point rubric assessment, citation audit & camera-ready export",
-    icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
-  },
-];
 
 
 export const ASSIGNMENT_TYPE_LABELS: Record<AssignmentType, string> = {
@@ -668,6 +625,12 @@ export const WRITING_TONE_OPTIONS: { id: string; label: string }[] = [
 
 export const AGENTIC_THINKING_STAGES = ["Your AI is reading the brief and writing the outline…"];
 
+/**
+ * How long the browser waits for the AI to write an outline before showing the
+ * starter outline. Local and free-tier models often need more than a minute.
+ */
+export const AI_OUTLINE_TIMEOUT_MS = 120_000;
+
 export const COMMON_COMMAND_VERBS: Record<string, { definition: string; keyAction: string }> = {
   "critically discuss": {
     definition: "Give a balanced and reasoned argument investigating different viewpoints, with substantiated evaluation of strengths and flaws.",
@@ -723,47 +686,26 @@ export interface SectionBreakdown {
   conclusion: SectionDetail;
 }
 
-export interface AssignmentProjectAnswers {
-  instructions: string;
-  academicLevel: AcademicLevel;
-  assignmentType: AssignmentType;
-  targetWordCount: number;
-  citationStyle: string;
-  sections?: SectionBreakdown;
-  courseDetails?: CourseDetails;
-  assignment_analysis?: AssignmentAnalysis;
-  brief_ledger?: DocumentRequirement[];
-  assignment_plan?: ResearchPlan;
-  structure?: AssignmentStructure;
-  assignment_structure?: AssignmentStructure;
-  analyticalSyntheses?: SectionAnalyticalSynthesis[];
-  analytical_syntheses?: SectionAnalyticalSynthesis[];
-  activeSourceView?: "vault" | "analysis";
-  // Legacy / interoperability aliases
-  assignment_question?: string;
-  assignment_brief_text?: string;
-  research_topic?: string;
-  word_count?: number;
-  word_limit?: number;
-  target_word_count?: number;
-  citation_style?: string;
-  academic_level?: AcademicLevel;
-  assignment_type?: AssignmentType;
-  course_name?: string;
-  institution?: string;
-  deadline?: string;
-  marking_rubric?: string;
-  [key: string]: any;
+
+/** A writing tone saved as a string or as { preset } / { id } (older saves), as a string. */
+export function tonePresetOf(tone: unknown): string {
+  if (typeof tone === "string") return tone;
+  if (tone && typeof tone === "object") {
+    const t = tone as { preset?: unknown; id?: unknown };
+    if (typeof t.preset === "string") return t.preset;
+    if (typeof t.id === "string") return t.id;
+  }
+  return "";
 }
 
-export function cleanAnswerString(val: any): string {
+export function cleanAnswerString(val: unknown): string {
   if (typeof val !== "string") return "";
   const trimmed = val.trim();
   if (trimmed.toLowerCase() === "provisional") return "";
   return trimmed;
 }
 
-export function extractStandardizedInstructions(answers: Record<string, any> = {}): string {
+export function extractStandardizedInstructions(answers: Record<string, unknown> = {}): string {
   const candidates = [
     answers.instructions,
     answers.assignment_question,
@@ -781,37 +723,29 @@ export function extractStandardizedInstructions(answers: Record<string, any> = {
   return "";
 }
 
-export function normalizeProjectAnswers(answers: any) {
-  if (!answers || typeof answers !== "object") return answers;
-  const target = Number(answers.targetWordCount || answers.word_count || answers.target_word_count || answers.word_limit) || 2000;
-  if (!answers.sections) {
-    const intro = Math.round(target * 0.10);
-    const conclusion = Math.round(target * 0.15);
-    const body = Math.max(0, target - intro - conclusion);
-
-    answers.sections = {
+/**
+ * The answers with a default 10/75/15 intro/body/conclusion split when none is
+ * saved (a customised split is kept as it is). The target is the canonical
+ * word_limit, or an older alias, or 2,000 words.
+ */
+export function normalizeProjectAnswers<T extends Record<string, unknown> & { sections?: SectionBreakdown }>(
+  answers: T
+): T & { sections: SectionBreakdown } {
+  const target = Number(answers.word_limit || answers.targetWordCount || answers.word_count || answers.target_word_count) || 2000;
+  if (answers.sections) return answers as T & { sections: SectionBreakdown };
+  const intro = Math.round(target * 0.1);
+  const conclusion = Math.round(target * 0.15);
+  const body = Math.max(0, target - intro - conclusion);
+  return Object.assign(answers, {
+    sections: {
       isCustomized: false,
-      intro: { targetWords: intro, guidelines: '' },
-      body: { targetWords: body, guidelines: '' },
-      conclusion: { targetWords: conclusion, guidelines: '' },
-    };
-  }
-  return answers;
+      intro: { targetWords: intro, guidelines: "" },
+      body: { targetWords: body, guidelines: "" },
+      conclusion: { targetWords: conclusion, guidelines: "" },
+    },
+  });
 }
 
-export function getSectionPromptGuidelines(
-  sectionKey: 'intro' | 'body' | 'conclusion',
-  answers: any
-): string {
-  const section = answers?.sections?.[sectionKey];
-  const targetWords = section?.targetWords ?? 500;
-  const guidelines = section?.guidelines?.trim();
-
-  return `
-SECTION ALLOCATION: ~${targetWords} words
-USER INSTRUCTIONS / MANDATORY CONTENT: ${guidelines ? guidelines : 'Standard academic rigor and appropriate depth for this section.'}
-`.trim();
-}
 
 /**
  * ============================================================================
@@ -1050,7 +984,7 @@ export function structureToInternalSections(structure?: AssignmentStructure | nu
   // MAX_DRAFTING_SECTIONS, draft one section per heading instead.
   const flatCount = structure.headings.reduce((n, h) => n + Math.max(1, h.subheadings?.length ?? 0), 0);
   const mergeSubheadings = flatCount > MAX_DRAFTING_SECTIONS;
-  structure.headings.forEach((h, hIdx) => {
+  structure.headings.forEach((h) => {
     // A heading whose sub-parts would each get a very small budget is drafted as one section.
     const tooSmall = (h.subheadings ?? []).length > 1 && (h.subheadings ?? []).some((x) => x.targetWordCount > 0 && x.targetWordCount < MIN_DRAFTING_SECTION_WORDS);
     if (!mergeSubheadings && !tooSmall && h.subheadings && h.subheadings.length > 0) {
@@ -1239,6 +1173,12 @@ export interface SectionAnalyticalSynthesis {
   analyticalLink: string;
   isUserEdited?: boolean;
   userNotes?: string;
+  /**
+   * Where the card's claim/evidence came from: a quote checked against the
+   * source ("source_evidence") or the source's own abstract. Cards without it
+   * and not edited by the student are old template cards: never sent to the AI.
+   */
+  basedOn?: "source_evidence" | "abstract";
 }
 
 export interface AssignmentSourcesState {

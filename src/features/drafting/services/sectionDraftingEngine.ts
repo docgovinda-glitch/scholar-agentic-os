@@ -10,40 +10,6 @@
  * - Strict section uniqueness (<20% overlap) and automated quality evaluation
  */
 
-import type { AcademicTone } from "../types/drafting";
-import {
-  compileAcademicSystemPrompt,
-  BANNED_ACADEMIC_BUZZWORDS,
-  BANNED_THROAT_CLEARING_OPENINGS,
-} from "../prompts/academicWritingPrompts";
-import {
-  normalizeAcademicTone,
-  compileTonePromptDirectives,
-} from "./academicToneProfiles";
-import {
-  evaluateWritingQuality,
-  calculateRepetitionRatio,
-} from "./writingQualityEvaluator";
-
-export interface SectionDraftParams {
-  sectionTitle: string;
-  assignmentQuestion?: string;
-  academicFunction?: string;
-  targetWordCount?: number;
-  academicLevel?: string;
-  citationStyle?: string;
-  thesis?: string;
-  keyPoints?: string[];
-  tone?: AcademicTone | string;
-  boundSources?: Array<{
-    title: string;
-    authors?: string[];
-    year?: string;
-    citation?: string;
-  }>;
-  revisionPrompt?: "deepen" | "expand" | "condense";
-  allDraftedSections?: Array<{ id?: string; title: string; content: string }>;
-}
 
 export interface UniquenessValidationResult {
   isUnique: boolean;
@@ -118,54 +84,4 @@ export function validateSectionUniqueness(
     isUnique: true,
     maxSimilarity: Math.round(maxSimilarity * 100) / 100,
   };
-}
-
-/**
- * Assembles a comprehensive LLM drafting prompt adhering to college writing tone standards.
- */
-export function assembleDraftingPrompt(params: SectionDraftParams): {
-  systemPrompt: string;
-  userPrompt: string;
-} {
-  const tone = normalizeAcademicTone(params.tone);
-  const systemPrompt = compileAcademicSystemPrompt(tone, {
-    topic: params.sectionTitle,
-    question: params.assignmentQuestion,
-    academicLevel: params.academicLevel || "undergraduate",
-    citationStyle: params.citationStyle || "apa7",
-  });
-
-  let userPrompt = `Draft the following academic section adhering strictly to collegiate clarity and active voice standards.\n\n`;
-  userPrompt += `SECTION TITLE: ${params.sectionTitle}\n`;
-  if (params.assignmentQuestion) {
-    userPrompt += `ASSIGNMENT QUESTION: ${params.assignmentQuestion}\n`;
-  }
-  if (params.targetWordCount) {
-    userPrompt += `TARGET WORD COUNT: ~${params.targetWordCount} words\n`;
-  }
-  if (params.thesis) {
-    userPrompt += `CENTRAL THESIS: ${params.thesis}\n`;
-  }
-  if (params.keyPoints && params.keyPoints.length > 0) {
-    userPrompt += `KEY INQUIRY POINTS:\n${params.keyPoints.map((p) => `- ${p}`).join("\n")}\n`;
-  }
-  if (params.boundSources && params.boundSources.length > 0) {
-    userPrompt += `EVIDENTIARY SOURCES TO INTEGRATE:\n${params.boundSources
-      .map(
-        (s) =>
-          `- ${s.title} (${s.authors?.join(", ") || "Author"}, ${s.year || "Year"})`
-      )
-      .join("\n")}\n`;
-  }
-  if (params.revisionPrompt) {
-    userPrompt += `REVISION DIRECTIVE: ${params.revisionPrompt.toUpperCase()}\n`;
-  }
-
-  userPrompt += `\nSTRICT INSTRUCTIONS:\n`;
-  userPrompt += `- Ensure active voice in at least 80% of sentences.\n`;
-  userPrompt += `- Start directly with the main analytical point in sentence 1 (NO throat-clearing fluff).\n`;
-  userPrompt += `- Forbid pretentious buzzwords like "Primary Phenomenon" or "computational expediency".\n`;
-  userPrompt += `- Maintain Flesch-Kincaid Grade Level 11–14.\n`;
-
-  return { systemPrompt, userPrompt };
 }

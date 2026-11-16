@@ -43,25 +43,20 @@ export default function AssignmentStageNavigation({
 
   const visiblePhases = useMemo(() => ASSIGNMENT_PHASES.map((p, idx) => ({ ...p, displayNumber: idx + 1 })), []);
 
-  // Global Progress Percentages for each phase
-  const phasePercentages = useMemo(() => {
+  // A short fact per stage (no made-up percentages): what is there, not a score.
+  const phaseFacts = useMemo<Record<AssignmentPhaseId, string>>(() => {
     const hasBrief = Boolean(question && question.trim().length > 10);
-    const p1 = hasBrief ? 100 : question?.trim() ? 50 : 0;
-    // A placeholder structure on a new project is not progress: only an outline
-    // built from a real brief counts.
     const hasOutline = hasBrief && (structure?.headings?.length ?? 0) > 0;
-    const p2 = !hasBrief ? 0 : structure?.isConfirmed ? 100 : hasOutline ? 75 : 50;
-    const p3 = Math.min(100, Math.round((approvedSourceIds.length / 4) * 100));
-    const p4 = Math.min(100, wordCountPercentage || 0);
-    const p5 = submissionReport ? 100 : 0;
+    const report = submissionReport as { bandLabel?: string } | null;
+    const checks = report?.bandLabel?.match(/^(\d+) of (\d+)/);
     return {
-      extract: p1,
-      understand: p2,
-      sources: p3,
-      drafting: p4,
-      submission: p5,
+      extract: hasBrief ? "brief added" : "",
+      understand: structure?.isConfirmed ? "confirmed" : hasOutline ? "outline ready" : "",
+      sources: approvedSourceIds.length ? `${approvedSourceIds.length} approved` : "",
+      drafting: currentWordCount > 0 ? `${Math.min(999, wordCountPercentage || 0)}% of words` : "",
+      submission: checks ? `${checks[1]}/${checks[2]} checks` : "",
     };
-  }, [structure, question, approvedSourceIds.length, wordCountPercentage, submissionReport]);
+  }, [structure, question, approvedSourceIds.length, wordCountPercentage, currentWordCount, submissionReport]);
 
   // On narrow screens the stepper scrolls sideways: keep the current stage in view.
   const activeStepRef = useRef<HTMLButtonElement>(null);
@@ -92,7 +87,7 @@ export default function AssignmentStageNavigation({
 
   return (
     <nav
-      className={`w-full bg-white dark:bg-ink-750 border-b border-neutral-200/80 dark:border-white/10 px-4 pt-1 pb-2.5 sm:px-6 flex items-center justify-between gap-4 shrink-0 transition-colors z-10 ${className}`}
+      className={`w-full bg-[color:var(--surface-raised)] border-b border-[color:var(--border-subtle)] px-4 pt-1 pb-2.5 sm:px-6 flex items-center justify-between gap-4 shrink-0 transition-colors z-10 ${className}`}
       aria-label="Assignment Workflow Phases"
     >
       {/* Horizontal Progress Stepper (4 steps in Minimal, 5 steps in Detailed) */}
@@ -100,9 +95,9 @@ export default function AssignmentStageNavigation({
         {visiblePhases.map((phase, idx) => {
           const isActive = currentPhase === phase.id;
           const status = phaseStatuses?.[phase.id] || (isActive ? "active" : "upcoming");
-          const isCompleted = status === "completed" || phasePercentages[phase.id] === 100;
+          const isCompleted = status === "completed";
           const formattedNumber = `0${phase.displayNumber}`;
-          const progressPct = phasePercentages[phase.id];
+          const fact = phaseFacts[phase.id];
 
           return (
             <React.Fragment key={phase.id}>
@@ -123,46 +118,41 @@ export default function AssignmentStageNavigation({
                   onSelectStage?.();
                 }}
                 aria-label={`Phase ${phase.number}: ${phase.shortLabel}`}
+                title={fact ? `${phase.shortLabel}: ${fact}` : phase.shortLabel}
                 ref={isActive ? activeStepRef : undefined}
                 aria-current={isActive ? "step" : undefined}
                 className={`group flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all shrink-0 cursor-pointer ${
                   isActive
-                    ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-xs font-semibold"
+                    ? "bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] shadow-xs font-semibold"
                     : isCompleted
-                    ? "bg-neutral-100 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200/70 dark:hover:bg-white/10"
-                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5"
+                    ? "bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)]"
+                    : "text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)]"
                 }`}
               >
                 {/* Visual State: Number Badge / Completed Check / Active Indicator */}
                 <div
-                  className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-mono shrink-0 transition-colors ${
+                  className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-mono shrink-0 transition-colors ${
                     isActive
                       ? "bg-white/20 text-white dark:bg-black/10 dark:text-neutral-900 font-bold"
                       : isCompleted
                       ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold"
-                      : "bg-neutral-200/70 dark:bg-white/10 text-neutral-500 dark:text-neutral-400"
+                      : "bg-[color:var(--surface-sunken)]/70 text-[color:var(--text-muted)]"
                   }`}
                 >
-                  {isCompleted ? (
-                    <Check className="w-3 h-3 stroke-[2.5]" />
-                  ) : (
-                    <span>{formattedNumber}</span>
-                  )}
+                  <span>{formattedNumber}</span>
                 </div>
 
                 {/* Phase Icon */}
-                <span className={isActive ? "text-white dark:text-neutral-900" : "text-neutral-400 dark:text-neutral-500 group-hover:text-current"}>
+                <span className={isActive ? "text-white" : "text-[color:var(--text-muted)] group-hover:text-current"}>
                   {renderIcon(phase.iconKey, isActive)}
                 </span>
 
                 {/* Title & Percentage */}
                 <div className="flex items-center gap-1.5 truncate max-w-[130px] sm:max-w-none">
                   <span className="truncate">{phase.shortLabel}</span>
-                  <span className={`text-[10px] font-mono tabular-nums ${
-                    isActive ? "opacity-90" : "opacity-60"
-                  }`}>
-                    {progressPct}%
-                  </span>
+                  {isCompleted && <Check className="w-3 h-3 stroke-[2.5] shrink-0" aria-label="done" />}
+                  {/* The current stage shows its fact; the others keep it in their tooltip, so the bar fits. */}
+                  {fact && isActive && <span className="hidden md:inline text-xs tabular-nums opacity-90">{fact}</span>}
                 </div>
 
                 {/* Active Pulse Dot */}
@@ -176,19 +166,19 @@ export default function AssignmentStageNavigation({
       </div>
 
       {/* Right-Aligned Live Word Budget Progress Indicator */}
-      <div className="flex items-center gap-3 shrink-0 ml-auto pl-2 border-l border-neutral-200/80 dark:border-white/10">
+      <div className="flex items-center gap-3 shrink-0 ml-auto pl-2 border-l border-[color:var(--border-subtle)]">
         <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2.5 text-right sm:text-left">
           <div className="flex items-center gap-1.5 text-xs tabular-nums">
-            <span className="font-semibold text-neutral-900 dark:text-neutral-100">
+            <span className="font-semibold text-[color:var(--text-primary)]">
               {currentWordCount.toLocaleString()}
             </span>
-            <span className="text-neutral-400 dark:text-neutral-500">
+            <span className="text-[color:var(--text-muted)]">
               / {targetWordCount.toLocaleString()} words
             </span>
           </div>
 
           {/* Mini progress bar */}
-          <div className="w-16 sm:w-24 h-1.5 bg-neutral-100 dark:bg-white/10 rounded-full overflow-hidden">
+          <div className="w-16 sm:w-24 h-1.5 bg-[color:var(--surface-inset)] rounded-full overflow-hidden">
             <div
               className={`h-full transition-all duration-300 rounded-full ${
                 isOverLimit
@@ -204,12 +194,12 @@ export default function AssignmentStageNavigation({
 
         {/* Percentage badge */}
         <span
-          className={`text-[11px] font-semibold px-2 py-0.5 rounded-full tabular-nums ${
+          className={`text-xs font-semibold px-2 py-0.5 rounded-full tabular-nums ${
             isOverLimit
               ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
               : isOptimal
               ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-              : "bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-300"
+              : "bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]"
           }`}
         >
           {wordCountPercentage}%

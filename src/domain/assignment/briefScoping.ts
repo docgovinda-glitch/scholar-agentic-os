@@ -58,7 +58,7 @@ export const DISCIPLINES: Discipline[] = [
   {
     id: "business",
     label: "Business, management or economics",
-    approach: "a case framework: the situation, analysis with suitable models, options and recommendations",
+    approach: "the situation or question, analysis with models that fit it, and justified conclusions or recommendations",
     lens: "Set out the situation or case, analyse it with frameworks that fit the question (only those that fit), compare options, and finish with justified, actionable recommendations and their risks.",
   },
   {

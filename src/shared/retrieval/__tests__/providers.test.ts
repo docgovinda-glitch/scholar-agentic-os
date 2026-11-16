@@ -25,3 +25,27 @@ describe("shared retrieval helpers", () => {
     expect(isLowCredibilityDomain("who.int")).toBe(false);
   });
 });
+
+import { searchCrossref } from "../providers";
+describe("searchCrossref: only citable works", () => {
+  it("drops figure/table components and peer-review reports", async () => {
+    const items = [
+      { type: "journal-article", title: ["Policy rates and lending"], DOI: "10.1/a", author: [{ family: "Lee", given: "K." }] },
+      { type: "component", title: ["2.2. Central bank policy interest rate in real terms"], DOI: "10.1787/x" },
+      { type: "peer-review", title: ["Review of: Policy rates"], DOI: "10.1/r" },
+    ];
+    const fetchImpl = (async () => new Response(JSON.stringify({ message: { items } }), { status: 200, headers: { "Content-Type": "application/json" } })) as unknown as typeof fetch;
+    const res = await searchCrossref("central bank policy rate", 15, 1, { fetchImpl });
+    expect(res.items.map((i) => i.title)).toEqual(["Policy rates and lending"]);
+  });
+});
+
+import { isPlausibleRecord } from "../providers";
+describe("isPlausibleRecord (repository spam)", () => {
+  it("drops keyword-stuffed titles and number-only authors", () => {
+    expect(isPlausibleRecord({ title: "x ".repeat(200), authors: ["Lee, K."] })).toBe(false);
+    expect(isPlausibleRecord({ title: "Stroke rehabilitation", authors: ["33"] })).toBe(false);
+    expect(isPlausibleRecord({ title: "Policy rates and lending", authors: ["Lee, K."] })).toBe(true);
+    expect(isPlausibleRecord({ title: "A dataset with no listed authors", authors: [] })).toBe(true);
+  });
+});

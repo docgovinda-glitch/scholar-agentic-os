@@ -1,22 +1,21 @@
-import React, { useState, useRef, useEffect } from "react";
+import React,{ useState,useRef,useEffect } from "react";
+import { formatSourceInTextCitation } from "./services/citationFormatService";
 import { parsePersonName } from "./services/referenceListGenerator";
 import { sourceVenueLabel } from "./services/sourceDisplay";
 import type { DiscoveredSource } from "./types";
 import {
-  Check,
-  Plus,
-  Copy,
-  Edit2,
-  X,
-  FileUp,
-  Bookmark,
-  ExternalLink,
-  BookOpen,
-  Table,
-  Quote,
-  ChevronUp,
-  ChevronDown,
-  Sparkles,
+Check,
+Plus,
+Copy,
+Edit2,
+X,
+FileUp,
+Bookmark,BookOpen,
+Table,
+Quote,
+ChevronUp,
+ChevronDown,
+Sparkles
 } from "lucide-react";
 
 export interface ReferenceBarItemProps {
@@ -30,33 +29,18 @@ export interface ReferenceBarItemProps {
   onSaveEdit?: (sourceId: string, updates: Partial<DiscoveredSource>) => void;
   className?: string;
   showDismiss?: boolean;
+  /** The project's citation style, for the copied in-text citation. */
+  citationStyle?: string;
 }
 
-export function formatInTextCitation(source: DiscoveredSource): string {
-  const year = source.year || "n.d.";
-  if (!source.authors || source.authors.length === 0) {
-    const fallbackTitle = source.title ? source.title.split(" ").slice(0, 3).join(" ") : "Source";
-    return `(${fallbackTitle}, ${year})`;
-  }
+const NUMERIC_STYLES = /^(ieee|vancouver|numeric)/i;
 
-  const parseLastName = (authorStr: string) => {
-    const trimmed = authorStr.trim();
-    if (trimmed.includes(",")) {
-      return trimmed.split(",")[0].trim();
-    }
-    const parts = trimmed.split(/\s+/);
-    return parts[parts.length - 1];
-  };
-
-  const firstAuthor = parseLastName(source.authors[0]);
-  if (source.authors.length === 1) {
-    return `(${firstAuthor}, ${year})`;
-  }
-  if (source.authors.length === 2) {
-    const secondAuthor = parseLastName(source.authors[1]);
-    return `(${firstAuthor} & ${secondAuthor}, ${year})`;
-  }
-  return `(${firstAuthor} et al., ${year})`;
+/**
+ * In-text citation for a source card, from the shared formatter. A card has no
+ * place in the reference order, so numeric styles fall back to author-date.
+ */
+export function formatInTextCitation(source: DiscoveredSource, style = "harvard"): string {
+  return formatSourceInTextCitation(source, NUMERIC_STYLES.test(style) ? "harvard" : style, 1);
 }
 
 export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
@@ -68,6 +52,7 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
   onToggleBookmark,
   onEdit,
   onSaveEdit,
+  citationStyle = "harvard",
   className = "",
   showDismiss = true,
 }) => {
@@ -104,7 +89,7 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isEditing]);
 
-  const rawAuthors = (source as any).authors;
+  const rawAuthors: unknown = source.authors; // older saves may hold one string
   const authorsList: string[] = Array.isArray(rawAuthors)
     ? rawAuthors
     : typeof rawAuthors === "string" && rawAuthors.trim()
@@ -127,12 +112,15 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
 
   const handleCopyInText = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const citation = formatInTextCitation(source);
-    if (navigator?.clipboard?.writeText) {
-      navigator.clipboard.writeText(citation).catch(() => {});
-    }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1600);
+    const citation = formatInTextCitation(source, citationStyle);
+    // "Copied" only when the clipboard actually took it.
+    void navigator?.clipboard
+      ?.writeText(citation)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1600);
+      })
+      .catch((err: unknown) => console.warn("Copy citation failed:", err));
   };
 
   const handleOpenEdit = (e: React.MouseEvent) => {
@@ -152,7 +140,6 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
       .map((a) => a.trim())
       .filter(Boolean);
 
-    const yearNum = parseInt(editYear.trim(), 10) || undefined;
 
     const updates: Partial<DiscoveredSource> = {
       title: editTitle.trim() || source.title,
@@ -190,56 +177,56 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
   const barContent = (
     <div
       data-testid={hasUploadedDetails ? undefined : `curated-source-${source.id}`}
-      className={`relative h-11 px-3.5 flex items-center justify-between gap-3 bg-white dark:bg-ink-750 border rounded-xl shadow-2xs dark:shadow-none transition-all group ${
+      className={`relative h-11 px-3.5 flex items-center justify-between gap-3 bg-[color:var(--surface-raised)] border rounded-xl shadow-2xs dark:shadow-none transition-all group ${
         isApproved
           ? "border-emerald-500/50 bg-emerald-500/[0.02] dark:border-emerald-500/30 dark:bg-emerald-500/[0.03] hover:border-emerald-500/70"
-          : "border-neutral-200/80 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20"
+          : "border-[color:var(--border-subtle)] hover:border-neutral-300 dark:hover:border-white/20"
       } ${className}`}
     >
       {/* Left Section: Badges & Single-Line Metadata */}
       <div className="flex items-center gap-2.5 min-w-0 flex-1">
         {/* Origin / Type Badge */}
         {source.isUserUploaded ? (
-          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 shrink-0 flex items-center gap-1">
+          <span className="px-1.5 py-0.5 rounded text-xs font-semibold uppercase tracking-wider bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 shrink-0 flex items-center gap-1">
             <FileUp className="w-2.5 h-2.5" />
             <span>Uploaded: {source.sourceFormatBadge || "DOCUMENT"}</span>
           </span>
         ) : source.sourceOrigin === "ai_research" ? (
-          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20 shrink-0 flex items-center gap-1">
+          <span className="px-1.5 py-0.5 rounded text-xs font-semibold uppercase tracking-wider bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20 shrink-0 flex items-center gap-1">
             <Sparkles className="w-2.5 h-2.5" />
             <span>AI Research</span>
           </span>
         ) : (
-          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 shrink-0 flex items-center gap-1">
+          <span className="px-1.5 py-0.5 rounded text-xs font-semibold uppercase tracking-wider bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 shrink-0 flex items-center gap-1">
             <BookOpen className="w-2.5 h-2.5" />
             <span>Ask Scholar</span>
           </span>
         )}
 
         {source.prescribedInBrief && (
-          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 shrink-0" data-testid="prescribed-in-brief-badge">
+          <span className="px-1.5 py-0.5 rounded text-xs font-semibold bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 shrink-0" data-testid="prescribed-in-brief-badge">
             Prescribed in Brief
           </span>
         )}
 
         {/* Primary line, title first: Title · Author (Year) · Venue · N% match */}
-        <div className="flex items-center gap-1.5 text-xs text-neutral-800 dark:text-neutral-200 min-w-0">
-          <span className="font-semibold text-neutral-900 dark:text-white truncate min-w-0" title={source.title}>
+        <div className="flex items-center gap-1.5 text-xs text-[color:var(--text-primary)] min-w-0">
+          <span className="font-semibold text-[color:var(--text-primary)] truncate min-w-0" title={source.title}>
             {source.title}
           </span>
-          <span className="text-neutral-400 dark:text-neutral-500 shrink-0">·</span>
-          <span className="shrink-0 text-neutral-600 dark:text-neutral-400">
+          <span className="text-[color:var(--text-muted)] shrink-0">·</span>
+          <span className="shrink-0 text-[color:var(--text-secondary)]">
             {authorDisplay}
             {source.year ? <> (<span className="font-mono">{source.year}</span>)</> : null}
           </span>
           {venueDisplay && (
             <>
-              <span className="text-neutral-400 dark:text-neutral-500 shrink-0 hidden sm:inline">·</span>
-              <span className="text-neutral-600 dark:text-neutral-400 shrink-0 italic max-w-[160px] truncate hidden sm:inline">{venueDisplay}</span>
+              <span className="text-[color:var(--text-muted)] shrink-0 hidden sm:inline">·</span>
+              <span className="text-[color:var(--text-secondary)] shrink-0 italic max-w-[160px] truncate hidden sm:inline">{venueDisplay}</span>
             </>
           )}
           {typeof source.relevanceScore === "number" && source.relevanceScore > 0 && (
-            <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+            <span className="shrink-0 px-1.5 py-0.5 rounded text-xs font-mono font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
               {Math.round(source.relevanceScore <= 1 ? source.relevanceScore * 100 : source.relevanceScore)}% match
             </span>
           )}
@@ -253,11 +240,11 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
           type="button"
           onClick={handleCopyInText}
           aria-label="Copy citation"
-          title={`Copy in-text citation: ${formatInTextCitation(source)}`}
-          className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer relative"
+          title={`Copy in-text citation: ${formatInTextCitation(source, citationStyle)}`}
+          className="p-1.5 rounded-lg text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer relative"
         >
           {copied ? (
-            <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400 px-1">
+            <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400 px-1">
               <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
               <span className="hidden sm:inline">Copied</span>
             </span>
@@ -279,7 +266,7 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
             className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
               effectiveBookmarked
                 ? "text-amber-500 hover:text-amber-600 dark:text-amber-400"
-                : "text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-white/5"
+                : "text-[color:var(--text-muted)] hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-[color:var(--surface-hover)]"
             }`}
           >
             <Bookmark className={`w-3.5 h-3.5 ${effectiveBookmarked ? "fill-amber-500 dark:fill-amber-400" : ""}`} />
@@ -294,8 +281,8 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
           title="Edit reference metadata"
           className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
             isEditing
-              ? "bg-neutral-200 dark:bg-white/20 text-neutral-900 dark:text-white"
-              : "text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5"
+              ? "bg-[color:var(--surface-sunken)] text-[color:var(--text-primary)]"
+              : "text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)]"
           }`}
         >
           <Edit2 className="w-3.5 h-3.5" />
@@ -312,7 +299,7 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
           className={`px-3 py-1 rounded-full text-xs font-medium transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
             isApproved
               ? "bg-emerald-600 text-white dark:bg-emerald-500 dark:text-neutral-950 hover:bg-emerald-700"
-              : "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 active:scale-[0.99]"
+              : "bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 active:scale-[0.99]"
           }`}
         >
           {isApproved ? (
@@ -335,7 +322,7 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
             onClick={handleRemoveOrDismiss}
             aria-label={isApproved ? `Remove ${source.title}` : `Dismiss ${source.title}`}
             title={isApproved ? "Remove from approved references" : "Dismiss source"}
-            className="p-1 rounded-lg text-neutral-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-[color:var(--text-muted)] hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-colors cursor-pointer"
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -346,17 +333,17 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
       {isEditing && (
         <div
           ref={popoverRef}
-          className="absolute right-0 top-12 z-50 p-4 w-80 sm:w-96 bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/15 rounded-2xl shadow-xl space-y-3 animate-in fade-in zoom-in-95 duration-150"
+          className="absolute right-0 top-12 z-50 p-4 w-80 sm:w-96 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-2xl shadow-xl space-y-3 animate-in fade-in zoom-in-95 duration-150"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center justify-between border-b border-neutral-100 dark:border-white/5 pb-2">
-            <span className="text-xs font-semibold text-neutral-900 dark:text-white">
+          <div className="flex items-center justify-between border-b border-[color:var(--border-subtle)] pb-2">
+            <span className="text-xs font-semibold text-[color:var(--text-primary)]">
               Edit Reference Details
             </span>
             <button
               type="button"
               onClick={() => setIsEditing(false)}
-              className="p-1 rounded-md text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 cursor-pointer"
+              className="p-1.5 rounded-md text-[color:var(--text-muted)] hover:text-neutral-700 dark:hover:text-neutral-200 cursor-pointer"
             >
               <X className="w-3 h-3" />
             </button>
@@ -364,14 +351,14 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
 
           <form onSubmit={handleSaveEdit} className="space-y-2.5 text-xs">
             <div className="space-y-1">
-              <label className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
+              <label className="text-xs font-medium text-[color:var(--text-muted)]">
                 Title
               </label>
               <input
                 type="text"
                 value={editTitle}
                 onChange={(e) => setEditTitle(e.target.value)}
-                className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-white/15 bg-neutral-50/50 dark:bg-white/5 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-400"
+                className="w-full px-2.5 py-1.5 rounded-lg border border-[color:var(--border-default)] bg-[color:var(--surface-inset)]/50 text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-neutral-400"
                 placeholder="Title of paper or book"
                 required
               />
@@ -379,56 +366,56 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
 
             <div className="grid grid-cols-3 gap-2">
               <div className="col-span-2 space-y-1">
-                <label className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
+                <label className="text-xs font-medium text-[color:var(--text-muted)]">
                   Author(s)
                 </label>
                 <input
                   type="text"
                   value={editAuthors}
                   onChange={(e) => setEditAuthors(e.target.value)}
-                  className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-white/15 bg-neutral-50/50 dark:bg-white/5 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-400"
+                  className="w-full px-2.5 py-1.5 rounded-lg border border-[color:var(--border-default)] bg-[color:var(--surface-inset)]/50 text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-neutral-400"
                   placeholder="Smith, J., Doe, A."
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
+                <label className="text-xs font-medium text-[color:var(--text-muted)]">
                   Year
                 </label>
                 <input
                   type="text"
                   value={editYear}
                   onChange={(e) => setEditYear(e.target.value)}
-                  className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-white/15 bg-neutral-50/50 dark:bg-white/5 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-400"
+                  className="w-full px-2.5 py-1.5 rounded-lg border border-[color:var(--border-default)] bg-[color:var(--surface-inset)]/50 text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-neutral-400"
                   placeholder="2024"
                 />
               </div>
             </div>
 
             <div className="space-y-1">
-              <label className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
+              <label className="text-xs font-medium text-[color:var(--text-muted)]">
                 Venue / Journal / Publisher
               </label>
               <input
                 type="text"
                 value={editVenue}
                 onChange={(e) => setEditVenue(e.target.value)}
-                className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-white/15 bg-neutral-50/50 dark:bg-white/5 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-400"
+                className="w-full px-2.5 py-1.5 rounded-lg border border-[color:var(--border-default)] bg-[color:var(--surface-inset)]/50 text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-neutral-400"
                 placeholder="Journal or publisher name"
               />
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-100 dark:border-white/5">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[color:var(--border-subtle)]">
               <button
                 type="button"
                 onClick={() => setIsEditing(false)}
-                className="px-3 py-1 rounded-lg text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-white/5 cursor-pointer"
+                className="px-3 py-1 rounded-lg text-xs font-medium text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-3 py-1 rounded-lg text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 cursor-pointer shadow-xs"
+                className="px-3 py-1 rounded-lg text-xs font-semibold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 cursor-pointer shadow-xs"
               >
                 Save Changes
               </button>
@@ -445,26 +432,26 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
         {barContent}
 
         {source.structuredDataSummary && (
-          <div className="px-3.5 py-2 rounded-xl bg-neutral-50 dark:bg-white/[0.02] border border-neutral-200/60 dark:border-white/10 text-neutral-700 dark:text-neutral-300 text-xs flex items-start gap-2">
-            <Table className="w-3.5 h-3.5 shrink-0 mt-0.5 text-neutral-500" />
+          <div className="px-3.5 py-2 rounded-xl bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)] text-[color:var(--text-secondary)] text-xs flex items-start gap-2">
+            <Table className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[color:var(--text-muted)]" />
             <span className="leading-relaxed">{source.structuredDataSummary}</span>
           </div>
         )}
 
         {evidences.length > 0 && (
-          <div className="p-3 rounded-xl bg-neutral-50/50 dark:bg-white/[0.02] border border-neutral-200/60 dark:border-white/10 space-y-2">
+          <div className="p-3 rounded-xl bg-[color:var(--surface-inset)]/50 border border-[color:var(--border-subtle)] space-y-2">
             <div className="flex items-center justify-between">
               <button
                 type="button"
                 onClick={() => setShowEvidences(!showEvidences)}
-                className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white flex items-center gap-1.5 cursor-pointer transition-colors"
+                className="py-1 text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] flex items-center gap-1.5 cursor-pointer transition-colors"
               >
-                <Quote className="w-3 h-3 text-neutral-400" />
+                <Quote className="w-3 h-3 text-[color:var(--text-muted)]" />
                 <span>Extracted Content & Used References ({evidences.length})</span>
                 {showEvidences ? (
-                  <ChevronUp className="w-3 h-3 text-neutral-400" />
+                  <ChevronUp className="w-3 h-3 text-[color:var(--text-muted)]" />
                 ) : (
-                  <ChevronDown className="w-3 h-3 text-neutral-400" />
+                  <ChevronDown className="w-3 h-3 text-[color:var(--text-muted)]" />
                 )}
               </button>
             </div>
@@ -474,19 +461,19 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
                 {evidences.map((ev, eIdx) => (
                   <div
                     key={ev.id || eIdx}
-                    className="p-2.5 rounded-lg bg-white dark:bg-ink-750 border border-neutral-200/60 dark:border-white/10 text-xs space-y-1"
+                    className="p-2.5 rounded-lg bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] text-xs space-y-1"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-400">
+                      <span className="text-xs font-mono font-medium px-1.5 py-0.5 rounded bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]">
                         📍 {ev.sourceLocation || `Excerpt ${eIdx + 1}`}
                       </span>
                       {ev.claim && (
-                        <span className="text-[10px] text-neutral-500 dark:text-neutral-400 truncate max-w-xs">
+                        <span className="text-xs text-[color:var(--text-muted)] truncate max-w-xs">
                           {ev.claim}
                         </span>
                       )}
                     </div>
-                    <p className="font-medium text-neutral-800 dark:text-neutral-200 text-xs leading-relaxed italic">
+                    <p className="font-medium text-[color:var(--text-primary)] text-xs leading-relaxed italic">
                       "{ev.excerpt}"
                     </p>
                   </div>

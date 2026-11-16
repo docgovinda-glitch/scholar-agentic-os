@@ -95,20 +95,6 @@ function rowToRecord(row: Record<string, unknown>): ProjectRecord {
     sourceCountOverride: (row.source_count_override as ProjectRecord["sourceCountOverride"] | null) ?? undefined,
   };
 
-  // Rehydrate normalized state
-  const rawSources = (row as { _sources?: unknown })._sources;
-  if (Array.isArray(rawSources) && rawSources.length > 0) {
-    record.answers.assignment_sources = rawSources;
-  }
-  const rawUploadedSources = (row as { _uploaded_sources?: unknown })._uploaded_sources;
-  if (Array.isArray(rawUploadedSources) && rawUploadedSources.length > 0) {
-    record.answers.assignment_user_uploaded_sources = rawUploadedSources;
-  }
-  const rawEvidence = (row as { _evidence?: unknown })._evidence;
-  if (Array.isArray(rawEvidence) && rawEvidence.length > 0) {
-    record.answers.assignment_evidence_items = rawEvidence;
-  }
-
   return record;
 }
 
@@ -154,10 +140,7 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
 
     async get(projectId: string): Promise<ProjectRecord | undefined> {
       const result = await db.query(
-        `SELECT p.*,
-                (SELECT coalesce(jsonb_agg(ps.metadata), '[]'::jsonb) FROM public.project_sources ps WHERE ps.project_id = p.project_id) as _sources,
-                (SELECT coalesce(jsonb_agg(jsonb_build_object('id', pus.document_id, 'filename', pus.filename, 'status', pus.status)), '[]'::jsonb) FROM public.project_uploaded_sources pus WHERE pus.project_id = p.project_id) as _uploaded_sources,
-                (SELECT coalesce(jsonb_agg(pe.metadata), '[]'::jsonb) FROM public.project_evidence pe WHERE pe.project_id = p.project_id) as _evidence
+        `SELECT p.*
          FROM public.projects p
          WHERE p.project_id = $1`,
         [projectId]
@@ -169,17 +152,10 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
     async save(record: ProjectRecord): Promise<ProjectRecord> {
       const nextVersion = record.version + 1;
 
-      // Extract sources & evidence
+      // answers is the source of truth (as in the Data API store): sources, uploads
+      // and evidence stay in it. The normalized tables are written by the
+      // onProjectSaved mirror, not here.
       const answersToSave = { ...(record.answers || {}) };
-      const sources = answersToSave.assignment_sources || [];
-      const uploadedSources = answersToSave.assignment_user_uploaded_sources || answersToSave.userUploadedSources || [];
-      const evidenceItems = answersToSave.assignment_evidence_items || [];
-
-      // Remove from monolithic jsonb
-      delete answersToSave.assignment_sources;
-      delete answersToSave.assignment_user_uploaded_sources;
-      delete answersToSave.userUploadedSources;
-      delete answersToSave.assignment_evidence_items;
 
       const result = await db.query(
         `insert into public.projects
@@ -236,58 +212,12 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
       }
       record.version = nextVersion;
 
-      // Update side tables safely after main record is committed
-      if (sources.length > 0) {
-        await db.query(`DELETE FROM public.project_sources WHERE project_id = $1`, [record.projectId]);
-        const values = [];
-        const params: any[] = [record.projectId];
-        let i = 2;
-        for (const s of sources) {
-          values.push(`($1, $${i++}, $${i++}, $${i++}, $${i++}, $${i++}, $${i++}, $${i++}, $${i++}, $${i++}, $${i++})`);
-          params.push(s.id, s.title, JSON.stringify(s.authors || []), s.year || "", s.abstract || "", s.url || "", s.doi || "", s.status || "kept", s.isExcluded || false, JSON.stringify(s));
-        }
-        await db.query(`INSERT INTO public.project_sources (project_id, source_id, title, authors, year, abstract, url, doi, status, is_excluded, metadata) VALUES ${values.join(", ")}`, params);
-      } else {
-        await db.query(`DELETE FROM public.project_sources WHERE project_id = $1`, [record.projectId]);
-      }
-
-      if (uploadedSources.length > 0) {
-        await db.query(`DELETE FROM public.project_uploaded_sources WHERE project_id = $1`, [record.projectId]);
-        const values = [];
-        const params: any[] = [record.projectId];
-        let i = 2;
-        for (const s of uploadedSources) {
-          values.push(`($1, $${i++}, $${i++}, $${i++})`);
-          params.push(s.id, s.filename || s.title || "Document", s.status || "kept");
-        }
-        await db.query(`INSERT INTO public.project_uploaded_sources (project_id, document_id, filename, status) VALUES ${values.join(", ")}`, params);
-      } else {
-        await db.query(`DELETE FROM public.project_uploaded_sources WHERE project_id = $1`, [record.projectId]);
-      }
-
-      if (evidenceItems.length > 0) {
-        await db.query(`DELETE FROM public.project_evidence WHERE project_id = $1`, [record.projectId]);
-        const values = [];
-        const params: any[] = [record.projectId];
-        let i = 2;
-        for (const e of evidenceItems) {
-          values.push(`($1, $${i++}, $${i++}, $${i++}, $${i++}, $${i++})`);
-          params.push(e.id, e.sourceId || "", e.evidenceSnippet || e.claim || "", e.status || "approved", JSON.stringify(e));
-        }
-        await db.query(`INSERT INTO public.project_evidence (project_id, evidence_id, source_id, text, status, metadata) VALUES ${values.join(", ")}`, params);
-      } else {
-        await db.query(`DELETE FROM public.project_evidence WHERE project_id = $1`, [record.projectId]);
-      }
-
       return record;
     },
 
     async listByOwner(ownerId: string): Promise<ProjectRecord[]> {
       const result = await db.query(
-        `SELECT p.*,
-                (SELECT coalesce(jsonb_agg(ps.metadata), '[]'::jsonb) FROM public.project_sources ps WHERE ps.project_id = p.project_id) as _sources,
-                (SELECT coalesce(jsonb_agg(jsonb_build_object('id', pus.document_id, 'filename', pus.filename, 'status', pus.status)), '[]'::jsonb) FROM public.project_uploaded_sources pus WHERE pus.project_id = p.project_id) as _uploaded_sources,
-                (SELECT coalesce(jsonb_agg(pe.metadata), '[]'::jsonb) FROM public.project_evidence pe WHERE pe.project_id = p.project_id) as _evidence
+        `SELECT p.*
          FROM public.projects p
          WHERE p.owner_id = $1 
          ORDER BY p.updated_at DESC`,

@@ -135,6 +135,19 @@ describe("PATCH /api/projects/:id/intake", () => {
     expect(res.status).toBe(404);
   });
 
+  it("Coursework: an update under an old alias replaces the one stored setting (no stale copy wins)", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    const id = created.body.projectId;
+    await request(app).patch(`/api/projects/${id}/intake`).send({ answers: { word_limit: 1500, citation_style: "apa7" } });
+    const res = await request(app).patch(`/api/projects/${id}/intake`).send({ answers: { targetWordCount: 2500, citationStyle: "harvard" } });
+    expect(res.status).toBe(200);
+    const got = await request(app).get(`/api/projects/${id}`);
+    expect(got.body.answers.word_limit).toBe(2500);
+    expect(got.body.answers.citation_style).toBe("harvard");
+    expect(got.body.answers.targetWordCount).toBeUndefined();
+    expect(got.body.answers.citationStyle).toBeUndefined();
+  });
+
   it("400s when answers is missing", async () => {
     const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
     const res = await request(app).patch(`/api/projects/${created.body.projectId}/intake`).send({});

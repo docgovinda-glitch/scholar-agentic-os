@@ -306,7 +306,7 @@ Synthesize corporate governance mechanisms that mitigate managerial agency confl
   });
 
   // Pillar 7: Coursework Endpoint Integration in server/routes/project/assignment.ts
-  describe("Coursework Endpoint Integration (/parse-brief, /generate-outline, /structure)", () => {
+  describe("Coursework Endpoint Integration (/parse-brief)", () => {
     it("POST /parse-brief extracts all 7 questions and persists mark allocation", async () => {
       const projectId = await createTestCourseworkProject("proj-test-brief-7q");
 
@@ -325,47 +325,6 @@ Synthesize corporate governance mechanisms that mitigate managerial agency confl
       expect(res.body.extractedQuestions[4]).toContain("behavioral heuristics");
       expect(res.body.extractedQuestions[5]).toContain("optimal portfolio asset allocation");
       expect(res.body.extractedQuestions[6]).toContain("corporate governance mechanisms");
-    });
-
-    it("POST /generate-outline returns research blueprint with mark_allocation", async () => {
-      const projectId = await createTestCourseworkProject("proj-test-outline-alias");
-
-      // First upload the brief
-      await request(app)
-        .post(`/api/projects/${projectId}/assignment/parse-brief`)
-        .attach("file", Buffer.from(sampleSevenQuestionExamBrief, "utf-8"), "exam_brief.txt");
-
-      // Call /generate-outline (alias for /structure)
-      const res = await request(app)
-        .post(`/api/projects/${projectId}/assignment/generate-outline`)
-        .send({
-          assignmentType: "coursework",
-          academicLevel: "undergraduate",
-          targetWordCount: 3500,
-        });
-
-      expect([200, 426]).toContain(res.status);
-      if (res.status === 200) {
-        expect(res.body.structure).toBeDefined();
-        expect(res.body.mark_allocation).toBeDefined();
-        expect(res.body.mark_allocation.questions.length).toBe(7);
-      }
-    });
-  });
-
-  describe("The outline is shaped by the subject, not one template", () => {
-    it("tells the AI how to structure a STEM piece when the student chose that subject", async () => {
-      const projectId = await createTestCourseworkProject("proj-lens-stem");
-      const store = getProjectStore();
-      const rec = (await store.get(projectId))!;
-      rec.answers = { ...rec.answers, assignment_question: "Evaluate the design of an experiment on enzyme activity.", assignment_discipline: "stem", assignment_type: "report" };
-      await store.save(rec);
-      // No AI connected: the route hands its prompt to the browser (426), so it can be read here.
-      const res = await request(app).post(`/api/projects/${projectId}/assignment/structure`).send({ targetWordCount: 2000 });
-      expect(res.status).toBe(426);
-      expect(res.body.userPrompt).toContain("SUBJECT AREA: Science, technology, engineering or maths.");
-      expect(res.body.userPrompt).toContain("hypothesis, method or design, results or analysis");
-      expect(res.body.userPrompt).toContain("FORM: a report");
     });
   });
 });

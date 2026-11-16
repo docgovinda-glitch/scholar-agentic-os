@@ -8,6 +8,7 @@
 
 import type { VaultItem } from "../vaultContents";
 import { formatVaultCitation } from "./citationService";
+import { parsePersonName } from "../../desk/assignment/services/personName";
 
 export interface LiteratureMatrixRow {
   sourceId: string;
@@ -64,7 +65,8 @@ function inferMethodology(item: VaultItem): string {
   if (item.sourceType === "web" || (item.sourceType as string) === "website") {
     return "Web Report / Industry Analysis";
   }
-  return "Theoretical / Conceptual Framework";
+  // Nothing in the source names a method: say so rather than guess one.
+  return "Not stated";
 }
 
 /**
@@ -113,30 +115,25 @@ function inferLimitations(item: VaultItem): string[] {
     }
   }
 
-  if (limitations.length === 0) {
-    limitations.push("Findings contingent on contextual sample; broader cross-domain replication advised.");
-  }
+  // No stock limitation is invented: a source that states none lists none.
 
   return limitations.slice(0, 3);
 }
 
 /**
- * Formats a short in-text citation e.g. "Smith et al. (2024)" or "(Smith, 2024)"
+ * Narrative in-text citation, e.g. "Walker (2024)", "Walker & Smith (2024)",
+ * "Walker et al. (2024)". Family names come from the shared name parser, so
+ * "Kuncoro, H." and "Haryo Kuncoro" both give "Kuncoro" (never an initial).
  */
 export function formatInTextCitation(row: { authors: string[]; year: string }): string {
   const year = row.year || "n.d.";
-  if (!row.authors || row.authors.length === 0) {
-    return `(${year})`;
-  }
-  const firstAuthor = row.authors[0].trim().split(" ").pop() || row.authors[0];
-  if (row.authors.length === 1) {
-    return `${firstAuthor} (${year})`;
-  }
-  if (row.authors.length === 2) {
-    const secondAuthor = row.authors[1].trim().split(" ").pop() || row.authors[1];
-    return `${firstAuthor} & ${secondAuthor} (${year})`;
-  }
-  return `${firstAuthor} et al. (${year})`;
+  const families = (row.authors || [])
+    .map((a) => parsePersonName(String(a)).family || String(a).trim())
+    .filter(Boolean);
+  if (families.length === 0) return `(${year})`;
+  if (families.length === 1) return `${families[0]} (${year})`;
+  if (families.length === 2) return `${families[0]} & ${families[1]} (${year})`;
+  return `${families[0]} et al. (${year})`;
 }
 
 /**

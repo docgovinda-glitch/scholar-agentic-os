@@ -1,14 +1,14 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Check, Edit2, Trash2, X } from "lucide-react";
+import { useEffect,useMemo,useState } from "react";
+import { Check,Edit2,Trash2,X } from "lucide-react";
 import { allocateWordsByMarks } from "../../../utils/briefExtractor";
 import {
-  parseBriefQuestions,
-  parseMarkingCriteria,
-  type BriefQuestionRow,
+parseBriefQuestions,
+parseMarkingCriteria,
+type BriefQuestionRow,
 } from "../../../utils/briefQuestions";
 
-const card = "bg-white dark:bg-ink-750 rounded-2xl border border-neutral-200/80 dark:border-white/10 p-4 sm:p-5 shadow-xs space-y-3";
-const heading = "text-xs font-semibold text-neutral-900 dark:text-white uppercase tracking-wider";
+const card = "bg-[color:var(--surface-raised)] rounded-2xl border border-[color:var(--border-subtle)] p-4 sm:p-5 shadow-xs space-y-3";
+const heading = "text-xs font-semibold text-[color:var(--text-primary)] uppercase tracking-wider";
 
 export interface SubQuestionsCardProps {
   briefText: string;
@@ -96,13 +96,13 @@ export function SubQuestionsCard({ briefText, fallbackQuestions = [], totalWords
   return (
     <section className={card} aria-label="Key sub-questions" data-testid="sub-questions-card">
       <h3 className={heading}>Key sub-questions your essay must answer</h3>
-      <ul className="divide-y divide-neutral-100 dark:divide-white/5">
-        {rows.map((row, i) => {
+      <ul className="divide-y divide-[color:var(--border-subtle)]">
+        {rows.map((row) => {
           const budget = targets[row.id];
           const editing = editingId === row.id;
           return (
-            <li key={row.id} className={`flex items-center gap-2.5 py-2 text-xs text-neutral-800 dark:text-neutral-200 ${budget?.within ? "pl-6" : ""}`} data-testid="sub-question-row">
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-neutral-200/70 dark:bg-white/10 text-neutral-700 dark:text-neutral-300 shrink-0">
+            <li key={row.id} className={`flex items-center gap-2.5 py-2 text-xs text-[color:var(--text-primary)] ${budget?.within ? "pl-6" : ""}`} data-testid="sub-question-row">
+              <span className="px-1.5 py-0.5 rounded text-xs font-mono font-bold bg-[color:var(--surface-sunken)]/70 text-[color:var(--text-secondary)] shrink-0">
                 {row.label}
               </span>
               {editing ? (
@@ -118,12 +118,12 @@ export function SubQuestionsCard({ briefText, fallbackQuestions = [], totalWords
                     if (e.key === "Escape") setEditingId(null);
                   }}
                   aria-label={`Edit ${row.label}`}
-                  className="min-w-0 flex-1 rounded-lg border border-neutral-300 dark:border-white/15 bg-transparent px-2 py-1"
+                  className="min-w-0 flex-1 rounded-lg border border-[color:var(--border-default)] bg-transparent px-2 py-1"
                 />
               ) : (
                 <span className="min-w-0 flex-1 truncate font-medium" title={row.text}>{row.text}</span>
               )}
-              <span className="shrink-0 text-[11px] text-neutral-600 dark:text-neutral-400 whitespace-nowrap">
+              <span className="shrink-0 text-xs text-[color:var(--text-secondary)] whitespace-nowrap">
                 {budget?.within
                   ? typeof row.marks === "number" && row.marks > 0
                     ? `${row.marks} Marks · part of ${budget.within}`
@@ -148,7 +148,7 @@ export function SubQuestionsCard({ briefText, fallbackQuestions = [], totalWords
                     if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                     if (e.key === "Escape") setEditingWordsId(null);
                   }}
-                  className="w-20 shrink-0 rounded-lg border border-neutral-300 dark:border-white/15 bg-transparent px-2 py-1 font-mono text-[11px]"
+                  className="w-20 shrink-0 rounded-lg border border-[color:var(--border-default)] bg-transparent px-2 py-1 font-mono text-xs"
                 />
               ) : (
                 <button
@@ -156,7 +156,7 @@ export function SubQuestionsCard({ briefText, fallbackQuestions = [], totalWords
                   onClick={() => setEditingWordsId(row.id)}
                   title="Click to set your own word count"
                   aria-label={`Edit words for ${row.label}`}
-                  className="shrink-0 font-mono text-[11px] text-emerald-700 dark:text-emerald-300 whitespace-nowrap hover:underline cursor-pointer"
+                  className="py-1 shrink-0 font-mono text-xs text-emerald-700 dark:text-emerald-300 whitespace-nowrap hover:underline cursor-pointer"
                 >
                   ~{(budget?.words ?? 0).toLocaleString()} words
                 </button>
@@ -172,11 +172,11 @@ export function SubQuestionsCard({ briefText, fallbackQuestions = [], totalWords
                         update(rows.map((r) => (r.id === row.id ? { ...r, text: draft.trim() } : r)));
                         setEditingId(null);
                       }}
-                      className="p-1 rounded hover:bg-neutral-100 dark:hover:bg-white/10 cursor-pointer"
+                      className="p-1.5 rounded hover:bg-[color:var(--surface-hover)] cursor-pointer"
                     >
                       <Check className="w-3.5 h-3.5" />
                     </button>
-                    <button type="button" aria-label="Cancel edit" onClick={() => setEditingId(null)} className="p-1 rounded hover:bg-neutral-100 dark:hover:bg-white/10 cursor-pointer">
+                    <button type="button" aria-label="Cancel edit" onClick={() => setEditingId(null)} className="p-1.5 rounded hover:bg-[color:var(--surface-hover)] cursor-pointer">
                       <X className="w-3.5 h-3.5" />
                     </button>
                   </>
@@ -189,7 +189,7 @@ export function SubQuestionsCard({ briefText, fallbackQuestions = [], totalWords
                         setDraft(row.text);
                         setEditingId(row.id);
                       }}
-                      className="p-1 rounded hover:bg-neutral-100 dark:hover:bg-white/10 cursor-pointer"
+                      className="p-1.5 rounded hover:bg-[color:var(--surface-hover)] cursor-pointer"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
@@ -203,7 +203,7 @@ export function SubQuestionsCard({ briefText, fallbackQuestions = [], totalWords
                         });
                         update(rows.filter((r) => r.id !== row.id));
                       }}
-                      className="p-1 rounded hover:bg-neutral-100 dark:hover:bg-white/10 cursor-pointer"
+                      className="p-1.5 rounded hover:bg-[color:var(--surface-hover)] cursor-pointer"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -228,20 +228,20 @@ export function GradingCriteriaCard({ briefText, rubricText }: { briefText: stri
       <div className="overflow-x-auto">
         <table className="w-full text-xs text-left">
           <thead>
-            <tr className="text-[11px] uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+            <tr className="text-xs uppercase tracking-wider text-[color:var(--text-muted)]">
               <th scope="col" className="py-1.5 pr-3 font-semibold">Criterion</th>
               <th scope="col" className="py-1.5 pr-3 font-semibold whitespace-nowrap">Weight % / Marks</th>
-              <th scope="col" className="py-1.5 font-semibold">Plain-English expectation for a 1st</th>
+              <th scope="col" className="py-1.5 font-semibold">In plain English</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-neutral-100 dark:divide-white/5 text-neutral-800 dark:text-neutral-200">
+          <tbody className="divide-y divide-[color:var(--border-subtle)] text-[color:var(--text-primary)]">
             {rows.map((r, i) => (
               <tr key={i} className="align-top">
                 <td className="py-2 pr-3 font-medium">{r.criterion}</td>
-                <td className="py-2 pr-3 whitespace-nowrap text-neutral-600 dark:text-neutral-400">
+                <td className="py-2 pr-3 whitespace-nowrap text-[color:var(--text-secondary)]">
                   {r.weightPercent ? `${r.weightPercent}%` : ""}{r.marks && r.weightPercent ? " · " : ""}{r.marks ? `${r.marks} marks` : ""}
                 </td>
-                <td className="py-2 text-neutral-600 dark:text-neutral-400">{r.expectation}</td>
+                <td className="py-2 text-[color:var(--text-secondary)]">{r.expectation}</td>
               </tr>
             ))}
           </tbody>

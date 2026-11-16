@@ -1,72 +1,58 @@
+import { tonePresetOf } from "../types";
+import { generateDynamicAssignmentStructure } from "../services/dynamicStructure";
 import { countProseWords } from "../../../shared/proseBlocks";
-import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode, useMemo, useRef } from "react";
+import { canonicalizeAssignmentUpdate,normalizeAssignmentAnswers } from "../../../domain/assignment/answerKeys";
+import { selectApprovedSources } from "../../../domain/assignment/approvedSources";
+import { createContext,useContext,useState,useCallback,useEffect,ReactNode,useMemo,useRef } from "react";
 import { purgeLegacyTemplateText } from "../../../domain/assignment/legacyPurge";
-import type { CanonicalDocument, OutputTypeSpec, ProjectView, RubricReport } from "../../types";
+import type { CanonicalDocument,OutputTypeSpec,ProjectView,RubricReport } from "../../types";
 import {
-  getDocument,
-  getOutputTypeSpec,
-  getProject,
-  getRubric,
-  saveIntakeAnswers,
-  commitProjectToDatabase,
-  isEphemeralProject,
-  authedJsonFetch,
-  UnauthenticatedError,
+getDocument,
+getOutputTypeSpec,
+getProject,
+getRubric,
+saveIntakeAnswers,
+commitProjectToDatabase,
+isEphemeralProject,
+authedJsonFetch,
+UnauthenticatedError,
 } from "../../api";
 import type {
-  AssignmentPhaseId,
-  AssignmentStage,
-  StageStatus,
-  AcademicLevel,
-  AssignmentType,
-  AssignmentAnalysis,
-  ResearchPlan,
-  DiscoveredSource,
-  EvidenceItem,
-  ThinkingMap,
-  OutlineSection,
-  SubmissionCheckReport,
-  TutorChatMessage,
-  TutorMode,
-  RubricGradeEstimation,
-  SectionBreakdown,
-  AssignmentProjectState,
-  UploadedSourceDocument,
-  AssignmentBriefRubricCriterion,
-  CitationAuditResult,
-  RubricScoreReport,
-  SectionBudgetItem,
-  WritingToneConfig,
-  WritingTonePreset,
-  WritingStyleConfig,
-  WritingStylePreset,
-  AssignmentStructure,
-  FlowAuditResult,
+AssignmentPhaseId,AcademicLevel,
+AssignmentType,
+AssignmentAnalysis,
+ResearchPlan,
+DiscoveredSource,
+EvidenceItem,
+ThinkingMap,
+OutlineSection,
+SubmissionCheckReport,SectionBreakdown,
+AssignmentProjectState,
+UploadedSourceDocument,
+AssignmentBriefRubricCriterion,
+CitationAuditResult,
+RubricScoreReport,
+SectionBudgetItem,
+WritingToneConfig,WritingStyleConfig,AssignmentStructure,
+FlowAuditResult
 } from "../types";
 import {
-  ASSIGNMENT_PHASES,
-  ASSIGNMENT_STAGES,
-  cleanAnswerString,
-  extractStandardizedInstructions,
-  normalizeProjectAnswers,
-  normalizeAssignmentPhase,
-  AssignmentDraftingSection,
-  structureToInternalSections,
-  structureToSectionBudgets,
+ASSIGNMENT_PHASES,cleanAnswerString,
+extractStandardizedInstructions,
+normalizeProjectAnswers,
+normalizeAssignmentPhase,
+AssignmentDraftingSection,
+structureToInternalSections,
+structureToSectionBudgets
 } from "../types";
-import { generateDynamicAssignmentStructure } from "../services/outlineService";
-import {
-  decomposeWordBudget,
-  tuneSectionsToQuestion,
-  type InternalSectionPlan,
-} from "../services/invisibleChunkerService";
-import { auditCitations, evaluateRubricCompliance, auditFlowAndTransitions } from "../services/submissionAuditService";
+import { auditCitations,evaluateRubricCompliance,auditFlowAndTransitions } from "../services/submissionAuditService";
 import { getCitationCoverage } from "../services/citationAnchoringService";
-import { generateReferenceListBlock } from "../services/referenceListGenerator";
 import { stripCircularReferences } from "../../../utils/briefExtractor";
 import type { CourseworkExecutionMode } from "../../../features/coursework/types/orchestrator";
 import { safeParseAnswerField } from "../../../shared/projectStateSchema";
-import { useCourseworkAgent, type CourseworkAgent } from "./useCourseworkAgent";
+import { useCourseworkAgent,type CourseworkAgent } from "./useCourseworkAgent";
+import { buildAssignmentProjectState,computePhaseStatuses } from "./assignmentState";
+import { readInternalSections,readRubricCriteria,readStructure,readSectionBudgets,readApprovedSourceIds,readWritingStyle } from "./answerReaders";
 
 export interface AssignmentContextValue {
   projectId: string;
@@ -82,11 +68,6 @@ export interface AssignmentContextValue {
   advancePhase: (nextPhase?: AssignmentPhaseId) => void;
 
   // Backward-compatible Stage Aliases
-  stage: AssignmentStage;
-  currentStage: AssignmentStage;
-  setStage: (stage: AssignmentStage, options?: { replace?: boolean }) => void;
-  stageStatuses: Record<AssignmentStage, StageStatus>;
-  advanceStage: (nextStage?: AssignmentStage) => void;
 
   // Unified 4-Phase Project State Model (Section 4.2)
   projectState: AssignmentProjectState;
@@ -184,20 +165,10 @@ export interface AssignmentContextValue {
   citationAuditResult: CitationAuditResult | null;
   flowAuditResult: FlowAuditResult | null;
 
-  // AI Tutor & Rubric Estimator
-  tutorMode: TutorMode;
-  setTutorMode: (mode: TutorMode) => void;
-  tutorMessages: TutorChatMessage[];
-  sendTutorMessage: (message: string, overrideMode?: TutorMode, activeDraftText?: string) => Promise<void>;
-  isTutorReplying: boolean;
-  isEstimatingRubric: boolean;
-  lastRubricEstimation: RubricGradeEstimation | null;
-  estimateRubricGrade: (selectedSectionId?: string) => Promise<RubricGradeEstimation | null>;
-  applyTutorSuggestionToDraft: (suggestion: { targetSectionId?: string; suggestedText: string; type?: string }) => Promise<void>;
 
   // Save Answers Helper
-  saveAnswers: (updates: Record<string, any>) => Promise<void>;
-  updateProjectAnswers: (updates: Record<string, any>) => Promise<void>;
+  saveAnswers: (updates: Record<string, unknown>) => Promise<void>;
+  updateProjectAnswers: (updates: Record<string, unknown>) => Promise<void>;
   ensurePersisted: () => Promise<string>;
 }
 
@@ -218,8 +189,8 @@ export function AssignmentProvider({
   children,
 }: {
   projectId: string;
-  initialStage: AssignmentStage | null;
-  onStageChangeCallback: (stage: AssignmentStage, options?: { replace?: boolean }) => void;
+  initialStage: AssignmentPhaseId | null;
+  onStageChangeCallback: (phase: AssignmentPhaseId, options?: { replace?: boolean }) => void;
   children: ReactNode;
 }) {
   const [activeProjectId, setActiveProjectId] = useState(projectId);
@@ -235,6 +206,8 @@ export function AssignmentProvider({
   // What the header shows: only "saved" once the server has the latest answers.
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
   const saveDirtyRef = useRef(false);
+  /** Keys changed since the last successful write: only these are sent (the server merges). */
+  const dirtyKeysRef = useRef<Set<string>>(new Set());
   const [document, setDocument] = useState<CanonicalDocument | null>(null);
   const [rubric, setRubric] = useState<RubricReport | null>(null);
   const [outputType, setOutputType] = useState<OutputTypeSpec | null>(null);
@@ -273,7 +246,7 @@ export function AssignmentProvider({
     return realProject.projectId;
   }, [activeProjectId]);
 
-  const [activeStage, setActiveStage] = useState<AssignmentStage>(initialStage ?? "understand");
+  const [activeStage, setActiveStage] = useState<AssignmentPhaseId>(initialStage ?? "understand");
 
   useEffect(() => {
     if (initialStage) {
@@ -286,14 +259,7 @@ export function AssignmentProvider({
     return normalizeAssignmentPhase(activeStage);
   }, [activeStage]);
 
-  const currentStage: AssignmentStage = activeStage;
 
-  // AI Tutor & Rubric Estimator state
-  const [tutorMode, setTutorMode] = useState<TutorMode>("socratic");
-  const [tutorMessages, setTutorMessages] = useState<TutorChatMessage[]>([]);
-  const [isTutorReplying, setIsTutorReplying] = useState(false);
-  const [isEstimatingRubric, setIsEstimatingRubric] = useState(false);
-  const [lastRubricEstimation, setLastRubricEstimation] = useState<RubricGradeEstimation | null>(null);
 
   // Phase 3 Drafting Engine state
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
@@ -313,8 +279,9 @@ export function AssignmentProvider({
     setIsLoading(true);
     try {
       const loaded = await getProject(activeProjectId);
-      // Legacy template text from older saves is removed on every load.
-      const proj = { ...loaded, answers: purgeLegacyTemplateText(loaded.answers) } as typeof loaded;
+      // Legacy template text from older saves is removed on every load, and settings
+      // stored under old alias names are read from their one canonical key.
+      const proj = { ...loaded, answers: normalizeAssignmentAnswers(purgeLegacyTemplateText(loaded.answers)) } as typeof loaded;
       const [rub, doc] = proj.hasDocument
         ? await Promise.all([getRubric(activeProjectId), getDocument(activeProjectId)])
         : [null, null];
@@ -325,28 +292,11 @@ export function AssignmentProvider({
 
       if (initialStage === null) {
         const persisted =
-          proj.answers?.["assignment_current_phase"] ||
-          proj.answers?.["assignment_current_stage"];
+          proj.answers?.["assignment_current_phase"];
         const targetPhase: AssignmentPhaseId = normalizeAssignmentPhase(persisted);
         setActiveStage(targetPhase);
         onStageChangeCallback(targetPhase, { replace: true });
       }
-
-      // Initialize AI Tutor greeting if empty
-      setTutorMessages((prev) => {
-        if (prev.length === 0) {
-          return [
-            {
-              id: "greeting",
-              sender: "tutor",
-              mode: "socratic",
-              text: `👋 Hello! I am your Scholar Core Socratic Academic Tutor & Rubric Estimator.\n\nChoose an advising mode above: Engage in deep Socratic questioning, estimate your marking rubric grade band (1st / 2:1 / 2:2), stress-test counterarguments, or polish academic prose.`,
-              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-            },
-          ];
-        }
-        return prev;
-      });
     } catch (e) {
       setError(
         e instanceof UnauthenticatedError
@@ -364,93 +314,49 @@ export function AssignmentProvider({
 
   // Persist answers
   const saveAnswers = useCallback(
-    async (updates: Record<string, any>) => {
+    async (updates: Record<string, unknown>) => {
       if (!project) return;
-      const standardized: Record<string, any> = { ...updates };
-      if (updates.instructions !== undefined || updates.assignment_question !== undefined) {
-        const text = cleanAnswerString(updates.instructions ?? updates.assignment_question ?? "");
-        standardized.instructions = text;
-        standardized.assignment_question = text;
-        standardized.assignment_brief_text = text;
-        standardized.research_topic = text;
-        if (standardized.assignment_brief === "provisional" || text) {
-          standardized.assignment_brief = text;
-        }
+      // One stored name per setting (answerKeys.ts): older call sites may still
+      // pass an alias ("instructions", "targetWordCount", ...); it lands on the canonical key.
+      const standardized: Record<string, unknown> = canonicalizeAssignmentUpdate(updates);
+      if (standardized.assignment_brief !== undefined) standardized.assignment_brief = cleanAnswerString(standardized.assignment_brief);
+      if (standardized.word_limit !== undefined) standardized.word_limit = Number(standardized.word_limit);
+      if (standardized.writing_style !== undefined && standardized.writing_tone === undefined) {
+        standardized.writing_tone = tonePresetOf(standardized.writing_style) || "analytical";
       }
-      if (updates.academicLevel !== undefined || updates.academic_level !== undefined) {
-        const lvl = updates.academicLevel ?? updates.academic_level;
-        standardized.academicLevel = lvl;
-        standardized.academic_level = lvl;
+      if (standardized.writing_tone !== undefined) {
+        standardized.writing_tone = tonePresetOf(standardized.writing_tone) || "analytical";
+        if (standardized.writing_style === undefined) standardized.writing_style = { preset: standardized.writing_tone, label: standardized.writing_tone };
       }
-      if (updates.assignmentType !== undefined || updates.assignment_type !== undefined) {
-        const t = updates.assignmentType ?? updates.assignment_type;
-        standardized.assignmentType = t;
-        standardized.assignment_type = t;
-      }
-      if (updates.targetWordCount !== undefined || updates.word_count !== undefined || updates.word_limit !== undefined) {
-        const wc = updates.targetWordCount ?? updates.word_count ?? updates.word_limit;
-        standardized.targetWordCount = Number(wc);
-        standardized.target_word_count = Number(wc);
-        standardized.word_count = Number(wc);
-        standardized.word_limit = Number(wc);
-      }
-      if (updates.citationStyle !== undefined || updates.citation_style !== undefined) {
-        const cs = updates.citationStyle ?? updates.citation_style;
-        standardized.citationStyle = cs;
-        standardized.citation_style = cs;
-      }
-      if (updates.sections !== undefined) {
-        standardized.sections = updates.sections;
-      }
-      if (updates.writingStyle !== undefined || updates.writing_style !== undefined) {
-        const ws = updates.writingStyle ?? updates.writing_style;
-        standardized.writingStyle = ws;
-        standardized.writing_style = ws;
-        const toneStr = typeof ws === "string" ? ws : ws?.preset || ws?.id || "analytical";
-        standardized.writingTone = toneStr;
-        standardized.writing_tone = toneStr;
-      }
-      if (updates.writingTone !== undefined || updates.writing_tone !== undefined) {
-        const wt = updates.writingTone ?? updates.writing_tone;
-        const toneStr = typeof wt === "string" ? wt : wt?.preset || wt?.id || "analytical";
-        standardized.writingTone = toneStr;
-        standardized.writing_tone = toneStr;
-        if (!standardized.writingStyle) {
-          standardized.writingStyle = { preset: toneStr as any, label: toneStr };
-          standardized.writing_style = { preset: toneStr as any, label: toneStr };
-        }
-      }
-      if (updates.sectionBudgets !== undefined || updates.section_budgets !== undefined) {
-        const sb = updates.sectionBudgets ?? updates.section_budgets;
-        standardized.sectionBudgets = sb;
-        standardized.section_budgets = sb;
-      }
-
-      if (updates.title !== undefined || updates.assignment_title !== undefined || updates.updatedTitle !== undefined) {
-        const titleVal = String(updates.title ?? updates.assignment_title ?? updates.updatedTitle ?? "").trim();
-        if (titleVal) {
-          standardized.title = titleVal;
-          standardized.assignment_title = titleVal;
-        }
+      if (standardized.title !== undefined) {
+        const titleVal = String(standardized.title ?? "").trim();
+        if (titleVal) standardized.title = titleVal;
+        else delete standardized.title;
       }
 
       const baseAnswers = projectRef.current?.answers || project?.answers || {};
-      const mergedAnswers = { ...baseAnswers, ...standardized };
+      // ProjectView types answers as strings, but Coursework keeps JSON values
+      // (sources, sections, structure) in them too: cast once, here.
+      const mergedAnswers = { ...baseAnswers, ...standardized } as ProjectView["answers"];
       const safeAnswers = stripCircularReferences(mergedAnswers);
+      const newTitle = typeof standardized.title === "string" ? standardized.title : undefined;
       if (projectRef.current) {
         projectRef.current = {
           ...projectRef.current,
           answers: safeAnswers,
-          title: standardized.title || projectRef.current.title,
+          title: newTitle || projectRef.current.title,
         };
       }
       setProject((prev) => {
         if (!prev) return null;
-        return { ...prev, answers: safeAnswers, title: standardized.title || prev.title };
+        return { ...prev, answers: safeAnswers, title: newTitle || prev.title };
       });
 
       // One write in flight at a time. The first starts at once; changes made
-      // while it runs are sent together, as the latest answers, right after.
+      // while it runs are sent together, with their latest values, right after.
+      // Only the changed keys are sent: the server merges them into the record, so
+      // a value another request saved meanwhile is not overwritten with a stale copy.
+      for (const k of Object.keys(standardized)) dirtyKeysRef.current.add(k);
       saveDirtyRef.current = true;
       if (!saveRunningRef.current) {
         saveRunningRef.current = true;
@@ -460,11 +366,18 @@ export function AssignmentProvider({
           try {
             while (saveDirtyRef.current) {
               saveDirtyRef.current = false;
+              const keys = Array.from(dirtyKeysRef.current);
+              dirtyKeysRef.current.clear();
+              const latest = (projectRef.current?.answers ?? safeAnswers) as Record<string, unknown>;
+              const patch = Object.fromEntries(keys.filter((k) => latest[k] !== undefined).map((k) => [k, latest[k]]));
+              if (Object.keys(patch).length === 0) continue;
               try {
-                await saveIntakeAnswers(activeProjectId, projectRef.current?.answers ?? safeAnswers);
+                await saveIntakeAnswers(activeProjectId, patch);
                 failed = false;
               } catch (err) {
                 failed = true;
+                // Not lost: these keys go out again with the next save.
+                for (const k of keys) dirtyKeysRef.current.add(k);
                 console.error("Failed to persist assignment answers:", err);
               }
             }
@@ -494,21 +407,6 @@ export function AssignmentProvider({
     [onStageChangeCallback, saveAnswers]
   );
 
-  // Backward-compatible setStage alias
-  const setStage = useCallback(
-    (stage: AssignmentStage, options?: { replace?: boolean }) => {
-      setActiveStage(stage);
-      const mappedPhase = normalizeAssignmentPhase(stage);
-      saveAnswers({
-        assignment_current_phase: mappedPhase,
-        assignment_current_stage: stage,
-      });
-      if (typeof onStageChangeCallback === "function") {
-        onStageChangeCallback(stage, options);
-      }
-    },
-    [onStageChangeCallback, saveAnswers]
-  );
 
   const advancePhase = useCallback(
     (nextPhase?: AssignmentPhaseId) => {
@@ -525,34 +423,24 @@ export function AssignmentProvider({
     [currentPhase, setPhase]
   );
 
-  const advanceStage = useCallback(
-    (nextStage?: AssignmentStage) => {
-      if (nextStage) {
-        setStage(nextStage);
-        return;
-      }
-      advancePhase();
-    },
-    [advancePhase, setStage]
-  );
 
   // Extract core properties from project answers
   const answers = project?.answers || {};
   const academicLevel: AcademicLevel =
-    (answers["academicLevel"] as AcademicLevel) ||
+    (answers["academic_level"] as AcademicLevel) ||
     (answers["academic_level"] as AcademicLevel) ||
     "undergraduate";
   const assignmentType: AssignmentType =
-    (answers["assignmentType"] as AssignmentType) ||
+    (answers["assignment_type"] as AssignmentType) ||
     (answers["assignment_type"] as AssignmentType) ||
     "essay";
   const rawTarget =
-    answers["targetWordCount"] !== undefined
-      ? answers["targetWordCount"]
-      : answers["target_word_count"] !== undefined
-      ? answers["target_word_count"]
-      : answers["word_count"] !== undefined
-      ? answers["word_count"]
+    answers["word_limit"] !== undefined
+      ? answers["word_limit"]
+      : answers["word_limit"] !== undefined
+      ? answers["word_limit"]
+      : answers["word_limit"] !== undefined
+      ? answers["word_limit"]
       : answers["word_limit"];
   let parsedTarget =
     rawTarget !== undefined && rawTarget !== null && rawTarget !== ""
@@ -567,8 +455,8 @@ export function AssignmentProvider({
   const targetWordCount = parsedTarget;
 
   const rawCitation =
-    answers["citationStyle"] !== undefined
-      ? answers["citationStyle"]
+    answers["citation_style"] !== undefined
+      ? answers["citation_style"]
       : answers["citation_style"];
   const citationStyle =
     rawCitation !== undefined ? cleanAnswerString(rawCitation) : "apa7";
@@ -594,22 +482,11 @@ export function AssignmentProvider({
   );
 
   const rawStyle =
-    answers["writingStyle"] ||
     answers["writing_style"] ||
-    answers["writingTone"] ||
     answers["writing_tone"];
   const rawStyleKey =
     typeof rawStyle === "object" ? JSON.stringify(rawStyle) : String(rawStyle ?? "");
-  const writingStyle: WritingStyleConfig = useMemo(() => {
-    if (rawStyle) {
-      const parsed = safeParseAnswerField<WritingStyleConfig | undefined>(rawStyle, undefined);
-      if (parsed && parsed.preset) return parsed;
-    }
-    return {
-      preset: "analytical",
-      description: "Breaks down causes, patterns, and connections between concepts.",
-    };
-  }, [rawStyleKey]);
+  const writingStyle: WritingStyleConfig = useMemo(() => readWritingStyle({ rawStyle }), [rawStyleKey]);
 
   const setWritingStyle = useCallback(
     async (style: WritingStyleConfig) => {
@@ -636,39 +513,13 @@ export function AssignmentProvider({
 
   const question = extractStandardizedInstructions(answers);
   const briefText =
-    cleanAnswerString(answers["assignment_brief_text"]) ||
+    cleanAnswerString(answers["assignment_brief"]) ||
     cleanAnswerString(answers["briefText"]) ||
     cleanAnswerString(answers["brief"]) ||
     question;
   const assignmentBriefText = briefText;
 
-  const structure: AssignmentStructure = useMemo(() => {
-    const raw = answers["assignment_structure"] || answers["structure"];
-    if (raw) {
-      const parsed = safeParseAnswerField<AssignmentStructure | undefined>(raw, undefined);
-      if (parsed?.headings && Array.isArray(parsed.headings) && parsed.headings.length > 0) {
-        const isNonMLTopic = !/\b(machine learning|deep learning|neural network|transformer|foundation model)\b/i.test(`${question} ${briefText}`);
-        const hasLeakedML = parsed.headings.some((h: any) =>
-          /Mathematical Formulations|Loss Optimization Landscapes|Algorithmic Architectures/i.test(h.title || "") ||
-          (h.subheadings || []).some((sub: any) => /Mathematical Formulations|Loss Optimization Landscapes|empirical risk minimization/i.test(sub.title || sub.guidance || ""))
-        );
-        const hasClassroomLogistics = parsed.headings.some((h: any) =>
-          /Divide Yourself in Teams|teams of 2|in classroom discussion/i.test(h.title || "")
-        );
-
-        if (!((isNonMLTopic && hasLeakedML) || hasClassroomLogistics)) {
-          return parsed;
-        }
-      }
-    }
-    return generateDynamicAssignmentStructure({
-      question: cleanAnswerString(question),
-      assignmentType,
-      academicLevel,
-      targetWordCount: targetWordCount > 0 ? targetWordCount : 2000,
-      briefText: cleanAnswerString(briefText),
-    });
-  }, [answers, question, assignmentType, academicLevel, targetWordCount, briefText]);
+  const structure: AssignmentStructure = useMemo(() => readStructure({ academicLevel, answers, assignmentType, briefText, question, targetWordCount }), [answers, question, assignmentType, academicLevel, targetWordCount, briefText]);
 
   const setStructure = useCallback(
     async (newStructure: AssignmentStructure) => {
@@ -686,29 +537,10 @@ export function AssignmentProvider({
     [saveAnswers]
   );
 
-  const rawBudgets = answers["sectionBudgets"] || answers["section_budgets"];
+  const rawBudgets = answers["section_budgets"];
   const rawBudgetsKey =
     typeof rawBudgets === "object" ? JSON.stringify(rawBudgets) : String(rawBudgets ?? "");
-  const sectionBudgets: SectionBudgetItem[] = useMemo(() => {
-    if (structure?.headings && structure.headings.length > 0) {
-      const converted = structureToSectionBudgets(structure);
-      if (converted.length > 0) return converted;
-    }
-    if (rawBudgets) {
-      const parsed = safeParseAnswerField<SectionBudgetItem[]>(rawBudgets, []);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    }
-    // Baseline allocation
-    const total = targetWordCount > 0 ? targetWordCount : 2000;
-    const intro = Math.round(total * 0.10);
-    const conclusion = Math.round(total * 0.10);
-    const body = Math.max(0, total - intro - conclusion);
-    return [
-      { id: "intro", title: "Introduction", targetWordCount: intro, isCustom: false },
-      { id: "body", title: "Body Paragraphs", targetWordCount: body, isCustom: false },
-      { id: "conclusion", title: "Conclusion", targetWordCount: conclusion, isCustom: false },
-    ];
-  }, [rawBudgetsKey, rawBudgets, structure, targetWordCount]);
+  const sectionBudgets: SectionBudgetItem[] = useMemo(() => readSectionBudgets({ rawBudgets, structure, targetWordCount }), [rawBudgetsKey, rawBudgets, structure, targetWordCount]);
 
   const addCustomSection = useCallback(
     async (title: string, targetWordCountVal: number) => {
@@ -792,52 +624,9 @@ export function AssignmentProvider({
     return safeParseAnswerField<UploadedSourceDocument[]>(raw, []);
   }, [answers]);
 
-  const approvedSourceIds: string[] = useMemo(() => {
-    const raw = answers["approved_source_ids"] || answers["approvedSourceIds"];
-    if (raw !== undefined && raw !== null) {
-      try {
-        const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-        if (Array.isArray(parsed)) return parsed;
-      } catch {
-        // fallback
-      }
-    }
-    // Until the student approves sources, only the brief's own prescribed
-    // references count as approved; discovered papers wait for a decision.
-    const fromSources = (sources ?? [])
-      .filter((s) => s.status !== "removed" && !s.isExcluded && s.prescribedInBrief)
-      .map((s) => s.id);
-    const fromUploaded = userUploadedSources.map((u) => u.id);
-    return Array.from(new Set([...fromSources, ...fromUploaded]));
-  }, [answers, sources, userUploadedSources, question, citationStyle]);
+  const approvedSourceIds: string[] = useMemo(() => readApprovedSourceIds({ answers, sources, userUploadedSources }), [answers, sources, userUploadedSources, question, citationStyle]);
 
-  const rubricCriteriaList: AssignmentBriefRubricCriterion[] = useMemo(() => {
-    const raw = answers["rubricCriteria"] || answers["rubric_criteria"];
-    if (raw) {
-      try {
-        const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch {
-        // fallback
-      }
-    }
-    const rubricText = answers["marking_rubric"] || answers["rubric"] || "";
-    if (rubricText && rubricText.trim()) {
-      const lines = rubricText.split("\n").map((l: string) => l.trim()).filter(Boolean);
-      return lines.slice(0, 8).map((line: string, idx: number) => {
-        const match = line.match(/(.*?)(?:[:\-–—]\s*(\d+)%?|(?:\((\d+)%\)))/);
-        return {
-          id: `rc-${idx + 1}`,
-          title: match ? match[1].replace(/^[0-9]+[.)\s]*/, "").trim() : line.slice(0, 50),
-          criterion: match ? match[1].replace(/^[0-9]+[.)\s]*/, "").trim() : line.slice(0, 50),
-          description: line,
-          weightPercentage: match ? parseInt(match[2] || match[3] || "0", 10) || undefined : undefined,
-          weightPercent: match ? parseInt(match[2] || match[3] || "0", 10) || undefined : undefined,
-        };
-      });
-    }
-    return [];
-  }, [answers]);
+  const rubricCriteriaList: AssignmentBriefRubricCriterion[] = useMemo(() => readRubricCriteria({ answers }), [answers]);
 
   const evidenceItems: EvidenceItem[] = useMemo(() => {
     const raw = answers["assignment_evidence_items"];
@@ -850,46 +639,12 @@ export function AssignmentProvider({
     : null;
 
   const outline: OutlineSection[] = useMemo(() => {
-    const raw = answers["assignment_outline"];
+    const raw = answers["assignment_internal_sections"];
     if (!raw) return [];
     return safeParseAnswerField<OutlineSection[]>(raw, []);
   }, [answers]);
 
-  const internalSections: AssignmentDraftingSection[] = useMemo(() => {
-    const isNonML = !/\b(machine learning|deep learning|neural network|transformer|foundation model)\b/i.test(`${question} ${briefText}`);
-    const isCorrupted = (list: any[]) =>
-      list.some((sec: any) =>
-        (isNonML && /Mathematical Formulations|Loss Optimization Landscapes|Algorithmic Architectures/i.test(sec.title || "")) ||
-        /Divide Yourself in Teams|teams of 2|in classroom discussion/i.test(sec.title || "")
-      );
-
-    const rawInternal = answers["assignment_internal_sections"];
-    if (rawInternal) {
-      const parsed = safeParseAnswerField<any[]>(rawInternal, []);
-      if (Array.isArray(parsed) && parsed.length > 0 && !isCorrupted(parsed)) return parsed;
-    }
-    const rawOutline = answers["assignment_outline"];
-    if (rawOutline) {
-      const parsed = safeParseAnswerField<any[]>(rawOutline, []);
-      if (Array.isArray(parsed) && parsed.length > 0 && !isCorrupted(parsed)) {
-        return parsed.map((sec: any) => ({
-          id: sec.id,
-          title: sec.title,
-          targetWordCount: sec.targetWordCount,
-          currentWordCount: sec.currentWordCount ?? countProseWords(sec.draftContent || ""),
-          guidance: sec.guidance || "",
-          draftContent: sec.draftContent || "",
-          status: sec.draftContent?.trim() ? "completed" : sec.status || "pending",
-          keyPoints: sec.keyPoints,
-          linkedEvidenceIds: sec.linkedEvidenceIds,
-          boundSourceIds: sec.boundSourceIds || [],
-          academicFunction: sec.academicFunction,
-          sectionType: sec.sectionType || (sec.id.includes("intro") ? "intro" : sec.id.includes("conclusion") ? "conclusion" : "body"),
-        }));
-      }
-    }
-    return [];
-  }, [answers, question, briefText]);
+  const internalSections: AssignmentDraftingSection[] = useMemo(() => readInternalSections({ answers, briefText, question }), [answers, question, briefText]);
 
   const submissionReport: RubricScoreReport | SubmissionCheckReport | null = answers["assignment_submission_report"]
     ? safeParseAnswerField<RubricScoreReport | SubmissionCheckReport | null>(answers["assignment_submission_report"], null)
@@ -1132,18 +887,11 @@ export function AssignmentProvider({
       return generated;
     }
 
-    const topicToUse = question || project?.title || "Academic Essay";
-    const generated = decomposeWordBudget({
-      targetWordCount,
-      wordBudget: {
-        intro: sections?.intro?.targetWords ?? Math.round(targetWordCount * 0.10),
-        body: sections?.body?.targetWords ?? Math.max(0, targetWordCount - (sections?.intro?.targetWords ?? Math.round(targetWordCount * 0.10)) - (sections?.conclusion?.targetWords ?? Math.round(targetWordCount * 0.15))),
-        conclusion: sections?.conclusion?.targetWords ?? Math.round(targetWordCount * 0.15),
-      },
-      approvedSourceIds,
-      assignmentTopic: topicToUse,
-      academicLevel,
-    });
+    // No outline yet: build it from the brief (one section per question), never
+    // from a generic theme template.
+    const generated = structureToInternalSections(
+      generateDynamicAssignmentStructure({ question, briefText, assignmentType, academicLevel, targetWordCount })
+    );
 
     saveAnswers({
       assignment_internal_sections: generated,
@@ -1154,7 +902,7 @@ export function AssignmentProvider({
       setActiveSectionId((prev) => prev || generated[0].id);
     }
     return generated;
-  }, [structure, targetWordCount, sections, approvedSourceIds, question, project?.title, academicLevel, saveAnswers]);
+  }, [structure, targetWordCount, question, briefText, assignmentType, academicLevel, saveAnswers]);
 
   /**
    * The sections as last written, not as of the last render: a draft that
@@ -1205,23 +953,21 @@ export function AssignmentProvider({
     [latestSections, saveAnswers]
   );
 
+  /**
+   * Rebuild the drafting sections from the brief (one per question, marks-weighted
+   * budgets), keeping the text of every section that is still there.
+   */
   const tuneOutlineWithQuestion = useCallback(async (): Promise<AssignmentDraftingSection[]> => {
-    const topicToUse = question || project?.title || "Academic Assignment";
-    const existing = latestSections() as (AssignmentDraftingSection | InternalSectionPlan)[];
-    const tuned = tuneSectionsToQuestion({
-      existingSections: existing,
-      assignmentTopic: topicToUse,
-      approvedSources: sources.filter((s) => approvedSourceIds.includes(s.id)),
-      targetWordCount,
-      academicLevel,
+    const existing = new Map(latestSections().map((sec) => [sec.id, sec]));
+    const rebuilt = structureToInternalSections(
+      generateDynamicAssignmentStructure({ question, briefText, assignmentType, academicLevel, targetWordCount })
+    ).map((sec) => {
+      const prev = existing.get(sec.id);
+      return prev?.draftContent ? { ...sec, draftContent: prev.draftContent, status: prev.status } : sec;
     });
-
-    await saveAnswers({
-      assignment_internal_sections: tuned,
-      assignment_outline: tuned,
-    });
-    return tuned;
-  }, [question, project?.title, latestSections, sources, approvedSourceIds, targetWordCount, academicLevel, saveAnswers]);
+    await saveAnswers({ assignment_internal_sections: rebuilt });
+    return rebuilt;
+  }, [question, briefText, assignmentType, academicLevel, targetWordCount, latestSections, saveAnswers]);
 
   const rewriteOutline = useCallback(
     async (instruction?: string): Promise<{ ok: true; structure: AssignmentStructure } | { ok: false; error: string }> => {
@@ -1335,173 +1081,12 @@ export function AssignmentProvider({
     }
   }, [currentPhase, isLoading, internalSections.length, targetWordCount, initializeDraftingPlan]);
 
-  // AI Tutor chat
-  const sendTutorMessage = useCallback(
-    async (text: string, overrideMode?: TutorMode, activeDraftText?: string) => {
-      const modeToUse = overrideMode || tutorMode;
-      const userMsg: TutorChatMessage = {
-        id: `msg-${Date.now()}`,
-        sender: "user",
-        mode: modeToUse,
-        text,
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      };
-      setTutorMessages((prev) => [...prev, userMsg]);
-      setIsTutorReplying(true);
 
-      try {
-        const response = await authedJsonFetch(`/api/projects/${projectId}/assignment/tutor-chat`, "POST", {
-          message: text,
-          mode: modeToUse,
-          stage: currentPhase,
-          academicLevel,
-          assignmentType,
-          question,
-          targetWordCount,
-          currentWordCount,
-          analysis,
-          plan: researchPlan,
-          outline,
-          evidence: evidenceItems.filter((e) => e.status === "approved"),
-          thesis: thinkingMap?.customThesis || thinkingMap?.thesisOptions?.find((t) => t.id === thinkingMap?.selectedThesisId)?.statement,
-          activeDraftText,
-        });
 
-        if (!response.ok) throw new Error("Failed to reach AI Tutor");
-        const data = await response.json();
-
-        // Apply bidirectional patch if returned by the tutor
-        if (data.patch) {
-          if (data.patch.plan) {
-            await updatePlan(data.patch.plan);
-          }
-          if (data.patch.analysis) {
-            await updateAnalysis(data.patch.analysis);
-          }
-          if (data.patch.question) {
-            await setQuestion(data.patch.question);
-          }
-        }
-
-        const replyMsg: TutorChatMessage = {
-          id: `reply-${Date.now()}`,
-          sender: "tutor",
-          mode: modeToUse,
-          text: data.reply || "I am thinking through your research problem. Let us review the next step.",
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          socraticQuestions: data.socraticQuestions,
-          rubricEstimation: data.rubricEstimation,
-          counterArguments: data.counterArguments,
-          actionableSuggestion: data.actionableSuggestion,
-          patch: data.patch,
-        };
-        setTutorMessages((prev) => [...prev, replyMsg]);
-      } catch (err) {
-        console.error("Failed to send message to AI Tutor:", err);
-        const errMsg: TutorChatMessage = {
-          id: `err-${Date.now()}`,
-          sender: "tutor",
-          mode: modeToUse,
-          text: "I encountered an error connecting to Scholar Core. Please check your network or try again shortly.",
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        };
-        setTutorMessages((prev) => [...prev, errMsg]);
-      } finally {
-        setIsTutorReplying(false);
-      }
-    },
-    [
-      projectId,
-      tutorMode,
-      currentPhase,
-      academicLevel,
-      assignmentType,
-      question,
-      targetWordCount,
-      currentWordCount,
-      analysis,
-      researchPlan,
-      outline,
-      evidenceItems,
-      thinkingMap,
-      updatePlan,
-      updateAnalysis,
-      setQuestion,
-    ]
-  );
-
-  // Rubric Grade Estimator
-  const estimateRubricGrade = useCallback(
-    async (selectedSectionId?: string): Promise<RubricGradeEstimation | null> => {
-      setIsEstimatingRubric(true);
-      try {
-        const res = await authedJsonFetch(`/api/projects/${projectId}/assignment/estimate-rubric`, "POST", {
-          question,
-          academicLevel,
-          assignmentType,
-          targetWordCount,
-          outline,
-          selectedSectionId,
-        });
-        if (!res.ok) throw new Error("Failed to estimate rubric grade");
-        const data: RubricGradeEstimation = await res.json();
-        setLastRubricEstimation(data);
-
-        // Also add a tutor message with this estimation
-        const estMsg: TutorChatMessage = {
-          id: `rubric-est-${Date.now()}`,
-          sender: "tutor",
-          mode: "rubric",
-          text: `📊 **Rubric Grade Assessment:** Your current draft is estimated at **${data.bandLabel}** (${data.overallScore}%).\n\n${data.summary}`,
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          rubricEstimation: data,
-        };
-        setTutorMessages((prev) => [...prev, estMsg]);
-        return data;
-      } catch (err) {
-        console.error("Failed to estimate rubric grade:", err);
-        return null;
-      } finally {
-        setIsEstimatingRubric(false);
-      }
-    },
-    [projectId, question, academicLevel, assignmentType, targetWordCount, outline]
-  );
-
-  // Apply Tutor Suggestion to Draft
-  const applyTutorSuggestionToDraft = useCallback(
-    async (suggestion: { targetSectionId?: string; suggestedText: string; type?: string }) => {
-      if (!suggestion.suggestedText) return;
-      const targetSec = suggestion.targetSectionId
-        ? outline.find((s) => s.id === suggestion.targetSectionId)
-        : outline[0];
-      if (!targetSec) return;
-
-      const currentText = targetSec.draftContent || "";
-      const updatedText = currentText
-        ? `${currentText}\n\n${suggestion.suggestedText}`
-        : suggestion.suggestedText;
-
-      await updateSectionDraft(targetSec.id, updatedText);
-    },
-    [outline, updateSectionDraft]
-  );
 
   // Compute 5-phase status
   const phaseStatuses: Record<AssignmentPhaseId, "active" | "completed" | "upcoming"> = useMemo(() => {
-    const hasExtract = Boolean(question && targetWordCount > 0 && citationStyle);
-    const hasUnderstand = Boolean(structure?.isConfirmed || (hasExtract && analysis?.approvedByUser));
-    const hasSources = sources.filter((s) => s.status === "kept").length >= 2;
-    const hasDrafting = currentWordCount >= Math.min(200, targetWordCount * 0.3);
-    const hasSubmission = Boolean(submissionReport);
-
-    return {
-      extract: currentPhase === "extract" ? "active" : hasExtract ? "completed" : "upcoming",
-      understand: currentPhase === "understand" ? "active" : hasUnderstand ? "completed" : "upcoming",
-      sources: currentPhase === "sources" ? "active" : hasSources ? "completed" : "upcoming",
-      drafting: currentPhase === "drafting" ? "active" : hasDrafting ? "completed" : "upcoming",
-      submission: currentPhase === "submission" ? "active" : hasSubmission ? "completed" : "upcoming",
-    };
+    return computePhaseStatuses({ question, targetWordCount, citationStyle, structure, analysis, sources, approvedSourceIds, currentWordCount, submissionReport, currentPhase });
   }, [
     question,
     targetWordCount,
@@ -1514,117 +1099,10 @@ export function AssignmentProvider({
     currentPhase,
   ]);
 
-  // Compute status for all stages (including legacy aliases)
-  const stageStatuses: Record<AssignmentStage, StageStatus> = useMemo(() => {
-    const hasExtract = Boolean(question && targetWordCount > 0 && citationStyle);
-    const hasUnderstand = Boolean(structure?.isConfirmed || (hasExtract && analysis?.approvedByUser));
-    const hasAnalysis = Boolean(analysis && analysis.approvedByUser);
-    const hasPlan = Boolean(researchPlan && researchPlan.approvedByUser);
-    const hasSources = sources.filter((s) => s.status === "kept").length >= 2;
-    const hasEvidence = evidenceItems.filter((e) => e.status === "approved").length >= 2;
-    const hasThinking = Boolean(thinkingMap && (thinkingMap.selectedThesisId || thinkingMap.customThesis));
-    const hasStructure = outline.length >= 3;
-    const hasDraft = currentWordCount >= Math.min(200, targetWordCount * 0.3);
-    const hasReport = Boolean(submissionReport);
-
-    return {
-      // 5 phases
-      extract: hasExtract ? "completed" : currentPhase === "extract" ? "active" : "needs_review",
-      understand: hasUnderstand && hasAnalysis ? "completed" : currentPhase === "understand" ? "active" : "needs_review",
-      sources: hasSources ? "completed" : currentPhase === "sources" ? "active" : hasUnderstand ? "available" : "locked",
-      drafting: hasDraft ? "completed" : currentPhase === "drafting" ? "active" : hasSources ? "available" : "locked",
-      submission: hasReport ? "completed" : currentPhase === "submission" ? "active" : hasDraft ? "available" : "locked",
-
-      // 8 legacy stages
-      plan: hasPlan ? "completed" : currentPhase === "understand" ? "active" : hasUnderstand ? "available" : "locked",
-      research: hasSources ? "completed" : currentPhase === "sources" ? "active" : hasPlan ? "available" : "locked",
-      evidence: hasEvidence ? "completed" : currentPhase === "sources" ? "active" : hasSources ? "available" : "locked",
-      think: hasThinking ? "completed" : currentPhase === "drafting" ? "active" : hasEvidence ? "available" : "locked",
-      structure: hasStructure ? "completed" : currentPhase === "drafting" ? "active" : hasThinking ? "available" : "locked",
-      draft: hasDraft ? "completed" : currentPhase === "drafting" ? "active" : hasStructure ? "available" : "locked",
-      final: hasReport ? "completed" : currentPhase === "submission" ? "active" : hasDraft ? "available" : "locked",
-    };
-  }, [
-    question,
-    targetWordCount,
-    citationStyle,
-    analysis,
-    researchPlan,
-    sources,
-    evidenceItems,
-    thinkingMap,
-    outline,
-    currentWordCount,
-    submissionReport,
-    currentPhase,
-  ]);
 
   // Unified 4-Phase Project State Model (Section 4.2)
   const projectState: AssignmentProjectState = useMemo(() => {
-    return {
-      projectId: activeProjectId,
-      currentPhase,
-      brief: {
-        rawPrompt: question,
-        instructions: question,
-        assignmentTopic: question,
-        targetWordCount,
-        wordBudget: {
-          intro: sections?.intro?.targetWords ?? Math.round(targetWordCount * 0.10),
-          conclusion: sections?.conclusion?.targetWords ?? Math.round(targetWordCount * 0.15),
-          body: sections?.body?.targetWords ?? Math.max(0, targetWordCount - (sections?.intro?.targetWords ?? Math.round(targetWordCount * 0.10)) - (sections?.conclusion?.targetWords ?? Math.round(targetWordCount * 0.15))),
-        },
-        academicLevel,
-        assignmentType,
-        citationStyle,
-        sections,
-        sectionBudgets,
-        writingStyle,
-        writingTone,
-        rubricCriteria: rubricCriteriaList,
-        analysis,
-        briefLedger: analysis?.briefLedger,
-      },
-      sources: {
-        curated: sources,
-        userUploaded: userUploadedSources,
-        approvedSourceIds,
-        evidenceItems,
-      },
-      drafting: {
-        internalSections: internalSections.length > 0 ? internalSections : outline.map((sec) => ({
-          id: sec.id,
-          title: sec.title,
-          targetWordCount: sec.targetWordCount,
-          currentWordCount: sec.currentWordCount,
-          guidance: sec.guidance,
-          draftContent: sec.draftContent || "",
-          status: sec.status,
-          keyPoints: sec.keyPoints,
-          linkedEvidenceIds: sec.linkedEvidenceIds,
-        })),
-        activeSectionId: activeSectionId || internalSections[0]?.id || outline[0]?.id || null,
-        fullDocumentMarkdown: (internalSections.length > 0 ? internalSections : outline)
-          .map((s) => `## ${s.title}\n\n${s.draftContent || ""}`)
-          .join("\n\n"),
-        overallWordCount: currentWordCount,
-        canonicalDocument: document,
-        thinkingMap,
-      },
-      submission: {
-        rubricScoreReport: submissionReport,
-        citationAudit: citationAuditResult,
-        flowAudit: flowAuditResult,
-        isReadyForSubmission: Boolean(
-          submissionReport &&
-          ((submissionReport as any).readinessPercentage !== undefined
-            ? (submissionReport as any).readinessPercentage >= 70
-            : (submissionReport as any).readyForSubmission) &&
-          (!citationAuditResult || citationAuditResult.isReconciled)
-        ),
-      },
-      updatedAt: new Date().toISOString(),
-    };
+    return buildAssignmentProjectState({ activeProjectId, currentPhase, question, targetWordCount, sections, academicLevel, assignmentType, citationStyle, sectionBudgets, writingStyle, writingTone, rubricCriteriaList, analysis, sources, userUploadedSources, approvedSourceIds, evidenceItems, internalSections, outline, activeSectionId, currentWordCount, document, thinkingMap, submissionReport, citationAuditResult, flowAuditResult });
   }, [
     activeProjectId,
     currentPhase,
@@ -1684,15 +1162,16 @@ export function AssignmentProvider({
       setCitationAuditResult(citAudit);
 
       // 1b. Citation Coverage
-      const approvedSources = sources.filter((s) => s.status === "kept" || (approvedSourceIds && approvedSourceIds.includes(s.id)));
-      const citationCoverage = getCitationCoverage(activeSecs as any, approvedSources);
+      const approvedSources = selectApprovedSources(sources, approvedSourceIds);
+      const citationCoverage = getCitationCoverage(activeSecs, approvedSources);
 
       // 2. Rubric Compliance Evaluation
       const rubricReport = evaluateRubricCompliance(
         fullMarkdown,
         projectState.brief,
         citAudit,
-        citationCoverage
+        citationCoverage,
+        activeSecs.map((sec: { title?: string; draftContent?: string }) => ({ title: sec.title || "", draftContent: sec.draftContent || "" }))
       );
 
       // 3. Flow & Transitions Audit
@@ -1736,11 +1215,6 @@ export function AssignmentProvider({
         advancePhase,
 
         // Backward-compatible Stage Aliases
-        stage: currentStage,
-        currentStage,
-        setStage,
-        stageStatuses,
-        advanceStage,
 
         // Project State Model
         projectState,
@@ -1815,15 +1289,6 @@ export function AssignmentProvider({
         isAuditingSubmission,
         citationAuditResult,
         flowAuditResult,
-        tutorMode,
-        setTutorMode,
-        tutorMessages,
-        sendTutorMessage,
-        isTutorReplying,
-        isEstimatingRubric,
-        lastRubricEstimation,
-        estimateRubricGrade,
-        applyTutorSuggestionToDraft,
         executionMode,
         saveAnswers,
         updateProjectAnswers: saveAnswers,
@@ -1835,3 +1300,4 @@ export function AssignmentProvider({
 }
 
 export default AssignmentContext;
+

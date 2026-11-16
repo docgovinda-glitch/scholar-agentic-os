@@ -93,7 +93,7 @@ describe("Unified Assignment Brief & 2-Step Outline Review Progression", () => {
 
     // 2. Step 2 Outline Review: Locked/collapsed brief summary appears
     await waitFor(() => {
-      expect(screen.getByText(/Locked & Calibrated/i)).toBeInTheDocument();
+      expect(screen.getByText(/From your brief/i)).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /Edit Brief/i })).toBeInTheDocument();
     });
 
@@ -122,10 +122,10 @@ describe("Unified Assignment Brief & 2-Step Outline Review Progression", () => {
       expect(saveIntakeAnswers).toHaveBeenCalledWith(
         "proj-brief-unified",
         expect.objectContaining({
-          academicLevel: "postgraduate",
-          assignmentType: "research_paper",
-          citationStyle: "ieee",
-          writingTone: "persuasive",
+          academic_level: "postgraduate",
+          assignment_type: "research_paper",
+          citation_style: "ieee",
+          writing_tone: "persuasive",
           assignment_structure: expect.objectContaining({
             isConfirmed: true,
             headings: expect.any(Array),

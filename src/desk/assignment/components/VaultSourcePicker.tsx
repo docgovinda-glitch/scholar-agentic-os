@@ -1,15 +1,15 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Archive, Check, Loader2, Lock, Plus, Search } from "lucide-react";
+import { useCallback,useEffect,useMemo,useState } from "react";
+import { Archive,Check,Loader2,Lock,Plus,Search } from "lucide-react";
 import { currentUserId } from "../../../services/userVault";
 import {
-  isVaultUnlocked,
-  linkVaultItemToProject,
-  listVaultItems,
-  searchVaultItems,
-  type VaultItem,
+isVaultUnlocked,
+linkVaultItemToProject,
+listVaultItems,
+searchVaultItems,
+type VaultItem,
 } from "../../../services/vaultContents";
 import type { DiscoveredSource } from "../types";
-import { vaultItemToDiscoveredSource, vaultSourceId } from "../services/vaultSources";
+import { vaultItemToDiscoveredSource,vaultSourceId } from "../services/vaultSources";
 
 export interface VaultSourcePickerProps {
   projectId: string;

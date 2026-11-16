@@ -1,28 +1,25 @@
 import { describe, it, expect } from "vitest";
 import {
-  ASSIGNMENT_STAGES,
   ASSIGNMENT_PHASES,
   LEGACY_STAGE_TO_PHASE_MAP,
   normalizeAssignmentPhase,
+  isAssignmentStageId,
   ASSIGNMENT_TYPE_LABELS,
   COMMON_COMMAND_VERBS,
   normalizeProjectAnswers,
-  getSectionPromptGuidelines,
   type AssignmentStage,
   type AssignmentPhaseId,
   type AssignmentProjectState,
 } from "../types";
 
 describe("Assignment Stages & Domain Taxonomy", () => {
-  it("defines exactly 4 dedicated academic phases in correct progression", () => {
-    expect(ASSIGNMENT_STAGES).toHaveLength(4);
-    const stageIds: AssignmentStage[] = ASSIGNMENT_STAGES.map((s) => s.id);
-    expect(stageIds).toEqual([
-      "understand",
-      "sources",
-      "drafting",
-      "submission",
-    ]);
+  it("defines the five phases in order, and maps every old 8-stage id onto one", () => {
+    expect(ASSIGNMENT_PHASES.map((p) => p.id)).toEqual(["extract", "understand", "sources", "drafting", "submission"]);
+    const legacy: AssignmentStage[] = ["plan", "research", "evidence", "think", "structure", "draft", "final"];
+    expect(legacy.map((s) => normalizeAssignmentPhase(s))).toEqual(["understand", "sources", "sources", "drafting", "drafting", "drafting", "submission"]);
+    expect(isAssignmentStageId("draft")).toBe(true);
+    expect(isAssignmentStageId("drafting")).toBe(true);
+    expect(isAssignmentStageId("nope")).toBe(false);
   });
 
   it("provides comprehensive command verb mappings for academic prompts", () => {
@@ -148,48 +145,6 @@ describe("Assignment Stages & Domain Taxonomy", () => {
     });
   });
 
-  describe("getSectionPromptGuidelines", () => {
-    it("formats section allocation and user instructions when custom guidelines exist", () => {
-      const answers = {
-        sections: {
-          isCustomized: true,
-          intro: {
-            targetWords: 250,
-            guidelines: "Highlight clean energy transition barriers and thesis on regulatory policy.",
-          },
-        },
-      };
-
-      const result = getSectionPromptGuidelines("intro", answers);
-      expect(result).toBe(
-        "SECTION ALLOCATION: ~250 words\nUSER INSTRUCTIONS / MANDATORY CONTENT: Highlight clean energy transition barriers and thesis on regulatory policy."
-      );
-    });
-
-    it("falls back to standard academic rigor instruction when guidelines are empty", () => {
-      const answers = {
-        sections: {
-          body: {
-            targetWords: 1450,
-            guidelines: "   ",
-          },
-        },
-      };
-
-      const result = getSectionPromptGuidelines("body", answers);
-      expect(result).toBe(
-        "SECTION ALLOCATION: ~1450 words\nUSER INSTRUCTIONS / MANDATORY CONTENT: Standard academic rigor and appropriate depth for this section."
-      );
-    });
-
-    it("falls back to 500 words when targetWords is omitted", () => {
-      const answers = {};
-      const result = getSectionPromptGuidelines("conclusion", answers);
-      expect(result).toBe(
-        "SECTION ALLOCATION: ~500 words\nUSER INSTRUCTIONS / MANDATORY CONTENT: Standard academic rigor and appropriate depth for this section."
-      );
-    });
-  });
 
   describe("Approved 5-Phase Architecture (extract -> understand -> sources -> drafting -> submission)", () => {
     it("defines exactly 5 canonical phases with metadata and Lucide icon keys", () => {

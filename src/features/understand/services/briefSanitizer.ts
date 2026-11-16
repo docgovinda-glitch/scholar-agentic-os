@@ -224,7 +224,17 @@ export function extractSanitizedQuestions(rawText: string): string[] {
 
   // 2. Look for sentences ending with '?' or starting with classic academic question stems
   // Splitting using lookbehind on sentence boundaries
-  const sentences = filteredText.split(/(?<=[.?!])\s+/);
+  const split = filteredText.split(/(?<=[.?!])\s+/);
+  // A short follow-up ("Why or why not?", "Explain.") belongs to the question before it.
+  const sentences: string[] = [];
+  for (const part of split) {
+    const t = part.trim();
+    if (sentences.length && /^(?:why or why not|why\??|explain( your answer| why)?|justify your answer)[.?!]?$/i.test(t)) {
+      sentences[sentences.length - 1] += ` ${t}`;
+    } else {
+      sentences.push(part);
+    }
+  }
 
   for (const sentence of sentences) {
     const s = sentence.trim();
@@ -252,49 +262,7 @@ export function extractSanitizedQuestions(rawText: string): string[] {
     }
   }
 
-  // 3. Special handling for Zappos + Schein tutorial slides:
-  // "Zappos offers new employees $2,000 to quit after their first week of training. Why would a company pay people to leave?"
-  // Ensure the full context is captured in Question 1
-  const containsZappos = /zappos/i.test(filteredText);
-  const containsSchein = /schein/i.test(filteredText);
-
-  if (containsZappos && containsSchein) {
-    const refinedQuestions: string[] = [];
-
-    // Q1: Zappos $2,000 quit bonus
-    if (/zappos.*\$?2,?000/i.test(filteredText)) {
-      refinedQuestions.push(
-        "Why would Zappos offer new employees $2,000 to quit after their first week of training?"
-      );
-    }
-
-    // Q2: Artifacts alone
-    if (/artifacts\s+alone/i.test(filteredText) || /redesigning\s+offices/i.test(filteredText)) {
-      refinedQuestions.push(
-        "Can organizational culture be changed by changing artifacts alone (e.g., redesigning offices, changing dress codes)? Why or why not?"
-      );
-    }
-
-    // Q3: Leadership Schein level
-    if (/as\s+a\s+leader/i.test(filteredText) && /which\s+level/i.test(filteredText)) {
-      refinedQuestions.push(
-        "As a leader, which level of Schein's model would you start with to change organizational culture, and why?"
-      );
-    }
-
-    // Q4: Job interview culture assessment
-    if (/job\s+interview/i.test(filteredText) || /assess.*culture.*interview/i.test(filteredText)) {
-      refinedQuestions.push(
-        "How would you assess a company's culture during a job interview using Schein's model?"
-      );
-    }
-
-    if (refinedQuestions.length >= 3) {
-      return deduplicateQuestions(refinedQuestions);
-    }
-  }
-
-  // General questions fallback with deduplication
+  // The brief's own questions, deduplicated; none is rewritten or added.
   return deduplicateQuestions(rawCandidateQuestions);
 }
 

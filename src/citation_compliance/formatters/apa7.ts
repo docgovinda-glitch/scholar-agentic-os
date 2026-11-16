@@ -53,15 +53,15 @@ export class APA7Formatter implements CitationStyle {
     const year = `(${authorDateYear(reference)}).`;
     const endSentence = (t: string) => (/[.?!]$/.test(t) ? t : `${t}.`);
     const parts: string[] = [];
-    if (authors) parts.push(endSentence(authors));
-    parts.push(year);
+    const title = reference.kind === "Book" ? endSentence(`*${reference.title}*`) : endSentence(reference.title);
+    // APA 7 (9.12): with no author, the title moves to the author position.
+    if (authors) parts.push(endSentence(authors), year, title);
+    else parts.push(title, year);
 
     if (reference.kind === "Book") {
-      parts.push(endSentence(`*${reference.title}*`));
       const publisher = reference.publisher || reference.source;
       if (publisher) parts.push(endSentence(publisher));
     } else if (reference.kind === "JournalArticle") {
-      parts.push(endSentence(reference.title));
       const journal = reference.journal || reference.source;
       if (journal) {
         let container = `*${journal}*`;
@@ -71,7 +71,6 @@ export class APA7Formatter implements CitationStyle {
         parts.push(endSentence(container));
       }
     } else {
-      parts.push(endSentence(reference.title));
       if (reference.source) parts.push(endSentence(reference.source));
     }
 

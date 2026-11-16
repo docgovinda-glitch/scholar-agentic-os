@@ -1,78 +1,47 @@
+import { errorText } from "../../../../src/shared/errorText.ts";
+import { parseBody, AnalyzeBody, OutlineBody } from "./schemas.ts";
 import { routedCompletion } from "../../../src/ai/routerBridge.ts";
-import { sendAiFailure, UnusableAiResponseError } from "../../../src/ai/aiRouteErrors.ts";
-import { assignmentOutlinePrompt, assignmentOutlineUserPrompt, structureFromAi } from "../../../../src/domain/assignment/aiAssignmentOutline.ts";
+import { sendAiFailure,UnusableAiResponseError } from "../../../src/ai/aiRouteErrors.ts";
+import { structureFromAi } from "../../../../src/domain/assignment/aiAssignmentOutline.ts";
 import { scopeBrief } from "../../../../src/domain/assignment/briefScoping.ts";
-import type { AssignmentDraftingSection } from "../../../../src/desk/assignment/types.ts";
+import type { AcademicLevel, AssignmentDraftingSection, AssignmentStructure, AssignmentType } from "../../../../src/desk/assignment/types.ts";
+import type { ProjectRecord } from "../../../../src/services/store/types.ts";
 import express from "express";
 import { parseDocument } from "../../../../src/document_intelligence/index.ts";
 import {
-  buildScholarlyVoiceSystemPrompt,
-  sanitizeScholarlyText,
-  normalizeUnicodeNFC,
+normalizeUnicodeNFC
 } from "../../../src/utils/scholarlyVoiceGuard.ts";
 import { getProjectStore } from "../../../../src/services/store/projectStore.ts";
-import { callOpenRouterJSON, callOpenRouterText } from "../../../src/services/scholarBrain.ts";
-import { requestKeyring } from "../../../src/ai/routerBridge.ts";
 import { scholarBrain } from "../../../src/services/scholarBrain.ts";
 import {
-  auditDocumentLineByLine,
-  runBriefScannerGraph,
-  COMMAND_VERB_MAP,
-  type DocumentRequirement,
+auditDocumentLineByLine,COMMAND_VERB_MAP,
+type DocumentRequirement
 } from "../../../services/briefScannerGraph.ts";
 import type {
-  AssignmentAnalysis,
-  CommandVerbDetail,
-  CoreResearchQuestion,
-  RecommendedSearchStrategy,
-  ResearchPlan,
-  TutorWorkspacePatch,
-  DiscoveredSource,
+AssignmentAnalysis,
+CommandVerbDetail
 } from "../../../../src/desk/assignment/types.ts";
 import {
-  cleanAnswerString,
-  extractStandardizedInstructions,
-  normalizeProjectAnswers,
-  getSectionPromptGuidelines,
-  structureToInternalSections,
+cleanAnswerString,
+extractStandardizedInstructions
 } from "../../../../src/desk/assignment/types.ts";
-import {
-  generateDynamicAssignmentStructure,
-  extractBriefInquiriesAndConcepts,
-  sanitizeOutlineHeadings,
-  assignmentStructureToOutlineTree,
-  outlineTreeToAssignmentStructure,
-} from "../../../../src/desk/assignment/services/outlineService.ts";
+import { generateDynamicAssignmentStructure } from "../../../../src/desk/assignment/services/dynamicStructure.ts";
+import { extractBriefInquiriesAndConcepts } from "../../../../src/desk/assignment/services/briefSemantics.ts";
+import { assignmentStructureToOutlineTree } from "../../../../src/desk/assignment/services/outlineTree.ts";
 import { sanitizeBrief } from "../../../../src/features/understand/services/briefSanitizer.ts";
-import { classifyScopeBoundaries, stripLineTags } from "../../../../src/features/understand/services/scopeClassifier.ts";
+import { classifyScopeBoundaries } from "../../../../src/features/understand/services/scopeClassifier.ts";
 import {
-  isClassroomLogisticsLine,
-  isTutorialOrShortQABrief,
-  extractSubstantiveBriefQuestions,
-  stripSlideArtifacts,
-  stripCourseCodes,
+isClassroomLogisticsLine,
+isTutorialOrShortQABrief,
+extractSubstantiveBriefQuestions,
+stripSlideArtifacts,
+stripCourseCodes,
 } from "../../../../src/utils/briefExtractor.ts";
-import { buildBriefSummary, extractPrescribedReferences } from "../../../../src/utils/briefQuestions.ts";
-import { discoverMultiPortalSources, type DiscoveredSourceDraft } from "../../../src/discovery/discovery.ts";
+import { buildBriefSummary,extractPrescribedReferences } from "../../../../src/utils/briefQuestions.ts";
 import {
-  replaceBracketTokensWithDeterministicCitations,
-  compileDeterministicBibliographyMarkdown,
-  formatAskScholarInText,
-  formatAskScholarBibliographyEntry,
-  type WebsiteCitationItem,
-} from "../../../../src/desk/scholarCitationEngine.ts";
-import {
-  upload,
-  getProjectSafe,
-  persistSourcesToSupabase,
-  isCorruptedOutlineHeadings,
-  healCorruptedProjectStructure,
-  safeParseObject,
-  extractProjectInstructions,
-  deriveHeuristicTitle,
-  deriveSemanticAcademicTitle,
-  autoUpdateProjectTitleIfUntitled,
-  buildDeterministicResearchPlan,
+upload,
+getProjectSafe,safeParseObject,deriveSemanticAcademicTitle,
+autoUpdateProjectTitleIfUntitled
 } from "./helpers.ts";
 
 const router = express.Router({ mergeParams: true });
@@ -93,6 +62,22 @@ router.post(
   const file = req.file;
   if (!file) {
     return res.status(400).json({ error: "No file provided" });
+  }
+
+  // A .pdf / .docx / .pptx whose bytes are not that format (renamed or corrupt)
+  // is refused: decoding it as text would put garbage in the brief box.
+  const lowerName = (file.originalname || "").toLowerCase();
+  const head = file.buffer.subarray(0, 5).toString("latin1");
+  const looksPdf = head.startsWith("%PDF");
+  const looksZip = head.startsWith("PK");
+  if ((/\.pdf$/.test(lowerName) && !looksPdf) || (/\.(docx|pptx)$/.test(lowerName) && !looksZip)) {
+    return res.status(422).json({
+      error: "This file is not a valid " + lowerName.split(".").pop()!.toUpperCase() + " document. Save it again from your word processor, or paste the brief text.",
+      code: "brief_unreadable",
+    });
+  }
+  if (file.size === 0) {
+    return res.status(422).json({ error: "This file is empty. Choose another file or paste the brief text.", code: "brief_empty" });
   }
 
   let text = "";
@@ -175,11 +160,7 @@ router.post(
     if (!project.answers) {
       project.answers = {};
     }
-    project.answers["instructions"] = cleanedText;
-    project.answers["assignment_question"] =
-      extractedQuestions.length > 0 ? extractedQuestions.join("\n\n") : cleanedText;
-    project.answers["assignment_brief_text"] = cleanedText;
-    project.answers["research_topic"] = cleanedText;
+    // One stored name per setting (answerKeys.ts); the questions are kept below.
     project.answers["assignment_brief"] = cleanedText;
     if (extractedQuestions.length > 0) {
       project.answers["extracted_questions"] = JSON.stringify(extractedQuestions);
@@ -191,17 +172,12 @@ router.post(
     project.answers["mark_allocation"] = JSON.stringify(markAllocation);
 
     if (detectedWordCount) {
-      project.answers["targetWordCount"] = String(detectedWordCount);
-      project.answers["target_word_count"] = String(detectedWordCount);
-      project.answers["word_count"] = String(detectedWordCount);
       project.answers["word_limit"] = String(detectedWordCount);
     }
     if (detectedLevel) {
-      project.answers["academicLevel"] = detectedLevel;
       project.answers["academic_level"] = detectedLevel;
     }
     if (detectedCitation) {
-      project.answers["citationStyle"] = detectedCitation;
       project.answers["citation_style"] = detectedCitation;
     }
     await getProjectStore().save(project);
@@ -222,14 +198,15 @@ router.post(
       detectedCitation,
       updatedTitle,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error parsing brief in assignment router:", err);
-    return res.status(500).json({ error: err.message || "Failed to extract text from brief" });
+    return res.status(500).json({ error: errorText(err) || "Failed to extract text from brief" });
   }
 });
 
 // 1. POST /api/projects/:id/assignment/analyze & /deconstruct
 const handleDeconstruct = async (req: express.Request<{ id: string }>, res: express.Response) => {
+  if (!parseBody(AnalyzeBody, req, res)) return;
   const project = await getProjectSafe(req, res);
   if (!project) return;
 
@@ -239,29 +216,24 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
     extractStandardizedInstructions(project.answers);
   const assignmentType =
     req.body?.assignmentType ||
-    project.answers["assignmentType"] ||
     project.answers["assignment_type"] ||
     "essay";
   const academicLevel =
     req.body?.academicLevel ||
-    project.answers["academicLevel"] ||
     project.answers["academic_level"] ||
     "undergraduate";
   const briefText =
     cleanAnswerString(req.body?.briefText) ||
-    cleanAnswerString(project.answers["assignment_brief_text"]) ||
+    cleanAnswerString(project.answers["assignment_brief"]) ||
     question;
   const isTutorial = isTutorialOrShortQABrief(briefText) || isTutorialOrShortQABrief(question);
   const targetWordCount = Number(
     req.body?.targetWordCount ||
-    project.answers["targetWordCount"] ||
-    project.answers["word_count"] ||
     project.answers["word_limit"] ||
     (isTutorial ? 400 : 2000)
   );
   const citationStyle =
     cleanAnswerString(req.body?.citationStyle) ||
-    cleanAnswerString(project.answers["citationStyle"]) ||
     cleanAnswerString(project.answers["citation_style"]) ||
     "apa7";
   const rubricText =
@@ -269,7 +241,8 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
     cleanAnswerString(project.answers["marking_rubric"]) ||
     "";
   const rawSections = req.body?.sections || project.answers["sections"];
-  const parsedSections = safeParseObject(rawSections);
+  type SavedBreakdown = { intro?: { targetWords?: number }; body?: { targetWords?: number }; conclusion?: { targetWords?: number }; isCustomized?: boolean };
+  const parsedSections = safeParseObject<SavedBreakdown>(rawSections);
 
   try {
     const combinedContent = [question, briefText, rubricText].filter(Boolean).join("\n\n").trim();
@@ -468,8 +441,8 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
     try {
       const aiText = await routedCompletion(req, {
         task: "drafting",
-        systemPrompt: assignmentOutlinePrompt(),
-        userPrompt: assignmentOutlineUserPrompt({
+        systemPrompt: scholarBrain.courseworkPrompts.assignmentOutlinePrompt(),
+        userPrompt: scholarBrain.courseworkPrompts.assignmentOutlineUserPrompt({
           brief: briefText,
           question,
           assignmentType: String(assignmentType),
@@ -488,19 +461,15 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
     }
     if (!structure) {
       structure = {
-        ...generateDynamicAssignmentStructure({ question, assignmentType: assignmentType as any, academicLevel: academicLevel as any, targetWordCount: targetWords, citationStyle, briefText }),
+        ...generateDynamicAssignmentStructure({ question, assignmentType: assignmentType as AssignmentType, academicLevel: academicLevel as AcademicLevel, targetWordCount: targetWords, citationStyle, briefText }),
         source: "starter",
       };
     }
 
     project.answers.assignment_structure = JSON.stringify(structure);
-    project.answers.structure = JSON.stringify(structure);
     project.answers.target_frameworks = JSON.stringify(structure.targetFrameworks || []);
     if (project.answers.assignment_internal_sections) {
       delete project.answers.assignment_internal_sections;
-    }
-    if (project.answers.assignment_outline) {
-      delete project.answers.assignment_outline;
     }
 
     await getProjectStore().save(project);
@@ -508,17 +477,17 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
     res.json({
       ...finalAnalysis,
       briefLedger: ledger,
-      updatedTitle: updatedTitle || project.answers?.["title"] || (project as any).title,
+      updatedTitle: updatedTitle || project.answers?.["title"],
       structure,
       outlineSource: structure.source,
       outlineNote,
       targetFrameworks: structure.targetFrameworks || [],
       sections: assignmentStructureToOutlineTree(structure).sections,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Assignment deconstruction error:", err);
     if (!res.headersSent) {
-      res.status(500).json({ error: err.message || "Failed to deconstruct assignment brief" });
+      res.status(500).json({ error: errorText(err) || "Failed to deconstruct assignment brief" });
     }
   }
 };
@@ -538,15 +507,15 @@ router.post("/analyze", handleDeconstruct);
  */
 export async function writeOutlineForProject(
   req: express.Request<{ id: string }>,
-  project: any,
+  project: ProjectRecord,
   opts: { instruction?: string; plan?: string } = {}
 ) {
   const a = project.answers;
-  const question = cleanAnswerString(a["assignment_question"]) || extractStandardizedInstructions(a);
-  const briefText = cleanAnswerString(a["assignment_brief_text"]) || question;
-  const targetWords = Number(a["targetWordCount"] || a["word_count"] || a["word_limit"] || 1500) || 1500;
-  const assignmentType = String(a["assignmentType"] || a["assignment_type"] || "essay");
-  const current = safeParseObject(a["assignment_structure"] || a["structure"]) as any;
+  const question = cleanAnswerString(a["assignment_brief"]) || extractStandardizedInstructions(a);
+  const briefText = cleanAnswerString(a["assignment_brief"]) || question;
+  const targetWords = Number(a["word_limit"] || 1500) || 1500;
+  const assignmentType = String(a["assignment_type"] || "essay");
+  const current = safeParseObject<AssignmentStructure>(a["assignment_structure"]);
   const previous = (safeParseObject(a["assignment_internal_sections"]) as AssignmentDraftingSection[] | undefined) ?? [];
   const ledger = safeParseObject(a["brief_ledger"]) as Array<{ category?: string; verbatimText?: string }> | undefined;
   const extraction = safeParseObject(a["assignment_extraction"]) as { criteria?: Array<{ criterion: string; weight?: number }> } | null;
@@ -558,14 +527,14 @@ export async function writeOutlineForProject(
 
   const aiText = await routedCompletion(req, {
     task: "drafting",
-    systemPrompt: assignmentOutlinePrompt(),
-    userPrompt: assignmentOutlineUserPrompt({
+    systemPrompt: scholarBrain.courseworkPrompts.assignmentOutlinePrompt(),
+    userPrompt: scholarBrain.courseworkPrompts.assignmentOutlineUserPrompt({
       brief: briefText,
       question,
       assignmentType,
-      academicLevel: String(a["academicLevel"] || a["academic_level"] || "undergraduate"),
+      academicLevel: String(a["academic_level"] || "undergraduate"),
       discipline: discipline || undefined,
-      citationStyle: cleanAnswerString(a["citationStyle"] || a["citation_style"]) || undefined,
+      citationStyle: cleanAnswerString(a["citation_style"]) || undefined,
       targetWords,
       criteria,
       instruction: opts.instruction,
@@ -578,10 +547,8 @@ export async function writeOutlineForProject(
   if (!structure) throw new UnusableAiResponseError("outline");
   structure.version = (Number(current?.version) || 0) + 1;
   project.answers.assignment_structure = JSON.stringify(structure);
-  project.answers.structure = JSON.stringify(structure);
-  if (structure.targetWordCount !== targetWords) project.answers.targetWordCount = String(structure.targetWordCount);
+  if (structure.targetWordCount !== targetWords) project.answers.word_limit = String(structure.targetWordCount);
   delete project.answers.assignment_internal_sections;
-  delete project.answers.assignment_outline;
   await getProjectStore().save(project);
   return structure;
 }
@@ -589,10 +556,11 @@ export async function writeOutlineForProject(
 router.post("/outline", async (req: express.Request<{ id: string }>, res: express.Response) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
+  if (!parseBody(OutlineBody, req, res)) return;
   const raw = req.body?.instruction;
   const instruction = typeof raw === "string" ? raw.trim().slice(0, 600) || undefined : undefined;
   const a = project.answers;
-  const briefText = cleanAnswerString(a["assignment_brief_text"]) || cleanAnswerString(a["assignment_question"]) || extractStandardizedInstructions(a);
+  const briefText = cleanAnswerString(a["assignment_brief"]) || extractStandardizedInstructions(a);
   if (!briefText || briefText.trim().length < 10) {
     return res.status(400).json({ error: "Add your assignment brief first, so the outline can be about your assignment.", code: "missing_brief" });
   }
@@ -603,6 +571,5 @@ router.post("/outline", async (req: express.Request<{ id: string }>, res: expres
     sendAiFailure(res, err, "Outline");
   }
 });
-router.post("/deconstruct", handleDeconstruct);
 
 export default router;

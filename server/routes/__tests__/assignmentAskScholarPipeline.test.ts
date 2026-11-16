@@ -65,6 +65,12 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/** The final text of a /stream-section event stream. */
+function streamedText(body: string): string {
+  const ev = body.split("\n\n").filter((l) => l.startsWith("data: {")).map((l) => JSON.parse(l.slice(6)));
+  return String(ev.find((e) => typeof e.fullText === "string")?.fullText ?? "");
+}
+
 async function createCourseworkProject(citationStyle = "apa7"): Promise<string> {
   const store = getProjectStore();
   const project = {
@@ -91,45 +97,7 @@ async function createCourseworkProject(citationStyle = "apa7"): Promise<string> 
 }
 
 describe("Coursework & Essays (OT-01) Ask Scholar Unified Pipeline", () => {
-  describe("1. Unified Evidence & Discovery (POST /research)", () => {
-    it("queries OpenAlex/Crossref multi-portal discovery and returns standard bibliographic metadata", async () => {
-      const projectId = await createCourseworkProject();
-
-      const fetchCalls: { url: string; body: any }[] = [];
-      global.fetch = vi.fn().mockImplementation(async (url: string, init?: any) => {
-        const body = init?.body ? JSON.parse(init.body) : null;
-        fetchCalls.push({ url: url.toString(), body });
-        return new Response(JSON.stringify([]), { status: 200 });
-      });
-
-      const res = await request(app)
-        .post(`/api/projects/${projectId}/assignment/research`)
-        .send({
-          question: "Critically evaluate self-attention mechanisms against residual representations.",
-          citationStyle: "apa7",
-        });
-
-      expect(res.status).toBe(200);
-      expect(res.body.sources).toBeDefined();
-      expect(Array.isArray(res.body.sources)).toBe(true);
-      expect(res.body.sources.length).toBe(2);
-
-      const s1 = res.body.sources[0];
-      expect(s1.title).toBe("Attention Is All You Need");
-      expect(s1.authors).toEqual(["Ashish Vaswani", "Noam Shazeer"]);
-      expect(s1.year).toBe("2017");
-      expect(s1.doi).toBe("10.48550/arXiv.1706.03762");
-      expect(s1.journal).toBe("Advances in Neural Information Processing Systems");
-      expect(s1.retrievalSource).toBe("openalex");
-      expect(s1.peerReviewed).toBe(true);
-
-      const s2 = res.body.sources[1];
-      expect(s2.title).toBe("Deep Residual Learning for Image Recognition");
-      expect(s2.retrievalSource).toBe("crossref");
-    });
-  });
-
-  describe("2. Deterministic Token Interceptor (POST /draft-section)", () => {
+  describe("2. Deterministic Token Interceptor (POST /stream-section)", () => {
     const approvedEvidence = [
       {
         id: "ev-vaswani-2017",
@@ -168,18 +136,16 @@ Both architectures scale effectively [1, 2].
       vi.mocked(callOpenRouterText).mockResolvedValue(llmOutput);
 
       const res = await request(app)
-        .post(`/api/projects/${projectId}/assignment/draft-section`)
+        .post(`/api/projects/${projectId}/assignment/stream-section`)
         .send({
           sectionTitle: "Theoretical Foundations of Transformer Architectures",
           sectionGuidance: "Evaluate attention and residual mechanisms",
           citationStyle: "apa",
-          approvedEvidence,
+          boundSources: approvedEvidence,
         });
 
       expect(res.status).toBe(200);
-      expect(res.body.draft).toBeDefined();
-
-      const draft: string = res.body.draft;
+      const draft = streamedText(res.text);
 
       // 1. Prohibits hallucinated bibliography: ## References must be stripped
       expect(draft.includes("## References")).toBe(false);
@@ -202,15 +168,15 @@ Both architectures scale effectively [1, 2].
       vi.mocked(callOpenRouterText).mockResolvedValue(llmOutput);
 
       const res = await request(app)
-        .post(`/api/projects/${projectId}/assignment/draft-section`)
+        .post(`/api/projects/${projectId}/assignment/stream-section`)
         .send({
           sectionTitle: "Comparative Performance",
           citationStyle: "ieee",
-          approvedEvidence,
+          boundSources: approvedEvidence,
         });
 
       expect(res.status).toBe(200);
-      const draft: string = res.body.draft;
+      const draft = streamedText(res.text);
       expect(draft).toContain("[1]");
       expect(draft).toContain("[2]");
       expect(draft.includes("(Vaswani")).toBe(false);
@@ -223,15 +189,15 @@ Both architectures scale effectively [1, 2].
       vi.mocked(callOpenRouterText).mockResolvedValue(llmOutput);
 
       const res = await request(app)
-        .post(`/api/projects/${projectId}/assignment/draft-section`)
+        .post(`/api/projects/${projectId}/assignment/stream-section`)
         .send({
           sectionTitle: "Architecture Review",
           citationStyle: "mla",
-          approvedEvidence,
+          boundSources: approvedEvidence,
         });
 
       expect(res.status).toBe(200);
-      const draft: string = res.body.draft;
+      const draft = streamedText(res.text);
       expect(draft).toMatch(/\(Vaswani(?: and Shazeer)?\)/);
       expect(draft.includes("2017")).toBe(false);
     });
@@ -284,70 +250,4 @@ Both architectures scale effectively [1, 2].
     });
   });
 
-  describe("1b. No invented fallback sources (POST /research)", () => {
-    it("returns and saves an empty list when live discovery finds nothing", async () => {
-      const { discoverMultiPortalSources } = await import("../../src/discovery/discovery.ts");
-      vi.mocked(discoverMultiPortalSources).mockResolvedValueOnce([]);
-      const projectId = await createCourseworkProject();
-
-      const res = await request(app)
-        .post(`/api/projects/${projectId}/assignment/research`)
-        .send({ question: "An obscure question no index can answer", citationStyle: "apa7" });
-
-      expect(res.status).toBe(200);
-      expect(res.body.sources).toEqual([]);
-    });
-
-    it("returns an empty list when live discovery errors", async () => {
-      const { discoverMultiPortalSources } = await import("../../src/discovery/discovery.ts");
-      vi.mocked(discoverMultiPortalSources).mockRejectedValueOnce(new Error("network down"));
-      const projectId = await createCourseworkProject();
-
-      const res = await request(app)
-        .post(`/api/projects/${projectId}/assignment/research`)
-        .send({ question: "Critically evaluate algorithmic governance", citationStyle: "apa7" });
-
-      expect(res.status).toBe(200);
-      expect(res.body.sources).toEqual([]);
-    });
-  });
-
-  describe("4. Citation Grounding (POST /citations-ground)", () => {
-    it("returns no citations (and never asks an LLM to write some) when discovery finds nothing", async () => {
-      const { discoverMultiPortalSources } = await import("../../src/discovery/discovery.ts");
-      const { callOpenRouterJSON } = await import("../../utils/llm.ts");
-      vi.mocked(discoverMultiPortalSources).mockResolvedValueOnce([]);
-      const projectId = await createCourseworkProject("apa7");
-      const res = await request(app)
-        .post(`/api/projects/${projectId}/assignment/citations-ground`)
-        .send({ question: "Nothing indexes this", citationStyle: "apa" });
-      expect(res.status).toBe(200);
-      expect(res.body.citations).toEqual([]);
-      expect(callOpenRouterJSON).not.toHaveBeenCalled();
-    });
-
-    it("returns verified multi-portal scholarly sources with deterministic citations", async () => {
-      const projectId = await createCourseworkProject("apa7");
-
-      const res = await request(app)
-        .post(`/api/projects/${projectId}/assignment/citations-ground`)
-        .send({
-          question: "Neural representations in machine learning",
-          citationStyle: "apa",
-        });
-
-      expect(res.status).toBe(200);
-      expect(res.body.citations).toBeDefined();
-      expect(Array.isArray(res.body.citations)).toBe(true);
-      expect(res.body.citations.length).toBeGreaterThan(0);
-
-      const c1 = res.body.citations[0];
-      expect(c1.sourceTitle).toBe("Attention Is All You Need");
-      expect(c1.authors).toContain("Ashish Vaswani");
-      expect(c1.year).toBe("2017");
-      expect(c1.citationText).toContain("Attention Is All You Need");
-      expect(c1.inTextCitation).toContain("Vaswani");
-      expect(c1.verifiedPeerReviewed).toBe(true);
-    });
-  });
 });

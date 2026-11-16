@@ -42,7 +42,7 @@ export function formatSourceInTextCitation(
 
   // Graceful deterministic fallback
   const year = source.year || "n.d.";
-  const rawAuthors = (source as any).authors;
+  const rawAuthors: unknown = source.authors; // older saves may hold one string
   const authorList = Array.isArray(rawAuthors)
     ? rawAuthors
     : typeof rawAuthors === "string" && rawAuthors.trim()

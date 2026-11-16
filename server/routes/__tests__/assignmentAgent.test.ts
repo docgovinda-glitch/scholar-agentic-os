@@ -70,7 +70,7 @@ describe("coursework agent", () => {
     expect(routedCompletion.mock.calls[0][1].userPrompt).toMatch(/Material "week3.pdf"/);
     const a = await saved();
     expect(JSON.parse(String(a.assignment_extraction)).missing[0].question).toMatch(/Which retailer/);
-    expect(a.targetWordCount).toBe("2500");
+    expect(a.word_limit).toBe("2500"); // one stored name per setting (answerKeys.ts)
     expect(a.citation_style).toBe("Harvard");
   });
 

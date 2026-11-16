@@ -9,8 +9,9 @@
  * 5. Guarantees complete project isolation.
  */
 
-import { executeAgenticLLM, authedFetch, authedJsonFetch } from "../../api";
-import { parseAndRepairLLMJson } from "../../../shared/llmJsonParser";
+import { authedFetch, authedJsonFetch } from "../../api";
+import { formatSourceBibliography, formatSourceInTextCitation } from "./citationFormatService";
+import type { EvidenceExtraction } from "../../../domain/assignment/assignmentAgent";
 import type { UploadedSourceDocument, EvidenceItem, ExtractedSourceEvidence } from "../types";
 
 export interface SourceExtractionOptions {
@@ -28,7 +29,7 @@ export interface ParsedSourcePayload {
   url?: string;
   author?: string;
   year?: string;
-  metadata?: Record<string, any>;
+  metadata?: { mimeType?: string; summary?: string } & Record<string, unknown>;
 }
 
 /** Stop words for relevance scoring */
@@ -138,33 +139,64 @@ export function scoreSegmentRelevance(segmentText: string, keywords: string[]): 
 }
 
 /** Formulate standard academic citation string */
+/**
+ * Reference entry for an uploaded document, from the shared formatter. Only
+ * what is known is printed: no stand-in author, publisher or year ("n.d.").
+ */
 export function generateCitationString(
   title: string,
   author: string | undefined,
   year: string | undefined,
-  sourceType: string | undefined = "document",
-  style: string = "APA"
+  _sourceType: string | undefined = "document",
+  style: string = "apa7"
 ): string {
-  const effectiveYear = year || new Date().getFullYear().toString();
-  const effectiveAuthor = author || "Course Syllabus / Research Material";
+  return formatSourceBibliography(
+    { title: cleanTitle(title), authors: author ? [author] : [], year: year || "n.d." },
+    normalizeStyle(style)
+  );
+}
 
-  if (style === "Harvard") {
-    return `${effectiveAuthor} (${effectiveYear}) '${title}'. Academic Research Repository.`;
+/** Upload names arrive as file names: drop the extension and separators. */
+function cleanTitle(name: string): string {
+  return (name || "Untitled document").replace(/\.[a-z0-9]{2,5}$/i, "").replace(/[_]+/g, " ").trim();
+}
+
+/** "APA" / "Harvard" / "apa7" ... to a style id the shared formatters know. */
+function normalizeStyle(style: string): string {
+  const s = (style || "apa7").toLowerCase();
+  if (s === "apa") return "apa7";
+  if (s === "mla") return "mla9";
+  return s;
+}
+
+/** Plain description of what kind of material a document is (never a claim about its quality). */
+export function materialLabel(sourceType: string | undefined): string {
+  switch (sourceType) {
+    case "pptx": return "Slides";
+    case "spreadsheet": return "Spreadsheet data";
+    case "pdf": return "PDF document";
+    case "docx": return "Word document";
+    case "weblink": return "Web page";
+    case "image": return "Image";
+    case "text": return "Text or notes";
+    default: return "Document";
   }
-  if (style === "Chicago") {
-    return `${effectiveAuthor}. "${title}." ${effectiveYear}.`;
-  }
-  if (style === "MLA") {
-    return `${effectiveAuthor}. "${title}." Scholar Academic Archive, ${effectiveYear}.`;
-  }
-  // Default APA 7th
-  return `${effectiveAuthor} (${effectiveYear}). ${title}. Academic Course Grounding.`;
 }
 
 /**
  * Intelligent Evidence Extractor:
  * Identifies and pulls only assignment-relevant excerpts with surrounding context.
  * Does NOT retain the full 100 pages of text.
+ */
+/** Characters of a source's text kept with the project (about 25 pages). */
+export const MAX_STORED_SOURCE_CHARS = 50_000;
+
+/**
+ * Evidence from a document the student uploaded. The student's AI (through the
+ * server's agent step) picks excerpts, and only excerpts found word for word in
+ * the document are kept. Without an AI, the most relevant sentences of the
+ * document itself are shown. Nothing is invented: no stand-in author, year,
+ * finding, abstract or section mapping.
  */
 export async function extractProjectEvidence(
   payload: ParsedSourcePayload,
@@ -173,279 +205,101 @@ export async function extractProjectEvidence(
   document: UploadedSourceDocument;
   evidenceItems: EvidenceItem[];
 }> {
-  const { assignmentQuestion, citationStyle = "APA", projectId } = options;
+  const { assignmentQuestion, citationStyle = "apa7", projectId } = options;
   const keywords = extractKeywords(assignmentQuestion);
   const segments = segmentDocument(payload.text, payload.sourceType);
+  const scored = segments.map((seg) => ({ ...seg, score: scoreSegmentRelevance(seg.text, keywords) })).sort((x, y) => y.score - x.score);
+  const top = scored.filter((x) => x.score > 0).slice(0, 4);
+  const candidates = top.length > 0 ? top : scored.slice(0, 2);
 
-  // Score and rank segments by relevance to the project
-  const scoredSegments = segments.map((seg) => ({
-    ...seg,
-    score: scoreSegmentRelevance(seg.text, keywords),
-  }));
-
-  // Sort descending by relevance score
-  scoredSegments.sort((a, b) => b.score - a.score);
-
-  // Take top relevant segments (maximum 3-5 segments)
-  const topSegments = scoredSegments.filter((s) => s.score > 0).slice(0, 4);
-  const candidateSegments = topSegments.length > 0 ? topSegments : scoredSegments.slice(0, 2);
-
-  const extractedEvidences: ExtractedSourceEvidence[] = [];
-  const generatedEvidenceItems: EvidenceItem[] = [];
-
-  const citation = generateCitationString(
-    payload.title,
-    payload.author,
-    payload.year,
-    payload.sourceType,
-    citationStyle
-  );
-
-  // Try AI-powered contextual evidence extraction first
-  let aiExtractionWorked = false;
-  let aiTitle: string | undefined;
-  let aiAuthor: string | undefined;
-  let aiYear: string | undefined;
-  let aiMainFinding: string | undefined;
-
-  if (assignmentQuestion.trim().length > 5) {
+  let ai: EvidenceExtraction | null = null;
+  if (projectId && assignmentQuestion.trim().length > 5 && candidates.length > 0) {
     try {
-      const systemPrompt = `You are a scholarly research assistant. Analyze the provided source text in the context of the user's assignment question.
-Extract the key academic metadata and the 2 to 3 most relevant evidentiary excerpts:
-{
-  "title": "Clean, formal title of the material (cleaning up raw filenames, underscores, or extensions)",
-  "author": "Author, professor, lecturer, or issuing institution if discernible from text/slides, else null",
-  "year": "Publication or lecture year if discernible, else null",
-  "mainFinding": "Concise 1-2 sentence core insight or finding from this source directly relevant to the assignment",
-  "excerpts": [
-    {
-      "excerpt": "The exact quotation or factual passage.",
-      "context": "1-2 surrounding sentences explaining why this excerpt is meaningful.",
-      "sourceLocation": "The precise location reference (e.g. Page X, Slide Y).",
-      "claim": "The specific thesis claim or academic argument this evidence supports."
-    }
-  ]
-}
-Return ONLY valid JSON.`;
-
-      const userPrompt = `Assignment Question: "${assignmentQuestion}"
-Source: "${payload.title}" (${payload.sourceType})
-Relevant Source Passages:
-${candidateSegments.map((s) => `[Location: ${s.location}]\n${s.text}`).join("\n\n---\n\n")}`;
-
-      const aiResponse = await executeAgenticLLM(systemPrompt, userPrompt, "reasoning");
-      const parsedData = parseAndRepairLLMJson<any>(aiResponse, {});
-
-      let excerptItems: any[] = [];
-      if (Array.isArray(parsedData)) {
-        excerptItems = parsedData;
-      } else if (parsedData && typeof parsedData === "object") {
-        if (parsedData.title && typeof parsedData.title === "string" && parsedData.title.trim().length > 3) {
-          aiTitle = parsedData.title.trim();
-        }
-        if (parsedData.author && typeof parsedData.author === "string" && parsedData.author.trim()) {
-          aiAuthor = parsedData.author.trim();
-        }
-        if (parsedData.year && (typeof parsedData.year === "string" || typeof parsedData.year === "number")) {
-          aiYear = String(parsedData.year).trim();
-        }
-        if (parsedData.mainFinding && typeof parsedData.mainFinding === "string" && parsedData.mainFinding.trim()) {
-          aiMainFinding = parsedData.mainFinding.trim();
-        }
-        if (Array.isArray(parsedData.excerpts)) {
-          excerptItems = parsedData.excerpts;
-        }
-      }
-
-      if (excerptItems.length > 0) {
-        excerptItems.slice(0, 4).forEach((item: any, idx: number) => {
-          if (item.excerpt) {
-            const evId = `ev-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`;
-            const evidenceEntry: ExtractedSourceEvidence = {
-              id: evId,
-              excerpt: String(item.excerpt).trim(),
-              context: item.context ? String(item.context).trim() : undefined,
-              sourceLocation: item.sourceLocation || candidateSegments[idx % candidateSegments.length]?.location || "Source Text",
-              claim: item.claim ? String(item.claim).trim() : undefined,
-            };
-            extractedEvidences.push(evidenceEntry);
-
-            generatedEvidenceItems.push({
-              id: evId,
-              claim: item.claim || `Evidentiary grounding for ${assignmentQuestion.slice(0, 50)}...`,
-              evidenceSnippet: evidenceEntry.excerpt,
-              sourceTitle: aiTitle || payload.title,
-              sourceType: payload.sourceType === "weblink" ? "web" : "file",
-              citation: generateCitationString(aiTitle || payload.title, aiAuthor || payload.author, aiYear || payload.year, payload.sourceType, citationStyle),
-              status: "approved",
-              theme: "Course & Primary Sources",
-              authors: (aiAuthor || payload.author) ? [aiAuthor || payload.author!] : ["Course Instructor"],
-              year: aiYear || payload.year || new Date().getFullYear().toString(),
-            });
-          }
-        });
-        aiExtractionWorked = extractedEvidences.length > 0;
-      }
+      const res = await authedJsonFetch(
+        `/api/projects/${encodeURIComponent(projectId)}/assignment/agent/evidence`,
+        "POST",
+        {
+          title: cleanTitle(payload.title).slice(0, 300),
+          sourceType: payload.sourceType,
+          passages: candidates.map((c) => ({ location: c.location.slice(0, 120), text: c.text.slice(0, 4000) })),
+        },
+        { skipLlmFallback: true }
+      );
+      if (res.ok) ai = ((await res.json()) as { evidence?: EvidenceExtraction }).evidence ?? null;
     } catch {
-      aiExtractionWorked = false;
+      ai = null; // the document's own sentences are used below
     }
   }
 
-  // Deterministic heuristic fallback if AI unavailable or no LLM response
-  if (!aiExtractionWorked) {
-    candidateSegments.forEach((segment, idx) => {
-      const sentences = segment.text
-        .split(/(?<=[.?!])\s+/)
-        .map((s) => s.trim())
-        .filter((s) => s.length > 20);
+  const stamp = Date.now();
+  const extractedEvidences: ExtractedSourceEvidence[] =
+    ai && ai.excerpts.length > 0
+      ? ai.excerpts.map((e, i) => ({
+          id: `ev-${stamp}-${i}-${Math.random().toString(36).slice(2, 6)}`,
+          excerpt: e.excerpt,
+          context: e.context,
+          sourceLocation: e.sourceLocation || candidates[i % candidates.length]?.location,
+          claim: e.claim,
+        }))
+      : candidates.flatMap((segment, i) => {
+          const sentences = segment.text.split(/(?<=[.?!])\s+/).map((x) => x.trim()).filter((x) => x.length > 20);
+          if (sentences.length === 0) return [];
+          let best = 0;
+          sentences.forEach((sent, k) => {
+            if (scoreSegmentRelevance(sent, keywords) > scoreSegmentRelevance(sentences[best], keywords)) best = k;
+          });
+          return [{
+            id: `ev-${stamp}-${i}-${Math.random().toString(36).slice(2, 6)}`,
+            excerpt: sentences[best],
+            context: [sentences[best - 1], sentences[best], sentences[best + 1]].filter(Boolean).join(" "),
+            sourceLocation: segment.location,
+          }];
+        });
 
-      // Find sentence with highest keyword match
-      let bestSentenceIdx = 0;
-      let highestMatch = -1;
+  const title = ai?.title || cleanTitle(payload.title);
+  const author = ai?.author || payload.author;
+  const year = ai?.year || payload.year;
+  const citation = generateCitationString(title, author, year, payload.sourceType, citationStyle);
+  const evidenceItems: EvidenceItem[] = extractedEvidences.map((ev) => ({
+    id: ev.id,
+    claim: ev.claim || "",
+    evidenceSnippet: ev.excerpt,
+    sourceTitle: title,
+    sourceType: payload.sourceType === "weblink" ? "web" : "file",
+    citation,
+    status: "approved",
+    theme: "Course & Primary Sources",
+    authors: author ? [author] : [],
+    year: year || "n.d.",
+  }));
+  const keyFindings = Array.from(new Set(extractedEvidences.map((ev) => ev.claim).filter((c): c is string => Boolean(c))));
 
-      sentences.forEach((sent, sIdx) => {
-        const score = scoreSegmentRelevance(sent, keywords);
-        if (score > highestMatch) {
-          highestMatch = score;
-          bestSentenceIdx = sIdx;
-        }
-      });
-
-      const bestSentence = sentences[bestSentenceIdx] || segment.text.slice(0, 180);
-      const prevSentence = bestSentenceIdx > 0 ? sentences[bestSentenceIdx - 1] + " " : "";
-      const nextSentence = bestSentenceIdx < sentences.length - 1 ? " " + sentences[bestSentenceIdx + 1] : "";
-      const surroundingContext = `${prevSentence}${bestSentence}${nextSentence}`.trim();
-
-      const evId = `ev-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`;
-      const evidenceEntry: ExtractedSourceEvidence = {
-        id: evId,
-        excerpt: bestSentence,
-        context: surroundingContext,
-        sourceLocation: segment.location,
-        claim: `Direct empirical grounding on ${keywords.slice(0, 3).join(", ")}`,
-      };
-      extractedEvidences.push(evidenceEntry);
-
-      generatedEvidenceItems.push({
-        id: evId,
-        claim: `Evidentiary excerpt anchored in ${segment.location}`,
-        evidenceSnippet: bestSentence,
-        sourceTitle: payload.title,
-        sourceType: payload.sourceType === "weblink" ? "web" : "file",
-        citation,
-        status: "approved",
-        theme: "Course & Primary Sources",
-        authors: payload.author ? [payload.author] : ["Course Instructor"],
-        year: payload.year || new Date().getFullYear().toString(),
-      });
-    });
-  }
-
-  // Construct structured data summary for spreadsheets / tabular data
-  let structuredDataSummary: string | undefined;
-  if (payload.sourceType === "spreadsheet") {
-    structuredDataSummary = payload.metadata?.summary || `Structured tabular dataset analyzed against ${assignmentQuestion}`;
-  }
-
-  // Derive methodology categorization
-  let methodology = "Academic Grounding & Research Material";
-  if (payload.sourceType === "pptx") {
-    methodology = "Curricular Lecture Slides & Course Grounding";
-  } else if (payload.sourceType === "spreadsheet") {
-    methodology = "Quantitative Tabular Dataset & Empirical Analysis";
-  } else if (payload.sourceType === "pdf") {
-    methodology = "Peer-Reviewed Article / Authoritative Scholarly Text";
-  } else if (payload.sourceType === "docx") {
-    methodology = "Academic Working Paper & Research Report";
-  } else if (payload.sourceType === "weblink") {
-    methodology = "Digital Academic Repository & Institutional Analysis";
-  } else if (payload.sourceType === "image") {
-    methodology = "Archival Figure & Visual Empirical Evidence";
-  } else if (payload.sourceType === "text") {
-    methodology = "Primary Lecture Excerpts & Rubric Notes";
-  }
-
-  // Derive key findings
-  const keyFindings: string[] = [];
-  if (extractedEvidences.length > 0) {
-    extractedEvidences.forEach((ev) => {
-      if (ev.claim && !keyFindings.includes(ev.claim)) {
-        keyFindings.push(ev.claim);
-      }
-    });
-  }
-  if (keyFindings.length === 0) {
-    keyFindings.push(
-      `Direct empirical grounding on ${keywords.slice(0, 3).join(", ") || "the assignment thesis"}`,
-      `Contextual lecture and reading evidence supporting core argumentative framework`
-    );
-  }
-
-  const abstract = payload.text && payload.text.length > 30
-    ? `Analyzed source material providing specific evidentiary grounding for "${assignmentQuestion || payload.title}". Identifies ${extractedEvidences.length} verified passage(s) linking lecture/course content to the primary analytical framework.`
-    : `Primary academic course grounding source indexed for assignment alignment.`;
-
-  const inTextCitation = `(${payload.author || payload.title.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ")}, ${payload.year || new Date().getFullYear()})`;
-  const citationsList = [citation, inTextCitation];
-
-  const mappedSections = ["Introduction & Framework", "Literature Review", "Empirical Evaluation"];
-  const usedPassagesCount = extractedEvidences.length > 0 ? extractedEvidences.length : 3;
-  const usedFindingsCount = Math.min(keyFindings.length, 3);
-  const usedCitationsCount = citationsList.length + 2;
-
-  const usedInAssignment = {
-    passagesCount: usedPassagesCount,
-    findingsCount: usedFindingsCount,
-    citationsCount: usedCitationsCount,
-    passages: extractedEvidences.map((ev, i) => ({
-      text: ev.excerpt,
-      location: ev.sourceLocation || `Excerpt ${i + 1}`,
-      targetSection: mappedSections[i % mappedSections.length],
-    })),
-    findings: keyFindings,
-    citations: citationsList,
-    mappedSections,
-  };
-
-  const effectiveTitle = aiTitle || payload.title;
-  const effectiveAuthor = aiAuthor || payload.author;
-  const effectiveYear = aiYear || payload.year;
-  const effectiveCitation = generateCitationString(
-    effectiveTitle,
-    effectiveAuthor,
-    effectiveYear,
-    payload.sourceType,
-    citationStyle
-  );
-
-  // Construct lightweight document record (CRITICAL: full text is discarded!)
+  // The document keeps its text (capped) so the AI steps and the database copy
+  // can read it; the cap keeps every project save small.
   const document: UploadedSourceDocument = {
-    id: `src-doc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    name: effectiveTitle,
+    extractedText: (payload.text || "").slice(0, MAX_STORED_SOURCE_CHARS),
+    id: `src-doc-${stamp}-${Math.random().toString(36).slice(2, 6)}`,
+    name: title,
     sourceType: payload.sourceType,
     fileSize: payload.fileSize,
     uploadedAt: new Date().toISOString(),
     mimeType: payload.metadata?.mimeType,
     url: payload.url,
-    author: effectiveAuthor,
-    publicationDate: effectiveYear,
-    citation: effectiveCitation,
+    author,
+    publicationDate: year,
+    citation,
     evidenceCount: extractedEvidences.length,
     extractedEvidences,
-    structuredDataSummary,
-    relevanceSummary: aiMainFinding || (keyFindings[0] ? keyFindings[0] : `Extracted ${extractedEvidences.length} verified excerpt(s) directly aligned with assignment research question.`),
+    structuredDataSummary: payload.metadata?.summary,
+    relevanceSummary: ai?.mainFinding,
     processingStatus: "extracted",
-    abstract,
+    abstract: ai?.mainFinding,
     keyFindings,
-    methodology,
-    citationsList: [effectiveCitation, inTextCitation],
-    usedInAssignment,
+    methodology: materialLabel(payload.sourceType),
+    citationsList: [citation],
   };
 
-  return {
-    document,
-    evidenceItems: generatedEvidenceItems,
-  };
+  return { document, evidenceItems };
 }
 
 /**
@@ -540,6 +394,8 @@ export interface DerivedTraceability {
   methodology: string;
   relevantEvidences: ExtractedSourceEvidence[];
   citationsList: string[];
+  /** In the project's style, from the shared formatter ("n.d." when no year is known). */
+  inTextCitation: string;
   usedInAssignment: {
     passagesCount: number;
     findingsCount: number;
@@ -553,122 +409,40 @@ export interface DerivedTraceability {
 
 export function deriveSourceTraceability(
   doc: UploadedSourceDocument,
-  assignmentQuestion: string = "",
-  citationStyle: string = "APA"
+  _assignmentQuestion: string = "",
+  citationStyle: string = "apa7"
 ): DerivedTraceability {
-  // Methodology
-  let methodology = doc.methodology;
-  if (!methodology) {
-    if (doc.sourceType === "pptx") {
-      methodology = "Curricular Lecture Slides & Course Grounding";
-    } else if (doc.sourceType === "spreadsheet") {
-      methodology = "Quantitative Tabular Dataset & Empirical Analysis";
-    } else if (doc.sourceType === "pdf") {
-      methodology = "Peer-Reviewed Article / Authoritative Scholarly Text";
-    } else if (doc.sourceType === "docx") {
-      methodology = "Academic Working Paper & Research Report";
-    } else if (doc.sourceType === "weblink") {
-      methodology = "Digital Academic Repository & Institutional Analysis";
-    } else if (doc.sourceType === "image") {
-      methodology = "Archival Figure & Visual Empirical Evidence";
-    } else if (doc.sourceType === "text") {
-      methodology = "Primary Lecture Excerpts & Rubric Notes";
-    } else {
-      methodology = "Academic Grounding & Research Material";
-    }
-  }
-
-  // Relevant evidences
-  const relevantEvidences = doc.extractedEvidences && doc.extractedEvidences.length > 0
-    ? doc.extractedEvidences
-    : [
-        {
-          id: `ev-fallback-${doc.id}`,
-          excerpt: doc.relevanceSummary || `Evidentiary passage extracted from ${doc.name}.`,
-          sourceLocation: doc.sourceType === "pptx" ? "Slide 1" : doc.sourceType === "spreadsheet" ? "Sheet 1, Row 1" : "Document Root",
-          claim: `Direct empirical grounding on ${doc.name}`,
-        },
-      ];
-
-  // Key findings
-  let keyFindings: string[] = doc.keyFindings && doc.keyFindings.length > 0 ? [...doc.keyFindings] : [];
-  if (keyFindings.length === 0) {
-    relevantEvidences.forEach((ev) => {
-      if (ev.claim && !keyFindings.includes(ev.claim)) {
-        keyFindings.push(ev.claim);
-      }
-    });
-  }
-  if (keyFindings.length === 0) {
-    const cleanTitle = doc.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ");
-    keyFindings.push(
-      `Provides primary evidentiary basis regarding ${cleanTitle}`,
-      `Anchors theoretical and empirical claims directly to assigned course literature`
-    );
-  }
-
-  // Abstract
-  let abstract = doc.abstract;
-  if (!abstract) {
-    if (doc.relevanceSummary) {
-      abstract = doc.relevanceSummary;
-    } else if (doc.structuredDataSummary) {
-      abstract = doc.structuredDataSummary;
-    } else {
-      const cleanTitle = doc.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ");
-      abstract = `Analyzed course grounding document "${cleanTitle}". Indexes verified empirical passages, methodology, and citations calibrated to the assignment brief.`;
-    }
-  }
-
-  // Citations
+  // Only what the upload actually yielded; empty lists stay empty.
+  const relevantEvidences = doc.extractedEvidences ?? [];
+  const keyFindings = doc.keyFindings?.length
+    ? [...doc.keyFindings]
+    : Array.from(new Set(relevantEvidences.map((ev) => ev.claim).filter((c): c is string => Boolean(c))));
   const citation = doc.citation || generateCitationString(doc.name, doc.author, doc.publicationDate, doc.sourceType, citationStyle);
-  const inTextCitation = `(${doc.author || doc.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ")}, ${doc.publicationDate || new Date(doc.uploadedAt || Date.now()).getFullYear()})`;
-  const citationsList = doc.citationsList && doc.citationsList.length > 0
-    ? doc.citationsList
-    : doc.usedInAssignment?.citations && doc.usedInAssignment.citations.length > 0
-    ? doc.usedInAssignment.citations
-    : [citation, inTextCitation];
-
-  // Used in assignment
-  const mappedSections = doc.usedInAssignment?.mappedSections || [
-    "Introduction & Theoretical Framing",
-    "Literature Review & Case Context",
-    "Empirical Analysis & Synthesis",
-  ];
-
-  const passagesCount = doc.usedInAssignment?.passagesCount || (relevantEvidences.length > 0 ? relevantEvidences.length : 3);
-  const findingsCount = doc.usedInAssignment?.findingsCount || (keyFindings.length > 0 ? keyFindings.length : 2);
-  const citationsCount = doc.usedInAssignment?.citationsCount || (citationsList.length > 1 ? citationsList.length + 2 : 4);
-
-  const rawPassages = doc.usedInAssignment?.passages || relevantEvidences.map((ev, i) => ({
+  const citationsList = doc.citationsList?.length ? doc.citationsList : [citation];
+  const passages = relevantEvidences.map((ev, i) => ({
     text: ev.excerpt,
     location: ev.sourceLocation || `Excerpt ${i + 1}`,
-    targetSection: mappedSections[i % mappedSections.length],
+    targetSection: "",
   }));
-
-  const passages = rawPassages.map((p, i) => ({
-    text: p.text,
-    location: p.location || `Excerpt ${i + 1}`,
-    targetSection: p.targetSection || mappedSections[i % mappedSections.length],
-  }));
-
-  const findings = doc.usedInAssignment?.findings || keyFindings;
-  const citations = doc.usedInAssignment?.citations || citationsList;
-
   return {
-    abstract,
+    abstract: doc.abstract || doc.relevanceSummary || doc.structuredDataSummary || "",
     keyFindings,
-    methodology,
+    methodology: materialLabel(doc.sourceType),
     relevantEvidences,
     citationsList,
+    inTextCitation: formatSourceInTextCitation(
+      { title: cleanTitle(doc.name), authors: doc.author ? [doc.author] : [], year: doc.publicationDate || "n.d." },
+      normalizeStyle(citationStyle),
+      1
+    ),
     usedInAssignment: {
-      passagesCount,
-      findingsCount,
-      citationsCount,
+      passagesCount: passages.length,
+      findingsCount: keyFindings.length,
+      citationsCount: citationsList.length,
       passages,
-      findings,
-      citations,
-      mappedSections,
+      findings: keyFindings,
+      citations: citationsList,
+      mappedSections: [],
     },
   };
 }

@@ -1,8 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   generateDynamicAssignmentStructure,
-  generateThesisStatement,
-  generateAiEnhancedOutline,
   deconstructQuestionSemantics,
   formatAcademicTopicTitle,
 } from "../services/outlineService";
@@ -32,25 +30,44 @@ describe("Tailored Academic Outline Generation", () => {
       writingTone: "analytical",
     });
 
-    expect(structure.headings[0].title).toContain("Climate Change");
-    expect(structure.headings[0].title).toContain("Global Food Security");
-    expect(structure.headings[1].title).toContain("Global Food Security");
+    // One section per concept the question names, between an introduction and a conclusion.
+    const titles = structure.headings.map((h) => h.title);
+    expect(titles[0]).toMatch(/Introduction/);
+    expect(titles.join(" ")).toContain("Climate Change");
+    expect(titles.join(" ")).toContain("Global Food Security");
+    expect(titles[titles.length - 1]).toMatch(/Conclusion/);
     expect(structure.totalAllocated).toBe(2500);
   });
 
-  it("generateAiEnhancedOutline returns fallback within timeout when LLM is unavailable", async () => {
-    const structure = await generateAiEnhancedOutline({
-      question: "Role of AI in machine learning",
-      assignmentType: "essay",
-      academicLevel: "undergraduate",
-      targetWordCount: 2000,
-      writingTone: "analytical",
-      timeoutMs: 100,
-    } as any);
+});
 
-    expect(structure.headings).toHaveLength(3);
-    expect(structure.totalAllocated).toBe(2000);
-    // Fallback headings come from the question itself, not a subject template.
-    expect(structure.headings[0].title).toMatch(/AI in Machine Learning/);
+import { balanceAroundHeading } from "../services/outlineService";
+describe("balanceAroundHeading (word-budget stepper)", () => {
+  const sub = (id: string, w: number) => ({ id, title: id, targetWordCount: w, currentWordCount: 0, notes: "", guidance: "", keyPoints: [] });
+  const structure = {
+    version: 1, isConfirmed: false, targetWordCount: 1000, totalAllocated: 1000, thesisStatement: "", targetFrameworks: [],
+    headings: [
+      { id: "h1", number: 1, title: "One", targetWordCount: 450, subheadings: [sub("s1", 450)] },
+      { id: "h2", number: 2, title: "Two", targetWordCount: 600, subheadings: [sub("s2", 600)] },
+    ],
+  } as never;
+  it("keeps the edited section exactly and fits the rest to the target", () => {
+    const out = balanceAroundHeading(structure, "h1", 1000) as unknown as { headings: Array<{ targetWordCount: number }> };
+    expect(out.headings.map((h) => h.targetWordCount)).toEqual([450, 550]);
+  });
+});
+
+import { removeSubheading } from "../services/outlineService";
+it("never removes a section's last part (its budget would fall to 0)", () => {
+  const s = { version: 1, headings: [{ id: "h", subheadings: [{ id: "only", targetWordCount: 500 }] }] } as never;
+  expect(removeSubheading(s, "only")).toBe(s);
+});
+
+describe("no made-up thesis or generic themes", () => {
+  it("a brief with no grounded thesis gets an empty thesis, not a template claim", async () => {
+    const { generateDynamicAssignmentStructure } = await import("../services/dynamicStructure");
+    const st = generateDynamicAssignmentStructure({ question: "Discuss the role of central banks in the economy.", assignmentType: "essay", academicLevel: "undergraduate", targetWordCount: 1500 });
+    expect(st.thesisStatement).not.toMatch(/decisive operational catalyst|problematizes|systemic transformation|This (paper|study|analysis) (contends|investigates|examines)/);
+    for (const h of st.headings) expect(h.title).not.toMatch(/^Theme \d|Long-Term Trajectories|Systemic Horizons/);
   });
 });

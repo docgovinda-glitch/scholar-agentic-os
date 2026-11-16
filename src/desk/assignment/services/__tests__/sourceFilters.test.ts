@@ -1,0 +1,31 @@
+import { describe, it, expect } from "vitest";
+import { countActiveFilters, DEFAULT_SOURCE_FILTERS, filterAndSortSources, normalizeRelevance } from "../sourceFilters";
+import type { DiscoveredSource } from "../../types";
+
+const src = (id: string, extra: Partial<DiscoveredSource> = {}) =>
+  ({ id, title: `Paper ${id}`, authors: ["Kuncoro, H."], year: "2020", type: "journal", relevanceScore: 0.5, status: "kept", ...extra }) as DiscoveredSource;
+
+const ids = { approvedSourceIds: ["b"], bookmarkedIds: ["c"], excludedIds: ["d"] };
+const list = [src("a"), src("b", { relevanceScore: 0.9 }), src("c", { year: "2025" }), src("d"), src("e", { prescribedInBrief: true, relevanceScore: 0.1 })];
+
+describe("Stage 3 source list", () => {
+  it("the All tab hides excluded sources and puts prescribed ones first, then by relevance", () => {
+    expect(filterAndSortSources(list, DEFAULT_SOURCE_FILTERS, ids).map((s) => s.id)).toEqual(["e", "b", "a", "c"]);
+  });
+
+  it("tabs show the approved, bookmarked and excluded sets", () => {
+    const tab = (activeTab: typeof DEFAULT_SOURCE_FILTERS.activeTab) => filterAndSortSources(list, { ...DEFAULT_SOURCE_FILTERS, activeTab }, ids).map((s) => s.id);
+    expect(tab("approved")).toEqual(["b"]);
+    expect(tab("bookmarked")).toEqual(["c"]);
+    expect(tab("excluded")).toEqual(["d"]);
+  });
+
+  it("search, year and relevance filters combine; the active count ignores tab and search", () => {
+    const f = { ...DEFAULT_SOURCE_FILTERS, searchQuery: "paper", selectedYearRange: "recent", minRelevance: 40 };
+    expect(filterAndSortSources(list, f, ids).map((s) => s.id)).toEqual(["c"]);
+    expect(countActiveFilters(f)).toBe(2);
+    expect(normalizeRelevance(0.42)).toBe(42);
+    expect(normalizeRelevance(87)).toBe(87);
+    expect(normalizeRelevance(undefined)).toBe(0);
+  });
+});

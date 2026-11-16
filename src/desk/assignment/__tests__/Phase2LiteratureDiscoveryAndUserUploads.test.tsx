@@ -272,8 +272,8 @@ describe("Phase 2 — Strengthened Literature Discovery, Phase 1 Integration & U
       expect(within(knowledgePanel).getAllByText(/Processed/i).length).toBeGreaterThan(0);
 
       // 2. Engine extracted layer
-      expect(within(knowledgePanel).getByText(/2. Engine Extracted/i)).toBeInTheDocument();
-      expect(within(knowledgePanel).getByText(/Key Findings:/i)).toBeInTheDocument();
+      expect(within(knowledgePanel).getByText(/2\. What was read/i)).toBeInTheDocument();
+      expect(within(knowledgePanel).getByText(/Key passages:/i)).toBeInTheDocument();
 
       // 3. Used in assignment layer
       expect(within(knowledgePanel).getByText(/3. Used in Assignment/i)).toBeInTheDocument();

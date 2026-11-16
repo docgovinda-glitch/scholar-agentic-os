@@ -1,4 +1,4 @@
-import { countExactWords } from "./wordBudgetAllocator.ts";
+import { countProseWords } from "../../../src/shared/proseBlocks.ts";
 
 /** Words allowed either side of a section's allocated budget. */
 export const SECTION_BUDGET_TOLERANCE = 0.05;
@@ -21,7 +21,7 @@ export const SENTENCE_END = /[.!?]["'”’)\]]?\s*$/;
  * budget is returned unchanged.
  */
 export function trimToSentenceWithinWords(text: string, maxWords: number): string {
-  if (countExactWords(text) <= maxWords) return text;
+  if (countProseWords(text) <= maxWords) return text;
   const tokens = text.split(/(\s+)/);
   let words = 0;
   let cutAt = tokens.length;
@@ -46,4 +46,56 @@ export function trimToSentenceWithinWords(text: string, maxWords: number): strin
   }
   if (lastEnd > 0) return head.slice(0, lastEnd).trimEnd();
   return head;
+}
+
+const norm = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
+
+/**
+ * A "continuation" that restates the draft instead of extending it: its opening
+ * words, or most of its sentences, already appear in the draft.
+ */
+export function repeatsDraft(continuation: string, draft: string): boolean {
+  const d = norm(draft);
+  const opening = norm(continuation).split(" ").slice(0, 8).join(" ");
+  if (opening.split(" ").length >= 5 && d.includes(opening)) return true;
+  const sentences = continuation.split(/(?<=[.!?])\s+/).map(norm).filter((x) => x.split(" ").length >= 5);
+  if (sentences.length === 0) return false;
+  const seen = sentences.filter((x) => d.includes(x)).length;
+  return seen / sentences.length >= 0.5;
+}
+
+export interface FitDraftSteps {
+  /** Ask for a full rewrite at the budget; null when the model gave nothing usable. */
+  rewriteLonger: (draft: string, draftWords: number) => Promise<string | null>;
+  /** Ask for a continuation of about `missingWords` words to append. */
+  continueDraft: (draft: string, missingWords: number) => Promise<string | null>;
+}
+
+/**
+ * Bring a first draft into its budget range, counting words exactly as the app
+ * does (countProseWords): when short, one full rewrite, then (still short) one
+ * continuation appended as new paragraphs. A step that fails or gives less text
+ * is ignored, so the draft never gets shorter. Trimming an overrun is left to
+ * `trimToSentenceWithinWords` after citations are expanded, because expanding
+ * "[1]" into "(Kuncoro, 2020)" adds words.
+ */
+export async function fitDraftToBudget(draft: string, range: { min: number; max: number }, steps: FitDraftSteps): Promise<string> {
+  let text = draft.trim();
+  if (countProseWords(text) >= range.min) return text;
+  try {
+    const longer = (await steps.rewriteLonger(text, countProseWords(text)))?.trim();
+    if (longer && countProseWords(longer) > countProseWords(text)) text = longer;
+  } catch {
+    // keep the draft we have
+  }
+  const words = countProseWords(text);
+  if (words >= range.min) return text;
+  const target = Math.round((range.min + range.max) / 2);
+  try {
+    const more = (await steps.continueDraft(text, target - words))?.trim();
+    if (more && !repeatsDraft(more, text)) text = `${text}\n\n${more}`;
+  } catch {
+    // keep the draft we have
+  }
+  return text;
 }

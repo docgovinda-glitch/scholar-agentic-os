@@ -1,17 +1,15 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import type { AssignmentDraftingSection } from "../types";
 import {
-  CheckCircle2,
-  Clock,
-  Sparkles,
-  BookOpen,
-  ArrowRight,
-  Layers,
-  FileText,
-  Loader2,
-  Edit2,
-  Check,
-  X,
+CheckCircle2,
+Clock,
+Sparkles,
+BookOpen,Layers,
+FileText,
+Loader2,
+Edit2,
+Check,
+X
 } from "lucide-react";
 
 export interface DraftingSectionIndexProps {
@@ -34,11 +32,7 @@ export function DraftingSectionIndex({
   activeSectionId,
   onSelectSection,
   onGenerateNext,
-  onGenerateAll,
-  onTuneToQuestion,
   onUpdateSectionTitle,
-  assignmentTopic,
-  isTuning = false,
   isGenerating = false,
   generatingSectionId = null,
   className = "",
@@ -56,31 +50,31 @@ export function DraftingSectionIndex({
   return (
     <aside
       aria-label="Section Index"
-      className={`flex flex-col bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 rounded-2xl p-4 sm:p-5 shadow-xs transition-colors ${className}`}
+      className={`flex flex-col bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-2xl p-4 sm:p-5 shadow-xs transition-colors ${className}`}
     >
       {/* Header & Section Progress */}
-      <div className="pb-4 border-b border-neutral-100 dark:border-white/5 space-y-2">
+      <div className="pb-4 border-b border-[color:var(--border-subtle)] space-y-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-neutral-100 dark:bg-white/5 text-neutral-700 dark:text-neutral-300">
+            <div className="p-1.5 rounded-lg bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]">
               <Layers className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-neutral-900 dark:text-white tracking-tight">
+              <h2 className="text-sm font-semibold text-[color:var(--text-primary)] tracking-tight">
                 Section Outline & Structure
               </h2>
-              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+              <p className="text-xs text-[color:var(--text-muted)]">
                 Drafting subsection-by-subsection
               </p>
             </div>
           </div>
-          <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-300 tabular-nums">
+          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] tabular-nums">
             {completedCount}/{totalCount} completed
           </span>
         </div>
 
         {/* Mini progress bar */}
-        <div className="w-full bg-neutral-100 dark:bg-white/5 h-1.5 rounded-full overflow-hidden">
+        <div className="w-full bg-[color:var(--surface-inset)] h-1.5 rounded-full overflow-hidden">
           <div
             className="h-full bg-neutral-900 dark:bg-white rounded-full transition-all duration-300"
             style={{ width: `${progressPercent}%` }}
@@ -89,12 +83,12 @@ export function DraftingSectionIndex({
       </div>
 
       {/* Global Actions */}
-      <div className="py-3 border-b border-neutral-100 dark:border-white/5 space-y-2">
+      <div className="py-3 border-b border-[color:var(--border-subtle)] space-y-2">
         <button
           type="button"
           onClick={onGenerateNext}
           disabled={isGenerating || !hasPending}
-          className="w-full py-2 px-3 rounded-xl text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+          className="w-full py-2 px-3 rounded-xl text-xs font-semibold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
         >
           {isGenerating ? (
             <>
@@ -134,23 +128,23 @@ export function DraftingSectionIndex({
           const innerCardContent = (
             <>
               <div className="flex items-start justify-between gap-2 mb-1">
-                <span className="text-[11px] font-mono font-medium text-neutral-400 dark:text-neutral-500">
+                <span className="text-xs font-mono font-medium text-[color:var(--text-muted)]">
                   Section {idx + 1}
                 </span>
 
                 {/* Status Indicator */}
                 {isSectionGenerating ? (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-blue-600 dark:text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded-full animate-pulse">
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded-full animate-pulse">
                     <Loader2 className="w-2.5 h-2.5 animate-spin" />
                     <span>Writing</span>
                   </span>
                 ) : isCompleted ? (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">
                     <CheckCircle2 className="w-2.5 h-2.5" />
                     <span>Ready</span>
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-white/5 px-1.5 py-0.5 rounded-full">
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-[color:var(--text-muted)] bg-[color:var(--surface-inset)] px-1.5 py-0.5 rounded-full">
                     <Clock className="w-2.5 h-2.5" />
                     <span>Pending</span>
                   </span>
@@ -178,7 +172,7 @@ export function DraftingSectionIndex({
                         setEditingSectionId(null);
                       }
                     }}
-                    className="w-full text-xs font-semibold px-2 py-1 rounded bg-white dark:bg-ink-600 border border-neutral-300 dark:border-white/20 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-400"
+                    className="w-full text-xs font-semibold px-2 py-1 rounded bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-neutral-400"
                     autoFocus
                   />
                   <button
@@ -189,7 +183,7 @@ export function DraftingSectionIndex({
                       }
                       setEditingSectionId(null);
                     }}
-                    className="p-1 rounded bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 shrink-0 cursor-pointer"
+                    className="p-1.5 rounded bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 shrink-0 cursor-pointer"
                     title="Save title"
                   >
                     <Check className="w-3 h-3" />
@@ -197,7 +191,7 @@ export function DraftingSectionIndex({
                   <button
                     type="button"
                     onClick={() => setEditingSectionId(null)}
-                    className="p-1 rounded hover:bg-neutral-200/60 dark:hover:bg-white/10 text-neutral-500 shrink-0 cursor-pointer"
+                    className="p-1.5 rounded hover:bg-[color:var(--surface-hover)] text-[color:var(--text-muted)] shrink-0 cursor-pointer"
                     title="Cancel"
                   >
                     <X className="w-3 h-3" />
@@ -208,8 +202,8 @@ export function DraftingSectionIndex({
                   <h3
                     className={`text-xs font-semibold leading-snug line-clamp-2 ${
                       isActive
-                        ? "text-neutral-900 dark:text-white"
-                        : "text-neutral-700 dark:text-neutral-300 group-hover:text-neutral-900 dark:group-hover:text-white"
+                        ? "text-[color:var(--text-primary)]"
+                        : "text-[color:var(--text-secondary)] group-hover:text-neutral-900 dark:group-hover:text-white"
                     }`}
                   >
                     {section.title}
@@ -230,7 +224,7 @@ export function DraftingSectionIndex({
                           setEditTitleValue(section.title);
                         }
                       }}
-                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-neutral-200/60 dark:hover:bg-white/10 transition-opacity shrink-0 cursor-pointer"
+                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] transition-opacity shrink-0 cursor-pointer"
                       title="Edit section title"
                     >
                       <Edit2 className="w-3 h-3" />
@@ -240,9 +234,9 @@ export function DraftingSectionIndex({
               )}
 
               {/* Word Count and Sources Meta */}
-              <div className="mt-2 flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400 pt-1 border-t border-neutral-100/80 dark:border-white/5">
+              <div className="mt-2 flex items-center justify-between text-xs text-[color:var(--text-muted)] pt-1 border-t border-[color:var(--border-subtle)]">
                 <div className="flex items-center gap-1.5 tabular-nums">
-                  <FileText className="w-3 h-3 text-neutral-400" />
+                  <FileText className="w-3 h-3 text-[color:var(--text-muted)]" />
                   <span>
                     {section.currentWordCount || 0} / {section.targetWordCount} words
                   </span>
@@ -251,16 +245,16 @@ export function DraftingSectionIndex({
                 {boundSourcesCount > 0 && (
                   <div
                     title={`${boundSourcesCount} approved sources assigned to this subsection`}
-                    className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 font-medium"
+                    className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] font-medium"
                   >
-                    <BookOpen className="w-2.5 h-2.5 text-neutral-400" />
+                    <BookOpen className="w-2.5 h-2.5 text-[color:var(--text-muted)]" />
                     <span>{boundSourcesCount}</span>
                   </div>
                 )}
               </div>
 
               {/* Subsection Word Budget Micro Progress Meter */}
-              <div className="w-full bg-neutral-100 dark:bg-white/5 h-1 rounded-full overflow-hidden mt-1.5">
+              <div className="w-full bg-[color:var(--surface-inset)] h-1 rounded-full overflow-hidden mt-1.5">
                 <div
                   className={`h-full rounded-full transition-all duration-300 ${
                     isCompleted
@@ -289,8 +283,8 @@ export function DraftingSectionIndex({
                 key={section.id}
                 className={`w-full text-left p-3 rounded-xl transition-all border ${
                   isActive
-                    ? "bg-neutral-50 dark:bg-white/[0.08] border-neutral-300/80 dark:border-white/20 shadow-xs"
-                    : "bg-transparent border-neutral-200/50 dark:border-white/10"
+                    ? "bg-[color:var(--surface-inset)] border-[color:var(--border-default)] shadow-xs"
+                    : "bg-transparent border-[color:var(--border-subtle)]"
                 }`}
               >
                 {innerCardContent}
@@ -305,8 +299,8 @@ export function DraftingSectionIndex({
               onClick={() => onSelectSection(section.id)}
               className={`w-full text-left p-3 rounded-xl transition-all border cursor-pointer relative group ${
                 isActive
-                  ? "bg-neutral-50 dark:bg-white/[0.08] border-neutral-300/80 dark:border-white/20 shadow-xs"
-                  : "bg-transparent hover:bg-neutral-50/70 dark:hover:bg-white/[0.03] border-transparent"
+                  ? "bg-[color:var(--surface-inset)] border-[color:var(--border-default)] shadow-xs"
+                  : "bg-transparent hover:bg-[color:var(--surface-hover)] border-transparent"
               }`}
             >
               {innerCardContent}

@@ -294,7 +294,12 @@ export function registerAIRoutes(
   });
 
   if (aiAbuseLimit) {
-    router.use(aiAbuseLimit);
+    // The generation limit covers model calls only. Thread storage (list / save /
+    // delete saved conversations, signed-in users only) is ordinary data access:
+    // counting it here let routine page loads use up the AI budget and 429 real
+    // generation requests.
+    const limit = aiAbuseLimit;
+    router.use((req, res, next) => (/^\/threads(\/|$)/.test(req.path) ? next() : limit(req, res, next)));
   }
 
   /**

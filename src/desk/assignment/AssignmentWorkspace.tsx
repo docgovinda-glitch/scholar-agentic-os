@@ -1,13 +1,12 @@
-import React, { useState, useEffect, useRef } from "react";
-import type { AssignmentStage, AssignmentPhaseId } from "./types";
-import { AssignmentProvider, useAssignmentWorkspace } from "./AssignmentContext";
+import React,{ useState,useEffect,useRef } from "react";
+import type { AssignmentPhaseId } from "./types";
+import { AssignmentProvider,useAssignmentWorkspace } from "./AssignmentContext";
 import AssignmentStageNavigation from "./components/AssignmentStageNavigation";
 import { authedJsonFetch } from "../api";
 import { useUnsavedChangesGuard } from "../../hooks/useUnsavedChangesGuard";
-import { WorkspaceAutosaveBadge } from "../../components/ui/WorkspaceAutosaveBadge";
-import AppleStudioHeader, { type AppleStudioPhaseId } from "../../components/ui/AppleStudioShell";
+import AppleStudioHeader,{ type AppleStudioPhaseId } from "../../components/ui/AppleStudioShell";
 
-import { ASSIGNMENT_AGENT_CONFIGS, ASSIGNMENT_PHASES } from "./types";
+import { ASSIGNMENT_AGENT_CONFIGS,ASSIGNMENT_PHASES } from "./types";
 import { sendAssignmentCopilotMessage } from "./services/assignmentCopilotService";
 
 const ContextPanel = React.lazy(() => import("../workspace/ContextPanel"));
@@ -21,30 +20,30 @@ const AssignmentSubmissionStage = React.lazy(() => import("./stages/AssignmentSu
 // Lightweight minimalist skeleton placeholders conforming to light/dark themes
 export function PhaseNavSkeleton() {
   return (
-    <div className="w-full h-12 px-4 py-2 bg-white dark:bg-ink-750 border-b border-neutral-200/80 dark:border-white/10 flex items-center justify-between gap-4 animate-pulse">
+    <div className="w-full h-12 px-4 py-2 bg-[color:var(--surface-raised)] border-b border-[color:var(--border-subtle)] flex items-center justify-between gap-4 animate-pulse">
       <div className="flex items-center gap-2">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-7 w-28 bg-neutral-200/60 dark:bg-white/5 rounded-full" />
+          <div key={i} className="h-7 w-28 bg-[color:var(--surface-sunken)]/60 rounded-full" />
         ))}
       </div>
-      <div className="h-6 w-36 bg-neutral-200/60 dark:bg-white/5 rounded-full" />
+      <div className="h-6 w-36 bg-[color:var(--surface-sunken)]/60 rounded-full" />
     </div>
   );
 }
 
 export function MainStageSkeleton() {
   return (
-    <div className="max-w-4xl mx-auto p-6 sm:p-8 space-y-8 animate-pulse text-neutral-400">
-      <div className="rounded-2xl p-6 sm:p-8 bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-6">
-        <div className="border-b border-neutral-100 dark:border-white/5 pb-4 space-y-2">
-          <div className="h-6 w-60 bg-neutral-200 dark:bg-white/10 rounded-lg" />
-          <div className="h-3.5 w-96 max-w-full bg-neutral-200/70 dark:bg-white/5 rounded" />
+    <div className="max-w-4xl mx-auto p-6 sm:p-8 space-y-8 animate-pulse text-[color:var(--text-muted)]">
+      <div className="rounded-2xl p-6 sm:p-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-xs space-y-6">
+        <div className="border-b border-[color:var(--border-subtle)] pb-4 space-y-2">
+          <div className="h-6 w-60 bg-[color:var(--surface-sunken)] rounded-lg" />
+          <div className="h-3.5 w-96 max-w-full bg-[color:var(--surface-sunken)]/70 rounded" />
         </div>
         <div className="space-y-4">
-          <div className="h-28 w-full bg-neutral-100 dark:bg-white/5 rounded-xl border border-neutral-200/60 dark:border-white/10" />
+          <div className="h-28 w-full bg-[color:var(--surface-inset)] rounded-xl border border-[color:var(--border-subtle)]" />
           <div className="grid grid-cols-2 gap-4">
-            <div className="h-10 bg-neutral-100 dark:bg-white/5 rounded-xl border border-neutral-200/60 dark:border-white/10" />
-            <div className="h-10 bg-neutral-100 dark:bg-white/5 rounded-xl border border-neutral-200/60 dark:border-white/10" />
+            <div className="h-10 bg-[color:var(--surface-inset)] rounded-xl border border-[color:var(--border-subtle)]" />
+            <div className="h-10 bg-[color:var(--surface-inset)] rounded-xl border border-[color:var(--border-subtle)]" />
           </div>
         </div>
       </div>
@@ -54,15 +53,15 @@ export function MainStageSkeleton() {
 
 export function AiTutorSkeleton() {
   return (
-    <div className="w-full h-full p-4 space-y-4 bg-paper-zinc dark:bg-ink-750 border-l border-neutral-200/80 dark:border-white/10 animate-pulse text-neutral-400">
-      <div className="flex items-center justify-between pb-3 border-b border-neutral-200/80 dark:border-white/10">
-        <div className="h-4 w-24 bg-neutral-200 dark:bg-white/10 rounded" />
-        <div className="h-4 w-12 bg-neutral-200 dark:bg-white/5 rounded" />
+    <div className="w-full h-full p-4 space-y-4 bg-paper-zinc dark:bg-ink-750 border-l border-[color:var(--border-subtle)] animate-pulse text-[color:var(--text-muted)]">
+      <div className="flex items-center justify-between pb-3 border-b border-[color:var(--border-subtle)]">
+        <div className="h-4 w-24 bg-[color:var(--surface-sunken)] rounded" />
+        <div className="h-4 w-12 bg-[color:var(--surface-sunken)] rounded" />
       </div>
-      <div className="h-24 w-full bg-white dark:bg-ink-500 rounded-xl border border-neutral-200/60 dark:border-white/10" />
+      <div className="h-24 w-full bg-[color:var(--surface-raised)] rounded-xl border border-[color:var(--border-subtle)]" />
       <div className="space-y-2 pt-2">
-        <div className="h-16 w-full bg-white dark:bg-ink-500 rounded-xl border border-neutral-200/60 dark:border-white/10" />
-        <div className="h-16 w-full bg-white dark:bg-ink-500 rounded-xl border border-neutral-200/60 dark:border-white/10" />
+        <div className="h-16 w-full bg-[color:var(--surface-raised)] rounded-xl border border-[color:var(--border-subtle)]" />
+        <div className="h-16 w-full bg-[color:var(--surface-raised)] rounded-xl border border-[color:var(--border-subtle)]" />
       </div>
     </div>
   );
@@ -88,7 +87,6 @@ function AssignmentWorkspaceInner({
     error,
     saveAnswers,
     projectState,
-    executionMode,
     saveStatus,
   } = useAssignmentWorkspace();
 
@@ -109,7 +107,6 @@ function AssignmentWorkspaceInner({
 
   // Inline-editable title with auto-save on blur / Enter
   const initialTitle =
-    project?.answers?.["assignment_title"] ||
     project?.answers?.["title"] ||
     "Academic Assignment";
   const [editableTitle, setEditableTitle] = useState(initialTitle);
@@ -118,7 +115,6 @@ function AssignmentWorkspaceInner({
   useEffect(() => {
     if (project) {
       setEditableTitle(
-        project.answers?.["assignment_title"] ||
         project.answers?.["title"] ||
         "Academic Assignment"
       );
@@ -134,12 +130,14 @@ function AssignmentWorkspaceInner({
   const commitTitle = (next: string) => {
     const trimmed = next.trim() || "Academic Assignment";
     setEditableTitle(trimmed);
-    if (project && (trimmed !== (project.answers?.["assignment_title"] || project.answers?.["title"]))) {
+    if (project && (trimmed !== (project.answers?.["title"]))) {
       saveAnswers({ assignment_title: trimmed, title: trimmed });
       try {
         const p = authedJsonFetch(`/api/projects/${encodeURIComponent(project.projectId)}`, "PATCH", { title: trimmed });
-        if (p && typeof (p as any).catch === "function") {
-          (p as any).catch(() => {});
+        if (p && typeof (p as Promise<unknown>).catch === "function") {
+          // The title is already saved in the project answers; a failed rename of the
+          // project row is reported, not silently dropped.
+          (p as Promise<unknown>).catch((err: unknown) => console.warn("Project title rename failed:", err));
         }
       } catch {
         // ignore in test or offline environments
@@ -157,7 +155,7 @@ function AssignmentWorkspaceInner({
 
   if (error) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-paper-cool dark:bg-ink-850 p-6 text-center text-neutral-800 dark:text-neutral-200">
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-paper-cool dark:bg-ink-850 p-6 text-center text-[color:var(--text-primary)]">
         <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-2">
           <span className="text-2xl">⚠️</span>
         </div>
@@ -166,7 +164,7 @@ function AssignmentWorkspaceInner({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full border border-neutral-300 dark:border-white/10 px-5 py-2.5 text-sm font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
+            className="rounded-full border border-[color:var(--border-default)] px-5 py-2.5 text-sm font-medium text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer"
           >
             Back to projects
           </button>
@@ -178,8 +176,8 @@ function AssignmentWorkspaceInner({
   // Immediate page load renders lightweight structural shell conforming to current theme
   if (isLoading || !project) {
     return (
-      <div className="h-screen flex flex-col bg-paper-cool dark:bg-ink-850 text-neutral-900 dark:text-neutral-100 overflow-hidden">
-        <div className="bg-white dark:bg-ink-750 z-20 shrink-0">
+      <div className="h-screen flex flex-col bg-paper-cool dark:bg-ink-850 text-[color:var(--text-primary)] overflow-hidden">
+        <div className="bg-[color:var(--surface-raised)] z-20 shrink-0">
           <div className="flex items-center justify-between px-4 sm:px-6 h-11 gap-4">
             <div className="flex items-center gap-2.5 min-w-0">
               <button
@@ -190,17 +188,17 @@ function AssignmentWorkspaceInner({
                 }}
                 title="Back"
                 aria-label="Back"
-                className="p-1.5 rounded-lg text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-200/60 dark:hover:bg-white/10 transition-colors cursor-pointer shrink-0"
+                className="p-1.5 rounded-lg text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer shrink-0"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                 </svg>
               </button>
-              <div className="h-4 w-36 bg-neutral-200 dark:bg-white/10 rounded animate-pulse" />
+              <div className="h-4 w-36 bg-[color:var(--surface-sunken)] rounded animate-pulse" />
             </div>
             <div className="flex items-center gap-3 shrink-0">
-              <div className="h-6 w-28 bg-neutral-200 dark:bg-white/10 rounded-full animate-pulse" />
-              <div className="w-7 h-7 rounded-lg bg-neutral-200 dark:bg-white/10" />
+              <div className="h-6 w-28 bg-[color:var(--surface-sunken)] rounded-full animate-pulse" />
+              <div className="w-7 h-7 rounded-lg bg-[color:var(--surface-sunken)]" />
             </div>
           </div>
         </div>
@@ -208,10 +206,10 @@ function AssignmentWorkspaceInner({
         <PhaseNavSkeleton />
 
         <div className="flex-1 flex overflow-hidden relative bg-paper-cool dark:bg-ink-850">
-          <main className="flex-1 h-full overflow-y-auto bg-paper-cool dark:bg-ink-850 text-neutral-900 dark:text-neutral-100">
+          <main className="flex-1 h-full overflow-y-auto bg-paper-cool dark:bg-ink-850 text-[color:var(--text-primary)]">
             <MainStageSkeleton />
           </main>
-          <div className="w-80 lg:w-96 shrink-0 h-full overflow-y-auto hidden sm:block bg-paper-zinc dark:bg-ink-750 border-l border-neutral-200/80 dark:border-white/10">
+          <div className="w-80 lg:w-96 shrink-0 h-full overflow-y-auto hidden sm:block bg-paper-zinc dark:bg-ink-750 border-l border-[color:var(--border-subtle)]">
             <AiTutorSkeleton />
           </div>
         </div>
@@ -260,7 +258,7 @@ function AssignmentWorkspaceInner({
   };
 
   return (
-    <div className="h-screen flex flex-col bg-paper-cool dark:bg-ink-850 text-neutral-900 dark:text-neutral-100 overflow-hidden">
+    <div className="h-screen flex flex-col bg-paper-cool dark:bg-ink-850 text-[color:var(--text-primary)] overflow-hidden">
       {/* Shared Apple-Grade Studio Chrome Bar */}
       <AppleStudioHeader
         deliverableCode="OT-01"
@@ -301,7 +299,7 @@ function AssignmentWorkspaceInner({
       />
 
       {/* Assignment bar: the title (editable on phones where the studio header hides it) */}
-      <header className={`${isZenMode ? "hidden" : "sm:hidden"} bg-white dark:bg-ink-750 border-b border-neutral-200/60 dark:border-white/5 z-20 shrink-0`}>
+      <header className={`${isZenMode ? "hidden" : "sm:hidden"} bg-[color:var(--surface-raised)] border-b border-[color:var(--border-subtle)] z-20 shrink-0`}>
         <div className="flex items-center justify-between px-4 sm:px-6 pt-2.5 pb-1 gap-4">
           <div className="flex items-center gap-2.5 min-w-0">
             {/* Inline-Editable Project Title with Auto-Save onBlur */}
@@ -315,14 +313,14 @@ function AssignmentWorkspaceInner({
                 onKeyDown={handleTitleKeyDown}
                 aria-label="Assignment Title"
                 title="Click to edit assignment title"
-                className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 bg-transparent hover:bg-neutral-200/50 dark:hover:bg-white/5 focus:bg-white dark:focus:bg-ink-750 border border-transparent hover:border-neutral-200/80 dark:hover:border-white/10 focus:border-neutral-300 dark:focus:border-white/20 rounded-lg px-2 py-1 focus:outline-none transition-all truncate cursor-text"
+                className="text-xs sm:text-sm font-medium text-[color:var(--text-primary)] bg-transparent hover:bg-[color:var(--surface-hover)] focus:bg-white dark:focus:bg-ink-750 border border-transparent hover:border-neutral-200/80 dark:hover:border-white/10 focus:border-neutral-300 dark:focus:border-white/20 rounded-lg px-2 py-1 focus:outline-none transition-all truncate cursor-text"
               />
               <button
                 type="button"
                 onClick={() => titleInputRef.current?.focus()}
                 title="Rename assignment"
                 aria-label="Rename assignment"
-                className="opacity-0 group-hover:opacity-100 focus:opacity-100 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 p-1 rounded-md transition-opacity cursor-pointer shrink-0"
+                className="opacity-0 group-hover:opacity-100 focus:opacity-100 text-[color:var(--text-muted)] hover:text-neutral-700 dark:hover:text-neutral-200 p-1 rounded-md transition-opacity cursor-pointer shrink-0"
               >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
@@ -340,7 +338,7 @@ function AssignmentWorkspaceInner({
       {/* Workspace Body: Center Content & Collapsible Right Socratic Tutor Drawer */}
       <div className="flex-1 flex overflow-hidden relative bg-paper-cool dark:bg-ink-850">
         {/* Center Column: Active Phase View Canvas */}
-        <main className="flex-1 h-full overflow-y-auto bg-paper-cool dark:bg-ink-850 text-neutral-900 dark:text-neutral-100">
+        <main className="flex-1 h-full overflow-y-auto bg-paper-cool dark:bg-ink-850 text-[color:var(--text-primary)]">
           <React.Suspense fallback={<MainStageSkeleton />}>
             {renderActivePhase()}
           </React.Suspense>
@@ -367,7 +365,7 @@ function AssignmentWorkspaceInner({
                   type="button"
                   data-testid="mobile-tutor-close"
                   onClick={() => setTutorPanelOpen(false)}
-                  className="p-1 rounded text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer"
+                  className="p-1.5 rounded text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer"
                   aria-label="Close AI Tutor Drawer"
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -413,8 +411,8 @@ export default function AssignmentWorkspace({
   onOpenAiAccess,
 }: {
   projectId: string;
-  initialStage: AssignmentStage | null;
-  onStageChange: (stage: AssignmentStage, options?: { replace?: boolean }) => void;
+  initialStage: AssignmentPhaseId | null;
+  onStageChange: (phase: AssignmentPhaseId, options?: { replace?: boolean }) => void;
   onClose?: () => void;
   onOpenAccountSettings?: () => void;
   onOpenVault?: () => void;

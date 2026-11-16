@@ -46,22 +46,23 @@ export async function writeAssignmentSnapshot(
       : pid
   );
 
-  // Revisions are append-only: an unchanged section maps to the same hash and is a no-op.
+  // Revisions are append-only, one row per distinct text. Each save stamps the rows
+  // holding the current text, so returning to earlier text (undo) makes that row
+  // the latest again instead of leaving the discarded text on top.
   if (snap.drafts.length) {
-    await table("assignment_draft_revisions").upsert(snap.drafts as unknown as Row[], "project_id,section_id,content_hash");
+    const currentAt = new Date().toISOString();
+    await table("assignment_draft_revisions").upsert(
+      snap.drafts.map((d) => ({ ...d, last_current_at: currentAt })) as unknown as Row[],
+      "project_id,section_id,content_hash"
+    );
   }
   if (snap.submission) {
     await table("assignment_submission_checks").upsert(snap.submission as unknown as Row, "project_id,report_hash");
   }
 
-  // Source rows themselves are written by persistSourcesToSupabase; here only their channel and approval.
-  const sources = table("project_sources");
-  for (const s of snap.sourceOrigins) {
-    await sources.update(`${pid}&source_id=eq.${encodeURIComponent(s.source_id)}`, {
-      origin: s.origin,
-      is_approved: s.is_approved,
-    });
-  }
+  // Every Stage 3 source (live, vault, upload, prescribed) with its channel and
+  // approval. Columns this mirror does not own (citation_status, themes...) are kept.
+  if (snap.sources.length) await table("project_sources").upsert(snap.sources as unknown as Row[], "project_id,source_id");
 }
 
 const chains = new Map<string, Promise<void>>();

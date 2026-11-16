@@ -148,7 +148,7 @@ describe("Scholar Core Assignment Workspace", () => {
     await waitFor(() => {
       expect(saveIntakeAnswers).toHaveBeenCalledWith(
         "proj-123",
-        expect.objectContaining({ assignment_title: "Renamed Assignment" })
+        expect.objectContaining({ title: "Renamed Assignment" })
       );
     });
 
@@ -260,7 +260,10 @@ describe("Scholar Core Assignment Workspace", () => {
     expect(screen.queryByText(/Visual Storyline Roadmap/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Clean Grading Checklist/i)).not.toBeInTheDocument();
     expect(screen.getByText(/Topic & Core Angle/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/Do not write about general history before 2000/i).length).toBeGreaterThanOrEqual(1);
+    // No generic research questions are made up when the brief states none
+    // (the old fallback pasted the whole brief into a template question).
+    expect(screen.queryByText(/What theoretical frameworks and foundational literature define the scope/i)).toBeNull();
+    expect(screen.queryByText(/Balanced Synthesis Stance/i)).toBeNull();
 
     // 5. Confirm no visual regressions or unwanted stage tabs exist
     expect(screen.queryByText(/AssignmentDeconstructStage/i)).not.toBeInTheDocument();
@@ -285,7 +288,7 @@ describe("Scholar Core Assignment Workspace", () => {
     fireEvent.change(input, { target: { value: "Renamed From Header" } });
     fireEvent.keyDown(input, { key: "Enter" });
     await waitFor(() =>
-      expect(saveIntakeAnswers).toHaveBeenCalledWith("proj-123", expect.objectContaining({ assignment_title: "Renamed From Header" }))
+      expect(saveIntakeAnswers).toHaveBeenCalledWith("proj-123", expect.objectContaining({ title: "Renamed From Header" }))
     );
   });
 
@@ -313,7 +316,8 @@ describe("Scholar Core Assignment Workspace", () => {
     });
     render(<AssignmentWorkspace projectId="proj-empty" initialStage="understand" onStageChange={vi.fn()} />);
     const nav = await screen.findByRole("navigation", { name: /Assignment Workflow Phases/i });
-    expect(within(nav).getByRole("button", { name: /Phase 1: Extract/i })).toHaveTextContent("0%");
+    // No made-up progress: an empty brief shows no fact on the Extract step.
+    expect(within(nav).getByRole("button", { name: /Phase 1: Extract/i })).not.toHaveTextContent(/%|brief added/);
     expect(await screen.findByRole("button", { name: /Proceed to Sources/i })).toBeDisabled();
     expect(screen.getByText(/Still needed: .*the assignment question/i)).toBeInTheDocument();
     // No Minimal/Detailed choice: the five-stage flow is the only one.
@@ -329,7 +333,7 @@ describe("Scholar Core Assignment Workspace", () => {
     await new Promise((r) => setTimeout(r, 50));
     expect(saveIntakeAnswers).not.toHaveBeenCalledWith("proj-123", expect.objectContaining({ assignment_submission_report: expect.anything() }));
     const nav = screen.getByRole("navigation", { name: /Assignment Workflow Phases/i });
-    expect(within(nav).getByRole("button", { name: /Phase \d: Submission/i })).toHaveTextContent("0%");
+    expect(within(nav).getByRole("button", { name: /Phase \d: Submission/i })).not.toHaveTextContent(/checks|%/);
   });
 
   it("Drafting asks for the brief instead of showing a generic outline", async () => {

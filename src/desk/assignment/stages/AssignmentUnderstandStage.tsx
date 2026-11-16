@@ -1,102 +1,48 @@
+import { safeParseAnswerField } from "../../../shared/projectStateSchema";
+import { tonePresetOf } from "../types";
 import { UnderstandAgentPanel } from "../components/AgentPanels";
-import { SubQuestionsCard, GradingCriteriaCard } from "../components/BriefBreakdownCards";
-import { buildBriefSummary, parseBriefQuestions } from "../../../utils/briefQuestions";
+import { SubQuestionsCard,GradingCriteriaCard } from "../components/BriefBreakdownCards";
+import { buildBriefSummary,parseBriefQuestions } from "../../../utils/briefQuestions";
 import { briefGroundedStances } from "../../../domain/assignment/briefThesis";
 import { applyQuestionWordTargets } from "../../../domain/assignment/outlineBudget";
-import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import BriefScopePanel from "../components/BriefScopePanel";
+import { useState,useRef,useEffect,useCallback,useMemo } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
-import { authedJsonFetch, authedFetch } from "../../api";
+import { authedJsonFetch,authedFetch } from "../../api";
 import {
-  type AcademicLevel,
-  type AssignmentType,
-  type AssignmentAnalysis,
-  type AssignmentStructure,
-  type SectionBudgetItem,
-  type WritingToneConfig,
-  type WritingStyleConfig,
-  type WritingStylePreset,
-  ASSIGNMENT_TYPE_LABELS,
-  ACADEMIC_LEVEL_OPTIONS,
-  ASSIGNMENT_TYPE_OPTIONS,
-  STAGE_CITATION_STYLES as CITATION_STYLES,
-  WRITING_TONE_OPTIONS,
-  ARCHETYPE_DEFAULT_TONES,
-  AGENTIC_THINKING_STAGES,
-  cleanAnswerString,
-  extractStandardizedInstructions,
-  structureToInternalSections,
-  structureToSectionBudgets,
+type AcademicLevel,
+type AssignmentType,
+type AssignmentAnalysis,
+type AssignmentStructure,
+type SectionBudgetItem,type WritingStyleConfig,
+type WritingStylePreset,ACADEMIC_LEVEL_OPTIONS,
+ASSIGNMENT_TYPE_OPTIONS,
+STAGE_CITATION_STYLES as CITATION_STYLES,
+WRITING_TONE_OPTIONS,
+ARCHETYPE_DEFAULT_TONES,
+AGENTIC_THINKING_STAGES,
+AI_OUTLINE_TIMEOUT_MS,
+cleanAnswerString,
+extractStandardizedInstructions,
+structureToInternalSections,
+structureToSectionBudgets
 } from "../types";
 import { deriveHeuristicTitle } from "../../projectNaming";
 import {
-  Upload,
-  ChevronDown,
-  Sparkles,
-  ArrowRight,
-  Check,
-  AlertCircle,
-  FileText,
-  X,
-  Plus,
-  Trash2,
-  Edit2,
-  RotateCcw,
-  BookOpen,
-  ArrowLeft,
-  SlidersHorizontal,
-  CheckCircle2,
+ChevronDown,ArrowRight,RotateCcw
 } from "lucide-react";
 import type { SectionBreakdown } from "../../../components/forms/TargetWordCountInput";
 import DynamicStructurePlanner from "../components/DynamicStructurePlanner";
 import { TONE_SUGGESTION_CHIPS } from "../components/WritingStyleSelector";
-import {
-  generateDynamicAssignmentStructure,
-  autoBalanceStructure,
-  extractBriefInquiriesAndConcepts,
-} from "../services/outlineService";
-import { useSubscriptionLimits } from "../../../hooks/useSubscriptionLimits";
-import { UpgradeModal } from "../../../components/modals/UpgradeModal";
-import { isDeepEqual, safeFormatLabel, allocateWordsByMarks } from "../../../utils/briefExtractor";
+import { generateDynamicAssignmentStructure } from "../services/dynamicStructure";
+import { autoBalanceStructure } from "../services/outlineEditing";
+import { briefSubQuestions } from "../services/briefSemantics";
+import { isDeepEqual } from "../../../utils/briefExtractor";
 import { validateBriefFile } from "../../../services/documentParser";
-import { classifyScopeBoundaries, stripLineTags } from "../../../features/understand/services/scopeClassifier";
-import type { CourseworkExecutionMode, CourseworkProgressEvent } from "../../../features/coursework/types/orchestrator";
-
-class DropzoneErrorBoundary extends React.Component<
-  { children: React.ReactNode; onError?: (error: Error) => void },
-  { hasError: boolean }
-> {
-  state = { hasError: false };
-
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error: Error) {
-    console.error("Caught dropzone error inline:", error);
-    this.props.onError?.(error);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="border border-neutral-200 dark:border-white/10 rounded-xl p-6 bg-neutral-50/50 dark:bg-white/[0.02] text-center space-y-3 font-sans">
-          <p className="text-xs text-neutral-600 dark:text-neutral-400">
-            Could not parse this document. Please verify the file format or paste the brief text manually.
-          </p>
-          <button
-            type="button"
-            onClick={() => this.setState({ hasError: false })}
-            className="px-4 py-1.5 rounded-full text-xs font-medium bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 cursor-pointer"
-          >
-            Try Again
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
+import { UnderstandAngleAndVoice } from "../components/understand/UnderstandAngleAndVoice";
+import { UnderstandBriefSummaryBar } from "../components/understand/UnderstandBriefSummaryBar";
+import { UnderstandActionBar } from "../components/understand/UnderstandActionBar";
+import { UnderstandSettingsGrid } from "../components/understand/UnderstandSettingsGrid";
+import { UnderstandBriefInput } from "../components/understand/UnderstandBriefInput";
 
 export {
   ACADEMIC_LEVEL_OPTIONS,
@@ -106,137 +52,6 @@ export {
   ARCHETYPE_DEFAULT_TONES,
   AGENTIC_THINKING_STAGES,
 };
-
-function cleanTopic(question: string): string {
-  if (!question) return "your assignment topic";
-  return question
-    .replace(/^(critically\s+evaluate|evaluate|analyze|analyse|assess|compare\s+and\s+contrast|compare|discuss|examine|explore|investigate|formulate)\s+/i, "")
-    .replace(/^the\s+/i, "")
-    .replace(/[\?\.!]+$/, "")
-    .trim() || question.trim();
-}
-
-function decodeCommandVerb(question: string): {
-  verb: string;
-  definition: string;
-  expectation: string;
-} {
-  const q = (question || "").toLowerCase();
-  if (q.includes("critically evaluate") || q.includes("critical evaluation")) {
-    return {
-      verb: "Critically Evaluate",
-      definition: "Weigh competing theoretical arguments and empirical evidence to judge their validity.",
-      expectation: "Don't just describe the topic—synthesize counterarguments, identify structural trade-offs, and reach a reasoned, defensible conclusion backed by authoritative literature.",
-    };
-  }
-  if (q.includes("analyze") || q.includes("analyse") || q.includes("analysis")) {
-    return {
-      verb: "Analyze",
-      definition: "Break down complex issues into component parts to examine relationships and causes.",
-      expectation: "Explain 'how' and 'why' mechanisms work rather than merely reciting descriptive facts. Trace cause-and-effect connections with academic precision.",
-    };
-  }
-  if (q.includes("assess")) {
-    return {
-      verb: "Assess",
-      definition: "Determine the significance, scale, efficacy, or value of concepts or findings.",
-      expectation: "Provide balanced criteria-based judgments supported by scholarly consensus and practical benchmarks.",
-    };
-  }
-  if (q.includes("compare") || q.includes("contrast")) {
-    return {
-      verb: "Compare & Contrast",
-      definition: "Identify meaningful parallels and divergences between two or more frameworks or cases.",
-      expectation: "Juxtapose core mechanisms systematically, evaluating which approach offers superior explanatory power or outcomes.",
-    };
-  }
-  if (q.includes("discuss")) {
-    return {
-      verb: "Discuss",
-      definition: "Explore multiple viewpoints, debates, and nuances surrounding the core question.",
-      expectation: "Structure a cohesive, balanced narrative weighing primary schools of thought before delivering a clear synthesis.",
-    };
-  }
-  if (q.includes("examine") || q.includes("investigate")) {
-    return {
-      verb: "Examine",
-      definition: "Investigate closely, scrutinizing assumptions and empirical proof.",
-      expectation: "Surface hidden assumptions and cross-reference them with primary research and verified case evidence.",
-    };
-  }
-  if (q.includes("evaluate")) {
-    return {
-      verb: "Evaluate",
-      definition: "Form a judgment on the value, efficacy, or validity of theories and evidence.",
-      expectation: "Deliver reasoned, criteria-based conclusions supported by empirical data and scholarly consensus.",
-    };
-  }
-  return {
-    verb: "Analyze & Synthesize",
-    definition: "Dissect core themes and engage critically with peer-reviewed scholarship.",
-    expectation: "Demonstrate independent evaluation, rigorous evidence grounding, and coherent structural development.",
-  };
-}
-
-function generateThesisStances(question: string, briefText?: string): {
-  id: string;
-  badge: string;
-  title: string;
-  statement: string;
-  isRecommended?: boolean;
-}[] {
-  // Grounded in the brief's own title and questions; never a subject lookup table.
-  const grounded = briefGroundedStances([briefText, question].filter(Boolean).join("\n"));
-  if (grounded.length) return grounded;
-  const topic = cleanTopic(question);
-
-  return [
-    {
-      id: "stance-gen-balanced",
-      badge: "Recommended",
-      title: "Balanced Synthesis Stance",
-      statement: `While ${topic} presents complex institutional and analytical trade-offs, a rigorous framework integrating competing theoretical perspectives provides the most coherent and defensible foundation.`,
-      isRecommended: true,
-    },
-    {
-      id: "stance-gen-critical",
-      badge: "Critical Analysis",
-      title: "Structural Critique Stance",
-      statement: `A critical examination indicates that conventional assumptions regarding ${topic} overlook underlying systemic vulnerabilities, demanding fundamental structural reassessment rather than incremental adaptation.`,
-    },
-    {
-      id: "stance-gen-reform",
-      badge: "Pragmatic Reform",
-      title: "Evidence-Led Reform Stance",
-      statement: `Empirical evidence indicates that addressing ${topic} effectively requires targeted policy interventions, transparent evaluation benchmarks, and adaptive stakeholder alignment.`,
-    },
-  ];
-}
-
-const WRITING_VOICE_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: "natural", label: "Clear & Natural Academic (Default)" },
-  { value: "expository", label: "Simple & Direct" },
-  { value: "analytical", label: "Analytical" },
-  { value: "custom", label: "My Own Writing Style" },
-];
-
-function generateSubQuestions(question: string, briefText?: string): string[] {
-  const extracted = extractBriefInquiriesAndConcepts(question || "", briefText || "");
-  const found = [...(extracted.subQuestions || []), ...(extracted.extractedTasks || [])].filter(
-    (q) => q && q.trim().length > 15
-  );
-  if (found.length >= 2) {
-    return found;
-  }
-
-  const topic = cleanTopic(question);
-  return [
-    `What theoretical frameworks and foundational literature define the scope of ${topic}?`,
-    `How do competing academic perspectives and counter-evidence challenge conventional assumptions?`,
-    `What empirical case studies or practical evidence best demonstrate the real-world trade-offs involved?`,
-    `What actionable conclusions and strategic recommendations follow from a critical synthesis of the findings?`,
-  ];
-}
 
 export interface AssignmentUnderstandStageProps {
   onBack?: () => void;
@@ -248,7 +63,6 @@ export default function AssignmentUnderstandStage({
   onProceed,
 }: AssignmentUnderstandStageProps = {}) {
   const {
-    projectId,
     project,
     question,
     academicLevel,
@@ -263,11 +77,9 @@ export default function AssignmentUnderstandStage({
     structure,
     setStructure,
     saveAnswers,
-    analysis,
     setAnalysis,
     advancePhase,
     setPhase,
-    advanceStage,
     ensurePersisted,
     isLoading,
     executionMode,
@@ -285,14 +97,7 @@ export default function AssignmentUnderstandStage({
   const [intakeTab, setIntakeTab] = useState<"paste" | "upload">("paste");
   const [uploadedFileName, setUploadedFileName] = useState<string>("");
 
-  const {
-    isAdmin,
-    isPremium,
-    canUploadBrief,
-  } = useSubscriptionLimits();
 
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [upgradeModalDescription, setUpgradeModalDescription] = useState<string | undefined>();
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [parseNotice, setParseNotice] = useState<string | null>(null);
 
@@ -312,11 +117,10 @@ export default function AssignmentUnderstandStage({
   );
 
   const [localTone, setLocalTone] = useState<string>(() => {
-    const raw = project?.answers?.["writing_tone"] || project?.answers?.["writingTone"] || writingTone;
+    const raw = project?.answers?.["writing_tone"] || writingTone;
     if (typeof raw === "string" && raw && raw !== "analytical") return raw;
     if (raw && typeof raw === "object") {
-      const obj = raw as any;
-      const t = obj.preset || obj.id;
+      const t = tonePresetOf(raw);
       if (t && t !== "analytical") return t;
     }
     if (writingStyle?.preset && writingStyle.preset !== "analytical") return writingStyle.preset;
@@ -324,13 +128,12 @@ export default function AssignmentUnderstandStage({
     return ARCHETYPE_DEFAULT_TONES[curType] || "formal_academic";
   });
 
-  const [isWordCountFocused, setIsWordCountFocused] = useState<boolean>(false);
 
   // Auto-Update Writing Tone on initial load if essay with default analytical tone
   useEffect(() => {
     const curType = assignmentType || localType || "essay";
-    const rawTone = project?.answers?.["writing_tone"] || project?.answers?.["writingTone"] || writingTone || localTone;
-    const toneStr = (typeof rawTone === "string" ? rawTone : (rawTone as any)?.preset || (rawTone as any)?.id || "").toLowerCase();
+    const rawTone = project?.answers?.["writing_tone"] || writingTone || localTone;
+    const toneStr = (tonePresetOf(rawTone) || "").toLowerCase();
     if (curType === "essay" && (toneStr === "analytical" || !toneStr || toneStr === "default")) {
       const targetTone = "formal_academic";
       setLocalTone(targetTone);
@@ -346,7 +149,7 @@ export default function AssignmentUnderstandStage({
   const initialStepSetRef = useRef(false);
   const userOverrideStepRef = useRef(false);
   const [understandStep, setUnderstandStep] = useState<"brief_input" | "outline_review">(() => {
-    const rawStruct: any = project?.answers?.["assignment_structure"] || project?.answers?.["structure"];
+    const rawStruct: unknown = project?.answers?.["assignment_structure"];
     if (rawStruct) {
       initialStepSetRef.current = true;
       return "outline_review";
@@ -358,7 +161,7 @@ export default function AssignmentUnderstandStage({
     if (isLoading || initialStepSetRef.current || userOverrideStepRef.current) return;
     if (project) {
       initialStepSetRef.current = true;
-      const rawStruct: any = project?.answers?.["assignment_structure"] || project?.answers?.["structure"];
+      const rawStruct: unknown = project?.answers?.["assignment_structure"];
       if (rawStruct) {
         setUnderstandStep("outline_review");
       }
@@ -385,8 +188,8 @@ export default function AssignmentUnderstandStage({
       setLocalWordCount((prev) => (prev !== sanitized ? sanitized : prev));
     }
     if (citationStyle) setLocalCitation((prev) => (prev !== citationStyle ? citationStyle : prev));
-    const resolvedTone = project?.answers?.["writing_tone"] || project?.answers?.["writingTone"] || writingTone;
-    const toneStr = typeof resolvedTone === "string" ? resolvedTone : (resolvedTone as any)?.preset || (resolvedTone as any)?.id;
+    const resolvedTone = project?.answers?.["writing_tone"] || writingTone;
+    const toneStr = tonePresetOf(resolvedTone);
     if (toneStr && typeof toneStr === "string") {
       setLocalTone((prev) => (prev !== toneStr ? toneStr : prev));
     }
@@ -413,18 +216,13 @@ export default function AssignmentUnderstandStage({
   const [activeThesis, setActiveThesis] = useState<string>(() => {
     const existing = project?.answers?.["assignment_thesis"] || project?.answers?.["thesis_statement"] || structure?.thesisStatement;
     if (typeof existing === "string" && existing.trim().length > 0) return existing;
-    const defaultStances = generateThesisStances(cleanAnswerString(question), cleanAnswerString(assignmentBriefText));
+    const defaultStances = briefGroundedStances([cleanAnswerString(assignmentBriefText), cleanAnswerString(question)].filter(Boolean).join("\n"));
     return defaultStances[0]?.statement || "";
   });
 
   const [isGeneratingStructure, setIsGeneratingStructure] = useState(false);
-  const [agenticStageIndex, setAgenticStageIndex] = useState(0);
-  const [structureError, setStructureError] = useState<string | null>(null);
 
   // Autonomous synthesis progress state
-  const [autonomousProgress, setAutonomousProgress] = useState<CourseworkProgressEvent | null>(null);
-  const [isExecutingAutonomous, setIsExecutingAutonomous] = useState<boolean>(false);
-  const [autonomousError, setAutonomousError] = useState<string | null>(null);
 
   // Writing Style state
   const [localStyle, setLocalStyle] = useState<WritingStyleConfig>(() => {
@@ -462,146 +260,8 @@ export default function AssignmentUnderstandStage({
   const [institution, setInstitution] = useState(institutionName);
   const [deadline, setDeadline] = useState(deadlineDate);
   const [rubricText, setRubricText] = useState(markingRubricText);
-  const rubricFileInputRef = useRef<HTMLInputElement>(null);
 
   const [uploadingBrief, setUploadingBrief] = useState(false);
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
-
-  // Scope boundaries
-  const [editingIncludedIdx, setEditingIncludedIdx] = useState<number | null>(null);
-  const [editingIncludedText, setEditingIncludedText] = useState("");
-  const [isAddingIncluded, setIsAddingIncluded] = useState(false);
-  const [newIncludedText, setNewIncludedText] = useState("");
-
-  const [editingExcludedIdx, setEditingExcludedIdx] = useState<number | null>(null);
-  const [editingExcludedText, setEditingExcludedText] = useState("");
-  const [isAddingExcluded, setIsAddingExcluded] = useState(false);
-  const [newExcludedText, setNewExcludedText] = useState("");
-
-  const scopeClassification = useMemo(() => {
-    return classifyScopeBoundaries(
-      localBrief || localQuestion || "",
-      analysis?.keyConcepts || []
-    );
-  }, [localBrief, localQuestion, analysis?.keyConcepts]);
-
-  const currentIncluded = useMemo(() => {
-    const raw = analysis?.scopeBoundaries?.included;
-    if (raw && raw.length > 0) {
-      return raw.map(stripLineTags).filter(Boolean);
-    }
-    return scopeClassification.included.map(stripLineTags).filter(Boolean);
-  }, [analysis?.scopeBoundaries?.included, scopeClassification]);
-
-  const currentExcluded = useMemo(() => {
-    const raw = analysis?.scopeBoundaries?.excluded;
-    if (raw && raw.length > 0) {
-      return raw.map(stripLineTags).filter(Boolean);
-    }
-    return scopeClassification.excluded.map(stripLineTags).filter(Boolean);
-  }, [analysis?.scopeBoundaries?.excluded, scopeClassification]);
-
-  const handleSaveIncludedEdit = (idx: number) => {
-    if (!editingIncludedText.trim()) {
-      setEditingIncludedIdx(null);
-      return;
-    }
-    const updated = [...currentIncluded];
-    updated[idx] = editingIncludedText.trim();
-    if (analysis) {
-      setAnalysis({
-        ...analysis,
-        scopeBoundaries: {
-          ...analysis.scopeBoundaries,
-          included: updated,
-          excluded: currentExcluded,
-        },
-      });
-    }
-    setEditingIncludedIdx(null);
-  };
-
-  const handleDeleteIncluded = (idx: number) => {
-    const updated = currentIncluded.filter((_, i) => i !== idx);
-    if (analysis) {
-      setAnalysis({
-        ...analysis,
-        scopeBoundaries: {
-          ...analysis.scopeBoundaries,
-          included: updated,
-          excluded: currentExcluded,
-        },
-      });
-    }
-  };
-
-  const handleAddIncluded = () => {
-    if (!newIncludedText.trim()) return;
-    const updated = [...currentIncluded, newIncludedText.trim()];
-    if (analysis) {
-      setAnalysis({
-        ...analysis,
-        scopeBoundaries: {
-          ...analysis.scopeBoundaries,
-          included: updated,
-          excluded: currentExcluded,
-        },
-      });
-    }
-    setNewIncludedText("");
-    setIsAddingIncluded(false);
-  };
-
-  const handleSaveExcludedEdit = (idx: number) => {
-    if (!editingExcludedText.trim()) {
-      setEditingExcludedIdx(null);
-      return;
-    }
-    const updated = [...currentExcluded];
-    updated[idx] = editingExcludedText.trim();
-    if (analysis) {
-      setAnalysis({
-        ...analysis,
-        scopeBoundaries: {
-          ...analysis.scopeBoundaries,
-          included: currentIncluded,
-          excluded: updated,
-        },
-      });
-    }
-    setEditingExcludedIdx(null);
-  };
-
-  const handleDeleteExcluded = (idx: number) => {
-    const updated = currentExcluded.filter((_, i) => i !== idx);
-    if (analysis) {
-      setAnalysis({
-        ...analysis,
-        scopeBoundaries: {
-          ...analysis.scopeBoundaries,
-          included: currentIncluded,
-          excluded: updated,
-        },
-      });
-    }
-  };
-
-  const handleAddExcluded = () => {
-    if (!newExcludedText.trim()) return;
-    const updated = [...currentExcluded, newExcludedText.trim()];
-    if (analysis) {
-      setAnalysis({
-        ...analysis,
-        scopeBoundaries: {
-          ...analysis.scopeBoundaries,
-          included: currentIncluded,
-          excluded: updated,
-        },
-      });
-    }
-    setNewExcludedText("");
-    setIsAddingExcluded(false);
-  };
 
   const computeWordBudgetFromSections = (
     total: number,
@@ -662,15 +322,16 @@ export default function AssignmentUnderstandStage({
     if (writingStyle) {
       setLocalStyle((prev) => (isDeepEqual(prev, writingStyle) ? prev : writingStyle));
     }
-    const resolvedTone = project?.answers?.["writing_tone"] || project?.answers?.["writingTone"] || writingTone;
-    const toneStr = typeof resolvedTone === "string" ? resolvedTone : (resolvedTone as any)?.preset || (resolvedTone as any)?.id;
+    const resolvedTone = project?.answers?.["writing_tone"] || writingTone;
+    const toneStr = tonePresetOf(resolvedTone);
     if (toneStr && typeof toneStr === "string") {
       setLocalTone((prev) => (prev !== toneStr ? toneStr : prev));
     }
     if (structure && structure.headings && structure.headings.length > 0) {
       setLocalStructure(autoBalanceStructure(structure, targetWordCount > 0 ? targetWordCount : 2000));
-      const rawStruct: any = project?.answers?.["assignment_structure"] || project?.answers?.["structure"];
-      if (rawStruct && rawStruct.isConfirmed && !userOverrideStepRef.current) {
+      // The saved structure may be JSON text or an object (older saves).
+      const savedStruct = safeParseAnswerField<{ isConfirmed?: boolean } | null>(project?.answers?.["assignment_structure"], null);
+      if (savedStruct?.isConfirmed && !userOverrideStepRef.current) {
         setUnderstandStep("outline_review");
       }
     }
@@ -731,7 +392,6 @@ export default function AssignmentUnderstandStage({
     if (trimmed) {
       const currentTitle =
         project?.answers?.["title"] ||
-        project?.answers?.["assignment_title"] ||
         project?.title ||
         "";
       const isDefaultOrUntitled =
@@ -743,7 +403,7 @@ export default function AssignmentUnderstandStage({
       const internalSecs = structureToInternalSections(localStructure);
       const budgets = structureToSectionBudgets(localStructure);
 
-      const updates: Record<string, any> = {
+      const updates: Record<string, unknown> = {
         rawPrompt: trimmed,
         raw_prompt: trimmed,
         instructions: trimmed,
@@ -812,7 +472,7 @@ export default function AssignmentUnderstandStage({
     const budgets = structureToSectionBudgets(updated);
     const internalSecs = structureToInternalSections(updated);
 
-    const updates: Record<string, any> = {
+    const updates: Record<string, unknown> = {
       targetWordCount: validCount,
       target_word_count: validCount,
       word_count: validCount,
@@ -870,15 +530,8 @@ export default function AssignmentUnderstandStage({
     if (setWritingStyle) {
       setWritingStyle(updatedStyle);
     }
-    if (setWritingTone) {
-      setWritingTone(newTone as any);
-    }
-    saveAnswers({
-      writing_tone: newTone,
-      writingTone: newTone,
-      writingStyle: updatedStyle,
-      writing_style: updatedStyle,
-    }).catch(console.warn);
+    // One save holds both (the tone as a string, the style as its object).
+    saveAnswers({ writing_tone: newTone, writing_style: updatedStyle }).catch(console.warn);
   };
 
   const handleLevelChange = (lvl: AcademicLevel) => {
@@ -905,45 +558,7 @@ export default function AssignmentUnderstandStage({
     saveAnswers({ citationStyle: cs, citation_style: cs });
   };
 
-  const handleCourseDetailsBlur = () => {
-    const parsedCriteria = parseRubricCriteria(rubricText);
-    saveAnswers({
-      course_name: course,
-      institution,
-      deadline,
-      marking_rubric: rubricText,
-      rubric: rubricText,
-      rubricCriteria: parsedCriteria,
-      rubric_criteria: parsedCriteria,
-      courseDetails: {
-        courseCode: course,
-        institution,
-        deadline,
-        rubric: rubricText,
-      },
-    });
-  };
 
-  const handleRubricFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const text = ev.target?.result as string;
-      setRubricText(text);
-      const parsedCriteria = parseRubricCriteria(text);
-      saveAnswers({
-        marking_rubric: text,
-        rubric: text,
-        rubricCriteria: parsedCriteria,
-        rubric_criteria: parsedCriteria,
-      });
-    };
-    reader.readAsText(file);
-    if (e.target) {
-      e.target.value = "";
-    }
-  };
 
   const canProceedToSources =
     localQuestion.trim().length > 0 &&
@@ -965,12 +580,9 @@ export default function AssignmentUnderstandStage({
   ].filter((x): x is string => Boolean(x));
 
   const subQuestions = useMemo(() => {
-    return generateSubQuestions(localQuestion, localBrief);
+    return briefSubQuestions(localQuestion, localBrief);
   }, [localQuestion, localBrief]);
 
-  const markBudgets = useMemo(() => {
-    return allocateWordsByMarks(subQuestions, localWordCount);
-  }, [subQuestions, localWordCount]);
 
   const briefSummary = useMemo(() => {
     const text = cleanAnswerString(localBrief) || cleanAnswerString(localQuestion);
@@ -994,7 +606,8 @@ export default function AssignmentUnderstandStage({
   }, [localBrief, localQuestion, subQuestions]);
 
   const thesisStances = useMemo(() => {
-    return generateThesisStances(localQuestion, localBrief);
+    // Only stances grounded in the brief's own title and questions; none are made up.
+    return briefGroundedStances([localBrief, localQuestion].filter(Boolean).join("\n"));
   }, [localQuestion, localBrief]);
 
   // Synchronize active thesis if empty: the AI's own line of argument first.
@@ -1089,27 +702,14 @@ export default function AssignmentUnderstandStage({
 
     if (onProceed) {
       onProceed();
-    } else if (advancePhase) {
-      advancePhase("sources");
-    } else if (setPhase) {
-      setPhase("sources");
     } else {
-      advanceStage("sources");
+      advancePhase("sources");
     }
   };
 
   const handleGenerateStructure = async () => {
     if (!canGenerate || isGeneratingStructure) return;
     setIsGeneratingStructure(true);
-    setStructureError(null);
-    setAnalysisError(null);
-    setAgenticStageIndex(0);
-
-    const stageInterval = setInterval(() => {
-      setAgenticStageIndex((prev) =>
-        prev < AGENTIC_THINKING_STAGES.length - 1 ? prev + 1 : prev
-      );
-    }, 500);
 
     let proposedStructure = generateDynamicAssignmentStructure({
       question: localQuestion,
@@ -1131,7 +731,7 @@ export default function AssignmentUnderstandStage({
     userOverrideStepRef.current = false;
     setUnderstandStep("outline_review");
 
-    const defaultStances = generateThesisStances(localQuestion, localBrief);
+    const defaultStances = briefGroundedStances([localBrief, localQuestion].filter(Boolean).join("\n"));
     if (!activeThesis && defaultStances.length > 0) {
       setActiveThesis(defaultStances[0].statement);
     }
@@ -1141,7 +741,7 @@ export default function AssignmentUnderstandStage({
     try {
       const targetProjectId = await ensurePersisted();
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Structure generation timeout")), 15000)
+        setTimeout(() => reject(new Error("Structure generation timeout")), AI_OUTLINE_TIMEOUT_MS)
       );
 
       const response = await Promise.race([
@@ -1176,7 +776,7 @@ export default function AssignmentUnderstandStage({
           serverAnalysis = incomingAnalysis;
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn("Using resilient client structure generation:", err);
     }
 
@@ -1185,7 +785,7 @@ export default function AssignmentUnderstandStage({
     const budget = computeWordBudgetFromSections(localWordCount, budgets);
     const legacyBreakdown = computeSectionBreakdown(localWordCount, budgets);
 
-    const updates: Record<string, any> = {
+    const updates: Record<string, unknown> = {
       instructions: localQuestion,
       research_topic: localQuestion,
       assignment_question: localQuestion,
@@ -1243,7 +843,6 @@ export default function AssignmentUnderstandStage({
     } catch (saveErr) {
       console.warn("Could not save answers during structure generation:", saveErr);
     } finally {
-      clearInterval(stageInterval);
       setIsGeneratingStructure(false);
     }
   };
@@ -1251,22 +850,10 @@ export default function AssignmentUnderstandStage({
   const processUploadedFile = async (file: File) => {
     if (!file) return;
 
-    setAnalysisError(null);
     setParseNotice(null);
 
-    const existingBriefCount = (uploadedFileName || project?.answers?.["assignment_brief_file"]) ? 1 : 0;
-    const check = canUploadBrief(file, existingBriefCount);
 
-    if (!check.allowed) {
-      setUpgradeModalDescription(check.message);
-      setShowUpgradeModal(true);
-      return;
-    }
-
-    const fileValidation = validateBriefFile(file, {
-      isAdmin,
-      maxBytes: isPremium ? 50 * 1024 * 1024 : 5 * 1024 * 1024,
-    });
+    const fileValidation = validateBriefFile(file);
     if (!fileValidation.valid) {
       setParseNotice(fileValidation.error || "Unsupported file format.");
       return;
@@ -1346,9 +933,8 @@ export default function AssignmentUnderstandStage({
         assignment_internal_sections: internalSecs,
         wordBudget: computeWordBudgetFromSections(newWordCount, budgets),
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn("Upload error:", err);
-      setAnalysisError(err.message || "Failed to parse brief file.");
     } finally {
       setUploadingBrief(false);
       if (fileInputRef.current) {
@@ -1362,468 +948,49 @@ export default function AssignmentUnderstandStage({
   }, [localQuestion]);
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6 sm:px-6 space-y-6 text-neutral-900 dark:text-neutral-100 font-sans">
-      {/* Hidden screen-reader headings for test compatibility */}
+    <div className="max-w-4xl mx-auto px-4 py-6 sm:px-6 space-y-6 text-[color:var(--text-primary)] font-sans">
+      {/* Older names of this step, kept for links and tests; hidden from screen readers. */}
       {understandStep !== "brief_input" && (
         <>
-          <span className="sr-only">Phase 1: Understand the Assignment Brief</span>
-          <span className="sr-only">Phase 1: Understand the Assignment</span>
+          <span className="sr-only" aria-hidden="true">Phase 1: Understand the Assignment Brief</span>
+          <span className="sr-only" aria-hidden="true">Phase 1: Understand the Assignment</span>
         </>
       )}
-      <span className="sr-only">Understand Your Brief</span>
-      <span className="sr-only">Coursework &amp; Essay</span>
+      <span className="sr-only" aria-hidden="true">Understand Your Brief</span>
+      <span className="sr-only" aria-hidden="true">Coursework &amp; Essay</span>
 
       {understandStep === "brief_input" ? (
         /* Unified Assignment Setup Box (Fallback Intake Mode) */
-        <div className="bg-white dark:bg-ink-750 rounded-2xl border border-neutral-200/80 dark:border-white/10 p-5 sm:p-7 shadow-xs space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-100 dark:border-white/5 pb-3">
+        <div className="bg-[color:var(--surface-raised)] rounded-2xl border border-[color:var(--border-subtle)] p-5 sm:p-7 shadow-xs space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[color:var(--border-subtle)] pb-3">
             <div>
-              <h2 className="text-base sm:text-lg font-semibold text-neutral-900 dark:text-white">
+              <h2 className="text-base sm:text-lg font-semibold text-[color:var(--text-primary)]">
                 Phase 1: Understand the Assignment Brief
               </h2>
-              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+              <p className="text-xs text-[color:var(--text-muted)] mt-0.5">
                 Paste your essay prompt or upload your module syllabus to extract research parameters.
               </p>
             </div>
 
           </div>
 
-          {/* Assignment Question Section */}
-          <div className="space-y-2.5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div className="inline-flex p-1 rounded-xl bg-neutral-100 dark:bg-white/5 border border-neutral-200/60 dark:border-white/10 w-fit">
-                <button
-                  type="button"
-                  onClick={() => setIntakeTab("paste")}
-                  className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                    intakeTab === "paste"
-                      ? "bg-white dark:bg-ink-500 text-neutral-900 dark:text-white shadow-2xs font-semibold"
-                      : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-                  }`}
-                >
-                  Paste Prompt
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIntakeTab("upload")}
-                  className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
-                    intakeTab === "upload"
-                      ? "bg-white dark:bg-ink-500 text-neutral-900 dark:text-white shadow-2xs font-semibold"
-                      : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-                  }`}
-                >
-                  <Upload className="w-3 h-3" />
-                  <span>Upload Brief Document (.pdf, .docx)</span>
-                </button>
-              </div>
+          <UnderstandBriefInput fileInputRef={fileInputRef} handleLevelChange={handleLevelChange} handleQuestionBlur={handleQuestionBlur} handleTypeChange={handleTypeChange} intakeTab={intakeTab} isDraggingOver={isDraggingOver} localDiscipline={localDiscipline} localQuestion={localQuestion} localType={localType} parseNotice={parseNotice} processUploadedFile={processUploadedFile} project={project} promptWordCount={promptWordCount} saveAnswers={saveAnswers} setIntakeTab={setIntakeTab} setIsDraggingOver={setIsDraggingOver} setLocalDiscipline={setLocalDiscipline} setLocalQuestion={setLocalQuestion} setParseNotice={setParseNotice} uploadedFileName={uploadedFileName} uploadingBrief={uploadingBrief} />
 
-              <div className="flex items-center gap-2">
-                {promptWordCount > 0 && intakeTab === "paste" && (
-                  <span className="text-[11px] font-mono text-neutral-400 dark:text-neutral-500">
-                    {promptWordCount} words entered
-                  </span>
-                )}
-                {uploadedFileName && (
-                  <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1.5 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
-                    <FileText className="w-3.5 h-3.5" />
-                    <span>{uploadedFileName}</span>
-                  </span>
-                )}
-              </div>
-            </div>
+          <UnderstandSettingsGrid dispatchToneAssistantSuggestions={dispatchToneAssistantSuggestions} handleCitationChange={handleCitationChange} handleLevelChange={handleLevelChange} handleTargetWordCountChange={handleTargetWordCountChange} handleToneChange={handleToneChange} handleTypeChange={handleTypeChange} handleWordCountChange={handleWordCountChange} localCitation={localCitation} localLevel={localLevel} localTone={localTone} localType={localType} localWordCount={localWordCount} setLocalWordCount={setLocalWordCount} toneSectionRef={toneSectionRef} />
 
-            {intakeTab === "paste" ? (
-              <textarea
-                value={localQuestion}
-                onChange={(e) => setLocalQuestion(e.target.value)}
-                onBlur={handleQuestionBlur}
-                rows={4}
-                placeholder="Paste your assignment prompt, essay title, or question here..."
-                className="w-full bg-neutral-50/70 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 rounded-xl p-3.5 text-xs sm:text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all leading-relaxed resize-y"
-              />
-            ) : (
-              <DropzoneErrorBoundary onError={() => setParseNotice("Could not parse this document. Please verify the file format or paste the brief text manually.")}>
-                <div
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setIsDraggingOver(true);
-                  }}
-                  onDragLeave={(e) => {
-                    e.preventDefault();
-                    setIsDraggingOver(false);
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setIsDraggingOver(false);
-                    const dropped = e.dataTransfer.files?.[0];
-                    if (dropped) processUploadedFile(dropped);
-                  }}
-                  className={`border border-dashed rounded-xl p-6 transition-all flex flex-col items-center justify-center text-center space-y-3 cursor-pointer ${
-                    isDraggingOver
-                      ? "border-neutral-900 bg-neutral-100/70 dark:border-white dark:bg-white/10"
-                      : "border-neutral-300 dark:border-white/15 bg-neutral-50/50 dark:bg-white/[0.02]"
-                  }`}
-                  onClick={() => {
-                    if (!uploadingBrief) fileInputRef.current?.click();
-                  }}
-                >
-                  <div className="w-10 h-10 rounded-full bg-neutral-100 dark:bg-white/5 flex items-center justify-center text-neutral-600 dark:text-neutral-300">
-                    <Upload className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">
-                      Upload your assignment brief or module handbook
-                    </p>
-                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">
-                      Supports PDF, DOCX, DOC, or TXT
-                    </p>
-                  </div>
-                </div>
-              </DropzoneErrorBoundary>
-            )}
-
-            <BriefScopePanel
-              brief={localQuestion}
-              discipline={localDiscipline}
-              assignmentType={project?.answers?.["assignment_type_confirmed"] === "true" ? localType : undefined}
-              onAnswer={(q, value) => {
-                if (q === "discipline") {
-                  setLocalDiscipline(value);
-                  saveAnswers({ assignment_discipline: value });
-                } else if (q === "assignmentType") {
-                  handleTypeChange(value as AssignmentType);
-                  saveAnswers({ assignment_type_confirmed: "true" });
-                } else {
-                  handleLevelChange(value as AcademicLevel);
-                }
-              }}
-            />
-
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) processUploadedFile(file);
-              }}
-              accept=".pdf,.docx,.doc,.txt"
-              className="hidden"
-            />
-          </div>
-
-          {/* Academic Level, Assignment Type, Citation, Tone, and Target Word Count */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_1.35fr] gap-3 pt-2 border-t border-neutral-100 dark:border-white/5">
-            {/* Academic Level */}
-            <div className="space-y-1">
-              <label htmlFor="academic_level" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
-                <span>Academic Level</span>
-                <span className="text-rose-500 text-xs">*</span>
-              </label>
-              <div className="relative">
-                <select
-                  id="academic_level"
-                  name="academic_level"
-                  aria-label="Academic Level"
-                  value={localLevel}
-                  onChange={(e) => handleLevelChange(e.target.value as AcademicLevel)}
-                  className="w-full h-8 bg-white dark:bg-ink-500 border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
-                >
-                  {ACADEMIC_LEVEL_OPTIONS.map((opt) => (
-                    <option key={opt.id} value={opt.id}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-neutral-400">
-                  <ChevronDown className="w-3.5 h-3.5" />
-                </div>
-              </div>
-
-              {/* Hidden companion buttons for test suite compatibility */}
-              <div className="sr-only" aria-hidden="true">
-                <button
-                  type="button"
-                  onClick={() => handleLevelChange("undergraduate")}
-                  className={localLevel === "undergraduate" ? "bg-white" : ""}
-                >
-                  Undergraduate
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleLevelChange("postgraduate")}
-                  className={localLevel === "postgraduate" ? "bg-white" : ""}
-                >
-                  Postgraduate / Masters
-                </button>
-              </div>
-            </div>
-
-            {/* Assignment Type */}
-            <div className="space-y-1">
-              <label htmlFor="assignment_type" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
-                <span>Assignment Type</span>
-                <span className="text-rose-500 text-xs">*</span>
-              </label>
-              <div className="relative">
-                <select
-                  id="assignment_type"
-                  name="assignment_type"
-                  aria-label="Assignment Type"
-                  value={localType}
-                  onChange={(e) => handleTypeChange(e.target.value as AssignmentType)}
-                  className="w-full h-8 bg-white dark:bg-ink-500 border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
-                >
-                  {ASSIGNMENT_TYPE_OPTIONS.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-neutral-400">
-                  <ChevronDown className="w-3.5 h-3.5" />
-                </div>
-              </div>
-            </div>
-
-            {/* Citation Style */}
-            <div className="space-y-1">
-              <label htmlFor="citation_style" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
-                <span>Citation Style</span>
-                <span className="text-rose-500 text-xs">*</span>
-              </label>
-              <div className="relative">
-                <select
-                  id="citation_style"
-                  name="citation_style"
-                  aria-label="Citation Style"
-                  value={localCitation}
-                  onChange={(e) => handleCitationChange(e.target.value)}
-                  className="w-full h-8 bg-white dark:bg-ink-500 border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs"
-                >
-                  {CITATION_STYLES.map((st) => (
-                    <option key={st.id} value={st.id}>
-                      {st.name}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-neutral-400">
-                  <ChevronDown className="w-3.5 h-3.5" />
-                </div>
-              </div>
-            </div>
-
-            {/* Writing Tone */}
-            <div
-              ref={toneSectionRef}
-              data-testid="tone-section-wrapper"
-              onFocusCapture={dispatchToneAssistantSuggestions}
-              onClickCapture={dispatchToneAssistantSuggestions}
-              className="space-y-1"
-            >
-              <label htmlFor="writing_tone" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
-                <span>Writing Tone</span>
-                <span className="text-rose-500 text-xs">*</span>
-              </label>
-              <div className="relative">
-                <select
-                  id="writing_tone"
-                  name="writing_tone"
-                  aria-label="Writing Tone"
-                  value={localTone}
-                  onChange={(e) => handleToneChange(e.target.value)}
-                  onFocus={dispatchToneAssistantSuggestions}
-                  className="w-full h-8 bg-white dark:bg-ink-500 border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
-                >
-                  {WRITING_TONE_OPTIONS.map((tn) => (
-                    <option key={tn.id} value={tn.id}>
-                      {tn.label}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-neutral-400">
-                  <ChevronDown className="w-3.5 h-3.5" />
-                </div>
-              </div>
-            </div>
-
-            {/* Target Words Stepper / Input */}
-            <div className="space-y-1 min-w-[130px]">
-              <label htmlFor="target_word_count" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center justify-between whitespace-nowrap">
-                <span className="flex items-center gap-1">
-                  <span>Target Word Count</span>
-                  <span className="text-rose-500 text-xs">*</span>
-                </span>
-              </label>
-              <div className="flex items-center gap-1.5 w-full min-w-[130px]">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const current = Number(localWordCount) || 2000;
-                    handleTargetWordCountChange(Math.max(100, current - 250));
-                  }}
-                  aria-label="Decrease target word count"
-                  className="h-8 w-8 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-500 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
-                  title="Decrease by 250 words"
-                >
-                  −
-                </button>
-                <div className="relative flex-1 min-w-[115px]">
-                  <input
-                    id="target_word_count"
-                    name="target_word_count"
-                    type="number"
-                    role="spinbutton"
-                    aria-valuenow={localWordCount > 0 ? localWordCount : 2000}
-                    value={localWordCount > 0 ? localWordCount : 2000}
-                    onChange={(e) => {
-                      const raw = e.target.value.replace(/[^0-9]/g, "");
-                      if (!raw) {
-                        setLocalWordCount(0);
-                        return;
-                      }
-                      const val = parseInt(raw, 10);
-                      if (!isNaN(val)) {
-                        const clamped = Math.min(50000, Math.max(0, val));
-                        setLocalWordCount(clamped);
-                        handleWordCountChange(clamped);
-                      }
-                    }}
-                    onBlur={() => {
-                      if (!localWordCount || localWordCount < 100) {
-                        handleTargetWordCountChange(2000);
-                      }
-                    }}
-                    aria-label="Target Word Count"
-                    placeholder="2000"
-                    className="w-full min-w-[115px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none whitespace-nowrap h-8 bg-white dark:bg-ink-500 border border-neutral-200/80 dark:border-white/10 rounded-lg px-2 text-center text-xs font-semibold text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white tabular-nums shadow-2xs"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const current = Number(localWordCount) || 2000;
-                    handleTargetWordCountChange(Math.min(50000, current + 250));
-                  }}
-                  aria-label="Increase target word count"
-                  className="h-8 w-8 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-500 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
-                  title="Increase by 250 words"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Action Button Bar */}
-          <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-neutral-100 dark:border-white/5">
-            <div className="text-xs">
-              {!canProceedToSources ? (
-                <p className="text-neutral-500 dark:text-neutral-400 flex items-start gap-1.5">
-                  <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" aria-hidden="true" />
-                  <span>
-                    Please provide the assignment question, word count, and citation style to continue.
-                    {missingFields.length > 0 && <span className="block text-[11px] mt-0.5">Still needed: {missingFields.join(", ")}.</span>}
-                  </span>
-                </p>
-              ) : (
-                <p className="text-neutral-500 dark:text-neutral-400">
-                  Ready to analyze assignment brief and build tone-tailored outline.
-                </p>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2.5 w-full sm:w-auto">
-              <button
-                type="button"
-                id="save_and_build_outline_btn"
-                disabled={!canGenerate || isGeneratingStructure}
-                onClick={handleGenerateStructure}
-                aria-label="Save & Build Outline (Save & Build / Generate Structure / Analyze Assignment Brief)"
-                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 active:scale-[0.99] font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-xs flex items-center justify-center gap-2 cursor-pointer"
-              >
-                {isGeneratingStructure ? (
-                  <>
-                    <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                    <span>Thinking through assignment…</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Save &amp; Build Outline</span>
-                  </>
-                )}
-              </button>
-
-              {/* Companion proceed button for backward-compatibility with tests expecting Proceed to Sources */}
-              <button
-                type="button"
-                disabled={!canProceedToSources || isGeneratingStructure}
-                onClick={handleProceedToSources}
-                aria-label="Proceed to Sources (Confirm Structure & Proceed to Sources / Approve Outline & Proceed)"
-                className="sr-only"
-              >
-                Proceed to Sources
-              </button>
-            </div>
-          </div>
+          <UnderstandActionBar canGenerate={canGenerate} canProceedToSources={canProceedToSources} handleGenerateStructure={handleGenerateStructure} handleProceedToSources={handleProceedToSources} isGeneratingStructure={isGeneratingStructure} missingFields={missingFields} />
         </div>
       ) : (
         /* Step 2: Understand 4 Human-Centered Cards */
         <div className="space-y-6 animate-in fade-in duration-200">
-          <UnderstandAgentPanel minimal />
-          {/* Top Locked Brief Summary Bar */}
-          <div className="bg-white dark:bg-ink-750 rounded-2xl border border-neutral-200/80 dark:border-white/10 p-4 sm:p-5 shadow-xs space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-neutral-100 dark:border-white/5">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                <span className="text-xs font-semibold text-neutral-900 dark:text-white uppercase tracking-wider">
-                  Assignment Brief Summary
-                </span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                  Locked &amp; Calibrated
-                </span>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  userOverrideStepRef.current = true;
-                  setUnderstandStep("brief_input");
-                  if (onBack) onBack();
-                  else if (setPhase) setPhase("extract");
-                }}
-                aria-label="Edit Brief"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer w-fit border border-neutral-200/60 dark:border-white/10"
-              >
-                <Edit2 className="w-3.5 h-3.5" />
-                <span>← Edit Brief in Phase 1</span>
-              </button>
-            </div>
-
-            {/* Executive summary (never the pasted brief) */}
-            <p className="text-sm text-neutral-800 dark:text-neutral-200 leading-relaxed" data-testid="brief-summary-text">
-              {briefSummary}
-            </p>
-
-            {/* Parameter Badges */}
-            <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-              <span className="px-2.5 py-1 rounded-lg bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-300">
-                Level: <strong className="font-semibold capitalize text-neutral-900 dark:text-white">{safeFormatLabel(localLevel)}</strong>
-              </span>
-              <span className="px-2.5 py-1 rounded-lg bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-300">
-                Type: <strong className="font-semibold capitalize text-neutral-900 dark:text-white">{safeFormatLabel(localType)}</strong>
-              </span>
-              <span className="px-2.5 py-1 rounded-lg bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-300">
-                Citation: <strong className="font-semibold uppercase text-neutral-900 dark:text-white">{localCitation}</strong>
-              </span>
-              <span className="px-2.5 py-1 rounded-lg bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20">
-                Tone: <strong className="font-semibold capitalize">{safeFormatLabel(localTone)}</strong>
-              </span>
-              <span className="px-2.5 py-1 rounded-lg bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-300">
-                Target: <strong className="font-semibold text-neutral-900 dark:text-white">{localWordCount.toLocaleString()} words</strong>
-              </span>
-            </div>
+          <div>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold tracking-wider uppercase bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]">
+              Phase 02 · Understand
+            </span>
+            <h1 className="mt-1 text-xl sm:text-2xl font-semibold tracking-tight text-[color:var(--text-primary)]">What your brief asks for</h1>
           </div>
+          <UnderstandAgentPanel minimal />
+          <UnderstandBriefSummaryBar briefSummary={briefSummary} localCitation={localCitation} localLevel={localLevel} localTone={localTone} localType={localType} localWordCount={localWordCount} onBack={onBack} setPhase={setPhase} setUnderstandStep={setUnderstandStep} userOverrideStepRef={userOverrideStepRef} />
 
           <SubQuestionsCard
             briefText={cleanAnswerString(localBrief) || cleanAnswerString(localQuestion)}
@@ -1841,118 +1008,22 @@ export default function AssignmentUnderstandStage({
           />
           <GradingCriteriaCard briefText={cleanAnswerString(localBrief) || cleanAnswerString(localQuestion)} rubricText={rubricText || markingRubricText} />
 
-          {/* Core topic, working angle and writing voice */}
-          <section className="bg-white dark:bg-ink-750 rounded-2xl border border-neutral-200/80 dark:border-white/10 p-4 sm:p-5 shadow-xs space-y-3" aria-label="Core topic and working angle">
-            <h3 className="text-xs font-semibold text-neutral-900 dark:text-white uppercase tracking-wider">
-              Topic &amp; Core Angle
-            </h3>
-            <p className="text-sm text-neutral-800 dark:text-neutral-200" data-testid="core-topic">
-              {coreTopic}
-            </p>
-
-            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Pick an angle">
-              {thesisStances.map((st) => {
-                const isSelected = activeThesis === st.statement;
-                return (
-                  <button
-                    key={st.id}
-                    type="button"
-                    aria-pressed={isSelected}
-                    title={st.statement}
-                    onClick={() => {
-                      setActiveThesis(st.statement);
-                      saveAnswers({ assignment_thesis: st.statement, thesis_statement: st.statement });
-                    }}
-                    className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-colors cursor-pointer ${
-                      isSelected
-                        ? "border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900"
-                        : "border-neutral-200 dark:border-white/15 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5"
-                    }`}
-                  >
-                    {st.title}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="space-y-1.5">
-              <label htmlFor="assignment_thesis_input" className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
-                Working thesis
-              </label>
-              <textarea
-                id="assignment_thesis_input"
-                value={activeThesis}
-                onChange={(e) => {
-                  setActiveThesis(e.target.value);
-                  saveAnswers({ assignment_thesis: e.target.value, thesis_statement: e.target.value });
-                }}
-                rows={2}
-                placeholder="Pick an angle above or write your own working thesis…"
-                className="w-full bg-transparent border border-neutral-200/80 dark:border-white/10 rounded-xl p-3 text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-400 resize-y"
-              />
-            </div>
-
-            <div
-              ref={toneSectionRef}
-              data-testid="tone-section-wrapper"
-              onFocusCapture={dispatchToneAssistantSuggestions}
-              onClickCapture={dispatchToneAssistantSuggestions}
-              className="space-y-1.5"
-            >
-              <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Writing style</span>
-              <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Writing style">
-                {WRITING_VOICE_OPTIONS.map((opt) => {
-                  const active = localTone === opt.value || (opt.value === "natural" && !WRITING_VOICE_OPTIONS.some((o) => o.value === localTone));
-                  return (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      role="radio"
-                      aria-checked={active}
-                      onClick={() => handleToneChange(opt.value)}
-                      className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-colors cursor-pointer ${
-                        active
-                          ? "border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900"
-                          : "border-neutral-200 dark:border-white/15 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5"
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  );
-                })}
-              </div>
-              {localTone === "custom" && (
-                <textarea
-                  aria-label="Paste a sample of your own writing"
-                  value={localStyle.customSampleText ?? ""}
-                  onChange={(e) => {
-                    const updated: WritingStyleConfig = { ...localStyle, preset: "custom", customSampleText: e.target.value };
-                    setLocalStyle(updated);
-                    setWritingStyle?.(updated);
-                    saveAnswers({ writingStyle: updated, writing_style: updated }).catch(console.warn);
-                  }}
-                  rows={2}
-                  placeholder="Paste a paragraph or two of your own writing; Scholar will mirror its voice when drafting."
-                  className="w-full bg-transparent border border-neutral-200/80 dark:border-white/10 rounded-xl p-3 text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-400 resize-y"
-                />
-              )}
-            </div>
-          </section>
+          <UnderstandAngleAndVoice activeThesis={activeThesis} coreTopic={coreTopic} dispatchToneAssistantSuggestions={dispatchToneAssistantSuggestions} handleToneChange={handleToneChange} localStyle={localStyle} localTone={localTone} saveAnswers={saveAnswers} setActiveThesis={setActiveThesis} setLocalStyle={setLocalStyle} setWritingStyle={setWritingStyle} thesisStances={thesisStances} toneSectionRef={toneSectionRef} />
 
             {/* Collapsed-by-default Fine-Tune Accordion */}
-            <details className="rounded-xl border border-neutral-200/80 dark:border-white/10 bg-neutral-50/50 dark:bg-white/[0.02] group">
-              <summary className="p-3.5 flex items-center justify-between cursor-pointer list-none select-none hover:bg-neutral-100/50 dark:hover:bg-white/5 transition-colors rounded-xl">
+            <details className="rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]/50 group">
+              <summary className="p-3.5 flex items-center justify-between cursor-pointer list-none select-none hover:bg-[color:var(--surface-hover)] transition-colors rounded-xl">
                 <div className="flex items-center gap-2">
-                  <ChevronDown className="w-4 h-4 text-neutral-500 group-open:rotate-180 transition-transform" />
-                  <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">
+                  <ChevronDown className="w-4 h-4 text-[color:var(--text-muted)] group-open:rotate-180 transition-transform" />
+                  <span className="text-xs font-semibold text-[color:var(--text-primary)]">
                     Fine-Tune Section Headings &amp; Word Budgets (Optional)
                   </span>
                 </div>
-                <span className="text-[11px] font-medium text-neutral-400">
+                <span className="text-xs font-medium text-[color:var(--text-muted)]">
                   Section word steppers &amp; H1-H3 ledger
                 </span>
               </summary>
-              <div className="p-4 pt-1 border-t border-neutral-200/60 dark:border-white/5">
+              <div className="p-4 pt-1 border-t border-[color:var(--border-subtle)]">
                 <DynamicStructurePlanner
                   structure={localStructure}
                   targetWordCount={localWordCount}
@@ -1972,7 +1043,7 @@ export default function AssignmentUnderstandStage({
           {/* ========================================================
               BOTTOM NAVIGATION BAR & PHASE 3 CONNECTION
              ======================================================== */}
-          <div className="p-4 sm:p-5 rounded-2xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-750 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="p-4 sm:p-5 rounded-2xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
             <div>
               <button
                 type="button"
@@ -1982,7 +1053,7 @@ export default function AssignmentUnderstandStage({
                   if (onBack) onBack();
                   else if (setPhase) setPhase("extract");
                 }}
-                className="text-xs font-semibold text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                className="py-1 text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-colors cursor-pointer inline-flex items-center gap-1.5"
               >
                 <span>← Back to Phase 1: Extract</span>
               </button>
@@ -1994,7 +1065,7 @@ export default function AssignmentUnderstandStage({
                 disabled={isGeneratingStructure}
                 onClick={handleGenerateStructure}
                 aria-label="Regenerate Outline (Generate Structure)"
-                className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-neutral-300 dark:border-white/15 hover:bg-neutral-100 dark:hover:bg-white/5 text-xs font-semibold text-neutral-800 dark:text-neutral-200 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-[color:var(--border-default)] hover:bg-[color:var(--surface-hover)] text-xs font-semibold text-[color:var(--text-primary)] transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
               >
                 {isGeneratingStructure ? (
                   <>
@@ -2014,7 +1085,7 @@ export default function AssignmentUnderstandStage({
                 disabled={!canProceedToSources || isGeneratingStructure}
                 onClick={handleProceedToSources}
                 aria-label="Proceed (Approve Outline & Proceed / Confirm Structure & Proceed to Sources / Proceed to Sources)"
-                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 active:scale-[0.99] font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 active:scale-[0.99] font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <span>Proceed to Sources</span>
                 <ArrowRight className="w-4 h-4" />
@@ -2023,13 +1094,6 @@ export default function AssignmentUnderstandStage({
           </div>
         </div>
       )}
-
-      {/* Role-Aware Tier Upgrade Modal */}
-      <UpgradeModal
-        isOpen={showUpgradeModal}
-        onClose={() => setShowUpgradeModal(false)}
-        description={upgradeModalDescription}
-      />
     </div>
   );
 }

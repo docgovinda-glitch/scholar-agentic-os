@@ -1,39 +1,22 @@
-import React, { useState, useRef } from "react";
-import type { UploadedSourceDocument, EvidenceItem } from "../types";
+import { errorText } from "../../../shared/errorText";
+import React,{ useState,useRef } from "react";
+import type { UploadedSourceDocument,EvidenceItem } from "../types";
 import {
-  Upload,
-  FileText,
-  CheckCircle2,
-  Trash2,
-  FileSpreadsheet,
-  Presentation,
-  Image as ImageIcon,
-  FileCode,
-  Globe,
-  Loader2,
-  ChevronDown,
-  ChevronUp,
-  Quote,
-  Sparkles,
-  Table,
-  Target,
-  ArrowRight,
-  Copy,
-  Check,
-  BookOpen,
-  Layers,
-  ShieldCheck,
-  CheckCheck,
-  FileUp,
+Upload,FileCode,
+Globe,
+Loader2,Layers,FileUp
 } from "lucide-react";
 import {
-  extractProjectEvidence,
-  parseProjectFile,
-  parseProjectUrl,
-  parseProjectText,
-  deriveSourceTraceability,
-  type ParsedSourcePayload,
+extractProjectEvidence,
+parseProjectFile,
+parseProjectUrl,type ParsedSourcePayload
 } from "../services/sourceEvidenceExtractionService";
+import { UploadPasteTextModal } from "./uploads/UploadPasteTextModal";
+import { UploadWebLinkModal } from "./uploads/UploadWebLinkModal";
+import { UploadedSourcesList } from "./uploads/UploadedSourcesList";
+
+/** The server's upload ceiling (MAX_UPLOAD_MB, at most 10). */
+const SOURCE_MAX_UPLOAD_MB = 10;
 
 export interface LectureUploadDropzoneProps {
   uploadedFiles: UploadedSourceDocument[];
@@ -44,80 +27,6 @@ export interface LectureUploadDropzoneProps {
   projectId?: string;
 }
 
-function formatBytes(bytes?: number): string {
-  if (!bytes || bytes === 0) return "0 KB";
-  const k = 1024;
-  const sizes = ["Bytes", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
-}
-
-function formatTimestamp(isoStr?: string): string {
-  if (!isoStr) return "Recently";
-  try {
-    const d = new Date(isoStr);
-    const now = new Date();
-    const diffSec = Math.floor((now.getTime() - d.getTime()) / 1000);
-    if (diffSec < 60) return "Just now";
-    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
-    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
-    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-  } catch {
-    return "Recently";
-  }
-}
-
-/** Icon based on source format */
-function SourceTypeIcon({ type }: { type?: string }) {
-  switch (type) {
-    case "pptx":
-      return <Presentation className="w-5 h-5 text-amber-500" />;
-    case "spreadsheet":
-      return <FileSpreadsheet className="w-5 h-5 text-emerald-500" />;
-    case "image":
-      return <ImageIcon className="w-5 h-5 text-purple-500" />;
-    case "weblink":
-      return <Globe className="w-5 h-5 text-sky-500" />;
-    case "docx":
-      return <FileText className="w-5 h-5 text-blue-500" />;
-    case "text":
-      return <FileCode className="w-5 h-5 text-slate-500" />;
-    default:
-      return <FileText className="w-5 h-5 text-rose-500" />;
-  }
-}
-
-/** Format label pill */
-function SourceFormatBadge({ type }: { type?: string }) {
-  let label = "PDF Document";
-  let color = "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20";
-
-  if (type === "pptx") {
-    label = "Slides / Keynote";
-    color = "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20";
-  } else if (type === "spreadsheet") {
-    label = "Spreadsheet / Dataset";
-    color = "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20";
-  } else if (type === "image") {
-    label = "Image / Scanned Figure";
-    color = "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20";
-  } else if (type === "weblink") {
-    label = "Web Page / URL";
-    color = "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20";
-  } else if (type === "docx") {
-    label = "Word Document";
-    color = "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20";
-  } else if (type === "text") {
-    label = "Text Notes";
-    color = "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20";
-  }
-
-  return (
-    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${color}`}>
-      {label}
-    </span>
-  );
-}
 
 export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
   uploadedFiles,
@@ -130,6 +39,7 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
   const [isDragOver, setIsDragOver] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStatusText, setProcessingStatusText] = useState("");
+  const [uploadProblems, setUploadProblems] = useState<string[]>([]);
   const [expandedDocIds, setExpandedDocIds] = useState<Set<string>>(new Set());
   const [activeInspectTabs, setActiveInspectTabs] = useState<Record<string, "extracted" | "used" | "original">>({});
   const [copiedDocId, setCopiedDocId] = useState<string | null>(null);
@@ -176,75 +86,59 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
     const newDocs: UploadedSourceDocument[] = [];
     const allEvidenceItems: EvidenceItem[] = [];
 
+    const problems: string[] = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
+      // Refuse what cannot be read, with a reason; never save a placeholder as if it were read.
+      if (file.size === 0) {
+        problems.push(`${file.name}: the file is empty.`);
+        continue;
+      }
+      if (file.size > SOURCE_MAX_UPLOAD_MB * 1024 * 1024) {
+        problems.push(`${file.name}: ${(file.size / (1024 * 1024)).toFixed(1)} MB is over the ${SOURCE_MAX_UPLOAD_MB} MB limit.`);
+        continue;
+      }
       setProcessingStatusText(`Extracting relevant evidence from "${file.name}"...`);
 
       try {
         let payload: ParsedSourcePayload;
-
-        // Try backend parse endpoint first
         try {
           payload = await parseProjectFile(projectId, file);
-        } catch {
-          // Client-side fallback if backend parse fails
+        } catch (parseErr) {
+          // Only plain-text files can be read in the browser when the server cannot;
+          // binary formats (PDF, Word, slides) are never decoded as text.
           const ext = file.name.split(".").pop()?.toLowerCase() || "";
-          let sourceType: UploadedSourceDocument["sourceType"] = "other";
-          if (ext === "pdf") sourceType = "pdf";
-          else if (ext === "docx" || ext === "doc") sourceType = "docx";
-          else if (ext === "pptx" || ext === "ppt") sourceType = "pptx";
-          else if (["xlsx", "xls", "csv", "tsv"].includes(ext)) sourceType = "spreadsheet";
-          else if (["png", "jpg", "jpeg", "webp"].includes(ext)) sourceType = "image";
-          else if (["txt", "md"].includes(ext)) sourceType = "text";
-
-          const text = await file.text().catch(() => `Source document: ${file.name}`);
+          if (!["txt", "md", "csv", "tsv"].includes(ext)) throw parseErr;
           payload = {
             title: file.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " "),
-            sourceType,
-            text,
+            sourceType: ["csv", "tsv"].includes(ext) ? "spreadsheet" : "text",
+            text: await file.text(),
             fileSize: file.size,
           };
         }
+        if (!payload.text || !payload.text.trim()) {
+          problems.push(`${file.name}: no readable text was found (a scanned image needs to be pasted as text).`);
+          continue;
+        }
 
-        // Run contextual evidence extraction
         const extraction = await extractProjectEvidence(payload, {
           projectId,
           assignmentQuestion,
           citationStyle,
         });
 
-        // Ensure doc ID conforms to doc- prefix
-        const docWithStandardId: UploadedSourceDocument = {
+        newDocs.push({
           ...extraction.document,
           id: `doc-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`,
           name: file.name,
-        };
-
-        newDocs.push(docWithStandardId);
+        });
         allEvidenceItems.push(...extraction.evidenceItems);
-      } catch (err: any) {
+      } catch (err) {
         console.error("Error processing file:", err);
-        // Fallback basic document record with traceability
-        const fallbackDoc: UploadedSourceDocument = {
-          id: `doc-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`,
-          name: file.name,
-          fileSize: file.size,
-          uploadedAt: new Date().toISOString(),
-          mimeType: file.type || "application/octet-stream",
-          evidenceCount: 1,
-          extractedEvidences: [
-            {
-              id: `ev-${Date.now()}-${i}`,
-              excerpt: `Uploaded source material: ${file.name}`,
-              sourceLocation: "Document Root",
-              claim: `Evidentiary grounding from ${file.name}`,
-            },
-          ],
-          processingStatus: "extracted",
-        };
-        newDocs.push(fallbackDoc);
+        problems.push(`${file.name}: ${err instanceof Error && err.message ? err.message : "could not be read"}`);
       }
     }
+    setUploadProblems(problems);
 
     setIsProcessing(false);
     setProcessingStatusText("");
@@ -290,8 +184,8 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
       await onUpload([docWithStandardId], extraction.evidenceItems);
       setShowUrlModal(false);
       setUrlInput("");
-    } catch (err: any) {
-      setModalError(err.message || "Failed to parse URL");
+    } catch (err: unknown) {
+      setModalError(errorText(err) || "Failed to parse URL");
     } finally {
       setIsProcessing(false);
       setProcessingStatusText("");
@@ -329,8 +223,8 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
       setShowTextModal(false);
       setPastedTextTitle("");
       setPastedTextContent("");
-    } catch (err: any) {
-      setModalError(err.message || "Failed to parse text");
+    } catch (err: unknown) {
+      setModalError(errorText(err) || "Failed to parse text");
     } finally {
       setIsProcessing(false);
       setProcessingStatusText("");
@@ -375,6 +269,23 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
         data-testid="lecture-file-input"
       />
 
+      {uploadProblems.length > 0 && (
+        <div
+          role="alert"
+          data-testid="source-upload-problems"
+          className="flex items-start justify-between gap-3 rounded-xl border border-[color:var(--state-danger)]/30 bg-[color:var(--state-danger-subtle)] p-3 text-xs text-[color:var(--state-danger)]"
+        >
+          <ul className="space-y-1">
+            {uploadProblems.map((p) => (
+              <li key={p}>Not added: {p}</li>
+            ))}
+          </ul>
+          <button type="button" onClick={() => setUploadProblems([])} className="shrink-0 font-semibold underline cursor-pointer">
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* Initial Empty State Dropzone */}
       {!hasUploadedSources && (
         <div
@@ -383,30 +294,30 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
           onDrop={handleDrop}
           onClick={() => !isProcessing && fileInputRef.current?.click()}
           data-testid="lecture-upload-dropzone"
-          className={`border border-dashed border-neutral-200 dark:border-white/15 rounded-2xl p-8 text-center bg-neutral-50/50 dark:bg-white/[0.02] hover:bg-neutral-50 dark:hover:bg-white/[0.04] transition-colors cursor-pointer flex flex-col items-center justify-center gap-3 relative overflow-hidden ${
-            isDragOver ? "border-neutral-900 bg-neutral-100/80 dark:border-white dark:bg-white/10" : ""
+          className={`border border-dashed border-[color:var(--border-subtle)] rounded-2xl p-8 text-center bg-[color:var(--surface-inset)]/50 hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer flex flex-col items-center justify-center gap-3 relative overflow-hidden ${
+            isDragOver ? "border-neutral-900 bg-[color:var(--surface-inset)]/80 dark:border-white" : ""
           } ${isProcessing ? "pointer-events-none opacity-80" : ""}`}
         >
           {isProcessing ? (
             <div className="flex flex-col items-center gap-3 py-2">
-              <Loader2 className="w-7 h-7 text-neutral-900 dark:text-white animate-spin" />
+              <Loader2 className="w-7 h-7 text-[color:var(--text-primary)] animate-spin" />
               <div className="space-y-1">
-                <p className="text-xs font-semibold text-neutral-900 dark:text-white">
+                <p className="text-xs font-semibold text-[color:var(--text-primary)]">
                   Context-Aware Evidence Extraction in Progress
                 </p>
-                <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                <p className="text-xs text-[color:var(--text-muted)]">
                   {processingStatusText || "Analyzing source contents against your assignment requirements..."}
                 </p>
               </div>
             </div>
           ) : (
             <>
-              <div className="w-10 h-10 rounded-full bg-neutral-100 dark:bg-white/10 flex items-center justify-center text-neutral-500 dark:text-neutral-400">
+              <div className="w-10 h-10 rounded-full bg-[color:var(--surface-inset)] flex items-center justify-center text-[color:var(--text-muted)]">
                 <Upload className="w-4 h-4" />
               </div>
 
               <div className="space-y-1 max-w-md">
-                <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                <p className="text-xs text-[color:var(--text-muted)]">
                   Drop lecture slides, syllabus, or readings here, or browse files
                 </p>
                 <div className="flex items-center gap-2 pt-1 flex-wrap justify-center">
@@ -416,7 +327,7 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
                       e.stopPropagation();
                       fileInputRef.current?.click();
                     }}
-                    className="px-3.5 py-1.5 rounded-full border border-neutral-200 dark:border-white/15 bg-white dark:bg-neutral-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5"
+                    className="px-3.5 py-1.5 rounded-full border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] text-xs font-semibold text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5"
                   >
                     <FileUp className="w-3.5 h-3.5" />
                     <span>Browse Files</span>
@@ -427,7 +338,7 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
                       e.stopPropagation();
                       setShowUrlModal(true);
                     }}
-                    className="px-3.5 py-1.5 rounded-full border border-neutral-200 dark:border-white/15 bg-white dark:bg-neutral-800 text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5"
+                    className="px-3.5 py-1.5 rounded-full border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] text-xs font-semibold text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5"
                   >
                     <Globe className="w-3.5 h-3.5 text-sky-500" />
                     <span>+ Add Web Link</span>
@@ -438,7 +349,7 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
                       e.stopPropagation();
                       setShowTextModal(true);
                     }}
-                    className="px-3.5 py-1.5 rounded-full border border-neutral-200 dark:border-white/15 bg-white dark:bg-neutral-800 text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5"
+                    className="px-3.5 py-1.5 rounded-full border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] text-xs font-semibold text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5"
                   >
                     <FileCode className="w-3.5 h-3.5 text-emerald-500" />
                     <span>+ Paste Notes</span>
@@ -461,19 +372,19 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
             data-testid="lecture-upload-dropzone"
             className={`p-3 rounded-2xl border border-dashed transition-all flex flex-col sm:flex-row items-center justify-between gap-3 ${
               isDragOver
-                ? "border-neutral-900 bg-neutral-100 dark:border-white dark:bg-white/10"
-                : "border-neutral-200 dark:border-white/15 bg-neutral-50/60 dark:bg-white/[0.02]"
+                ? "border-neutral-900 bg-[color:var(--surface-inset)] dark:border-white"
+                : "border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]/60"
             }`}
           >
-            <div className="flex items-center gap-2.5 text-xs text-neutral-600 dark:text-neutral-300">
-              <div className="w-7 h-7 rounded-lg bg-neutral-200/70 dark:bg-white/10 flex items-center justify-center shrink-0">
-                <Upload className="w-3.5 h-3.5 text-neutral-700 dark:text-neutral-300" />
+            <div className="flex items-center gap-2.5 text-xs text-[color:var(--text-secondary)]">
+              <div className="w-7 h-7 rounded-lg bg-[color:var(--surface-sunken)]/70 flex items-center justify-center shrink-0">
+                <Upload className="w-3.5 h-3.5 text-[color:var(--text-secondary)]" />
               </div>
               <div>
-                <span className="font-semibold text-neutral-900 dark:text-white">
+                <span className="font-semibold text-[color:var(--text-primary)]">
                   Add more course material:
                 </span>{" "}
-                <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                <span className="text-xs text-[color:var(--text-muted)]">
                   Drop lecture slides, PDFs, datasets, or notes here
                 </span>
               </div>
@@ -484,7 +395,7 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isProcessing}
-                className="px-3.5 py-1.5 rounded-full border border-neutral-200 dark:border-white/15 bg-white dark:bg-neutral-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                className="px-3.5 py-1.5 rounded-full border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] text-xs font-semibold text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
               >
                 <FileUp className="w-3.5 h-3.5" />
                 <span>Browse Files</span>
@@ -493,7 +404,7 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
                 type="button"
                 onClick={() => setShowUrlModal(true)}
                 disabled={isProcessing}
-                className="px-3 py-1.5 rounded-full border border-neutral-200 dark:border-white/15 bg-white dark:bg-neutral-800 text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                className="px-3 py-1.5 rounded-full border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] text-xs font-semibold text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
               >
                 <Globe className="w-3.5 h-3.5 text-sky-500" />
                 <span>+ Web Link</span>
@@ -502,7 +413,7 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
                 type="button"
                 onClick={() => setShowTextModal(true)}
                 disabled={isProcessing}
-                className="px-3 py-1.5 rounded-full border border-neutral-200 dark:border-white/15 bg-white dark:bg-neutral-800 text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                className="px-3 py-1.5 rounded-full border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] text-xs font-semibold text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
               >
                 <FileCode className="w-3.5 h-3.5 text-emerald-500" />
                 <span>+ Notes</span>
@@ -512,11 +423,11 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
 
           {/* Processing Spinner Notification when uploading in background */}
           {isProcessing && (
-            <div className="p-3.5 rounded-2xl bg-neutral-900 text-white dark:bg-neutral-800 border border-neutral-700 flex items-center gap-3 animate-in fade-in duration-150">
+            <div className="p-3.5 rounded-2xl bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] border border-neutral-700 flex items-center gap-3 animate-in fade-in duration-150">
               <Loader2 className="w-4 h-4 text-emerald-400 animate-spin shrink-0" />
               <div className="text-xs space-y-0.5">
                 <p className="font-semibold text-white">Extracting & indexing source evidence...</p>
-                <p className="text-[11px] text-neutral-300">{processingStatusText}</p>
+                <p className="text-xs text-neutral-300">{processingStatusText}</p>
               </div>
             </div>
           )}
@@ -524,648 +435,25 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
           {/* Knowledge Panel Header */}
           <div className="flex items-center justify-between text-xs px-1 pt-1">
             <div className="flex items-center gap-2">
-              <span className="font-bold text-neutral-800 dark:text-neutral-200 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                <Layers className="w-3.5 h-3.5 text-neutral-500" />
-                <span>Uploaded Sources & Evidence Knowledge Panel</span>
+              <span className="font-bold text-[color:var(--text-primary)] uppercase tracking-wider text-xs flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-[color:var(--text-muted)]" />
+                <span>Your uploaded materials</span>
               </span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-300 font-mono">
+              <span className="text-xs px-2 py-0.5 rounded-full bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] font-mono">
                 {uploadedFiles.length} source{uploadedFiles.length === 1 ? "" : "s"}
               </span>
             </div>
 
-            <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Evidence Grounding Active</span>
-            </span>
+            <span className="text-xs text-[color:var(--text-muted)]">Used as evidence when you draft</span>
           </div>
 
-          {/* List of Uploaded Source Cards with 3-Layer Architecture */}
-          <div className="space-y-3.5">
-            {uploadedFiles.map((doc) => {
-              const isExpanded = expandedDocIds.has(doc.id);
-              const traceability = deriveSourceTraceability(doc, assignmentQuestion, citationStyle);
-              const currentTab = activeInspectTabs[doc.id] || "extracted";
-              const isCopied = copiedDocId === doc.id;
-
-              return (
-                <div
-                  key={doc.id}
-                  data-testid={`uploaded-file-${doc.id}`}
-                  className="rounded-2xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-750 p-4 sm:p-5 shadow-xs transition-all hover:border-neutral-300 dark:hover:border-white/20 space-y-4"
-                >
-                  {/* Top Card Identity Bar */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-neutral-100 dark:border-white/5">
-                    <div className="flex items-start sm:items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-xl bg-neutral-100 dark:bg-white/5 flex items-center justify-center shrink-0 border border-neutral-200/60 dark:border-white/10">
-                        <SourceTypeIcon type={doc.sourceType} />
-                      </div>
-
-                      <div className="min-w-0 space-y-0.5">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="text-sm font-bold text-neutral-900 dark:text-white truncate">
-                            {doc.name}
-                          </h3>
-                          <SourceFormatBadge type={doc.sourceType} />
-                          {/* Processed Status Badge */}
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                            <span>Processed</span>
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-neutral-400 dark:text-neutral-500 font-mono">
-                          {formatBytes(doc.fileSize)} · Uploaded {formatTimestamp(doc.uploadedAt)} · Successfully read by engine
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Action Controls */}
-                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-                      <button
-                        type="button"
-                        onClick={() => toggleExpand(doc.id)}
-                        className="px-3 py-1.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-white/5 hover:bg-neutral-100 dark:hover:bg-white/10 text-xs font-semibold text-neutral-700 dark:text-neutral-200 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                        aria-expanded={isExpanded}
-                      >
-                        <span>{isExpanded ? "Hide Details" : "Inspect Details"}</span>
-                        {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleCopyCitation(doc.id, doc.citation || traceability.citationsList[0] || doc.name)}
-                        className="p-2 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-white/5 hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-600 dark:text-neutral-300 transition-colors cursor-pointer"
-                        title="Copy citation reference"
-                        aria-label="Copy citation reference"
-                      >
-                        {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => onRemove(doc.id)}
-                        aria-label={`Remove ${doc.name}`}
-                        className="p-2 rounded-xl text-neutral-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer"
-                        title="Remove source from assignment"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* 3-Tier Layered Transparency Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    {/* Layer 1: Uploaded Material */}
-                    <div className="p-3.5 rounded-xl bg-neutral-50/80 dark:bg-white/[0.03] border border-neutral-200/60 dark:border-white/5 space-y-2 flex flex-col justify-between">
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 flex items-center gap-1">
-                            <FileText className="w-3 h-3 text-neutral-500" />
-                            <span>1. Uploaded Material</span>
-                          </span>
-                          <span className="text-[10px] font-mono text-neutral-400">Original</span>
-                        </div>
-                        <p className="text-xs font-bold text-neutral-900 dark:text-white truncate">
-                          {doc.name}
-                        </p>
-                        <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-snug">
-                          Original file provided by user. Stored as verified course grounding material.
-                        </p>
-                      </div>
-
-                      <div className="pt-1 flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-white dark:bg-white/10 border border-neutral-200/80 dark:border-white/10 text-neutral-600 dark:text-neutral-300 font-mono">
-                          {formatBytes(doc.fileSize)}
-                        </span>
-                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-medium border border-emerald-500/20">
-                          ✓ Processed
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Layer 2: Processed Material / Engine Extracted */}
-                    <div className="p-3.5 rounded-xl bg-blue-50/40 dark:bg-blue-950/15 border border-blue-200/60 dark:border-blue-500/20 space-y-2 flex flex-col justify-between">
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400 flex items-center gap-1">
-                            <Sparkles className="w-3 h-3 text-blue-500" />
-                            <span>2. Engine Extracted</span>
-                          </span>
-                          <span className="text-[10px] font-mono text-blue-600 dark:text-blue-300 bg-blue-500/10 px-1.5 py-0.5 rounded">
-                            {traceability.relevantEvidences.length} excerpts
-                          </span>
-                        </div>
-
-                        <ul className="text-[11px] text-neutral-700 dark:text-neutral-300 space-y-1">
-                          <li className="flex items-center gap-1.5">
-                            <CheckCircle2 className="w-3 h-3 text-blue-500 shrink-0" />
-                            <span><strong>Abstract:</strong> {traceability.abstract ? "Synthesized" : "Indexed"}</span>
-                          </li>
-                          <li className="flex items-center gap-1.5">
-                            <CheckCircle2 className="w-3 h-3 text-blue-500 shrink-0" />
-                            <span><strong>Key Findings:</strong> {traceability.keyFindings.length} identified</span>
-                          </li>
-                          <li className="flex items-center gap-1.5">
-                            <CheckCircle2 className="w-3 h-3 text-blue-500 shrink-0" />
-                            <span className="truncate"><strong>Methodology:</strong> {traceability.methodology.split("&")[0]}</span>
-                          </li>
-                          <li className="flex items-center gap-1.5">
-                            <CheckCircle2 className="w-3 h-3 text-blue-500 shrink-0" />
-                            <span><strong>Citations:</strong> References formatted</span>
-                          </li>
-                        </ul>
-                      </div>
-
-                      <div className="pt-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (!isExpanded) toggleExpand(doc.id);
-                            setInspectTab(doc.id, "extracted");
-                          }}
-                          className="text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
-                        >
-                          <span>Inspect extracted data</span>
-                          <ArrowRight className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Layer 3: Used Material / Evidence in Assignment */}
-                    <div className="p-3.5 rounded-xl bg-emerald-50/40 dark:bg-emerald-950/15 border border-emerald-200/60 dark:border-emerald-500/20 space-y-2 flex flex-col justify-between">
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
-                            <Target className="w-3 h-3 text-emerald-500" />
-                            <span>3. Used in Assignment</span>
-                          </span>
-                          <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded-full border border-emerald-500/25">
-                            Active
-                          </span>
-                        </div>
-
-                        <ul className="text-[11px] text-neutral-700 dark:text-neutral-300 space-y-1">
-                          <li className="flex items-center gap-1.5 font-medium text-emerald-900 dark:text-emerald-200">
-                            <CheckCheck className="w-3 h-3 text-emerald-500 shrink-0" />
-                            <span>{traceability.usedInAssignment.passagesCount} relevant passages</span>
-                          </li>
-                          <li className="flex items-center gap-1.5 font-medium text-emerald-900 dark:text-emerald-200">
-                            <CheckCheck className="w-3 h-3 text-emerald-500 shrink-0" />
-                            <span>{traceability.usedInAssignment.findingsCount} findings</span>
-                          </li>
-                          <li className="flex items-center gap-1.5 font-medium text-emerald-900 dark:text-emerald-200">
-                            <CheckCheck className="w-3 h-3 text-emerald-500 shrink-0" />
-                            <span>{traceability.usedInAssignment.citationsCount} citations</span>
-                          </li>
-                        </ul>
-                      </div>
-
-                      <div className="pt-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (!isExpanded) toggleExpand(doc.id);
-                            setInspectTab(doc.id, "used");
-                          }}
-                          className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
-                        >
-                          <span>View assignment usage</span>
-                          <ArrowRight className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Expanded Inspection Drawer */}
-                  {isExpanded && (
-                    <div className="pt-3 border-t border-neutral-200/60 dark:border-white/10 space-y-4 animate-in fade-in duration-150">
-                      {/* Sub-tab Navigation Switcher */}
-                      <div className="flex items-center gap-1 bg-neutral-100 dark:bg-white/5 p-1 rounded-xl w-fit">
-                        <button
-                          type="button"
-                          onClick={() => setInspectTab(doc.id, "extracted")}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
-                            currentTab === "extracted"
-                              ? "bg-white dark:bg-ink-500 text-neutral-900 dark:text-white shadow-xs font-semibold"
-                              : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-                          }`}
-                        >
-                          <Sparkles className="w-3.5 h-3.5 text-blue-500" />
-                          <span>Engine Extracted Material</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setInspectTab(doc.id, "used")}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
-                            currentTab === "used"
-                              ? "bg-white dark:bg-ink-500 text-neutral-900 dark:text-white shadow-xs font-semibold"
-                              : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-                          }`}
-                        >
-                          <Target className="w-3.5 h-3.5 text-emerald-500" />
-                          <span>Used in Assignment</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setInspectTab(doc.id, "original")}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
-                            currentTab === "original"
-                              ? "bg-white dark:bg-ink-500 text-neutral-900 dark:text-white shadow-xs font-semibold"
-                              : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-                          }`}
-                        >
-                          <FileText className="w-3.5 h-3.5 text-neutral-500" />
-                          <span>Original File & Citation</span>
-                        </button>
-                      </div>
-
-                      {/* Tab 1 Content: Engine Extracted Material */}
-                      {currentTab === "extracted" && (
-                        <div className="space-y-3.5">
-                          {/* Abstract / Overview */}
-                          <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/60 dark:border-white/5 space-y-1">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 flex items-center gap-1">
-                              <BookOpen className="w-3 h-3 text-neutral-400" />
-                              <span>Abstract & Source Overview</span>
-                            </span>
-                            <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed">
-                              {traceability.abstract}
-                            </p>
-                          </div>
-
-                          {/* Key Findings */}
-                          <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/60 dark:border-white/5 space-y-2">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 flex items-center gap-1">
-                              <ShieldCheck className="w-3 h-3 text-blue-500" />
-                              <span>Key Findings Extracted by Engine</span>
-                            </span>
-                            <div className="space-y-1.5">
-                              {traceability.keyFindings.map((finding, fIdx) => (
-                                <div
-                                  key={fIdx}
-                                  className="text-xs text-neutral-800 dark:text-neutral-200 flex items-start gap-2"
-                                >
-                                  <span className="w-4 h-4 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px] flex items-center justify-center font-bold shrink-0 mt-0.5">
-                                    {fIdx + 1}
-                                  </span>
-                                  <span className="leading-snug">{finding}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* Methodology and Dataset Summary */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div className="p-3 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/60 dark:border-white/5 space-y-1">
-                              <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-                                Methodology
-                              </span>
-                              <p className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">
-                                {traceability.methodology}
-                              </p>
-                            </div>
-
-                            {doc.structuredDataSummary ? (
-                              <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/15 space-y-1">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                                  <Table className="w-3 h-3" />
-                                  <span>Structured Data Summary</span>
-                                </span>
-                                <p className="text-xs text-emerald-900 dark:text-emerald-200 font-medium">
-                                  {doc.structuredDataSummary}
-                                </p>
-                              </div>
-                            ) : (
-                              <div className="p-3 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/60 dark:border-white/5 space-y-1">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-                                  Grounding Status
-                                </span>
-                                <p className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">
-                                  Context-Aligned & Verified
-                                </p>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Extracted Excerpts with Precise Locators */}
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between text-[11px] font-semibold text-neutral-500 dark:text-neutral-400">
-                              <span className="flex items-center gap-1">
-                                <Quote className="w-3 h-3 text-neutral-400" />
-                                <span>Extracted Relevant Evidence Excerpts ({traceability.relevantEvidences.length})</span>
-                              </span>
-                              <span className="text-[10px] font-mono text-neutral-400">
-                                Exact Page / Slide Locators
-                              </span>
-                            </div>
-
-                            <div className="space-y-2">
-                              {traceability.relevantEvidences.map((ev, eIdx) => (
-                                <div
-                                  key={ev.id || eIdx}
-                                  className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-900/80 border border-neutral-200/60 dark:border-neutral-800 text-xs space-y-1.5"
-                                >
-                                  <div className="flex items-center justify-between gap-2">
-                                    <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-                                      📍 {ev.sourceLocation || `Excerpt ${eIdx + 1}`}
-                                    </span>
-                                    {ev.claim && (
-                                      <span className="text-[10px] text-neutral-500 dark:text-neutral-400 truncate max-w-sm">
-                                        {ev.claim}
-                                      </span>
-                                    )}
-                                  </div>
-
-                                  <p className="font-medium text-neutral-900 dark:text-neutral-100 text-xs leading-relaxed italic">
-                                    "{ev.excerpt}"
-                                  </p>
-
-                                  {ev.context && ev.context !== ev.excerpt && (
-                                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-normal">
-                                      <span className="font-semibold text-neutral-600 dark:text-neutral-300">Context: </span>
-                                      {ev.context}
-                                    </p>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Tab 2 Content: Used in Assignment */}
-                      {currentTab === "used" && (
-                        <div className="space-y-3.5">
-                          {/* Summary Banner */}
-                          <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-950 dark:text-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                            <div>
-                              <span className="font-bold">Active Assignment Grounding:</span> This material provides{" "}
-                              <strong>{traceability.usedInAssignment.passagesCount} specific passages</strong> and{" "}
-                              <strong>{traceability.usedInAssignment.findingsCount} findings</strong> grounding your assignment analysis.
-                            </div>
-                            <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-mono font-semibold shrink-0">
-                              Phase 3 Active
-                            </span>
-                          </div>
-
-                          {/* Passages Mapped to Sections */}
-                          <div className="space-y-2">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 flex items-center gap-1">
-                              <Target className="w-3 h-3 text-emerald-500" />
-                              <span>Passages Mapped into Assignment Sections</span>
-                            </span>
-
-                            <div className="space-y-2">
-                              {traceability.usedInAssignment.passages.map((p, pIdx) => (
-                                <div
-                                  key={pIdx}
-                                  className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-900/80 border border-neutral-200/60 dark:border-neutral-800 text-xs space-y-1.5"
-                                >
-                                  <div className="flex items-center justify-between gap-2">
-                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
-                                      Section: {p.targetSection}
-                                    </span>
-                                    <span className="text-[10px] font-mono text-neutral-400">
-                                      📍 {p.location}
-                                    </span>
-                                  </div>
-                                  <p className="font-medium text-neutral-900 dark:text-neutral-100 text-xs italic">
-                                    "{p.text}"
-                                  </p>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* Citations Generated for Assignment */}
-                          <div className="space-y-2 pt-1">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 flex items-center gap-1">
-                              <Quote className="w-3 h-3 text-purple-500" />
-                              <span>Assignment In-Text & Reference Citations</span>
-                            </span>
-
-                            <div className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-900/80 border border-neutral-200/60 dark:border-neutral-800 text-xs space-y-2">
-                              <div className="flex items-center justify-between gap-2">
-                                <div>
-                                  <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
-                                    In-Text Citation Format
-                                  </span>
-                                  <p className="font-mono text-neutral-800 dark:text-neutral-200 mt-0.5">
-                                    {traceability.citationsList[1] || `(${doc.name}, 2024)`}
-                                  </p>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => handleCopyCitation(doc.id + "-intext", traceability.citationsList[1] || `(${doc.name}, 2024)`)}
-                                  className="px-2.5 py-1 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-[11px] font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 transition-colors flex items-center gap-1 cursor-pointer"
-                                >
-                                  {copiedDocId === doc.id + "-intext" ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-                                  <span>{copiedDocId === doc.id + "-intext" ? "Copied" : "Copy"}</span>
-                                </button>
-                              </div>
-
-                              <div className="pt-2 border-t border-neutral-200/50 dark:border-white/5 flex items-center justify-between gap-2">
-                                <div>
-                                  <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
-                                    Full Reference ({citationStyle})
-                                  </span>
-                                  <p className="font-serif italic text-neutral-800 dark:text-neutral-200 mt-0.5">
-                                    {doc.citation || traceability.citationsList[0]}
-                                  </p>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => handleCopyCitation(doc.id, doc.citation || traceability.citationsList[0])}
-                                  className="px-2.5 py-1 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-[11px] font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 transition-colors flex items-center gap-1 cursor-pointer shrink-0"
-                                >
-                                  {isCopied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-                                  <span>{isCopied ? "Copied" : "Copy"}</span>
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Tab 3 Content: Original File Details */}
-                      {currentTab === "original" && (
-                        <div className="space-y-3">
-                          <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/60 dark:border-white/5 space-y-2 text-xs">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              <div>
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-                                  File Name
-                                </span>
-                                <p className="font-mono text-neutral-800 dark:text-neutral-200 truncate mt-0.5">
-                                  {doc.name}
-                                </p>
-                              </div>
-                              <div>
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-                                  Format & MIME
-                                </span>
-                                <p className="font-mono text-neutral-800 dark:text-neutral-200 mt-0.5">
-                                  {(doc.sourceType || "other").toUpperCase()} · {doc.mimeType || "application/octet-stream"}
-                                </p>
-                              </div>
-                              <div>
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-                                  File Size
-                                </span>
-                                <p className="font-mono text-neutral-800 dark:text-neutral-200 mt-0.5">
-                                  {formatBytes(doc.fileSize)}
-                                </p>
-                              </div>
-                              <div>
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-                                  Uploaded Timestamp
-                                </span>
-                                <p className="font-mono text-neutral-800 dark:text-neutral-200 mt-0.5">
-                                  {doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleString() : "Recently"}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center justify-between text-xs pt-1">
-                            <span className="text-neutral-500 dark:text-neutral-400">
-                              Need to remove this course grounding source?
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => onRemove(doc.id)}
-                              className="px-3 py-1.5 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 transition-colors font-medium cursor-pointer flex items-center gap-1.5"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span>Remove from Assignment</span>
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          <UploadedSourcesList activeInspectTabs={activeInspectTabs} assignmentQuestion={assignmentQuestion} citationStyle={citationStyle} copiedDocId={copiedDocId} expandedDocIds={expandedDocIds} handleCopyCitation={handleCopyCitation} onRemove={onRemove} setInspectTab={setInspectTab} toggleExpand={toggleExpand} uploadedFiles={uploadedFiles} />
         </div>
       )}
 
-      {/* Web Link Modal */}
-      {showUrlModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="w-full max-w-md bg-white dark:bg-ink-750 rounded-3xl p-6 shadow-2xl border border-neutral-200 dark:border-neutral-800 text-left">
-            <div className="flex items-center gap-2 mb-2">
-              <Globe className="w-4 h-4 text-sky-500" />
-              <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
-                Add Web Link / Academic Article URL
-              </h3>
-            </div>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-4 leading-relaxed">
-              Enter any accessible article, institutional report, or reading page. We will fetch and extract only the assignment-relevant excerpts with citation references.
-            </p>
+      <UploadWebLinkModal handleUrlSubmit={handleUrlSubmit} isProcessing={isProcessing} modalError={modalError} setShowUrlModal={setShowUrlModal} setUrlInput={setUrlInput} showUrlModal={showUrlModal} urlInput={urlInput} />
 
-            <form onSubmit={handleUrlSubmit} className="space-y-4">
-              <div>
-                <input
-                  type="url"
-                  placeholder="https://example.edu/article or research report..."
-                  value={urlInput}
-                  onChange={(e) => setUrlInput(e.target.value)}
-                  required
-                  autoFocus
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 text-xs text-neutral-900 dark:text-white placeholder:text-neutral-400 outline-none focus:ring-2 focus:ring-sky-500/20"
-                />
-              </div>
-
-              {modalError && (
-                <p className="text-xs text-rose-500 font-medium">{modalError}</p>
-              )}
-
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowUrlModal(false)}
-                  className="px-4 py-2 rounded-full text-xs font-semibold text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isProcessing || !urlInput.trim()}
-                  className="px-4 py-2 rounded-full text-xs font-semibold bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
-                >
-                  {isProcessing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                  <span>Extract Evidence</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Paste Text Modal */}
-      {showTextModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="w-full max-w-lg bg-white dark:bg-ink-750 rounded-3xl p-6 shadow-2xl border border-neutral-200 dark:border-neutral-800 text-left">
-            <div className="flex items-center gap-2 mb-2">
-              <FileCode className="w-4 h-4 text-slate-500" />
-              <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
-                Paste Lecture Notes or Syllabus Excerpt
-              </h3>
-            </div>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-4 leading-relaxed">
-              Paste passages from lecture slides, assigned reading packs, or rubric rubrics. Only excerpts relevant to the assignment will be stored.
-            </p>
-
-            <form onSubmit={handleTextSubmit} className="space-y-3">
-              <div>
-                <input
-                  type="text"
-                  placeholder="Note Title / Lecture Title (e.g. Week 4: China's Foreign Policy)..."
-                  value={pastedTextTitle}
-                  onChange={(e) => setPastedTextTitle(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 text-xs text-neutral-900 dark:text-white placeholder:text-neutral-400 outline-none focus:ring-2 focus:ring-neutral-400"
-                />
-              </div>
-
-              <div>
-                <textarea
-                  rows={6}
-                  placeholder="Paste lecture content, slide points, or reading notes here..."
-                  value={pastedTextContent}
-                  onChange={(e) => setPastedTextContent(e.target.value)}
-                  required
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 text-xs text-neutral-900 dark:text-white placeholder:text-neutral-400 outline-none focus:ring-2 focus:ring-neutral-400 resize-none font-sans"
-                />
-              </div>
-
-              {modalError && (
-                <p className="text-xs text-rose-500 font-medium">{modalError}</p>
-              )}
-
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowTextModal(false)}
-                  className="px-4 py-2 rounded-full text-xs font-semibold text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isProcessing || !pastedTextContent.trim()}
-                  className="px-4 py-2 rounded-full text-xs font-semibold bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
-                >
-                  {isProcessing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                  <span>Extract Evidence</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <UploadPasteTextModal handleTextSubmit={handleTextSubmit} isProcessing={isProcessing} modalError={modalError} pastedTextContent={pastedTextContent} pastedTextTitle={pastedTextTitle} setPastedTextContent={setPastedTextContent} setPastedTextTitle={setPastedTextTitle} setShowTextModal={setShowTextModal} showTextModal={showTextModal} />
     </div>
   );
 };

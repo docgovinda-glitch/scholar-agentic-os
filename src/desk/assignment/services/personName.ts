@@ -46,3 +46,24 @@ export function parsePersonName(raw: string): ParsedPersonName {
     .replace(/ -/g, "-");
   return { family, given, initials, etAl };
 }
+
+/**
+ * Split a typed author list into one string per person. Semicolons separate
+ * people when present; otherwise commas do, except that a part made only of
+ * initials ("M. A.") belongs to the family name before it, so
+ * "Nielsen, M. A., Chuang, I. L." is two people, not four. "and" / "&" also
+ * separate people.
+ */
+export function splitAuthorList(text: string): string[] {
+  const raw = (text || "").replace(/\s+(?:and|&)\s+/gi, text.includes(";") ? "; " : ", ").trim();
+  if (!raw) return [];
+  if (raw.includes(";")) return raw.split(";").map((a) => a.trim()).filter(Boolean);
+  const parts = raw.split(",").map((a) => a.trim()).filter(Boolean);
+  const initialsOnly = /^(?:[A-Z]\.?(?:-[A-Z]\.?)?\s*)+$/;
+  const out: string[] = [];
+  for (const part of parts) {
+    if (out.length && initialsOnly.test(part) && !out[out.length - 1].includes(",")) out[out.length - 1] = `${out[out.length - 1]}, ${part}`;
+    else out.push(part);
+  }
+  return out;
+}

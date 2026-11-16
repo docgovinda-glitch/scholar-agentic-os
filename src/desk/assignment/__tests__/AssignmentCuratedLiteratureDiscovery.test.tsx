@@ -255,6 +255,28 @@ describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
     });
   });
 
+  describe("4b. Removing a source the draft cites", () => {
+    it("warns which section still cites a source that is un-approved", async () => {
+      const family = String(firstSource.authors[0]).split(",")[0].trim().split(/\s+/).pop()!;
+      const base = await getProject();
+      getProject.mockResolvedValue({
+        ...base,
+        answers: {
+          ...base.answers,
+          approved_source_ids: [firstSource.id],
+          assignment_internal_sections: JSON.stringify([
+            { id: "sec-1", title: "Due process", draftContent: `Review matters (${family}, ${String(firstSource.year).slice(0, 4)}).` },
+          ]),
+        },
+      });
+      render(<AssignmentWorkspace projectId="proj-lit-1" initialStage="sources" onStageChange={vi.fn()} />);
+      expect(await screen.findByText(/Sources & Course Materials/i, undefined, { timeout: 5000 })).toBeInTheDocument();
+      // The approved card's "Remove" un-approves the source: the draft's citation now dangles.
+      fireEvent.click(screen.getAllByRole("button", { name: `Remove ${firstSource.title}` })[0]);
+      expect(await screen.findByTestId("sources-notice")).toHaveTextContent(/Un-approved .*still cites it in "Due process": approve it again/);
+    });
+  });
+
   describe("5. Search, Filtering, and Bookmarking", () => {
     it("filters sources via the search input in real time", async () => {
       render(
