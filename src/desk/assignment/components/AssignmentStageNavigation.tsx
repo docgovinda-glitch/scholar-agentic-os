@@ -118,6 +118,7 @@ export default function AssignmentStageNavigation({
                   onSelectStage?.();
                 }}
                 aria-label={`Phase ${phase.number}: ${phase.shortLabel}`}
+                title={fact ? `${phase.shortLabel}: ${fact}` : phase.shortLabel}
                 ref={isActive ? activeStepRef : undefined}
                 aria-current={isActive ? "step" : undefined}
                 className={`group flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all shrink-0 cursor-pointer ${
@@ -150,11 +151,8 @@ export default function AssignmentStageNavigation({
                 <div className="flex items-center gap-1.5 truncate max-w-[130px] sm:max-w-none">
                   <span className="truncate">{phase.shortLabel}</span>
                   {isCompleted && <Check className="w-3 h-3 stroke-[2.5] shrink-0" aria-label="done" />}
-                  {fact && (
-                    <span className={`hidden md:inline text-xs tabular-nums ${isActive ? "opacity-90" : "opacity-70"}`}>
-                      {fact}
-                    </span>
-                  )}
+                  {/* The current stage shows its fact; the others keep it in their tooltip, so the bar fits. */}
+                  {fact && isActive && <span className="hidden md:inline text-xs tabular-nums opacity-90">{fact}</span>}
                 </div>
 
                 {/* Active Pulse Dot */}

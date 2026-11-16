@@ -886,7 +886,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                 type="button"
                 onClick={() => setParseNotice(null)}
                 aria-label="Dismiss notice"
-                className="text-xs font-semibold hover:underline"
+                className="py-1 text-xs font-semibold hover:underline"
               >
                 Dismiss
               </button>

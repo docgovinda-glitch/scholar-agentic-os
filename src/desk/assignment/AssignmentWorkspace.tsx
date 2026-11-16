@@ -365,7 +365,7 @@ function AssignmentWorkspaceInner({
                   type="button"
                   data-testid="mobile-tutor-close"
                   onClick={() => setTutorPanelOpen(false)}
-                  className="p-1 rounded text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer"
+                  className="p-1.5 rounded text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer"
                   aria-label="Close AI Tutor Drawer"
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

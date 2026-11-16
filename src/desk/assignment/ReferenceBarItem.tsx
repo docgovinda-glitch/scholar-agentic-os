@@ -322,7 +322,7 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
             onClick={handleRemoveOrDismiss}
             aria-label={isApproved ? `Remove ${source.title}` : `Dismiss ${source.title}`}
             title={isApproved ? "Remove from approved references" : "Dismiss source"}
-            className="p-1 rounded-lg text-[color:var(--text-muted)] hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-[color:var(--text-muted)] hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-colors cursor-pointer"
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -343,7 +343,7 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
             <button
               type="button"
               onClick={() => setIsEditing(false)}
-              className="p-1 rounded-md text-[color:var(--text-muted)] hover:text-neutral-700 dark:hover:text-neutral-200 cursor-pointer"
+              className="p-1.5 rounded-md text-[color:var(--text-muted)] hover:text-neutral-700 dark:hover:text-neutral-200 cursor-pointer"
             >
               <X className="w-3 h-3" />
             </button>
@@ -444,7 +444,7 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
               <button
                 type="button"
                 onClick={() => setShowEvidences(!showEvidences)}
-                className="text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] flex items-center gap-1.5 cursor-pointer transition-colors"
+                className="py-1 text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] flex items-center gap-1.5 cursor-pointer transition-colors"
               >
                 <Quote className="w-3 h-3 text-[color:var(--text-muted)]" />
                 <span>Extracted Content & Used References ({evidences.length})</span>

@@ -156,7 +156,7 @@ export function SubQuestionsCard({ briefText, fallbackQuestions = [], totalWords
                   onClick={() => setEditingWordsId(row.id)}
                   title="Click to set your own word count"
                   aria-label={`Edit words for ${row.label}`}
-                  className="shrink-0 font-mono text-xs text-emerald-700 dark:text-emerald-300 whitespace-nowrap hover:underline cursor-pointer"
+                  className="py-1 shrink-0 font-mono text-xs text-emerald-700 dark:text-emerald-300 whitespace-nowrap hover:underline cursor-pointer"
                 >
                   ~{(budget?.words ?? 0).toLocaleString()} words
                 </button>
@@ -172,11 +172,11 @@ export function SubQuestionsCard({ briefText, fallbackQuestions = [], totalWords
                         update(rows.map((r) => (r.id === row.id ? { ...r, text: draft.trim() } : r)));
                         setEditingId(null);
                       }}
-                      className="p-1 rounded hover:bg-[color:var(--surface-hover)] cursor-pointer"
+                      className="p-1.5 rounded hover:bg-[color:var(--surface-hover)] cursor-pointer"
                     >
                       <Check className="w-3.5 h-3.5" />
                     </button>
-                    <button type="button" aria-label="Cancel edit" onClick={() => setEditingId(null)} className="p-1 rounded hover:bg-[color:var(--surface-hover)] cursor-pointer">
+                    <button type="button" aria-label="Cancel edit" onClick={() => setEditingId(null)} className="p-1.5 rounded hover:bg-[color:var(--surface-hover)] cursor-pointer">
                       <X className="w-3.5 h-3.5" />
                     </button>
                   </>
@@ -189,7 +189,7 @@ export function SubQuestionsCard({ briefText, fallbackQuestions = [], totalWords
                         setDraft(row.text);
                         setEditingId(row.id);
                       }}
-                      className="p-1 rounded hover:bg-[color:var(--surface-hover)] cursor-pointer"
+                      className="p-1.5 rounded hover:bg-[color:var(--surface-hover)] cursor-pointer"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
@@ -203,7 +203,7 @@ export function SubQuestionsCard({ briefText, fallbackQuestions = [], totalWords
                         });
                         update(rows.filter((r) => r.id !== row.id));
                       }}
-                      className="p-1 rounded hover:bg-[color:var(--surface-hover)] cursor-pointer"
+                      className="p-1.5 rounded hover:bg-[color:var(--surface-hover)] cursor-pointer"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -231,7 +231,7 @@ export function GradingCriteriaCard({ briefText, rubricText }: { briefText: stri
             <tr className="text-xs uppercase tracking-wider text-[color:var(--text-muted)]">
               <th scope="col" className="py-1.5 pr-3 font-semibold">Criterion</th>
               <th scope="col" className="py-1.5 pr-3 font-semibold whitespace-nowrap">Weight % / Marks</th>
-              <th scope="col" className="py-1.5 font-semibold">Plain-English expectation for a 1st</th>
+              <th scope="col" className="py-1.5 font-semibold">In plain English</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[color:var(--border-subtle)] text-[color:var(--text-primary)]">

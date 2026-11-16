@@ -1053,7 +1053,7 @@ export default function AssignmentUnderstandStage({
                   if (onBack) onBack();
                   else if (setPhase) setPhase("extract");
                 }}
-                className="text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                className="py-1 text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-colors cursor-pointer inline-flex items-center gap-1.5"
               >
                 <span>← Back to Phase 1: Extract</span>
               </button>

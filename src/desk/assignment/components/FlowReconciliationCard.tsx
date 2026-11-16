@@ -32,7 +32,7 @@ export function FlowReconciliationCard({ audit, onReRunAudit, isAuditing }: Flow
           </div>
         </div>
         <div className="flex flex-col items-end">
-          <span className="text-xs font-semibold text-[color:var(--text-muted)] mb-0.5">To look at</span>
+          <span className="text-xs font-semibold text-[color:var(--text-muted)] mb-0.5 whitespace-nowrap">To look at</span>
           <span className={`text-xl font-bold tabular-nums ${hasIssues ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`} data-testid="flow-issue-count">
             {audit.issues.length}
           </span>

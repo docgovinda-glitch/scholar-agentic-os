@@ -595,7 +595,7 @@ export const SectionAnalysisWorkspace: React.FC<SectionAnalysisWorkspaceProps> =
                           <button
                             type="button"
                             onClick={() => setTraceabilityItem({ synthesis: card, source: matchedSource })}
-                            className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer flex items-center gap-1"
+                            className="py-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer flex items-center gap-1"
                           >
                             <span>Trace to Source</span>
                             <ChevronRight className="w-3 h-3" />
@@ -645,7 +645,7 @@ export const SectionAnalysisWorkspace: React.FC<SectionAnalysisWorkspaceProps> =
               <button
                 type="button"
                 onClick={() => setTraceabilityItem(null)}
-                className="p-1 rounded-lg text-[color:var(--text-muted)] hover:text-neutral-700 dark:hover:text-neutral-200 cursor-pointer"
+                className="p-1.5 rounded-lg text-[color:var(--text-muted)] hover:text-neutral-700 dark:hover:text-neutral-200 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>

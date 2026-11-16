@@ -78,7 +78,7 @@ export function StructureHeadingCard({ expandedBlueprintHeadings, expandedBluepr
                         <button
                           type="button"
                           onClick={() => handleAdjustHeadingWords(heading.id, -50)}
-                          className="px-1.5 py-0.5 text-xs font-mono font-semibold rounded hover:bg-[color:var(--surface-hover)] text-[color:var(--text-secondary)] transition-colors cursor-pointer"
+                          className="px-1.5 py-1 text-xs font-mono font-semibold rounded hover:bg-[color:var(--surface-hover)] text-[color:var(--text-secondary)] transition-colors cursor-pointer"
                           title="Decrease section word budget by 50 words"
                           aria-label={`Decrease section ${heading.number} word count by 50`}
                         >
@@ -103,7 +103,7 @@ export function StructureHeadingCard({ expandedBlueprintHeadings, expandedBluepr
                         <button
                           type="button"
                           onClick={() => handleAdjustHeadingWords(heading.id, 50)}
-                          className="px-1.5 py-0.5 text-xs font-mono font-semibold rounded hover:bg-[color:var(--surface-hover)] text-[color:var(--text-secondary)] transition-colors cursor-pointer"
+                          className="px-1.5 py-1 text-xs font-mono font-semibold rounded hover:bg-[color:var(--surface-hover)] text-[color:var(--text-secondary)] transition-colors cursor-pointer"
                           title="Increase section word budget by 50 words"
                           aria-label={`Increase section ${heading.number} word count by 50`}
                         >
@@ -128,7 +128,7 @@ export function StructureHeadingCard({ expandedBlueprintHeadings, expandedBluepr
                           onClick={() => handleMoveHeading(hIdx, hIdx - 1)}
                           disabled={hIdx === 0}
                           title="Move heading up"
-                          className="p-1 rounded hover:text-neutral-700 dark:hover:text-white hover:bg-[color:var(--surface-hover)] disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
+                          className="p-1.5 min-w-6 min-h-6 inline-flex items-center justify-center rounded hover:text-neutral-700 dark:hover:text-white hover:bg-[color:var(--surface-hover)] disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
                         >
                           <ArrowUp className="w-3 h-3" />
                         </button>
@@ -137,7 +137,7 @@ export function StructureHeadingCard({ expandedBlueprintHeadings, expandedBluepr
                           onClick={() => handleMoveHeading(hIdx, hIdx + 1)}
                           disabled={hIdx === structure.headings.length - 1}
                           title="Move heading down"
-                          className="p-1 rounded hover:text-neutral-700 dark:hover:text-white hover:bg-[color:var(--surface-hover)] disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
+                          className="p-1.5 min-w-6 min-h-6 inline-flex items-center justify-center rounded hover:text-neutral-700 dark:hover:text-white hover:bg-[color:var(--surface-hover)] disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
                         >
                           <ArrowDown className="w-3 h-3" />
                         </button>
@@ -181,7 +181,7 @@ export function StructureHeadingCard({ expandedBlueprintHeadings, expandedBluepr
                         <button
                           type="button"
                           onClick={() => handleDeleteHeading(heading.id)}
-                          className="p-1 text-[color:var(--text-muted)] hover:text-rose-500 hover:bg-rose-500/10 rounded transition-colors cursor-pointer"
+                          className="p-1.5 text-[color:var(--text-muted)] hover:text-rose-500 hover:bg-rose-500/10 rounded transition-colors cursor-pointer"
                           title="Delete main heading"
                           aria-label={`Delete heading ${heading.title}`}
                         >
@@ -381,7 +381,7 @@ export function StructureHeadingCard({ expandedBlueprintHeadings, expandedBluepr
                                   onClick={() => handleMoveSubheading(heading.id, sIdx, sIdx - 1)}
                                   disabled={sIdx === 0}
                                   title="Move subheading up"
-                                  className="p-1 rounded hover:text-neutral-700 dark:hover:text-white hover:bg-[color:var(--surface-hover)] disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
+                                  className="p-1.5 min-w-6 min-h-6 inline-flex items-center justify-center rounded hover:text-neutral-700 dark:hover:text-white hover:bg-[color:var(--surface-hover)] disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
                                 >
                                   <ArrowUp className="w-2.5 h-2.5" />
                                 </button>
@@ -390,7 +390,7 @@ export function StructureHeadingCard({ expandedBlueprintHeadings, expandedBluepr
                                   onClick={() => handleMoveSubheading(heading.id, sIdx, sIdx + 1)}
                                   disabled={sIdx === heading.subheadings.length - 1}
                                   title="Move subheading down"
-                                  className="p-1 rounded hover:text-neutral-700 dark:hover:text-white hover:bg-[color:var(--surface-hover)] disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
+                                  className="p-1.5 min-w-6 min-h-6 inline-flex items-center justify-center rounded hover:text-neutral-700 dark:hover:text-white hover:bg-[color:var(--surface-hover)] disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
                                 >
                                   <ArrowDown className="w-2.5 h-2.5" />
                                 </button>
@@ -400,7 +400,7 @@ export function StructureHeadingCard({ expandedBlueprintHeadings, expandedBluepr
                               <button
                                 type="button"
                                 onClick={() => toggleSubheadingBlueprint(sub.id)}
-                                className={`p-1 rounded text-xs transition-colors cursor-pointer ml-0.5 ${
+                                className={`p-1 min-w-6 min-h-6 inline-flex items-center justify-center rounded text-xs transition-colors cursor-pointer ml-0.5 ${
                                   expandedBlueprintSubheadings[sub.id]
                                     ? "text-indigo-600 dark:text-indigo-400 bg-indigo-500/10"
                                     : "text-[color:var(--text-muted)] hover:text-indigo-600 dark:hover:text-indigo-400"
@@ -415,7 +415,7 @@ export function StructureHeadingCard({ expandedBlueprintHeadings, expandedBluepr
                               <button
                                 type="button"
                                 onClick={() => toggleNotes(sub.id)}
-                                className={`p-1 rounded text-xs transition-colors cursor-pointer ml-0.5 ${
+                                className={`p-1 min-w-6 min-h-6 inline-flex items-center justify-center rounded text-xs transition-colors cursor-pointer ml-0.5 ${
                                   sub.notes || isNotesOpen
                                     ? "text-blue-600 dark:text-blue-400 bg-blue-500/10"
                                     : "text-[color:var(--text-muted)] hover:text-neutral-700 dark:hover:text-neutral-200"
@@ -430,7 +430,7 @@ export function StructureHeadingCard({ expandedBlueprintHeadings, expandedBluepr
                                 type="button"
                                 onClick={() => handleDeleteSubheading(sub.id)}
                                 disabled={heading.subheadings.length <= 1}
-                                className="p-1 text-[color:var(--text-muted)] hover:text-rose-500 hover:bg-rose-500/10 rounded transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-neutral-400"
+                                className="p-1.5 text-[color:var(--text-muted)] hover:text-rose-500 hover:bg-rose-500/10 rounded transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-neutral-400"
                                 title={heading.subheadings.length <= 1 ? "A section needs at least one part; delete the section instead" : "Delete subheading"}
                                 aria-label={`Delete subheading ${sub.title}`}
                               >

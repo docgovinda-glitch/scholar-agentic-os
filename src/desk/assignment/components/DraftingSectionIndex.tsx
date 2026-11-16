@@ -183,7 +183,7 @@ export function DraftingSectionIndex({
                       }
                       setEditingSectionId(null);
                     }}
-                    className="p-1 rounded bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 shrink-0 cursor-pointer"
+                    className="p-1.5 rounded bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 shrink-0 cursor-pointer"
                     title="Save title"
                   >
                     <Check className="w-3 h-3" />
@@ -191,7 +191,7 @@ export function DraftingSectionIndex({
                   <button
                     type="button"
                     onClick={() => setEditingSectionId(null)}
-                    className="p-1 rounded hover:bg-[color:var(--surface-hover)] text-[color:var(--text-muted)] shrink-0 cursor-pointer"
+                    className="p-1.5 rounded hover:bg-[color:var(--surface-hover)] text-[color:var(--text-muted)] shrink-0 cursor-pointer"
                     title="Cancel"
                   >
                     <X className="w-3 h-3" />

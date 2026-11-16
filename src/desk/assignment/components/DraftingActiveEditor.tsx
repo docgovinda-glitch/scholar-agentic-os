@@ -672,7 +672,7 @@ export function DraftingActiveEditor({
             <button
               type="button"
               onClick={() => setInspectedCitation(null)}
-              className="p-1 rounded text-blue-700 dark:text-blue-300 hover:bg-blue-200/60 dark:hover:bg-blue-900/40 transition-colors cursor-pointer"
+              className="p-1.5 rounded text-blue-700 dark:text-blue-300 hover:bg-blue-200/60 dark:hover:bg-blue-900/40 transition-colors cursor-pointer"
               title="Close inspection"
             >
               <X className="w-3.5 h-3.5" />

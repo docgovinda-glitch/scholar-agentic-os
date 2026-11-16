@@ -172,7 +172,7 @@ export function UploadedSourcesList({ activeInspectTabs, assignmentQuestion, cit
                             if (!isExpanded) toggleExpand(doc.id);
                             setInspectTab(doc.id, "extracted");
                           }}
-                          className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
+                          className="py-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
                         >
                           <span>Inspect extracted data</span>
                           <ArrowRight className="w-3 h-3" />
@@ -216,7 +216,7 @@ export function UploadedSourcesList({ activeInspectTabs, assignmentQuestion, cit
                             if (!isExpanded) toggleExpand(doc.id);
                             setInspectTab(doc.id, "used");
                           }}
-                          className="text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
+                          className="py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
                         >
                           <span>View assignment usage</span>
                           <ArrowRight className="w-3 h-3" />

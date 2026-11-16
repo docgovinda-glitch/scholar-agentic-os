@@ -30,7 +30,7 @@ export function SourcesCustomReferenceForm({ customForm, handleAddCustomSource, 
                   <button
                     type="button"
                     onClick={() => setIsAddingCustom(false)}
-                    className="p-1 rounded-lg text-[color:var(--text-muted)] hover:text-neutral-600 dark:hover:text-neutral-200 cursor-pointer"
+                    className="p-1.5 rounded-lg text-[color:var(--text-muted)] hover:text-neutral-600 dark:hover:text-neutral-200 cursor-pointer"
                   >
                     <X className="w-4 h-4" />
                   </button>

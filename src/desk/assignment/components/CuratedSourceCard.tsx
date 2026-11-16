@@ -238,7 +238,7 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
               <button
                 type="button"
                 onClick={() => setShowSubheadingPicker(!showSubheadingPicker)}
-                className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline cursor-pointer flex items-center gap-0.5"
+                className="py-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline cursor-pointer flex items-center gap-0.5"
               >
                 <span>{showSubheadingPicker ? "Done" : "Assign"}</span>
                 <ChevronDown className="w-3 h-3" />
@@ -309,7 +309,7 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
             <button
               type="button"
               onClick={() => setShowNotesEditor(!showNotesEditor)}
-              className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+              className="py-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
             >
               {source.userNotes ? "Edit Note" : "+ Add Note"}
             </button>
@@ -365,7 +365,7 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
               <button
                 type="button"
                 onClick={() => setShowEvidences(!showEvidences)}
-                className="text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] flex items-center gap-1.5 cursor-pointer transition-colors"
+                className="py-1 text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] flex items-center gap-1.5 cursor-pointer transition-colors"
               >
                 <Quote className="w-3 h-3 text-blue-500" />
                 <span>Extracted Content & Used References ({evidences.length})</span>
@@ -413,7 +413,7 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
             <button
               type="button"
               onClick={() => setShowAbstract(!showAbstract)}
-              className="text-xs font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] flex items-center gap-1 cursor-pointer transition-colors"
+              className="py-1 text-xs font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] flex items-center gap-1 cursor-pointer transition-colors"
             >
               <span>{showAbstract ? "Hide abstract" : "Read scholarly abstract"}</span>
               {showAbstract ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
