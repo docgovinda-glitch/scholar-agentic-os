@@ -1,3 +1,4 @@
+import { errorText } from "../../../shared/errorText";
 /**
  * Scholar Core Academic Assignment Copilot Service
  * Client API service for interacting with phase-grounded personas:
@@ -68,7 +69,7 @@ export async function sendAssignmentCopilotMessage(
       return {
         ok: false,
         response: "",
-        error: (errData as any).error || `Copilot request failed (HTTP ${res.status})`,
+        error: (errData as { error?: string }).error || `Copilot request failed (HTTP ${res.status})`,
       };
     }
 
@@ -78,11 +79,11 @@ export async function sendAssignmentCopilotMessage(
       response: data.response || data.reply || "",
       persona: data.persona,
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
     return {
       ok: false,
       response: "",
-      error: err.message || "Failed to communicate with Assignment Copilot",
+      error: errorText(err) || "Failed to communicate with Assignment Copilot",
     };
   }
 }

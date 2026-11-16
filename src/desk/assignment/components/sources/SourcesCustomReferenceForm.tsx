@@ -83,7 +83,7 @@ export function SourcesCustomReferenceForm({ customForm, handleAddCustomSource, 
                     </label>
                     <select
                       value={customForm.type}
-                      onChange={(e) => setCustomForm({ ...customForm, type: e.target.value as any })}
+                      onChange={(e) => setCustomForm({ ...customForm, type: e.target.value as SourceAcademicType })}
                       className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-white/20 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
                     >
                       <option value="journal">Peer-Reviewed Journal</option>

@@ -380,7 +380,7 @@ export function generateReferenceList(
   const isNumbered = norm.includes("ieee") || norm.includes("vancouver");
 
   // Filter to active, non-removed sources
-  let pool = sources.filter((s) => s.status !== "removed" && (s as any).status !== "dismissed" && (s as any).status !== "excluded" && s.isActive !== false);
+  let pool = sources.filter((s) => s.status !== "removed" && (s.status as string) !== "dismissed" && (s.status as string) !== "excluded" && s.isActive !== false);
   if (citedSourceIds && citedSourceIds.size > 0) {
     pool = pool.filter((s) => citedSourceIds.has(s.id));
   }

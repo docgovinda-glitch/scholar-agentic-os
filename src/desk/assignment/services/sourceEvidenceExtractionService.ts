@@ -29,7 +29,7 @@ export interface ParsedSourcePayload {
   url?: string;
   author?: string;
   year?: string;
-  metadata?: Record<string, any>;
+  metadata?: { mimeType?: string; summary?: string } & Record<string, unknown>;
 }
 
 /** Stop words for relevance scoring */

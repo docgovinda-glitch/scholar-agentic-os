@@ -18,7 +18,7 @@ export function parseAuthorStringToCanonical(authorStr: string, order: number): 
  * Maps DiscoveredSource or partial source data to CanonicalReference
  */
 export function discoveredSourceToCanonical(source: Partial<DiscoveredSource>): CanonicalReference {
-  const rawAuthors = (source as any).authors;
+  const rawAuthors: unknown = source.authors; // older saves may hold one string
   const authorStrings: string[] = Array.isArray(rawAuthors)
     ? rawAuthors
     : typeof rawAuthors === "string" && rawAuthors.trim()

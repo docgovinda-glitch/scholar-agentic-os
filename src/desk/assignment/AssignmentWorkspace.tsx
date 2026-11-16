@@ -134,10 +134,10 @@ function AssignmentWorkspaceInner({
       saveAnswers({ assignment_title: trimmed, title: trimmed });
       try {
         const p = authedJsonFetch(`/api/projects/${encodeURIComponent(project.projectId)}`, "PATCH", { title: trimmed });
-        if (p && typeof (p as any).catch === "function") {
+        if (p && typeof (p as Promise<unknown>).catch === "function") {
           // The title is already saved in the project answers; a failed rename of the
           // project row is reported, not silently dropped.
-          (p as any).catch((err: unknown) => console.warn("Project title rename failed:", err));
+          (p as Promise<unknown>).catch((err: unknown) => console.warn("Project title rename failed:", err));
         }
       } catch {
         // ignore in test or offline environments

@@ -51,7 +51,7 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
   const [showNotesEditor, setShowNotesEditor] = useState(false);
   const [noteText, setNoteText] = useState(source.userNotes || "");
 
-  const rawAuthors = (source as any).authors;
+  const rawAuthors: unknown = source.authors; // older saves may hold one string
   const authorsList: string[] = Array.isArray(rawAuthors)
     ? rawAuthors
     : typeof rawAuthors === "string" && rawAuthors.trim()

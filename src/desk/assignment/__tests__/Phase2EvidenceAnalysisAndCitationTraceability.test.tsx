@@ -20,9 +20,8 @@ import {
 
 import {
   synthesizeSectionAnalysis,
+  generateOrSyncAnalyticalSyntheses,
   recalculateAllSynthesesCitations,
-  strengthenSynthesisClaim,
-  deepenCounterargument,
 } from "../services/sectionAnalysisService";
 
 import { SectionAnalysisWorkspace } from "../components/SectionAnalysisWorkspace";
@@ -190,14 +189,14 @@ describe("Phase II — Evidence Vault, Ephemeral Recovery, and AI Analysis Engin
       const syn = syntheses[0];
 
       expect(syn.sectionId).toBe("sub-1-1");
-      expect(syn.claim).toBeDefined();
-      expect(typeof syn.claim).toBe("string");
-      expect(syn.evidenceExcerpt).toBeDefined();
-      expect(syn.inTextCitation).toBeDefined();
       expect(syn.inTextCitation).toContain("Hawkins");
-      expect(syn.interpretation).toBeDefined();
-      expect(syn.counterargument).toBeDefined();
-      expect(syn.analyticalLink).toBeDefined();
+      // The fixture source has no abstract and no checked quote: nothing is
+      // attributed to it, and the analysis fields are left for the student.
+      expect(syn.claim).toBe("");
+      expect(syn.evidenceExcerpt).toBeUndefined();
+      expect(syn.interpretation).toBe("");
+      expect(syn.counterargument).toBe("");
+      expect(syn.analyticalLink).toBe("");
       expect(syn.sourceId).toBe("src-agent-01");
       expect(syn.sourceTitle).toBe("Principal-Agent Models of International Bureaucracies");
     });
@@ -246,16 +245,19 @@ describe("Phase II — Evidence Vault, Ephemeral Recovery, and AI Analysis Engin
       expect(updatedToIeee[0].inTextCitation).toBe("[1]");
     });
 
-    it("strengthens claim and deepens counterargument with academic precision", () => {
-      const claim = "International organizations often act on their own.";
-      const strengthened = strengthenSynthesisClaim(claim, "International Organization");
-      expect(strengthened).toContain("substantive empirical and theoretical support");
-      expect(strengthened).toContain(claim);
-
-      const counter = "States can still veto decisions.";
-      const deepened = deepenCounterargument(counter, "Hawkins, Darren");
-      expect(deepened).toContain("Contrasting perspectives");
-      expect(deepened).toContain(counter);
+    it("builds cards only from what the source says, and keeps old template cards away from the AI", () => {
+      const withQuote = {
+        ...mockSources[0],
+        extractedEvidences: [{ id: "q1", excerpt: "Delegation creates agency slack.", claim: "Delegation weakens oversight", sourceLocation: "Abstract" }],
+      } as unknown as DiscoveredSource;
+      const [card] = synthesizeSectionAnalysis("Evaluate accountability.", mockOutline, [withQuote], "apa7");
+      expect(card.claim).toBe("Delegation weakens oversight");
+      expect(card.evidence).toBe("Delegation creates agency slack.");
+      expect(card.basedOn).toBe("source_evidence");
+      // An old template card (not edited, not built from the source) is rebuilt on sync.
+      const template = { ...card, id: "old", basedOn: undefined, isUserEdited: false, claim: "The theoretical conceptualization advanced by X demonstrates..." };
+      const synced = generateOrSyncAnalyticalSyntheses(mockOutline, [withQuote], "q", "apa7", [template]);
+      expect(synced.map((c) => c.claim)).not.toContain(template.claim);
     });
   });
 

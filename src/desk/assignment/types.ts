@@ -1196,6 +1196,12 @@ export interface SectionAnalyticalSynthesis {
   analyticalLink: string;
   isUserEdited?: boolean;
   userNotes?: string;
+  /**
+   * Where the card's claim/evidence came from: a quote checked against the
+   * source ("source_evidence") or the source's own abstract. Cards without it
+   * and not edited by the student are old template cards: never sent to the AI.
+   */
+  basedOn?: "source_evidence" | "abstract";
 }
 
 export interface AssignmentSourcesState {

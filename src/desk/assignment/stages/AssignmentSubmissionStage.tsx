@@ -1,3 +1,4 @@
+import { errorText } from "../../../shared/errorText";
 import { ReviewAgentPanel } from "../components/AgentPanels";
 import { selectApprovedSources } from "../../../domain/assignment/approvedSources";
 import { useState,useEffect,useMemo } from "react";
@@ -121,8 +122,8 @@ export function AssignmentSubmissionStage({
         sources: approvedSources,
         actualWordCount: currentWordCount,
       });
-    } catch (err: any) {
-      setExportError(err?.message || "Failed to generate Word document (.docx).");
+    } catch (err: unknown) {
+      setExportError(errorText(err) || "Failed to generate Word document (.docx).");
     } finally {
       setIsExportingDocx(false);
     }
@@ -153,13 +154,13 @@ export function AssignmentSubmissionStage({
     };
     try {
       await downloadAssignmentPdf(projectId, params);
-    } catch (err: any) {
+    } catch (err: unknown) {
       // The PDF service is unreachable: fall back to the printable view.
       try {
         exportAssignmentToPdf(params);
-        setExportError(`${err?.message || "PDF export failed."} Opened the printable view instead (use Save as PDF).`);
+        setExportError(`${errorText(err) || "PDF export failed."} Opened the printable view instead (use Save as PDF).`);
       } catch {
-        setExportError(err?.message || "Failed to export PDF.");
+        setExportError(errorText(err) || "Failed to export PDF.");
       }
     } finally {
       setIsExportingPdf(false);

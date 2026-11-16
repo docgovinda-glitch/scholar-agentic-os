@@ -362,7 +362,7 @@ export function generateThesisStatement(
   academicLevel?: AcademicLevel
 ): string {
   const qStr = typeof question === "string" ? question : String(question || "");
-  const rawTone = typeof tone === "string" ? tone : (tone as any)?.preset || (tone as any)?.id || "formal_academic";
+  const rawTone = typeof tone === "string" ? tone : (tone as unknown as { preset?: string; id?: string } | undefined)?.preset || (tone as unknown as { preset?: string; id?: string } | undefined)?.id || "formal_academic";
   const toneLower = String(rawTone || "formal_academic").toLowerCase();
 
   // The thesis is phrased from the question itself; there are no subject-specific canned theses.

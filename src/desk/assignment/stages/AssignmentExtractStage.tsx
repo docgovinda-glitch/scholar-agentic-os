@@ -387,7 +387,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
           serverAnalysis = incomingAnalysis;
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn("Using resilient client question-specific structure decomposition:", err);
     } finally {
       clearInterval(stageInterval);
@@ -659,7 +659,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
       }
 
       // Save answers without auto-advancing so user can review extracted brief parameters
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn("Brief parsing error caught safely:", err);
       setParseNotice(
         err && (err as { userFacing?: boolean }).userFacing

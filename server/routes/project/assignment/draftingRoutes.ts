@@ -1,3 +1,4 @@
+import { errorText } from "../../../../src/shared/errorText.ts";
 import { parseBody, StreamSectionBody } from "./schemas.ts";
 import express from "express";
 import { buildSectionScaffold,type ScaffoldSource } from "../../../src/utils/sectionScaffold.ts";
@@ -205,8 +206,8 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
     res.write(`data: ${JSON.stringify({ fullText: effectiveDraft })}\n\n`);
     res.write("data: [DONE]\n\n");
     res.end();
-  } catch (err: any) {
-    const handedOff = err?.message === "RequireFrontendLLMException";
+  } catch (err: unknown) {
+    const handedOff = errorText(err) === "RequireFrontendLLMException";
     if (handedOff && !res.headersSent) return;
     if (!res.headersSent) return sendAiFailure(res, err, "Section draft");
     // The stream is open: every failure becomes an event, never a dropped socket.
@@ -229,14 +230,14 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
         sources: Array.isArray(boundSources) ? (boundSources as ScaffoldSource[]) : [],
         targetWords: targetWordCount,
       });
-      console.warn("[stream-section] AI unavailable, sending offline scaffold:", err instanceof Error ? err.message : err);
+      console.warn("[stream-section] AI unavailable, sending offline scaffold:", err instanceof Error ? errorText(err) : err);
       res.write(`data: ${JSON.stringify({ fallback: { mode: "offline_scaffold", reason: "No AI provider could answer right now." } })}\n\n`);
       res.write(`data: ${JSON.stringify({ fullText: scaffold })}\n\n`);
       res.write("data: [DONE]\n\n");
       res.end();
       return;
     }
-    console.error("Stream section error:", err instanceof Error ? err.message : err);
+    console.error("Stream section error:", err instanceof Error ? errorText(err) : err);
     if (!res.writableEnded) {
       res.write(`data: ${JSON.stringify({ error: streamErrorMessage(err, handedOff), recoverable: true })}\n\n`);
       res.write("data: [DONE]\n\n");

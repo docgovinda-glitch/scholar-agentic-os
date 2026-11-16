@@ -8,8 +8,6 @@ import { flattenStructureSubheadings,CITATION_STYLES } from "../types";
 import {
 generateOrSyncAnalyticalSyntheses,
 recalculateAllSynthesesCitations,
-strengthenSynthesisClaim,
-deepenCounterargument,
 } from "../services/sectionAnalysisService";
 import { formatSourceInTextCitation } from "../services/citationFormatService";
 import {
@@ -205,44 +203,30 @@ export const SectionAnalysisWorkspace: React.FC<SectionAnalysisWorkspaceProps> =
     handleUpdateSyntheses(updated);
   };
 
-  // Strengthen argument for a card
-  const handleStrengthenArgument = (card: SectionAnalyticalSynthesis) => {
-    const enriched = strengthenSynthesisClaim(card, sources, citationStyle);
-    const updated = syntheses.map((s) => (s.id === card.id ? enriched : s));
-    handleUpdateSyntheses(updated);
-  };
 
-  // Deepen counterargument for a card
-  const handleDeepenCounterargument = (card: SectionAnalyticalSynthesis) => {
-    const enriched = deepenCounterargument(card, sources, citationStyle);
-    const updated = syntheses.map((s) => (s.id === card.id ? enriched : s));
-    handleUpdateSyntheses(updated);
-  };
 
   // Add new custom analytical claim to active section
   const handleAddCustomClaim = () => {
     if (!activeSection) return;
     const matchedSource = sources[0];
-    const defaultCitation = matchedSource
-      ? formatSourceInTextCitation(matchedSource, citationStyle)
-      : citationStyle.includes("mla") ? "(Scholar 42)" : "(Scholar, 2024)";
-
+    // A new card starts empty (the edit fields show what to write); its source
+    // details come only from a real source, never stand-ins.
     const newClaim: SectionAnalyticalSynthesis = {
       id: `synth-custom-${Date.now()}`,
       sectionId: activeSection.id,
       sectionTitle: activeSection.title,
       sectionNumberStr: activeSection.numberStr,
-      claim: "State your central argument or proposition here...",
-      evidence: "Add supporting statistical finding, case study observation, or textual evidence...",
+      claim: "",
+      evidence: "",
       sourceId: matchedSource?.id,
-      sourceTitle: matchedSource?.title || "Scholarly Source",
-      sourceAuthors: matchedSource?.authors || ["Scholar, A."],
-      sourceYear: matchedSource?.year || "n.d.",
-      sourceJournal: matchedSource?.journal || "Academic Journal",
-      citation: defaultCitation,
-      interpretation: "Explain how this evidence substantiates your thesis...",
-      counterargument: "Identify an opposing theoretical perspective or empirical limitation...",
-      analyticalLink: "Conclude with an explicit analytical bridge addressing the assignment prompt...",
+      sourceTitle: matchedSource?.title,
+      sourceAuthors: matchedSource?.authors,
+      sourceYear: matchedSource?.year,
+      sourceJournal: matchedSource?.journal,
+      citation: matchedSource ? formatSourceInTextCitation(matchedSource, citationStyle) : "",
+      interpretation: "",
+      counterargument: "",
+      analyticalLink: "",
       isUserEdited: true,
     };
 
@@ -489,13 +473,14 @@ export const SectionAnalysisWorkspace: React.FC<SectionAnalysisWorkspaceProps> =
                             {isEditing ? (
                               <textarea
                                 value={editForm.claim}
+                                placeholder="State your central argument or proposition"
                                 onChange={(e) => setEditForm({ ...editForm, claim: e.target.value })}
                                 rows={2}
                                 className="w-full p-2.5 rounded-xl border border-neutral-300 dark:border-white/20 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-white outline-none focus:ring-1 focus:ring-neutral-400"
                               />
                             ) : (
                               <p className="font-semibold text-neutral-900 dark:text-white text-xs sm:text-sm leading-relaxed">
-                                {card.claim}
+                                {card.claim || <span className="not-italic text-neutral-400 dark:text-neutral-500">Not written yet. Use Edit to add it.</span>}
                               </p>
                             )}
                           </div>
@@ -524,19 +509,20 @@ export const SectionAnalysisWorkspace: React.FC<SectionAnalysisWorkspaceProps> =
                             {isEditing ? (
                               <textarea
                                 value={editForm.evidence}
+                                placeholder="Paste the supporting quotation or finding from the source"
                                 onChange={(e) => setEditForm({ ...editForm, evidence: e.target.value })}
                                 rows={2}
                                 className="w-full p-2 rounded-lg border border-neutral-300 dark:border-white/20 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white outline-none"
                               />
                             ) : (
                               <p className="text-neutral-700 dark:text-neutral-300 italic leading-relaxed">
-                                "{card.evidence}"
+                                {card.evidence ? `"${card.evidence}"` : <span className="not-italic text-neutral-400 dark:text-neutral-500">No quotation yet. Use Edit to add one from the source.</span>}
                               </p>
                             )}
 
                             {card.evidenceLocation && (
                               <span className="text-[10px] font-mono text-neutral-400 dark:text-neutral-500 block pt-1">
-                                📍 Provenance: {card.evidenceLocation} · Source: {card.sourceTitle || "Scholarly Publication"}
+                                📍 Provenance: {card.evidenceLocation} {card.sourceTitle ? ` · Source: ${card.sourceTitle}` : ""}
                               </span>
                             )}
                           </div>
@@ -549,13 +535,14 @@ export const SectionAnalysisWorkspace: React.FC<SectionAnalysisWorkspaceProps> =
                             {isEditing ? (
                               <textarea
                                 value={editForm.interpretation}
+                                placeholder="Explain how this evidence supports your thesis"
                                 onChange={(e) => setEditForm({ ...editForm, interpretation: e.target.value })}
                                 rows={2}
                                 className="w-full p-2.5 rounded-xl border border-neutral-300 dark:border-white/20 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-white outline-none focus:ring-1 focus:ring-neutral-400"
                               />
                             ) : (
                               <p className="text-neutral-800 dark:text-neutral-200 leading-relaxed">
-                                {card.interpretation}
+                                {card.interpretation || <span className="not-italic text-neutral-400 dark:text-neutral-500">Not written yet. Use Edit to add it.</span>}
                               </p>
                             )}
                           </div>
@@ -568,13 +555,14 @@ export const SectionAnalysisWorkspace: React.FC<SectionAnalysisWorkspaceProps> =
                             {isEditing ? (
                               <textarea
                                 value={editForm.counterargument}
+                                placeholder="An opposing view or limitation"
                                 onChange={(e) => setEditForm({ ...editForm, counterargument: e.target.value })}
                                 rows={2}
                                 className="w-full p-2 rounded-lg border border-amber-300 dark:border-amber-700/50 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white outline-none"
                               />
                             ) : (
                               <p className="text-neutral-700 dark:text-neutral-300 leading-relaxed">
-                                {card.counterargument}
+                                {card.counterargument || <span className="not-italic text-neutral-400 dark:text-neutral-500">Not written yet. Use Edit to add it.</span>}
                               </p>
                             )}
                           </div>
@@ -587,39 +575,22 @@ export const SectionAnalysisWorkspace: React.FC<SectionAnalysisWorkspaceProps> =
                             {isEditing ? (
                               <textarea
                                 value={editForm.analyticalLink}
+                                placeholder="How this answers the assignment question"
                                 onChange={(e) => setEditForm({ ...editForm, analyticalLink: e.target.value })}
                                 rows={2}
                                 className="w-full p-2.5 rounded-xl border border-neutral-300 dark:border-white/20 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-white outline-none focus:ring-1 focus:ring-neutral-400"
                               />
                             ) : (
                               <p className="text-neutral-800 dark:text-neutral-200 leading-relaxed font-medium">
-                                {card.analyticalLink}
+                                {card.analyticalLink || <span className="not-italic text-neutral-400 dark:text-neutral-500">Not written yet. Use Edit to add it.</span>}
                               </p>
                             )}
                           </div>
                         </div>
 
-                        {/* Card Sub-actions Footer: Strengthen / Deepen */}
+                        {/* Card footer */}
                         <div className="flex items-center justify-between gap-3 pt-3 border-t border-neutral-100 dark:border-white/5 flex-wrap">
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleStrengthenArgument(card)}
-                              className="text-[11px] font-medium text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
-                            >
-                              <Sparkles className="w-3 h-3 text-neutral-400" />
-                              <span>Strengthen Argument</span>
-                            </button>
-                            <span className="text-neutral-300 dark:text-neutral-700">·</span>
-                            <button
-                              type="button"
-                              onClick={() => handleDeepenCounterargument(card)}
-                              className="text-[11px] font-medium text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
-                            >
-                              <Layers className="w-3 h-3 text-neutral-400" />
-                              <span>Deepen Counterargument</span>
-                            </button>
-                          </div>
+                          <span />
 
                           <button
                             type="button"

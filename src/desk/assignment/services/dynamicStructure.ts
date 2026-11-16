@@ -289,7 +289,7 @@ export function generateDynamicAssignmentStructure(
     headings,
     thesisStatement,
     targetFrameworks,
-    writingTone: typeof options.writingTone === "string" ? options.writingTone : (options.writingTone as any)?.preset || "formal_academic",
+    writingTone: typeof options.writingTone === "string" ? options.writingTone : (options.writingTone as { preset?: string } | undefined)?.preset || "formal_academic",
     rationale: `AI-proposed academic structure tailored to '${question.slice(0, 100)}' at ${academicLevel} level.`,
     researchBlueprintOverview: {
       centralProblem: askScholarResearch.centralProblem,

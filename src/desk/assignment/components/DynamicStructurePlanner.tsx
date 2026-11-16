@@ -1,3 +1,4 @@
+import type { AcademicLevel, AssignmentType } from "../types";
 import React,{ useState } from "react";
 import {
 Plus,
@@ -194,8 +195,8 @@ export function DynamicStructurePlanner({
   const handleResetToAI = () => {
     const fresh = generateDynamicAssignmentStructure({
       question: effectiveQuestion,
-      assignmentType: assignmentType as any,
-      academicLevel: academicLevel as any,
+      assignmentType: assignmentType as AssignmentType,
+      academicLevel: academicLevel as AcademicLevel,
       targetWordCount,
       writingTone,
       citationStyle,

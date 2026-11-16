@@ -1,3 +1,4 @@
+import { errorText } from "../../../../src/shared/errorText.ts";
 import { parseBody, AnalyzeBody, OutlineBody } from "./schemas.ts";
 import { routedCompletion } from "../../../src/ai/routerBridge.ts";
 import { sendAiFailure,UnusableAiResponseError } from "../../../src/ai/aiRouteErrors.ts";
@@ -196,9 +197,9 @@ router.post(
       detectedCitation,
       updatedTitle,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error parsing brief in assignment router:", err);
-    return res.status(500).json({ error: err.message || "Failed to extract text from brief" });
+    return res.status(500).json({ error: errorText(err) || "Failed to extract text from brief" });
   }
 });
 
@@ -481,10 +482,10 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
       targetFrameworks: structure.targetFrameworks || [],
       sections: assignmentStructureToOutlineTree(structure).sections,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Assignment deconstruction error:", err);
     if (!res.headersSent) {
-      res.status(500).json({ error: err.message || "Failed to deconstruct assignment brief" });
+      res.status(500).json({ error: errorText(err) || "Failed to deconstruct assignment brief" });
     }
   }
 };

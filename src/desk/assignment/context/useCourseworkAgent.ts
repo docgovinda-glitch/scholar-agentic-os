@@ -49,7 +49,8 @@ interface Deps {
 
 const IDLE: AgentStepState = { status: "idle" };
 
-async function postStep(projectId: string, step: AgentStepId, body: object): Promise<any> {
+/** The step's JSON answer; each caller reads (and narrows) the fields its step returns. */
+async function postStep(projectId: string, step: AgentStepId, body: object): Promise<Record<string, unknown>> {
   const res = await authedJsonFetch(`/api/projects/${projectId}/assignment/agent/${step}`, "POST", body, { skipLlmFallback: true });
   const data = await res.json().catch(() => null);
   if (!res.ok) throw new Error(data?.error || `This step failed (${res.status}).`);
@@ -104,7 +105,7 @@ export function useCourseworkAgent(d: Deps): CourseworkAgent {
       guard("understand", "Working out what to produce and planning the outline…", async () => {
         const data = await postStep(depsRef.current.projectId, "understand", {});
         if (data.outlineError) return `Plan ready; the outline could not be written (${data.outlineError}). Try again from Drafting.`;
-        const n = (data.structure?.headings ?? []).length;
+        const n = ((data.structure as { headings?: unknown[] } | undefined)?.headings ?? []).length;
         return `Plan ready, with an outline of ${n} section${n === 1 ? "" : "s"}.`;
       }),
     [guard]

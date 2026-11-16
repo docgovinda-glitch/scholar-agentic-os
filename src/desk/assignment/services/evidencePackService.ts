@@ -244,8 +244,10 @@ export function buildEvidencePack(
   }));
 
   // Filter syntheses for this section
+  // Only cards the student wrote or that were built from the source itself:
+  // older template cards attributed claims to authors who never made them.
   const sectionSyntheses = syntheses.filter(
-    (s) => s.sectionId === section.id
+    (s) => s.sectionId === section.id && Boolean(s.isUserEdited || s.basedOn) && Boolean(s.claim?.trim() || s.evidence?.trim())
   );
 
   // Extract section number string from title (e.g., "1.1 Introduction" → "1.1")
@@ -352,11 +354,11 @@ export function serializeEvidencePackForPrompt(pack: EvidencePack): string {
     lines.push("PRE-DEFINED ANALYTICAL SYNTHESES:");
     lines.push("───────────────────────────────────────────────────────");
     pack.syntheses.forEach((syn) => {
-      lines.push(`  Claim: ${syn.claim}`);
-      lines.push(`  Evidence: ${syn.evidence}`);
-      lines.push(`  Interpretation: ${syn.interpretation}`);
+      if (syn.claim) lines.push(`  Claim: ${syn.claim}`);
+      if (syn.evidence) lines.push(`  Evidence (${syn.citation}): ${syn.evidence}`);
+      if (syn.interpretation) lines.push(`  Interpretation: ${syn.interpretation}`);
       if (syn.counterargument) lines.push(`  Counterargument: ${syn.counterargument}`);
-      lines.push(`  Analytical Link: ${syn.analyticalLink}`);
+      if (syn.analyticalLink) lines.push(`  Analytical Link: ${syn.analyticalLink}`);
       lines.push("");
     });
   }

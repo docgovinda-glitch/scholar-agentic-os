@@ -9,7 +9,7 @@ export interface UnderstandAngleAndVoiceProps {
   handleToneChange: (newTone: string) => void;
   localStyle: WritingStyleConfig;
   localTone: string;
-  saveAnswers: (updates: Record<string, any>) => Promise<void>;
+  saveAnswers: (updates: Record<string, unknown>) => Promise<void>;
   setActiveThesis: (value: React.SetStateAction<string>) => void;
   setLocalStyle: (value: React.SetStateAction<WritingStyleConfig>) => void;
   setWritingStyle: (style: WritingStyleConfig) => Promise<void>;

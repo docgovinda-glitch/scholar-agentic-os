@@ -89,7 +89,7 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isEditing]);
 
-  const rawAuthors = (source as any).authors;
+  const rawAuthors: unknown = source.authors; // older saves may hold one string
   const authorsList: string[] = Array.isArray(rawAuthors)
     ? rawAuthors
     : typeof rawAuthors === "string" && rawAuthors.trim()

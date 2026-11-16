@@ -780,7 +780,7 @@ export default function AssignmentUnderstandStage({
           serverAnalysis = incomingAnalysis;
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn("Using resilient client structure generation:", err);
     }
 
@@ -937,7 +937,7 @@ export default function AssignmentUnderstandStage({
         assignment_internal_sections: internalSecs,
         wordBudget: computeWordBudgetFromSections(newWordCount, budgets),
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn("Upload error:", err);
     } finally {
       setUploadingBrief(false);

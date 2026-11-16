@@ -23,7 +23,7 @@ export interface UnderstandBriefInputProps {
   processUploadedFile: (file: File) => Promise<void>;
   project: ProjectView | null;
   promptWordCount: number;
-  saveAnswers: (updates: Record<string, any>) => Promise<void>;
+  saveAnswers: (updates: Record<string, unknown>) => Promise<void>;
   setIntakeTab: (value: React.SetStateAction<"paste" | "upload">) => void;
   setIsDraggingOver: (value: React.SetStateAction<boolean>) => void;
   setLocalDiscipline: (value: React.SetStateAction<string>) => void;

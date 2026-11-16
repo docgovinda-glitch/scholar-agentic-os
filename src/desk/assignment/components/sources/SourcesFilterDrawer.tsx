@@ -1,3 +1,4 @@
+import type { SourceSort } from "../../services/sourceFilters";
 import type { SetStateAction } from "react";
 import {
 Unlock,
@@ -127,7 +128,7 @@ export function SourcesFilterDrawer({ activeFilterCount, minRelevance, openAcces
                       id="filter-sort-order"
                       aria-label="Sort Order"
                       value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value as any)}
+                      onChange={(e) => setSortBy(e.target.value as SourceSort)}
                       className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-ink-750 border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
                     >
                       <option value="relevance">Question Alignment & Recency (Default)</option>

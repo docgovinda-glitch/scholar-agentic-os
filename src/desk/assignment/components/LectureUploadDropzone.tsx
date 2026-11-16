@@ -1,3 +1,4 @@
+import { errorText } from "../../../shared/errorText";
 import React,{ useState,useRef } from "react";
 import type { UploadedSourceDocument,EvidenceItem } from "../types";
 import {
@@ -276,8 +277,8 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
       await onUpload([docWithStandardId], extraction.evidenceItems);
       setShowUrlModal(false);
       setUrlInput("");
-    } catch (err: any) {
-      setModalError(err.message || "Failed to parse URL");
+    } catch (err: unknown) {
+      setModalError(errorText(err) || "Failed to parse URL");
     } finally {
       setIsProcessing(false);
       setProcessingStatusText("");
@@ -315,8 +316,8 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
       setShowTextModal(false);
       setPastedTextTitle("");
       setPastedTextContent("");
-    } catch (err: any) {
-      setModalError(err.message || "Failed to parse text");
+    } catch (err: unknown) {
+      setModalError(errorText(err) || "Failed to parse text");
     } finally {
       setIsProcessing(false);
       setProcessingStatusText("");
