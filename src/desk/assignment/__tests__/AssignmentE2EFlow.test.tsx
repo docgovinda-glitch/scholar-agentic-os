@@ -30,7 +30,6 @@ import {
 import { generateAdaptiveDefaultOutline } from "../services/outlineService";
 import { evaluateRubricCompliance, auditCitations } from "../services/submissionAuditService";
 import { formatBibliographyEntry } from "../services/assignmentExportService";
-import { decomposeWordBudget } from "../services/invisibleChunkerService";
 
 // ─── Mock docx Packer (heavy native dep) ────────────────────────────────────
 vi.mock("docx", async () => {
@@ -265,21 +264,6 @@ describe("Phase 3: Drafting — Invisible Chunker, PEEL Synthesis & Section Inde
     expect(outline[outline.length - 1].targetWordCount).toBe(300);
     const bodyWords = outline.slice(1, -1).reduce((s, o) => s + o.targetWordCount, 0);
     expect(bodyWords).toBe(1950);
-  });
-
-  it("decomposeWordBudget creates section plans matching target word allocations", () => {
-    const plans = decomposeWordBudget({
-      totalWordCount: 2500,
-      sections: MOCK_BRIEF.sections!,
-      outline: [
-        { id: "sec-1", title: "Introduction", targetWordCount: 250, currentWordCount: 0, guidance: "", keyPoints: [], linkedEvidenceIds: [], status: "not_started" },
-        { id: "sec-2", title: "Body Analysis", targetWordCount: 1950, currentWordCount: 0, guidance: "", keyPoints: [], linkedEvidenceIds: [], status: "not_started" },
-        { id: "sec-3", title: "Conclusion", targetWordCount: 300, currentWordCount: 0, guidance: "", keyPoints: [], linkedEvidenceIds: [], status: "not_started" },
-      ],
-    });
-    expect(plans.length).toBeGreaterThan(0);
-    const total = plans.reduce((s, p) => s + p.targetWordCount, 0);
-    expect(total).toBeGreaterThan(0);
   });
 
   it("all draft sections have non-empty content before submission audit", () => {

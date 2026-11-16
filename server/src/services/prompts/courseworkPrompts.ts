@@ -61,6 +61,12 @@ export function streamSectionSystemPrompt({ scholarlyDirectives }: { scholarlyDi
   return `You are the Scholar Core Grounded Academic Drafting Agent.\n\n${scholarlyDirectives}`;
 }
 
+/** The section's current text, sent with a revision request. */
+export function streamSectionExistingBlock({ existingContent, revisionPrompt }: { existingContent?: string; revisionPrompt?: string }): string {
+  if (!existingContent || !revisionPrompt) return "";
+  return `EXISTING DRAFT CONTENT TO REVISE:\n"""\n${existingContent}\n"""\nPlease revise and upgrade this draft following the revision focus above while preserving accurate empirical citations.\n`;
+}
+
 export function streamSectionRevisionInstruction({ revisionPrompt }: { revisionPrompt: unknown }): string {
   return revisionPrompt === "deepen"
       ? "REVISION FOCUS: Deepen analytical critique. Minimize passive descriptive text and amplify dialectical interrogation of theoretical assumptions (target 70% analysis / 30% description)."

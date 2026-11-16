@@ -112,9 +112,7 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
 
     const revisionInstruction = scholarBrain.courseworkPrompts.streamSectionRevisionInstruction({ revisionPrompt });
 
-    const existingBlock = (existingContent && revisionPrompt)
-      ? `EXISTING DRAFT CONTENT TO REVISE:\n"""\n${existingContent}\n"""\nPlease revise and upgrade this draft following the revision focus above while preserving accurate empirical citations.\n`
-      : "";
+    const existingBlock = scholarBrain.courseworkPrompts.streamSectionExistingBlock({ existingContent, revisionPrompt });
 
     const briefRaw = [
       project.answers["assignment_brief"],

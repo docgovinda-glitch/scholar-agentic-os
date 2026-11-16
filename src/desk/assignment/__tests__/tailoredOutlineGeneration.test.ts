@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   generateDynamicAssignmentStructure,
-  generateThesisStatement,
   deconstructQuestionSemantics,
   formatAcademicTopicTitle,
 } from "../services/outlineService";
@@ -59,4 +58,13 @@ import { removeSubheading } from "../services/outlineService";
 it("never removes a section's last part (its budget would fall to 0)", () => {
   const s = { version: 1, headings: [{ id: "h", subheadings: [{ id: "only", targetWordCount: 500 }] }] } as never;
   expect(removeSubheading(s, "only")).toBe(s);
+});
+
+describe("no made-up thesis or generic themes", () => {
+  it("a brief with no grounded thesis gets an empty thesis, not a template claim", async () => {
+    const { generateDynamicAssignmentStructure } = await import("../services/dynamicStructure");
+    const st = generateDynamicAssignmentStructure({ question: "Discuss the role of central banks in the economy.", assignmentType: "essay", academicLevel: "undergraduate", targetWordCount: 1500 });
+    expect(st.thesisStatement).not.toMatch(/decisive operational catalyst|problematizes|systemic transformation|This (paper|study|analysis) (contends|investigates|examines)/);
+    for (const h of st.headings) expect(h.title).not.toMatch(/^Theme \d|Long-Term Trajectories|Systemic Horizons/);
+  });
 });

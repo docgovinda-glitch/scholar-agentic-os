@@ -1,6 +1,5 @@
-import { clipHeadingWords, isNonQuestionBriefLine } from "../../../utils/briefQuestions";
-import { stripSlideArtifacts, extractSubstantiveBriefQuestions, isClassroomLogisticsLine } from "../../../utils/briefExtractor";
-import type { AcademicLevel } from "../types";
+import { clipHeadingWords,isNonQuestionBriefLine } from "../../../utils/briefQuestions";
+import { stripSlideArtifacts,extractSubstantiveBriefQuestions,isClassroomLogisticsLine } from "../../../utils/briefExtractor";
 
 export interface DeconstructedQuestion {
   raw: string;
@@ -350,62 +349,6 @@ export function isGenericPlaceholderTitle(title: string): boolean {
     /^methodology$/i,
   ];
   return bannedPatterns.some((pattern) => pattern.test(t));
-}
-/**
- * Generate a dynamic, tone-calibrated academic thesis statement or central problem formulation.
- * Tailors claims specifically to the assignment question and academic tone.
- */
-
-export function generateThesisStatement(
-  question: string,
-  tone?: string,
-  academicLevel?: AcademicLevel
-): string {
-  const qStr = typeof question === "string" ? question : String(question || "");
-  const rawTone = typeof tone === "string" ? tone : (tone as unknown as { preset?: string; id?: string } | undefined)?.preset || (tone as unknown as { preset?: string; id?: string } | undefined)?.id || "formal_academic";
-  const toneLower = String(rawTone || "formal_academic").toLowerCase();
-
-  // The thesis is phrased from the question itself; there are no subject-specific canned theses.
-  const deconstructed = deconstructQuestionSemantics(qStr);
-  const topicA = deconstructed.subjectFormattedA;
-  const topicB = deconstructed.subjectFormattedB;
-
-  if (deconstructed.relationType === "role_in" && topicB) {
-    if (toneLower.includes("persuasive") || toneLower.includes("argumentative")) {
-      return `This paper contends that ${topicA} serves as the decisive operational catalyst within ${topicB}, establishing that its structural integration is essential to achieving sustainable efficacy.`;
-    }
-    if (toneLower.includes("critical")) {
-      return `This critique problematizes the presumed efficacy of ${topicA} within ${topicB}, demonstrating that underlying structural constraints and institutional frictions fundamentally limit its practical impact.`;
-    }
-    return `This study investigates the integral role of ${topicA} within ${topicB}, systematically evaluating the theoretical mechanisms, operational dynamics, and empirical outcomes that govern their interaction.`;
-  }
-
-  if (deconstructed.relationType === "impact_on" && topicB) {
-    if (toneLower.includes("persuasive") || toneLower.includes("argumentative")) {
-      return `This paper argues that the impact of ${topicA} on ${topicB} produces profound systemic transformation, necessitating a fundamental recalibration of existing strategic and theoretical paradigms.`;
-    }
-    if (toneLower.includes("critical")) {
-      return `This critique challenges optimistic accounts regarding the influence of ${topicA} on ${topicB}, highlighting systemic disparities, unintended externalities, and empirical inconsistencies across contemporary environments.`;
-    }
-    return `This analysis examines the multi-faceted impact of ${topicA} on ${topicB}, analyzing direct empirical evidence, mediating variables, and broader disciplinary implications.`;
-  }
-
-  if (deconstructed.relationType === "comparative" && topicB) {
-    if (toneLower.includes("critical")) {
-      return `This comparative critique interrogates the core dichotomy between ${topicA} and ${topicB}, demonstrating that rigid paradigmatic divisions obscure shared structural vulnerabilities and implementation constraints.`;
-    }
-    return `This comparative study evaluates the contrasting theoretical foundations, operational trade-offs, and empirical efficacy of ${topicA} versus ${topicB} across contemporary practice.`;
-  }
-
-  // General Tone-Calibrated Fallbacks
-  const topicText = topicB ? `${topicA} in relation to ${topicB}` : topicA;
-  if (toneLower.includes("persuasive") || toneLower.includes("argumentative")) {
-    return `This investigation argues that an evidence-based analysis of ${topicText} demonstrates decisive systemic advantages, challenging conventional assumptions and substantiating a revised analytical paradigm.`;
-  }
-  if (toneLower.includes("critical")) {
-    return `This critique problematizes prevailing assumptions surrounding ${topicText}, demonstrating how underlying structural inequalities, methodological limitations, and institutional blind spots undermine purported outcomes.`;
-  }
-  return `This study provides a systematic academic investigation into ${topicText}, synthesizing authoritative theoretical frameworks and empirical evidence to evaluate contemporary outcomes.`;
 }
 
 /**

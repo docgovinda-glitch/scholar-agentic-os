@@ -1,10 +1,10 @@
 import { applyMarksBudget } from "../../../domain/assignment/outlineBudget";
 import { briefGroundedThesis } from "../../../domain/assignment/briefThesis";
 import { planBriefInquiries } from "../../../domain/assignment/briefInquiryPlan";
-import type { AssignmentType, AcademicLevel, AssignmentStructure, ResearchSourceReference, AssignmentSubheading, AssignmentMainHeading } from "../types";
+import type { AssignmentType,AcademicLevel,AssignmentStructure,ResearchSourceReference,AssignmentSubheading,AssignmentMainHeading } from "../types";
 import { sanitizeOutlineHeadings } from "./outlineTree";
-import { extractBriefInquiriesAndConcepts, generateThesisStatement } from "./briefSemantics";
-import { HeadingSpec, buildBriefSpecificSpecs } from "./briefOutlineSpecs";
+import { extractBriefInquiriesAndConcepts } from "./briefSemantics";
+import { HeadingSpec,buildBriefSpecificSpecs } from "./briefOutlineSpecs";
 
 
 export interface DynamicStructureOptions {
@@ -277,8 +277,8 @@ export function generateDynamicAssignmentStructure(
   const totalAllocated = headings.reduce((sum, h) => sum + h.targetWordCount, 0);
   // A multi-question brief gets a thesis built from its own title and questions,
   // never from a regex reading of its first "compare/contrast" sub-part.
-  const thesisStatement = briefGroundedThesis([options.briefText, question].filter(Boolean).join("\n")) ||
-    generateThesisStatement(question, options.writingTone, academicLevel);
+  // Nothing grounded in the brief: no thesis is made up (the AI or the student writes it).
+  const thesisStatement = briefGroundedThesis([options.briefText, question].filter(Boolean).join("\n"));
 
   // Marks-weighted, clean multiples, exact sum to the target (never 40w + 960w).
   return applyMarksBudget({

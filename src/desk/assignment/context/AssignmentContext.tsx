@@ -1,3 +1,4 @@
+import { generateDynamicAssignmentStructure } from "../services/dynamicStructure";
 import { countProseWords } from "../../../shared/proseBlocks";
 import { canonicalizeAssignmentUpdate,normalizeAssignmentAnswers } from "../../../domain/assignment/answerKeys";
 import { selectApprovedSources } from "../../../domain/assignment/approvedSources";
@@ -43,11 +44,6 @@ AssignmentDraftingSection,
 structureToInternalSections,
 structureToSectionBudgets
 } from "../types";
-import {
-decomposeWordBudget,
-tuneSectionsToQuestion,
-type InternalSectionPlan,
-} from "../services/invisibleChunkerService";
 import { auditCitations,evaluateRubricCompliance,auditFlowAndTransitions } from "../services/submissionAuditService";
 import { getCitationCoverage } from "../services/citationAnchoringService";
 import { stripCircularReferences } from "../../../utils/briefExtractor";
@@ -889,18 +885,11 @@ export function AssignmentProvider({
       return generated;
     }
 
-    const topicToUse = question || project?.title || "Academic Essay";
-    const generated = decomposeWordBudget({
-      targetWordCount,
-      wordBudget: {
-        intro: sections?.intro?.targetWords ?? Math.round(targetWordCount * 0.10),
-        body: sections?.body?.targetWords ?? Math.max(0, targetWordCount - (sections?.intro?.targetWords ?? Math.round(targetWordCount * 0.10)) - (sections?.conclusion?.targetWords ?? Math.round(targetWordCount * 0.15))),
-        conclusion: sections?.conclusion?.targetWords ?? Math.round(targetWordCount * 0.15),
-      },
-      approvedSourceIds,
-      assignmentTopic: topicToUse,
-      academicLevel,
-    });
+    // No outline yet: build it from the brief (one section per question), never
+    // from a generic theme template.
+    const generated = structureToInternalSections(
+      generateDynamicAssignmentStructure({ question, briefText, assignmentType, academicLevel, targetWordCount })
+    );
 
     saveAnswers({
       assignment_internal_sections: generated,
@@ -911,7 +900,7 @@ export function AssignmentProvider({
       setActiveSectionId((prev) => prev || generated[0].id);
     }
     return generated;
-  }, [structure, targetWordCount, sections, approvedSourceIds, question, project?.title, academicLevel, saveAnswers]);
+  }, [structure, targetWordCount, question, briefText, assignmentType, academicLevel, saveAnswers]);
 
   /**
    * The sections as last written, not as of the last render: a draft that
@@ -962,23 +951,21 @@ export function AssignmentProvider({
     [latestSections, saveAnswers]
   );
 
+  /**
+   * Rebuild the drafting sections from the brief (one per question, marks-weighted
+   * budgets), keeping the text of every section that is still there.
+   */
   const tuneOutlineWithQuestion = useCallback(async (): Promise<AssignmentDraftingSection[]> => {
-    const topicToUse = question || project?.title || "Academic Assignment";
-    const existing = latestSections() as (AssignmentDraftingSection | InternalSectionPlan)[];
-    const tuned = tuneSectionsToQuestion({
-      existingSections: existing,
-      assignmentTopic: topicToUse,
-      approvedSources: sources.filter((s) => approvedSourceIds.includes(s.id)),
-      targetWordCount,
-      academicLevel,
+    const existing = new Map(latestSections().map((sec) => [sec.id, sec]));
+    const rebuilt = structureToInternalSections(
+      generateDynamicAssignmentStructure({ question, briefText, assignmentType, academicLevel, targetWordCount })
+    ).map((sec) => {
+      const prev = existing.get(sec.id);
+      return prev?.draftContent ? { ...sec, draftContent: prev.draftContent, status: prev.status } : sec;
     });
-
-    await saveAnswers({
-      assignment_internal_sections: tuned,
-      assignment_outline: tuned,
-    });
-    return tuned;
-  }, [question, project?.title, latestSections, sources, approvedSourceIds, targetWordCount, academicLevel, saveAnswers]);
+    await saveAnswers({ assignment_internal_sections: rebuilt });
+    return rebuilt;
+  }, [question, briefText, assignmentType, academicLevel, targetWordCount, latestSections, saveAnswers]);
 
   const rewriteOutline = useCallback(
     async (instruction?: string): Promise<{ ok: true; structure: AssignmentStructure } | { ok: false; error: string }> => {
