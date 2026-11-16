@@ -69,4 +69,17 @@ describe("alignment in the PDF document", () => {
     const result = await exportDocument({ document: doc, format: "pdf", title: "Al" });
     expect(result.data.subarray(0, 4).toString()).toBe("%PDF");
   }, 30_000);
+
+  it("clamps a malformed source record instead of failing the export", () => {
+    const parsed = AssignmentPdfRequestSchema.safeParse({
+      title: "Essay",
+      sections: [{ title: "One", draftContent: "Text." }],
+      sources: [{ id: "x", title: "T".repeat(3093), authors: ["A".repeat(400)] }],
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.sources[0].title).toHaveLength(2000);
+      expect(parsed.data.sources[0].authors[0]).toHaveLength(300);
+    }
+  });
 });

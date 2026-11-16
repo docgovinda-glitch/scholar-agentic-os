@@ -179,4 +179,11 @@ describe("evaluateRubricCompliance: missing sections", () => {
     expect(report.missingRequirements.join(" ")).toMatch(/1 section\(s\) have no text yet: Analysis/);
     expect(report.strengths).not.toContain("Every section has text");
   });
+
+  it("lists only the brief's own marking criteria and invents none when it has none", () => {
+    const brief = { targetWordCount: 10, rawPrompt: "", instructions: "", rubricCriteria: [] } as never;
+    expect(evaluateRubricCompliance("Introduction. Conclusion.", brief).criteria).toEqual([]);
+    const withRubric = { targetWordCount: 10, rawPrompt: "", instructions: "", rubricCriteria: [{ id: "c1", criterion: "Use of evidence", weightPercentage: 40 }] } as never;
+    expect(evaluateRubricCompliance("Introduction. Conclusion.", withRubric).criteria.map((c) => [c.criterion, c.weightPercentage])).toEqual([["Use of evidence", 40]]);
+  });
 });

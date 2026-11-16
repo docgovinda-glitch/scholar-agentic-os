@@ -1,4 +1,5 @@
 import OutlineByAiPanel from "../components/OutlineByAiPanel";
+import { selectApprovedSources } from "../../../domain/assignment/approvedSources";
 import { useToast } from "../../../components/ui/FeedbackSystem";
 import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
@@ -99,7 +100,7 @@ export function AssignmentDraftingStage({
 
   const draftMarkdown = useMemo(() => {
     const body = internalSections.map((sec) => `## ${sec.title}\n\n${sec.draftContent || ""}`).join("\n\n");
-    const approved = sources.filter((s) => s.status === "kept" || (approvedSourceIds && approvedSourceIds.includes(s.id)));
+    const approved = selectApprovedSources(sources, approvedSourceIds);
     // The compiled draft lists only what the text cites, plus the brief's prescribed references.
     const refs = buildFormattedBibliography(selectCitedSources(approved, body), citationStyle || "harvard");
     return refs.length ? `${body}\n\n## References\n\n${refs.join("\n\n")}` : body;
@@ -188,7 +189,7 @@ export function AssignmentDraftingStage({
 
   // Filter approved sources
   const approvedSources = useMemo(() => {
-    return sources.filter((s) => s.status === "kept" || (approvedSourceIds && approvedSourceIds.includes(s.id)));
+    return selectApprovedSources(sources, approvedSourceIds);
   }, [sources, approvedSourceIds]);
 
   // Stream single section (or revision)

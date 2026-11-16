@@ -433,9 +433,10 @@ export async function streamSectionGeneration(options: StreamSectionOptions): Pr
     writingStyle,
   } = options;
 
-  const relevantSources = approvedSources.filter(
-    (s) => section.boundSourceIds?.includes(s.id) || s.status === "kept"
-  );
+  // approvedSources is already the approved set; sources bound to the section go
+  // first, and a section with no bound source may use any approved one.
+  const bound = approvedSources.filter((s) => section.boundSourceIds?.includes(s.id));
+  const relevantSources = bound.length ? bound : approvedSources;
 
   const attempt = async (): Promise<{ finalText: string; scaffold: boolean }> => {
     const { authedJsonFetch } = await import("../../api/client");

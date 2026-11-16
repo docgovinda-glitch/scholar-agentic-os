@@ -1,4 +1,5 @@
 import express from "express";
+import { selectApprovedSources } from "../../../../src/domain/assignment/approvedSources.ts";
 import { exportDocument } from "../../../../src/app/export/export.ts";
 import {
   AssignmentPdfRequestSchema,
@@ -322,8 +323,14 @@ router.post("/copilot-chat", async (req: express.Request<{ id: string }>, res) =
     safeParseObject(answers["assignment_sources"]) ||
     [];
 
-  const keptSources = sources.filter(
-    (s: any) => s.status === "kept" || s.isKept || s.approved
+  const approvedIds: string[] | null = (() => {
+    const raw = safeParseObject(answers["approved_source_ids"]);
+    return Array.isArray(raw) ? raw.map(String) : null;
+  })();
+  // Only what the student approved (before any decision: the brief's prescribed references).
+  const keptSources = selectApprovedSources(
+    sources,
+    approvedIds ?? sources.filter((s: any) => s?.prescribedInBrief).map((s: any) => String(s.id))
   );
 
   const lectureSlides: any[] =

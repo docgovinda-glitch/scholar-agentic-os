@@ -6,6 +6,8 @@
  * writes these rows after every save; the project row stays the source the app reads.
  */
 
+import { isSourceApproved } from "./approvedSources";
+
 export type AssignmentPhase = "extract" | "understand" | "sources" | "drafting" | "submission";
 
 const PHASES: AssignmentPhase[] = ["extract", "understand", "sources", "drafting", "submission"];
@@ -308,13 +310,17 @@ export function buildAssignmentRelationalSnapshot(
   const outline = outlineRows(projectId, answers, at);
 
   const sources = readJson<SourceLike[]>(answers["assignment_sources"], []);
-  const approvedIds = new Set(readJson<string[]>(answers["approved_source_ids"], []).map(String));
+  const approvedRaw = readJson<string[] | null>(answers["approved_source_ids"], null);
+  // Before any decision only the brief's prescribed references count (see approvedSources.ts).
+  const approvedIds = Array.isArray(approvedRaw)
+    ? new Set(approvedRaw.map(String))
+    : new Set((Array.isArray(sources) ? sources : []).filter((s) => s?.prescribedInBrief && typeof s.id === "string").map((s) => s.id as string));
   const sourceOrigins: AssignmentSourceOriginRow[] = (Array.isArray(sources) ? sources : [])
     .filter((s): s is SourceLike & { id: string } => typeof s?.id === "string")
     .map((s) => ({
       source_id: s.id,
       origin: sourceOrigin(s),
-      is_approved: approvedIds.has(s.id) || (s.status === "kept" && !s.isExcluded) || Boolean(s.prescribedInBrief),
+      is_approved: isSourceApproved(s, approvedIds),
     }));
 
   const sections = readJson<SectionLike[]>(answers["assignment_internal_sections"], []);

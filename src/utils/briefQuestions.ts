@@ -497,14 +497,33 @@ export function extractPrescribedReferences(briefText: string): PrescribedRefere
   return out.slice(0, 20);
 }
 
+/** Words a clipped heading must not end on ("…policy rate and how", "…since 2008, using at"). */
+const DANGLING_HEADING_WORD =
+  /^(?:a|an|the|and|or|but|nor|of|to|in|on|at|by|for|from|with|within|into|onto|as|via|using|how|why|what|which|who|whom|whose|that|this|these|those|its|their|his|her|our|your|is|are|was|were|be|been|whether|if|than|then|so|such|including|e\.g\.?|i\.e\.?)$/i;
+
+/**
+ * At most `maxWords` words of a heading, cut at a clean point: no trailing "…",
+ * dangling function word or punctuation, so the heading reads as written in a
+ * submitted document. A heading already clipped with "…" (older saves) is tidied the same way.
+ */
+export function clipHeadingWords(text: string, maxWords = Number.POSITIVE_INFINITY): string {
+  const clipped = /…\s*$/.test(text);
+  let w = text.replace(/\s*…\s*$/, "").trim().split(/\s+/).filter(Boolean);
+  const cut = clipped || w.length > maxWords;
+  if (w.length > maxWords) w = w.slice(0, maxWords);
+  if (cut) {
+    while (w.length > 1 && DANGLING_HEADING_WORD.test(w[w.length - 1].replace(/[,;:–—-]+$/, ""))) w.pop();
+  }
+  return w.join(" ").replace(/[\s,;:–—-]+$/, "");
+}
+
 /** A short (about 8 word) label for a question: drops the leading command verb. */
 export function shortQuestionLabel(text: string, maxWords = 8): string {
   const stripped = text
     .replace(/^(?:critically\s+)?(?:compare|contrast|evaluate|analy[sz]e|assess|discuss|explain|describe|examine|derive|justify|propose|recommend|explore|investigate|identify|outline|define|apply|develop|design|calculate|show)\s+/i, "")
     .replace(/[?.:]+$/, "")
     .trim();
-  const w = stripped.split(/\s+/);
-  return w.length > maxWords ? `${w.slice(0, maxWords).join(" ")}…` : stripped;
+  return clipHeadingWords(stripped, maxWords);
 }
 
 export interface BriefQuestionGroup {

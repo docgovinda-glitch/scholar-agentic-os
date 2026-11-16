@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  clipHeadingWords,
   parseBriefQuestions,
   parseBriefParts,
   parseMarkingCriteria,
@@ -191,5 +192,17 @@ describe("parsePrescribedBibliography: APA entries and 'Required reading' headin
   it("keeps an APA book as a book", () => {
     const [e] = parseBib("Essential reading\nMishkin, F. S. (2019). The Economics of Money, Banking and Financial Markets. Pearson.");
     expect(e).toMatchObject({ title: "The Economics of Money, Banking and Financial Markets", isBook: true });
+  });
+});
+
+describe("clipHeadingWords", () => {
+  it("cuts a long heading at a clean word, never with a trailing ellipsis or dangling word", () => {
+    expect(clipHeadingWords("1.0 Explain how a central bank sets its policy interest rate and how it reaches", 12)).toBe(
+      "1.0 Explain how a central bank sets its policy interest rate"
+    );
+    expect(clipHeadingWords("2.0 Evaluate the effect of quantitative easing on inflation since 2008, using at…")).toBe(
+      "2.0 Evaluate the effect of quantitative easing on inflation since 2008"
+    );
+    expect(clipHeadingWords("Short heading", 8)).toBe("Short heading");
   });
 });

@@ -21,6 +21,7 @@ describe("Coursework relational mirror", () => {
           assignment_brief_file: "brief.pdf",
           assignment_structure: { headings: [{ id: "h1", title: "One", subheadings: [] }] },
           assignment_sources: [{ id: "s1", status: "kept" }],
+          approved_source_ids: ["s1"],
           assignment_internal_sections: [{ id: "h1", draftContent: "Some text" }],
           assignment_submission_report: { passed: false },
         } as never,

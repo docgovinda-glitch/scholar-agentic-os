@@ -20,6 +20,7 @@ import type {
   SourceAcademicType,
   SectionAnalyticalSynthesis,
 } from "../types";
+import { selectCitedSources } from "../services/exportText";
 import { flattenStructureSubheadings } from "../types";
 import {
   Library,
@@ -96,6 +97,7 @@ export default function AssignmentSourcesStage({
     structure,
     sources,
     setSources,
+    internalSections,
     approvedSourceIds,
     setApprovedSourceIds,
     toggleSourceApproval,
@@ -539,6 +541,29 @@ export default function AssignmentSourcesStage({
     await setSources(nextSources);
   };
 
+  // A source the draft already cites leaves a dangling citation when it is removed
+  // or un-approved: say where, so the student can undo now or fix the text
+  // (the submission check flags it either way). Returns whether it warned.
+  const warnIfCited = (source: DiscoveredSource | undefined, verb: string, fix: string): boolean => {
+    if (!source) return false;
+    const citing = (internalSections || []).filter(
+      (sec) => sec.draftContent && selectCitedSources([{ ...source, prescribedInBrief: false }], sec.draftContent).length > 0
+    );
+    if (citing.length === 0) return false;
+    const where = citing.map((sec) => `"${sec.title.slice(0, 40)}"`).join(", ");
+    setDiscoverySuccessMsg(
+      `${verb} "${source.title.slice(0, 42)}". Your draft still cites it in ${where}: ${fix}, or edit that citation (the submission check will flag it).`
+    );
+    setTimeout(() => setDiscoverySuccessMsg(null), 12000);
+    return true;
+  };
+
+  const handleToggleApproval = async (sourceId: string) => {
+    const wasApproved = approvedSourceIds.includes(sourceId);
+    await toggleSourceApproval(sourceId);
+    if (wasApproved) warnIfCited(sources.find((s) => s.id === sourceId), "Un-approved", "approve it again");
+  };
+
   // Dismiss / Delete source with clean removal & Undo option
   const handleDismissSource = async (sourceId: string) => {
     const isUserDoc = userUploadedSources.some((doc) => doc.id === sourceId);
@@ -567,8 +592,10 @@ export default function AssignmentSourcesStage({
     );
     await setSources(nextSources);
 
-    setDiscoverySuccessMsg(`Removed "${removedSource?.title?.slice(0, 42) || "source"}..." from assignment.`);
-    setTimeout(() => setDiscoverySuccessMsg(null), 5000);
+    if (!warnIfCited(removedSource, "Removed", "undo")) {
+      setDiscoverySuccessMsg(`Removed "${removedSource?.title?.slice(0, 42) || "source"}..." from assignment.`);
+      setTimeout(() => setDiscoverySuccessMsg(null), 5000);
+    }
   };
 
   // Undo accidental removal
@@ -1737,7 +1764,7 @@ export default function AssignmentSourcesStage({
               <div className="p-3 rounded-xl bg-neutral-900 text-white dark:bg-neutral-800 border border-neutral-700/80 text-xs flex items-center justify-between gap-3 animate-in fade-in duration-200 shadow-lg">
                 <div className="flex items-center gap-2 min-w-0">
                   <Sparkles className="w-4 h-4 shrink-0 text-emerald-400" />
-                  <span className="font-medium text-neutral-100 truncate">{discoverySuccessMsg}</span>
+                  <span data-testid="sources-notice" className="font-medium text-neutral-100">{discoverySuccessMsg}</span>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   {recentlyRemovedSource && (
@@ -1798,7 +1825,7 @@ export default function AssignmentSourcesStage({
                       source={source}
                       isApproved={approvedSourceIds.includes(source.id)}
                       isBookmarked={bookmarkedIds.includes(source.id)}
-                      onToggleApproval={toggleSourceApproval}
+                      onToggleApproval={handleToggleApproval}
                       onDismiss={handleDismissSource}
                       onToggleBookmark={handleToggleBookmark}
                       onSaveEdit={handleSaveSourceUpdates}
@@ -1816,7 +1843,7 @@ export default function AssignmentSourcesStage({
                       source={source}
                       isApproved={approvedSourceIds.includes(source.id)}
                       isBookmarked={bookmarkedIds.includes(source.id)}
-                      onToggleApproval={toggleSourceApproval}
+                      onToggleApproval={handleToggleApproval}
                       onDismiss={handleDismissSource}
                       onToggleBookmark={handleToggleBookmark}
                       onSaveEdit={handleSaveSourceUpdates}
@@ -1926,7 +1953,7 @@ export default function AssignmentSourcesStage({
       <ApprovedReferencesShelf
         approvedSources={approvedSourcesList}
         recommendedCount={4}
-        onToggleApproval={toggleSourceApproval}
+        onToggleApproval={handleToggleApproval}
         onProceedToDrafting={handleContinue}
         onSaveEditSource={handleSaveSourceUpdates}
       />

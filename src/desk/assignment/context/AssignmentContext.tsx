@@ -1,4 +1,5 @@
 import { countProseWords } from "../../../shared/proseBlocks";
+import { selectApprovedSources } from "../../../domain/assignment/approvedSources";
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode, useMemo, useRef } from "react";
 import { purgeLegacyTemplateText } from "../../../domain/assignment/legacyPurge";
 import type { CanonicalDocument, OutputTypeSpec, ProjectView, RubricReport } from "../../types";
@@ -821,7 +822,8 @@ export function AssignmentProvider({
         // fallback
       }
     }
-    const rubricText = answers["marking_rubric"] || answers["rubric"] || "";
+    // "provisional" is the intake placeholder, not a rubric.
+    const rubricText = cleanAnswerString(answers["marking_rubric"]) || cleanAnswerString(answers["rubric"]);
     if (rubricText && rubricText.trim()) {
       const lines = rubricText.split("\n").map((l: string) => l.trim()).filter(Boolean);
       return lines.slice(0, 8).map((line: string, idx: number) => {
@@ -866,7 +868,11 @@ export function AssignmentProvider({
     const rawInternal = answers["assignment_internal_sections"];
     if (rawInternal) {
       const parsed = safeParseAnswerField<any[]>(rawInternal, []);
-      if (Array.isArray(parsed) && parsed.length > 0 && !isCorrupted(parsed)) return parsed;
+      // Word counts always come from the text: a stored count can be stale after
+      // a write that did not refresh it (server-side revisions, older saves).
+      if (Array.isArray(parsed) && parsed.length > 0 && !isCorrupted(parsed)) {
+        return parsed.map((sec) => ({ ...sec, currentWordCount: countProseWords(sec?.draftContent || "") }));
+      }
     }
     const rawOutline = answers["assignment_outline"];
     if (rawOutline) {
@@ -876,7 +882,7 @@ export function AssignmentProvider({
           id: sec.id,
           title: sec.title,
           targetWordCount: sec.targetWordCount,
-          currentWordCount: sec.currentWordCount ?? countProseWords(sec.draftContent || ""),
+          currentWordCount: countProseWords(sec.draftContent || ""),
           guidance: sec.guidance || "",
           draftContent: sec.draftContent || "",
           status: sec.draftContent?.trim() ? "completed" : sec.status || "pending",
@@ -1491,7 +1497,7 @@ export function AssignmentProvider({
   const phaseStatuses: Record<AssignmentPhaseId, "active" | "completed" | "upcoming"> = useMemo(() => {
     const hasExtract = Boolean(question && targetWordCount > 0 && citationStyle);
     const hasUnderstand = Boolean(structure?.isConfirmed || (hasExtract && analysis?.approvedByUser));
-    const hasSources = sources.filter((s) => s.status === "kept").length >= 2;
+    const hasSources = selectApprovedSources(sources, approvedSourceIds).length > 0;
     const hasDrafting = currentWordCount >= Math.min(200, targetWordCount * 0.3);
     const hasSubmission = Boolean(submissionReport);
 
@@ -1520,7 +1526,7 @@ export function AssignmentProvider({
     const hasUnderstand = Boolean(structure?.isConfirmed || (hasExtract && analysis?.approvedByUser));
     const hasAnalysis = Boolean(analysis && analysis.approvedByUser);
     const hasPlan = Boolean(researchPlan && researchPlan.approvedByUser);
-    const hasSources = sources.filter((s) => s.status === "kept").length >= 2;
+    const hasSources = selectApprovedSources(sources, approvedSourceIds).length > 0;
     const hasEvidence = evidenceItems.filter((e) => e.status === "approved").length >= 2;
     const hasThinking = Boolean(thinkingMap && (thinkingMap.selectedThesisId || thinkingMap.customThesis));
     const hasStructure = outline.length >= 3;
@@ -1684,7 +1690,7 @@ export function AssignmentProvider({
       setCitationAuditResult(citAudit);
 
       // 1b. Citation Coverage
-      const approvedSources = sources.filter((s) => s.status === "kept" || (approvedSourceIds && approvedSourceIds.includes(s.id)));
+      const approvedSources = selectApprovedSources(sources, approvedSourceIds);
       const citationCoverage = getCitationCoverage(activeSecs as any, approvedSources);
 
       // 2. Rubric Compliance Evaluation

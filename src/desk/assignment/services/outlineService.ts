@@ -36,7 +36,7 @@ import {
 } from "../../../utils/briefExtractor";
 
 import { applyMarksBudget, allocateCleanWords } from "../../../domain/assignment/outlineBudget";
-import { isNonQuestionBriefLine, parseBriefQuestions, groupBriefQuestions } from "../../../utils/briefQuestions";
+import { clipHeadingWords, isNonQuestionBriefLine, parseBriefQuestions, groupBriefQuestions } from "../../../utils/briefQuestions";
 import { briefGroundedThesis } from "../../../domain/assignment/briefThesis";
 export function generateAdaptiveDefaultOutline(
   type: AssignmentType,
@@ -618,16 +618,13 @@ export function shortHeading(text: string, maxWords = 8): string {
     .replace(/^(?:critically\s+)?(?:compare|contrast|evaluate|analy[sz]e|assess|discuss|explain|describe|examine|derive|justify|propose|recommend|explore|investigate|identify|outline|define|apply|develop|design|calculate|show)\s+(?:and\s+\w+\s+)?/i, "")
     .replace(/[?.:]+$/, "")
     .trim();
-  const words = stripped.split(/\s+/);
-  const cut = words.length > maxWords ? `${words.slice(0, maxWords).join(" ")}…` : stripped;
+  const cut = clipHeadingWords(stripped, maxWords);
   return cut.charAt(0).toUpperCase() + cut.slice(1);
 }
 
 /** Keep a title as written (no case changes) but at most `maxWords` words. */
 function clipWords(text: string, maxWords: number): string {
-  const t = text.replace(/[:.\s]+$/, "").trim();
-  const w = t.split(/\s+/);
-  return w.length > maxWords ? `${w.slice(0, maxWords).join(" ")}…` : t;
+  return clipHeadingWords(text.replace(/[:.\s]+$/, "").trim(), maxWords);
 }
 
 /** Max top-level sections an outline may be expanded to (human-scale outlines). */

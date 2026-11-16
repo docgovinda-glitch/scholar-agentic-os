@@ -1,4 +1,5 @@
 import { ReviewAgentPanel } from "../components/AgentPanels";
+import { selectApprovedSources } from "../../../domain/assignment/approvedSources";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
 import { RubricComplianceCard } from "../components/RubricComplianceCard";
@@ -125,7 +126,7 @@ export function AssignmentSubmissionStage({
         institution: institutionName || undefined,
         brief: projectState.brief,
         sections: activeSections,
-        sources: projectState.sources.curated,
+        sources: approvedSources,
         actualWordCount: currentWordCount,
       });
     } catch (err: any) {
@@ -155,7 +156,7 @@ export function AssignmentSubmissionStage({
       institution: institutionName || undefined,
       brief: projectState.brief,
       sections: activeSections,
-      sources: projectState.sources.curated,
+      sources: approvedSources,
       actualWordCount: currentWordCount,
     };
     try {
@@ -188,7 +189,7 @@ export function AssignmentSubmissionStage({
 
   // Citation Coverage Statistics (Production Spec §5)
   const approvedSources = useMemo(
-    () => sources.filter((s) => s.status === "kept" || (approvedSourceIds && approvedSourceIds.includes(s.id))),
+    () => selectApprovedSources(sources, approvedSourceIds),
     [sources, approvedSourceIds]
   );
   const citationCoverage = useMemo(

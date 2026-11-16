@@ -115,4 +115,15 @@ describe("Coursework export (.docx) alignment", () => {
     expect(xml).toMatch(/<w:jc w:val="(?:right|end)"\/>(?:(?!<\/w:p>).)*A right line/s);
     expect(xml).not.toContain("align=");
   });
+
+  it("keeps the reference list in a short answer and prints '&' as written", async () => {
+    const text = await docxText({
+      title: "Rates & Expectations", brief: { ...brief, targetWordCount: 300 } as AssignmentBriefState,
+      sections: [section("Q1", "Triage reduces waiting (Okafor, 2021).")], sources: [source],
+    });
+    expect(text).toContain("Rates &amp; Expectations"); // XML-escaped once: Word shows "&"
+    expect(text).not.toContain("&amp;amp;");
+    expect(text).toMatch(/Reference/);
+    expect(text).toContain("Nurse-led triage in rural clinics");
+  });
 });

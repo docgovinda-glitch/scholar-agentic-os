@@ -326,40 +326,13 @@ export function evaluateRubricCompliance(
   }
 
   // 5. Evaluate individual criteria
-  // If brief.rubricCriteria was provided, use those; otherwise use standard 4 academic pillars
-  const definedCriteria = (brief.rubricCriteria && brief.rubricCriteria.length > 0)
-    ? brief.rubricCriteria.map((c, idx) => ({
-        id: c.id || `crit-${idx}`,
-        name: c.criterion || c.title || `Criterion ${idx + 1}`,
-        weight: c.weightPercentage || c.weightPercent || Math.round(100 / brief.rubricCriteria!.length),
-        description: c.description || c.expectedStandard || "",
-      }))
-    : [
-        {
-          id: "crit-analysis",
-          name: "Critical Analysis & Argumentation",
-          weight: 35,
-          description: "Depth of analytical reasoning, dialectical evaluation, and counter-perspectives.",
-        },
-        {
-          id: "crit-evidence",
-          name: "Evidence & Scholarly Grounding",
-          weight: 30,
-          description: "Rigorous substantiation using peer-reviewed sources and verified in-text citations.",
-        },
-        {
-          id: "crit-structure",
-          name: "Structure & Academic Coherence",
-          weight: 20,
-          description: "Proportional word distribution, paragraph progression, and logical flow.",
-        },
-        {
-          id: "crit-presentation",
-          name: "Academic Style & Presentation",
-          weight: 15,
-          description: "Formal academic register, conceptual clarity, and citation style conformance.",
-        },
-      ];
+  // Only the brief's own marking criteria are listed; none are invented when the brief has none.
+  const definedCriteria = (brief.rubricCriteria ?? []).map((c, idx) => ({
+    id: c.id || `crit-${idx}`,
+    name: c.criterion || c.title || `Criterion ${idx + 1}`,
+    weight: c.weightPercentage || c.weightPercent || undefined,
+    description: c.description || c.expectedStandard || "",
+  }));
 
   // Readiness is the share of checks that can be shown to pass. Scholar does
   // not predict marks: no grade, band or per-criterion score is invented.
