@@ -15,7 +15,7 @@
 import * as courseworkPrompts from "./prompts/courseworkPrompts.ts";
 import { searchEuropePmc } from "../../../src/shared/retrieval/providers.ts";
 import { buildAskGeneralPrompt, buildAskSearchPrompt } from "../../../src/shared/askPrompts.ts";
-import { NoAiConnectedError, routedText, RouterHandoffError, toRouterTask } from "../ai/routerBridge.ts";
+import { NoAiConnectedError, routedCompletion as rawRoutedCompletion, routedText, RouterHandoffError, toRouterTask } from "../ai/routerBridge.ts";
 import { BrowserAiRequiredError, LocalModelUnreachableError, NoClientAiProviderError } from "../ai/aiRouteErrors.ts";
 import {
   createChallengeTokenForRequest,
@@ -279,6 +279,14 @@ async function runGatewayCall<T>(kind: string, taskType: string | undefined, fn:
     console.warn(`[scholarBrain] ${kind} failed task=${taskType ?? "reasoning"} ms=${Date.now() - started} error=${name}`);
     throw err;
   }
+}
+
+/** The router call the Coursework agent steps use: timed and logged like the other gateway calls, NFC-normalised, errors rethrown unchanged. */
+export function routedCompletion(...args: Parameters<typeof rawRoutedCompletion>): ReturnType<typeof rawRoutedCompletion> {
+  return runGatewayCall("routed", args[1]?.task, async () => {
+    const text = await rawRoutedCompletion(...args);
+    return typeof text === "string" ? normalizeUnicodeNFC(text) : text;
+  });
 }
 
 export function callOpenRouterJSON<T = any>(...args: Parameters<typeof rawCallOpenRouterJSON>): Promise<T> {

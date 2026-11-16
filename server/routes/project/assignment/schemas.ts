@@ -3,12 +3,13 @@
  * reach a prompt has a type and a length cap; a bad body is a 400, never a
  * crash or an unbounded prompt.
  */
+import { WORD_LIMIT_MAX } from "../../../../src/domain/assignment/wordLimit.ts";
 import type express from "express";
 import { z } from "zod";
 
 const text = (max: number) => z.string().max(max);
 const optText = (max: number) => z.string().max(max).optional();
-const wordCount = z.coerce.number().int().min(0).max(200_000);
+const wordCount = z.coerce.number().int().min(0).max(WORD_LIMIT_MAX);
 
 /** Same 1 MB cap the project save applies to one answer; keeps a prompt sane. */
 const MAX_JSON = 1_000_000;

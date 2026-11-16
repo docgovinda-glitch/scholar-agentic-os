@@ -15,7 +15,7 @@ export interface ApprovableSource {
 }
 
 /** Statuses that allow a source to be approved (must be in approvedIds). */
-const APPROVALABLE_STATUSES = new Set(["kept", "discovered", null, undefined]);
+const APPROVALABLE_STATUSES = new Set(["kept", "unreviewed", null, undefined]);
 
 export function isSourceApproved(source: ApprovableSource, approvedIds: Iterable<string>): boolean {
   // Explicit rejections: removed sources and excluded items are never approved

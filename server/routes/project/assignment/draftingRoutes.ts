@@ -1,3 +1,4 @@
+import { DEFAULT_CITATION_STYLE } from "../../../../src/domain/assignment/answerKeys.ts";
 import { errorText } from "../../../../src/shared/errorText.ts";
 import { parseBody, StreamSectionBody } from "./schemas.ts";
 import express from "express";
@@ -40,7 +41,7 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
     targetWordCount: requestedTarget = 500,
     allocatedWords,
     academicLevel = project.answers["academic_level"] || "undergraduate",
-    citationStyle = project.answers["citation_style"] || "apa7",
+    citationStyle = project.answers["citation_style"] || DEFAULT_CITATION_STYLE,
     assignmentTopic = project.answers["assignment_brief"] || "",
     thesis = "",
     boundSources = [],

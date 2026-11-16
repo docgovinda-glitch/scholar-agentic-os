@@ -1,6 +1,8 @@
+import { WORD_LIMIT_MAX } from "../../../../src/domain/assignment/wordLimit.ts";
+import { DEFAULT_CITATION_STYLE } from "../../../../src/domain/assignment/answerKeys.ts";
 import { errorText } from "../../../../src/shared/errorText.ts";
 import { parseBody, AnalyzeBody, OutlineBody } from "./schemas.ts";
-import { routedCompletion } from "../../../src/ai/routerBridge.ts";
+import { routedCompletion } from "../../../src/services/scholarBrain.ts";
 import { sendAiFailure,UnusableAiResponseError } from "../../../src/ai/aiRouteErrors.ts";
 import { structureFromAi } from "../../../../src/domain/assignment/aiAssignmentOutline.ts";
 import { scopeBrief } from "../../../../src/domain/assignment/briefScoping.ts";
@@ -50,14 +52,15 @@ const router = express.Router({ mergeParams: true });
 router.post(
   "/parse-brief",
   async (req: express.Request<{ id: string }>, res: express.Response, next: express.NextFunction) => {
+    // Ownership is checked before the upload is read; the handler reuses this project.
     const project = await getProjectSafe(req, res);
     if (!project) return;
+    res.locals.project = project;
     next();
   },
   upload.single("file"),
   async (req: express.Request<{ id: string }>, res: express.Response) => {
-  const project = await getProjectSafe(req, res);
-  if (!project) return;
+  const project = res.locals.project as NonNullable<Awaited<ReturnType<typeof getProjectSafe>>>;
 
   const file = req.file;
   if (!file) {
@@ -132,7 +135,7 @@ router.post(
       wordSlice.match(/(?:^|[^\d,])([1-9]\d{0,2}(?:,\d{3})+|[1-9]\d{2,4})\s*words\b/i);
     if (wordMatch) {
       const parsed = parseInt((wordMatch[1] || "").replace(/,/g, ""), 10);
-      if (parsed >= 200 && parsed <= 50000) {
+      if (parsed >= 200 && parsed <= WORD_LIMIT_MAX) {
         detectedWordCount = parsed;
       }
     } else if (isTutorialOrShortQABrief(cleanedText)) {
@@ -235,7 +238,7 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
   const citationStyle =
     cleanAnswerString(req.body?.citationStyle) ||
     cleanAnswerString(project.answers["citation_style"]) ||
-    "apa7";
+    DEFAULT_CITATION_STYLE;
   const rubricText =
     cleanAnswerString(req.body?.rubricText) ||
     cleanAnswerString(project.answers["marking_rubric"]) ||

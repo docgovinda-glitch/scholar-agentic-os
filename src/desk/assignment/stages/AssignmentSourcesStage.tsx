@@ -1,3 +1,4 @@
+import { DEFAULT_CITATION_STYLE } from "../../../domain/assignment/answerKeys";
 import { SourcesAgentPanel } from "../components/AgentPanels";
 import { filterAndSortSources,normalizeRelevance } from "../services/sourceFilters";
 import { useSourceFilters } from "../components/sources/useSourceFilters";
@@ -39,10 +40,11 @@ import { SourcesCatalog } from "../components/sources/SourcesCatalog";
 import { SourcesQueryBar } from "../components/sources/SourcesQueryBar";
 import { SourcesCourseMaterials } from "../components/sources/SourcesCourseMaterials";
 import { mergeSearchResults } from "../services/sourceMerge";
+import { selectApprovedSources } from "../../../domain/assignment/approvedSources";
 
 /** A source's reference entry in the project's style, from the shared formatter. */
 export function formatSourceReference(source: Partial<DiscoveredSource>, style: string): string {
-  return formatSourceBibliography(source, style || "harvard");
+  return formatSourceBibliography(source, style || DEFAULT_CITATION_STYLE);
 }
 
 
@@ -219,7 +221,7 @@ export default function AssignmentSourcesStage({
 
 
   const handleCopyAllReferences = () => {
-    const approved = allMasterSources.filter((s) => approvedSourceIds.includes(s.id));
+    const approved = selectApprovedSources(allMasterSources, approvedSourceIds);
     const text = approved
       .map((s) => formatSourceReference(s, citationStyle))
       .sort((a, b) => a.localeCompare(b))
@@ -591,7 +593,7 @@ export default function AssignmentSourcesStage({
   }, [mappedUserSources, allCuratedSources]);
 
   const approvedSourcesList = useMemo<DiscoveredSource[]>(() => {
-    return allMasterSources.filter((s) => approvedSourceIds.includes(s.id));
+    return selectApprovedSources(allMasterSources, approvedSourceIds);
   }, [allMasterSources, approvedSourceIds]);
 
   // Filter and sort sources
@@ -844,7 +846,7 @@ export default function AssignmentSourcesStage({
         approvedSources={approvedSourcesList}
         onToggleApproval={handleToggleApproval}
         onProceedToDrafting={handleContinue}
-        citationStyle={citationStyle || "harvard"}
+        citationStyle={citationStyle || DEFAULT_CITATION_STYLE}
         onSaveEditSource={handleSaveSourceUpdates}
       />
     </div>

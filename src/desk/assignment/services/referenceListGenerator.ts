@@ -13,6 +13,7 @@
  */
 
 import type { DiscoveredSource } from "../types";
+import { DEFAULT_CITATION_STYLE } from "../../../domain/assignment/answerKeys";
 import { parsePersonName } from "./personName";
 import { CitationFormatterFactory } from "../../../citation_compliance/formattingEngine";
 import { discoveredSourceToCanonical } from "./sourceCanonical";
@@ -301,7 +302,7 @@ function buildVolumeIssue(source: DiscoveredSource): string {
 }
 
 function normalizeCitationStyle(style: string): string {
-  return (style || "harvard").toLowerCase().replace(/[^a-z0-9]/g, "");
+  return (style || DEFAULT_CITATION_STYLE).toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -316,8 +317,11 @@ export function formatReference(
   style: string,
   index: number = 0
 ): string {
-  // If the source already has a pre-formatted citation and it looks complete, use it
-  if (source.citation && source.citation.trim().length > 30 && !source.retrievalSource) {
+  // A pre-written citation is used only for a source with no structured details to
+  // format (a hand-typed reference). One with authors, title and year is formatted in
+  // the project's style, so changing the style never leaves an old-style entry behind.
+  const hasStructuredDetails = (source.authors ?? []).some((a) => String(a).trim()) && !!source.title?.trim() && !!String(source.year ?? "").trim();
+  if (source.citation && source.citation.trim().length > 30 && !source.retrievalSource && !hasStructuredDetails) {
     return source.citation.trim();
   }
 
@@ -339,7 +343,8 @@ export function formatReference(
     ? null
     : "harvard";
   // A source whose author list was already cut short ("et al.") cannot be
-  // listed in full; the local formatter keeps "Family, I. et al." for it.
+  // listed in full; the local formatters below exist only for that case (and for MHRA,
+  // and if the shared engine throws): they keep "Family, I. et al.".
   const truncatedAuthors = (source.authors || []).some((a) => parsePersonName(String(a)).etAl);
   if (sharedStyle && !truncatedAuthors) {
     try {

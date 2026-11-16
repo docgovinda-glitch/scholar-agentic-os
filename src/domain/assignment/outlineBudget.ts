@@ -19,17 +19,30 @@ export function cleanWordStep(total: number): number {
 export function allocateCleanWords(weights: number[], total: number, remainderIndex?: number, stepOverride?: number): number[] {
   const n = weights.length;
   if (n === 0) return [];
-  const step = stepOverride ?? cleanWordStep(total);
+  let step = stepOverride ?? cleanWordStep(total);
+  // More sections than the step allows (e.g. 11 sections of 100 words): use a finer
+  // step so every section keeps a positive share and the sum stays exact.
+  while (step > 1 && n * step > total) step = step > 5 ? 5 : 1;
   const safe = weights.map((w) => (Number.isFinite(w) && w > 0 ? w : 0));
   const sum = safe.reduce((a, b) => a + b, 0);
   const shares = sum > 0 ? safe.map((w) => w / sum) : safe.map(() => 1 / n);
   const words = shares.map((s) => Math.max(step, Math.round((s * total) / step) * step));
   const largest = remainderIndex ?? words.indexOf(Math.max(...words));
-  const drift = total - words.reduce((a, b) => a + b, 0);
-  words[largest] = Math.max(step, words[largest] + drift);
-  // If the floor pushed the sum over, take the excess from the largest share.
-  const over = words.reduce((a, b) => a + b, 0) - total;
-  if (over !== 0) words[largest] -= over;
+  let drift = total - words.reduce((a, b) => a + b, 0);
+  if (drift >= 0) {
+    words[largest] += drift;
+  } else {
+    // Rounding (and the one-step floor) pushed the sum over: take the excess from the
+    // largest shares first, never below one step (one word when even that cannot fit).
+    while (drift < 0) {
+      const i = words.indexOf(Math.max(...words));
+      const floor = n * step <= total ? step : 1;
+      const take = Math.min(-drift, Math.max(0, words[i] - floor));
+      if (take === 0) break;
+      words[i] -= take;
+      drift += take;
+    }
+  }
   return words;
 }
 

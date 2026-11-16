@@ -4,6 +4,7 @@
  * and PEEL-structured sequential section streaming.
  */
 
+import { DEFAULT_CITATION_STYLE } from "../../../domain/assignment/answerKeys";
 import type { DiscoveredSource,AssignmentDraftingSection } from "../types";
 import { ensureParagraphBreaks } from "../../../shared/proseParagraphs";
 
@@ -71,7 +72,7 @@ export async function streamSectionGeneration(options: StreamSectionOptions): Pr
     section,
     assignmentTopic,
     academicLevel = "undergraduate",
-    citationStyle = "apa7",
+    citationStyle = DEFAULT_CITATION_STYLE,
     approvedSources = [],
     thesis = "",
     revisionPrompt,

@@ -3,6 +3,7 @@
  * shared export pipeline (src/app/export/export.ts) like every other workspace.
  * Pure: safe to import on the server.
  */
+import { DEFAULT_CITATION_STYLE } from "../../../domain/assignment/answerKeys";
 import { z } from "zod";
 import type { Block, CanonicalDocument } from "../../types";
 import type { DiscoveredSource } from "../types";
@@ -76,7 +77,7 @@ export function buildAssignmentCanonicalDocument(input: AssignmentPdfRequest, id
     }
   }
 
-  const style = input.citationStyle || "harvard";
+  const style = input.citationStyle || DEFAULT_CITATION_STYLE;
   const cited = selectCitedSources(input.sources as unknown as DiscoveredSource[], body);
   const refs = generateReferenceList(cited, style);
   if (refs.length) {

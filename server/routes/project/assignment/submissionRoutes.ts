@@ -1,3 +1,4 @@
+import { DEFAULT_CITATION_STYLE } from "../../../../src/domain/assignment/answerKeys.ts";
 import { parseBody, CopilotChatBody } from "./schemas.ts";
 import express from "express";
 import { selectApprovedSources } from "../../../../src/domain/assignment/approvedSources.ts";
@@ -45,7 +46,6 @@ function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
 }
 
-// 13. POST /api/projects/:id/assignment/audit-export
 /**
  * Stage 5 PDF: the submission rendered by the shared export pipeline
  * (same renderer as the other workspaces), returned as a real .pdf file.
@@ -80,9 +80,7 @@ router.post("/export-pdf", async (req: express.Request<{ id: string }>, res) => 
 });
 
 
-// Deterministic Grounded Fallback Response Generator
-
-// 15. POST /api/projects/:id/assignment/copilot-chat
+// POST /api/projects/:id/assignment/copilot-chat
 router.post("/copilot-chat", async (req: express.Request<{ id: string }>, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
@@ -127,7 +125,7 @@ router.post("/copilot-chat", async (req: express.Request<{ id: string }>, res) =
   const citationStyle =
     state.brief?.citationStyle ||
     answers["citation_style"] ||
-    "apa7";
+    DEFAULT_CITATION_STYLE;
 
   const assignmentType =
     state.brief?.assignmentType ||

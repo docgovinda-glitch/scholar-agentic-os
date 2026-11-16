@@ -240,7 +240,7 @@ export const SectionAnalysisWorkspace: React.FC<SectionAnalysisWorkspaceProps> =
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[color:var(--border-subtle)] pb-5">
         <div className="space-y-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wider uppercase bg-emerald-700 text-white dark:bg-emerald-600">
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wider uppercase bg-emerald-700 text-white dark:bg-emerald-700">
               Evidence & Analysis
             </span>
             <span className="text-xs font-semibold text-[color:var(--text-muted)]">
@@ -436,7 +436,7 @@ export const SectionAnalysisWorkspace: React.FC<SectionAnalysisWorkspaceProps> =
                               <button
                                 type="button"
                                 onClick={handleSaveCardEdit}
-                                className="px-3 py-1 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 flex items-center gap-1 cursor-pointer"
+                                className="px-3 py-1 rounded-lg text-xs font-semibold bg-emerald-700 text-white hover:bg-emerald-800 flex items-center gap-1 cursor-pointer"
                               >
                                 <Check className="w-3 h-3" />
                                 <span>Save</span>

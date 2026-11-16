@@ -1,3 +1,4 @@
+import { DEFAULT_CITATION_STYLE } from "../../../../domain/assignment/answerKeys";
 import type { AssignmentSubheading } from "../../types";
 import { ReferenceBarItem } from "../../ReferenceBarItem";
 import { CuratedSourceCard } from "../CuratedSourceCard";
@@ -7,6 +8,7 @@ DiscoveredSource
 import {
 RotateCcw
 } from "lucide-react";
+import { isSourceApproved } from "../../../../domain/assignment/approvedSources";
 
 export interface SourcesCatalogProps {
   approvedSourceIds: string[];
@@ -36,7 +38,7 @@ export function SourcesCatalog({ approvedSourceIds, bookmarkedIds, citationStyle
                     <CuratedSourceCard
                       key={source.id}
                       source={source}
-                      isApproved={approvedSourceIds.includes(source.id)}
+                      isApproved={isSourceApproved(source, approvedSourceIds)}
                       isBookmarked={bookmarkedIds.includes(source.id)}
                       onToggleApproval={handleToggleApproval}
                       onDismiss={handleDismissSource}
@@ -52,10 +54,10 @@ export function SourcesCatalog({ approvedSourceIds, bookmarkedIds, citationStyle
                     />
                   ) : (
                     <ReferenceBarItem
-                      citationStyle={citationStyle || "harvard"}
+                      citationStyle={citationStyle || DEFAULT_CITATION_STYLE}
                       key={source.id}
                       source={source}
-                      isApproved={approvedSourceIds.includes(source.id)}
+                      isApproved={isSourceApproved(source, approvedSourceIds)}
                       isBookmarked={bookmarkedIds.includes(source.id)}
                       onToggleApproval={handleToggleApproval}
                       onDismiss={handleDismissSource}

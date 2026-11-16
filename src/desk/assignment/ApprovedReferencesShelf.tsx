@@ -1,3 +1,4 @@
+import { DEFAULT_CITATION_STYLE } from "../../domain/assignment/answerKeys";
 import React,{ useState } from "react";
 import type { DiscoveredSource } from "./types";
 import { ReferenceBarItem } from "./ReferenceBarItem";
@@ -29,7 +30,7 @@ export const ApprovedReferencesShelf: React.FC<ApprovedReferencesShelfProps> = (
   onSaveEditSource,
   onProceedToDrafting,
   className = "",
-  citationStyle = "harvard",
+  citationStyle = DEFAULT_CITATION_STYLE,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [copiedAll, setCopiedAll] = useState(false);

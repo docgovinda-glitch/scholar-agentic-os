@@ -83,3 +83,12 @@ describe("alignment in the PDF document", () => {
     }
   });
 });
+
+describe("reference style follows the project style", () => {
+  it("formats a source with full details in the chosen style instead of reusing an old citation string", async () => {
+    const { formatReference } = await import("../referenceListGenerator");
+    const src = { id: "s1", title: "Remote work and wellbeing", authors: ["Jane Smith"], year: "2021", journal: "Journal of Work", citation: "Smith, J. (2021). Remote work and wellbeing. Journal of Work." } as never;
+    const ieee = formatReference(src, "ieee", 0);
+    expect(ieee.startsWith("[1]")).toBe(true);
+  });
+});

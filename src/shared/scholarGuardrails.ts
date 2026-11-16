@@ -7,6 +7,7 @@
  * 3. Banned Cliché Stripping & Rephrasing: Neutralizes typical generative LLM tropes ("delve", "tapestry", "pivotal").
  * 4. Syntactic Burstiness Telemetry: Calculates sentence length variance and coefficient of variation (CV).
  */
+import { countProseWords } from "./proseBlocks";
 
 export type ScholarOrthography = "british" | "us";
 
@@ -228,8 +229,7 @@ export function evaluateBurstiness(text: string): {
 }
 
 export function countWords(text: string): number {
-  if (!text || text.trim().length === 0) return 0;
-  return text.trim().split(/\s+/).filter(Boolean).length;
+  return countProseWords(text || "");
 }
 
 /**

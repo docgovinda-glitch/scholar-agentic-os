@@ -1,3 +1,4 @@
+import { DEFAULT_CITATION_STYLE } from "../../../domain/assignment/answerKeys";
 import { hasLeakedTemplateHeadings } from "../../../domain/assignment/legacyPurge";
 import type { SectionAnalyticalSynthesis } from "../types";
 import OutlineByAiPanel from "../components/OutlineByAiPanel";
@@ -94,7 +95,7 @@ export function AssignmentDraftingStage({
     const body = internalSections.map((sec) => `## ${sec.title}\n\n${sec.draftContent || ""}`).join("\n\n");
     const approved = selectApprovedSources(sources, approvedSourceIds);
     // The compiled draft lists only what the text cites, plus the brief's prescribed references.
-    const refs = buildFormattedBibliography(selectCitedSources(approved, body), citationStyle || "harvard");
+    const refs = buildFormattedBibliography(selectCitedSources(approved, body), citationStyle || DEFAULT_CITATION_STYLE);
     return refs.length ? `${body}\n\n## References\n\n${refs.join("\n\n")}` : body;
   }, [internalSections, sources, approvedSourceIds, citationStyle]);
 
@@ -396,7 +397,7 @@ export function AssignmentDraftingStage({
           </div>
           <div className="w-full bg-[color:var(--surface-sunken)] h-1.5 rounded-full overflow-hidden">
             <div
-              className={`h-full rounded-full transition-all duration-300 ${isWordCountCompliant ? "bg-emerald-500" : "bg-neutral-900 dark:bg-white"}`}
+              className={`h-full rounded-full transition-all duration-300 ${isWordCountCompliant ? "bg-emerald-500" : "bg-[color:var(--accent-solid)]"}`}
               style={{ width: `${Math.min(100, wordCountPercentage)}%` }}
             />
           </div>
@@ -524,7 +525,7 @@ export function AssignmentDraftingStage({
             streamingChunk={activeStreamingSectionId === activeSection?.id ? streamingChunk : ""}
             boundSources={approvedSources.filter((s) => activeSection?.boundSourceIds?.includes(s.id))}
             allApprovedSources={approvedSources}
-            citationStyle={citationStyle || "harvard"}
+            citationStyle={citationStyle || DEFAULT_CITATION_STYLE}
             hasPrevious={hasPrevious}
             hasNext={hasNext}
             onNavigatePrevious={() => {
@@ -543,7 +544,7 @@ export function AssignmentDraftingStage({
           {selectCitedSources(approvedSources, internalSections.map((x) => x.draftContent || "").join("\n\n")).length > 0 && (
             <ReferencesCard
               sources={selectCitedSources(approvedSources, internalSections.map((x) => x.draftContent || "").join("\n\n"))}
-              style={citationStyle || "harvard"}
+              style={citationStyle || DEFAULT_CITATION_STYLE}
               savedEdit={typeof project?.answers?.["assignment_reference_list_edit"] === "string" ? (project?.answers?.["assignment_reference_list_edit"] as string) : ""}
               onSaveEdit={(text) => {
                 void saveAnswers?.({ assignment_reference_list_edit: text });

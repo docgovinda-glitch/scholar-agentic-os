@@ -459,11 +459,13 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
       return res.status(400).json({ error: "Missing required field: answers (object)" });
     }
     for (const value of Object.values(answers)) {
+      // null clears a key (see below); every other value must be JSON-serializable.
       if (
+        value !== null &&
         typeof value !== "string" &&
         typeof value !== "number" &&
         typeof value !== "boolean" &&
-        (typeof value !== "object" || value === null)
+        typeof value !== "object"
       ) {
         return res.status(400).json({ error: "Every answer value must be JSON-serializable (string, number, boolean, or object)." });
       }
@@ -472,7 +474,9 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     const spec = catalog.getOrThrow(record.outputTypeId);
     // Coursework settings have one stored name; an update naming an old alias lands on it.
     const patch = record.outputTypeId === "OT-01" ? canonicalizeAssignmentUpdate(answers as Record<string, unknown>) : (answers as Record<string, unknown>);
-    const nextAnswers = { ...record.answers, ...(patch as Record<string, any>) };
+    const nextAnswers: Record<string, any> = { ...record.answers, ...(patch as Record<string, any>) };
+    // A key sent as null is cleared (the client sends null for a value the student removed).
+    for (const [k, v] of Object.entries(patch as Record<string, unknown>)) if (v === null) delete nextAnswers[k];
     const criteria = computeG0ExitCriteria(spec, nextAnswers as any);
 
     try {

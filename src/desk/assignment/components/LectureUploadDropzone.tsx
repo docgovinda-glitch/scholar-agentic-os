@@ -423,11 +423,11 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
 
           {/* Processing Spinner Notification when uploading in background */}
           {isProcessing && (
-            <div className="p-3.5 rounded-2xl bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] border border-neutral-700 flex items-center gap-3 animate-in fade-in duration-150">
-              <Loader2 className="w-4 h-4 text-emerald-400 animate-spin shrink-0" />
+            <div className="p-3.5 rounded-2xl bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] border border-[color:var(--border-default)] flex items-center gap-3 animate-in fade-in duration-150">
+              <Loader2 className="w-4 h-4 animate-spin shrink-0" />
               <div className="text-xs space-y-0.5">
-                <p className="font-semibold text-white">Extracting & indexing source evidence...</p>
-                <p className="text-xs text-neutral-300">{processingStatusText}</p>
+                <p className="font-semibold">Extracting & indexing source evidence...</p>
+                <p className="text-xs opacity-80">{processingStatusText}</p>
               </div>
             </div>
           )}

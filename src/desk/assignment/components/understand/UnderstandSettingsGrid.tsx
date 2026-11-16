@@ -1,3 +1,4 @@
+import { WORD_LIMIT_DEFAULT, WORD_LIMIT_MAX, WORD_LIMIT_STEP } from "../../../../domain/assignment/wordLimit";
 import React from "react";
 import {
 type AcademicLevel,
@@ -45,7 +46,7 @@ export function UnderstandSettingsGrid({ dispatchToneAssistantSuggestions, handl
                   aria-label="Academic Level"
                   value={localLevel}
                   onChange={(e) => handleLevelChange(e.target.value as AcademicLevel)}
-                  className="w-full h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-3 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
+                  className="w-full h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-3 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-solid)] transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
                 >
                   {ACADEMIC_LEVEL_OPTIONS.map((opt) => (
                     <option key={opt.id} value={opt.id}>
@@ -90,7 +91,7 @@ export function UnderstandSettingsGrid({ dispatchToneAssistantSuggestions, handl
                   aria-label="Assignment Type"
                   value={localType}
                   onChange={(e) => handleTypeChange(e.target.value as AssignmentType)}
-                  className="w-full h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-3 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
+                  className="w-full h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-3 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-solid)] transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
                 >
                   {ASSIGNMENT_TYPE_OPTIONS.map((t) => (
                     <option key={t.id} value={t.id}>
@@ -117,7 +118,7 @@ export function UnderstandSettingsGrid({ dispatchToneAssistantSuggestions, handl
                   aria-label="Citation Style"
                   value={localCitation}
                   onChange={(e) => handleCitationChange(e.target.value)}
-                  className="w-full h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-3 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs"
+                  className="w-full h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-3 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-solid)] transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs"
                 >
                   {CITATION_STYLES.map((st) => (
                     <option key={st.id} value={st.id}>
@@ -151,7 +152,7 @@ export function UnderstandSettingsGrid({ dispatchToneAssistantSuggestions, handl
                   value={localTone}
                   onChange={(e) => handleToneChange(e.target.value)}
                   onFocus={dispatchToneAssistantSuggestions}
-                  className="w-full h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-3 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
+                  className="w-full h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-3 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-solid)] transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
                 >
                   {WRITING_TONE_OPTIONS.map((tn) => (
                     <option key={tn.id} value={tn.id}>
@@ -177,8 +178,7 @@ export function UnderstandSettingsGrid({ dispatchToneAssistantSuggestions, handl
                 <button
                   type="button"
                   onClick={() => {
-                    const current = Number(localWordCount) || 2000;
-                    handleTargetWordCountChange(Math.max(100, current - 250));
+                    handleTargetWordCountChange((Number(localWordCount) || WORD_LIMIT_DEFAULT) - WORD_LIMIT_STEP);
                   }}
                   aria-label="Decrease target word count"
                   className="h-8 w-8 rounded-lg border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
@@ -201,27 +201,21 @@ export function UnderstandSettingsGrid({ dispatchToneAssistantSuggestions, handl
                         return;
                       }
                       const val = parseInt(raw, 10);
-                      if (!isNaN(val)) {
-                        const clamped = Math.min(50000, Math.max(0, val));
-                        setLocalWordCount(clamped);
-                        handleWordCountChange(clamped);
-                      }
+                      // Typing only edits the box; the structure is rebuilt when the field is left.
+                      if (!isNaN(val)) setLocalWordCount(Math.min(WORD_LIMIT_MAX, val));
                     }}
                     onBlur={() => {
-                      if (!localWordCount || localWordCount < 100) {
-                        handleTargetWordCountChange(2000);
-                      }
+                      handleTargetWordCountChange(localWordCount);
                     }}
                     aria-label="Target Word Count"
                     placeholder="2000"
-                    className="w-full min-w-[115px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none whitespace-nowrap h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-2 text-center text-xs font-semibold text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white tabular-nums shadow-2xs"
+                    className="w-full min-w-[115px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none whitespace-nowrap h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-2 text-center text-xs font-semibold text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-solid)] tabular-nums shadow-2xs"
                   />
                 </div>
                 <button
                   type="button"
                   onClick={() => {
-                    const current = Number(localWordCount) || 2000;
-                    handleTargetWordCountChange(Math.min(50000, current + 250));
+                    handleTargetWordCountChange((Number(localWordCount) || WORD_LIMIT_DEFAULT) + WORD_LIMIT_STEP);
                   }}
                   aria-label="Increase target word count"
                   className="h-8 w-8 rounded-lg border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"

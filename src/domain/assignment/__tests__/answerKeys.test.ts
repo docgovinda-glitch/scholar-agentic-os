@@ -27,3 +27,16 @@ describe("one stored name per Coursework setting", () => {
     expect(canonicalizeAssignmentUpdate({ word_limit: 1000, word_count: 3000 })).toEqual({ word_limit: 1000 });
   });
 });
+
+describe("normalizeAssignmentAnswers logging", () => {
+  it("does not warn when aliases hold the same value", async () => {
+    const { vi } = await import("vitest");
+    const { normalizeAssignmentAnswers } = await import("../answerKeys");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    normalizeAssignmentAnswers({ word_limit: 1500, word_count: 1500 });
+    expect(warn).not.toHaveBeenCalled();
+    normalizeAssignmentAnswers({ word_limit: 1500, word_count: 900 });
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+  });
+});

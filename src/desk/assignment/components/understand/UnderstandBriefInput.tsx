@@ -87,7 +87,7 @@ export function UnderstandBriefInput({ fileInputRef, handleLevelChange, handleQu
                 onBlur={handleQuestionBlur}
                 rows={4}
                 placeholder="Paste your assignment prompt, essay title, or question here..."
-                className="w-full bg-[color:var(--surface-inset)]/70 border border-[color:var(--border-subtle)] rounded-xl p-3.5 text-xs sm:text-sm text-[color:var(--text-primary)] placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all leading-relaxed resize-y"
+                className="w-full bg-[color:var(--surface-inset)]/70 border border-[color:var(--border-subtle)] rounded-xl p-3.5 text-xs sm:text-sm text-[color:var(--text-primary)] placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-solid)] transition-all leading-relaxed resize-y"
               />
             ) : (
               <DropzoneErrorBoundary onError={() => setParseNotice("Could not parse this document. Please verify the file format or paste the brief text manually.")}>

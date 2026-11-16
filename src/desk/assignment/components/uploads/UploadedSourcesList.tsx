@@ -45,7 +45,7 @@ export function UploadedSourcesList({ activeInspectTabs, assignmentQuestion, cit
                 <div
                   key={doc.id}
                   data-testid={`uploaded-file-${doc.id}`}
-                  className="rounded-2xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-4 sm:p-5 shadow-xs transition-all hover:border-neutral-300 dark:hover:border-white/20 space-y-4"
+                  className="rounded-2xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-4 sm:p-5 shadow-xs transition-all hover:border-[color:var(--border-default)] space-y-4"
                 >
                   {/* Top Card Identity Bar */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[color:var(--border-subtle)]">

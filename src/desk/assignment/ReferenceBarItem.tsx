@@ -1,3 +1,4 @@
+import { DEFAULT_CITATION_STYLE } from "../../domain/assignment/answerKeys";
 import React,{ useState,useRef,useEffect } from "react";
 import { formatSourceInTextCitation } from "./services/citationFormatService";
 import { parsePersonName } from "./services/referenceListGenerator";
@@ -39,7 +40,7 @@ const NUMERIC_STYLES = /^(ieee|vancouver|numeric)/i;
  * In-text citation for a source card, from the shared formatter. A card has no
  * place in the reference order, so numeric styles fall back to author-date.
  */
-export function formatInTextCitation(source: DiscoveredSource, style = "harvard"): string {
+export function formatInTextCitation(source: DiscoveredSource, style = DEFAULT_CITATION_STYLE): string {
   return formatSourceInTextCitation(source, NUMERIC_STYLES.test(style) ? "harvard" : style, 1);
 }
 
@@ -52,7 +53,7 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
   onToggleBookmark,
   onEdit,
   onSaveEdit,
-  citationStyle = "harvard",
+  citationStyle = DEFAULT_CITATION_STYLE,
   className = "",
   showDismiss = true,
 }) => {
@@ -180,7 +181,7 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
       className={`relative h-11 px-3.5 flex items-center justify-between gap-3 bg-[color:var(--surface-raised)] border rounded-xl shadow-2xs dark:shadow-none transition-all group ${
         isApproved
           ? "border-emerald-500/50 bg-emerald-500/[0.02] dark:border-emerald-500/30 dark:bg-emerald-500/[0.03] hover:border-emerald-500/70"
-          : "border-[color:var(--border-subtle)] hover:border-neutral-300 dark:hover:border-white/20"
+          : "border-[color:var(--border-subtle)] hover:border-[color:var(--border-default)]"
       } ${className}`}
     >
       {/* Left Section: Badges & Single-Line Metadata */}
@@ -298,7 +299,7 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
           aria-label={isApproved ? `Remove ${source.title} from approved` : `Approve ${source.title}`}
           className={`px-3 py-1 rounded-full text-xs font-medium transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
             isApproved
-              ? "bg-emerald-600 text-white dark:bg-emerald-500 dark:text-neutral-950 hover:bg-emerald-700"
+              ? "bg-emerald-700 text-white dark:bg-emerald-500 dark:text-neutral-950 hover:bg-emerald-700"
               : "bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 active:scale-[0.99]"
           }`}
         >

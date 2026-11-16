@@ -1,4 +1,5 @@
-import { routedCompletion } from "../../../src/ai/routerBridge.ts";
+import { DEFAULT_CITATION_STYLE } from "../../../../src/domain/assignment/answerKeys.ts";
+import { routedCompletion } from "../../../src/services/scholarBrain.ts";
 import type { ProjectRecord } from "../../../../src/services/store/types.ts";
 import express from "express";
 import { createUploadInstance } from "../../../src/middleware/uploadGuard.ts";
@@ -46,7 +47,7 @@ export function healCorruptedProjectStructure(project: { answers?: Record<string
           assignmentType: (project.answers["assignment_type"] || "essay") as AssignmentType,
           academicLevel: (project.answers["academic_level"] || "undergraduate") as AcademicLevel,
           targetWordCount: targetWords,
-          citationStyle: project.answers["citation_style"] || "apa7",
+          citationStyle: project.answers["citation_style"] || DEFAULT_CITATION_STYLE,
           briefText,
         });
         project.answers["assignment_structure"] = JSON.stringify(repaired);

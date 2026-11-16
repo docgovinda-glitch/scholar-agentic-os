@@ -116,7 +116,7 @@ export function SourcesFilterBar({ activeFilterCount, activeTab, aiResearchCount
                   onClick={() => setActiveTab("approved")}
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                     activeTab === "approved"
-                      ? "bg-emerald-600 text-white shadow-xs dark:shadow-none"
+                      ? "bg-emerald-700 text-white shadow-xs dark:shadow-none"
                       : "bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
                   }`}
                 >
@@ -196,7 +196,7 @@ export function SourcesFilterBar({ activeFilterCount, activeTab, aiResearchCount
                   aria-label="Toggle advanced filters"
                   className={`px-3 py-1.5 rounded-xl text-xs font-medium border flex items-center gap-1.5 transition-colors cursor-pointer ${
                     showAdvancedFilters || activeFilterCount > 0
-                      ? "border-neutral-900 dark:border-white bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] font-semibold"
+                      ? "border-[color:var(--accent-solid)] bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] font-semibold"
                       : "border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] hover:border-neutral-300"
                   }`}
                 >

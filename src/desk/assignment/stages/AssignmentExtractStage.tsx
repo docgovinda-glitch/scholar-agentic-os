@@ -1,3 +1,5 @@
+import { DEFAULT_CITATION_STYLE } from "../../../domain/assignment/answerKeys";
+import { clampWordLimit, WORD_LIMIT_DEFAULT, WORD_LIMIT_MAX, WORD_LIMIT_STEP } from "../../../domain/assignment/wordLimit";
 import { tonePresetOf } from "../types";
 import { ExtractAgentPanel } from "../components/AgentPanels";
 import React,{ useState,useRef,useEffect,useMemo } from "react";
@@ -135,7 +137,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
     if (raw > 50000) return 2000;
     return Math.max(100, Math.min(50000, Math.round(raw)));
   });
-  const [localCitation, setLocalCitation] = useState<string>(citationStyle || "apa7");
+  const [localCitation, setLocalCitation] = useState<string>(citationStyle || DEFAULT_CITATION_STYLE);
   const [localBrief, setLocalBrief] = useState(
     cleanAnswerString(assignmentBriefText) || cleanAnswerString(question)
   );
@@ -224,7 +226,6 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
       setLocalTone(targetTone);
       saveAnswers({
         writing_tone: targetTone,
-        writingTone: targetTone,
         academicTone: targetTone,
         academic_tone: targetTone,
       });
@@ -245,8 +246,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
     if (academicLevel) setLocalLevel((prev) => (prev !== academicLevel ? academicLevel : prev));
     if (assignmentType) setLocalType((prev) => (prev !== assignmentType ? assignmentType : prev));
     if (targetWordCount > 0) {
-      const sanitized =
-        targetWordCount > 50000 ? 2000 : Math.max(100, Math.min(50000, Number(targetWordCount) || 2000));
+      const sanitized = clampWordLimit(targetWordCount);
       setLocalWordCount((prev) => (prev !== sanitized ? sanitized : prev));
     }
     if (citationStyle) setLocalCitation((prev) => (prev !== citationStyle ? citationStyle : prev));
@@ -541,14 +541,9 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
           assignment_question: cleanPrompt,
           assignment_brief_text: cleanPrompt,
           assignment_brief_file: file.name,
-          targetWordCount: newWordCount,
-          target_word_count: newWordCount,
-          word_count: newWordCount,
           word_limit: newWordCount,
           academic_level: nextLevel,
-          academicLevel: nextLevel,
           citation_style: nextCitation,
-          citationStyle: nextCitation,
         });
       } catch (persistErr) {
         console.warn("Could not save the extracted brief yet:", persistErr);
@@ -559,10 +554,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
       let dynamicStruct = generateDynamicAssignmentStructure({
         question: cleanPrompt,
         assignmentType: localType,
-        academicLevel: nextLevel,
-        targetWordCount: newWordCount,
         writingTone: localTone,
-        citationStyle: nextCitation,
       });
 
       let serverAnalysis: AssignmentAnalysis | null = null;
@@ -580,7 +572,6 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
             academicLevel: nextLevel,
             targetWordCount: newWordCount,
             citationStyle: nextCitation,
-            writingTone: localTone,
             writing_tone: localTone,
             briefText: cleanPrompt,
           }
@@ -614,28 +605,18 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
         assignment_prompt: cleanPrompt,
         assignment_question: cleanPrompt,
         assignment_brief_text: cleanPrompt,
-        research_topic: cleanPrompt,
         assignment_brief: cleanPrompt,
         assignment_brief_file: file.name,
-        targetWordCount: newWordCount,
-        target_word_count: newWordCount,
-        word_count: newWordCount,
         word_limit: newWordCount,
         assignment_structure: dynamicStruct,
-        structure: dynamicStruct,
-        sectionBudgets: budgets,
         section_budgets: budgets,
         assignment_internal_sections: internalSecs,
-        assignment_outline: internalSecs,
         sections: legacyBreakdown,
         wordBudget: budget,
         word_budget: budget,
         academic_level: nextLevel,
-        academicLevel: nextLevel,
         citation_style: nextCitation,
-        citationStyle: nextCitation,
         writing_tone: localTone,
-        writingTone: localTone,
       };
 
       if (serverAnalysis) {
@@ -780,7 +761,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
               }}
               rows={4}
               placeholder="Paste your assignment prompt, essay title, or question here..."
-              className="w-full bg-[color:var(--surface-inset)]/70 border border-[color:var(--border-subtle)] rounded-xl p-3.5 text-xs sm:text-sm text-[color:var(--text-primary)] placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all leading-relaxed resize-y"
+              className="w-full bg-[color:var(--surface-inset)]/70 border border-[color:var(--border-subtle)] rounded-xl p-3.5 text-xs sm:text-sm text-[color:var(--text-primary)] placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-solid)] transition-all leading-relaxed resize-y"
             />
           ) : (
             <DropzoneErrorBoundary onError={() => setParseNotice("Could not parse this document. Please verify the file format or paste the brief text manually.")}>
@@ -819,7 +800,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
 
                 {uploadingBrief ? (
                   <div className="flex flex-col items-center justify-center space-y-2.5">
-                    <div className="w-5 h-5 border-2 border-neutral-900 dark:border-white border-t-transparent rounded-full animate-spin" />
+                    <div className="w-5 h-5 border-2 border-[color:var(--accent-solid)] border-t-transparent rounded-full animate-spin" />
                     <p className="text-xs font-medium text-[color:var(--text-primary)]">
                       Extracting assignment questions, word limits &amp; criteria...
                     </p>
@@ -916,7 +897,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                 ASSIGNMENT_TYPE_OPTIONS.find((o) => o.id === localType)?.label,
                 CITATION_STYLES.find((o) => o.id === localCitation)?.name,
                 WRITING_TONE_OPTIONS.find((o) => o.id === localTone)?.label,
-                `${(Number(localWordCount) || 2000).toLocaleString()} words`,
+                `${(Number(localWordCount) || WORD_LIMIT_DEFAULT).toLocaleString()} words`,
               ]
                 .filter(Boolean)
                 .join(" · ")}
@@ -941,7 +922,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                   setLocalLevel(val);
                   saveAnswers({ academic_level: val, academicLevel: val });
                 }}
-                className="w-full h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-3 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
+                className="w-full h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-3 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-solid)] transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
               >
                 {ACADEMIC_LEVEL_OPTIONS.map((lvl) => (
                   <option key={lvl.id} value={lvl.id}>
@@ -998,14 +979,12 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                   setLocalTone(matchedTone);
                   saveAnswers({
                     assignment_type: val,
-                    assignmentType: val,
                     writing_tone: matchedTone,
-                    writingTone: matchedTone,
                     academicTone: matchedTone,
                     academic_tone: matchedTone,
                   });
                 }}
-                className="w-full h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-3 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
+                className="w-full h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-3 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-solid)] transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
               >
                 {ASSIGNMENT_TYPE_OPTIONS.map((t) => (
                   <option key={t.id} value={t.id}>
@@ -1036,7 +1015,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                   setLocalCitation(val);
                   saveAnswers({ citation_style: val, citationStyle: val });
                 }}
-                className="w-full h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-3 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs"
+                className="w-full h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-3 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-solid)] transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs"
               >
                 {CITATION_STYLES.map((st) => (
                   <option key={st.id} value={st.id}>
@@ -1067,7 +1046,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                   setLocalTone(val);
                   saveAnswers({ writing_tone: val, writingTone: val });
                 }}
-                className="w-full h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-3 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
+                className="w-full h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-3 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-solid)] transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
               >
                 {WRITING_TONE_OPTIONS.map((tn) => (
                   <option key={tn.id} value={tn.id}>
@@ -1093,10 +1072,9 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
               <button
                 type="button"
                 onClick={() => {
-                  const current = Number(localWordCount) || 2000;
-                  const next = Math.max(100, current - 250);
+                  const next = clampWordLimit((Number(localWordCount) || WORD_LIMIT_DEFAULT) - WORD_LIMIT_STEP);
                   setLocalWordCount(next);
-                  saveAnswers({ word_count: next, word_limit: next, targetWordCount: next });
+                  saveAnswers({ word_limit: next });
                 }}
                 aria-label="Decrease target word count"
                 className="h-8 w-7.5 rounded-lg border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
@@ -1112,7 +1090,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                   value={
                     isWordCountFocused
                       ? (localWordCount > 0 ? String(localWordCount) : "")
-                      : `${(Number(localWordCount) || 2000).toLocaleString()} words`
+                      : `${(Number(localWordCount) || WORD_LIMIT_DEFAULT).toLocaleString()} words`
                   }
                   onFocus={() => setIsWordCountFocused(true)}
                   onChange={(e) => {
@@ -1122,31 +1100,26 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                       return;
                     }
                     const val = parseInt(raw, 10);
-                    if (!isNaN(val)) {
-                      const clamped = Math.min(50000, Math.max(0, val));
-                      setLocalWordCount(clamped);
-                      saveAnswers({ word_count: clamped, word_limit: clamped, targetWordCount: clamped });
-                    }
+                    // Typing only edits the box; the value is saved when the field is left.
+                    if (!isNaN(val)) setLocalWordCount(Math.min(WORD_LIMIT_MAX, val));
                   }}
                   onBlur={() => {
                     setIsWordCountFocused(false);
-                    const cur = Number(localWordCount);
-                    const sanitized = !cur || isNaN(cur) || cur < 100 ? 2000 : cur > 50000 ? 50000 : cur;
+                    const sanitized = clampWordLimit(localWordCount);
                     setLocalWordCount(sanitized);
-                    saveAnswers({ word_count: sanitized, word_limit: sanitized, targetWordCount: sanitized });
+                    saveAnswers({ word_limit: sanitized });
                   }}
                   aria-label="Target Word Count"
                   placeholder="2,000 words"
-                  className="w-full min-w-[115px] whitespace-nowrap h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-2 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all font-semibold shadow-2xs text-center tabular-nums"
+                  className="w-full min-w-[115px] whitespace-nowrap h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-2 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-solid)] transition-all font-semibold shadow-2xs text-center tabular-nums"
                 />
               </div>
               <button
                 type="button"
                 onClick={() => {
-                  const current = Number(localWordCount) || 2000;
-                  const next = Math.min(50000, current + 250);
+                  const next = clampWordLimit((Number(localWordCount) || WORD_LIMIT_DEFAULT) + WORD_LIMIT_STEP);
                   setLocalWordCount(next);
-                  saveAnswers({ word_count: next, word_limit: next, targetWordCount: next });
+                  saveAnswers({ word_limit: next });
                 }}
                 aria-label="Increase target word count"
                 className="h-8 w-7.5 rounded-lg border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"

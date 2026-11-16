@@ -28,6 +28,9 @@ export const ASSIGNMENT_SETTING_ALIASES = {
   assignment_current_phase: ["assignment_current_stage"],
 } as const;
 
+/** The citation style used until the student picks one (client, server, exports and in-text citations all use this). */
+export const DEFAULT_CITATION_STYLE = "apa7";
+
 export type AssignmentSettingKey = keyof typeof ASSIGNMENT_SETTING_ALIASES;
 
 /** alias -> canonical key */
@@ -57,7 +60,7 @@ export function normalizeAssignmentAnswers<T extends Record<string, unknown>>(an
     const candidates = [canonical, ...aliases].map((k) => src[k]);
     const matches = candidates.filter(hasValue);
     // Log if multiple values found (data quality issue from old saves)
-    if (matches.length > 1) {
+    if (matches.length > 1 && new Set(matches.map((m) => JSON.stringify(m))).size > 1) {
       console.warn(`[normalizeAssignmentAnswers] Multiple values found for "${canonical}"; keeping first`);
     }
     const value = matches.find(hasValue) ?? src[canonical];

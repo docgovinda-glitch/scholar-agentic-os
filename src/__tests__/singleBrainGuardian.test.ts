@@ -113,6 +113,13 @@ describe("Single-Brain Architecture lock", () => {
     expect(fs.readFileSync(path.join(ROOT, "server/src/services/scholarBrain.ts"), "utf8")).toMatch(/courseworkPrompts/);
   });
 
+  it("Coursework routes reach the AI only through scholarBrain's logged wrappers, never routerBridge directly", () => {
+    const offenders = productionFiles(["server/routes/project/assignment"]).filter((rel) =>
+      /ai\/routerBridge/.test(fs.readFileSync(path.join(ROOT, rel), "utf8"))
+    );
+    expect(offenders).toEqual([]);
+  });
+
   it("OT-22 (Presentation Studio) runs its AI only through scholarBrain", () => {
     for (const rel of ["server/routes/project/presentation.ts", "server/routes/presentations.ts"]) {
       const text = fs.readFileSync(path.join(ROOT, rel), "utf8");

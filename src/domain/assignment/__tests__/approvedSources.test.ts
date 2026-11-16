@@ -28,3 +28,12 @@ describe("approved Coursework sources", () => {
     expect(after.sourceOrigins.filter((s) => s.is_approved).map((s) => s.source_id)).toEqual(["y"]);
   });
 });
+
+describe("approval statuses", () => {
+  it("accepts an unreviewed source that is in the approved list, never a removed one", async () => {
+    const { isSourceApproved } = await import("../approvedSources");
+    expect(isSourceApproved({ id: "a", status: "unreviewed" }, ["a"])).toBe(true);
+    expect(isSourceApproved({ id: "a", status: "unreviewed" }, [])).toBe(false);
+    expect(isSourceApproved({ id: "a", status: "removed" }, ["a"])).toBe(false);
+  });
+});

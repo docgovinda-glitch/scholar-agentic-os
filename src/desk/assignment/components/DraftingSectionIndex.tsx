@@ -76,7 +76,7 @@ export function DraftingSectionIndex({
         {/* Mini progress bar */}
         <div className="w-full bg-[color:var(--surface-inset)] h-1.5 rounded-full overflow-hidden">
           <div
-            className="h-full bg-neutral-900 dark:bg-white rounded-full transition-all duration-300"
+            className="h-full bg-[color:var(--accent-solid)] rounded-full transition-all duration-300"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
@@ -203,7 +203,7 @@ export function DraftingSectionIndex({
                     className={`text-xs font-semibold leading-snug line-clamp-2 ${
                       isActive
                         ? "text-[color:var(--text-primary)]"
-                        : "text-[color:var(--text-secondary)] group-hover:text-neutral-900 dark:group-hover:text-white"
+                        : "text-[color:var(--text-secondary)] group-hover:text-[color:var(--text-primary)]"
                     }`}
                   >
                     {section.title}

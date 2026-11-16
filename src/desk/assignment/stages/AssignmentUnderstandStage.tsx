@@ -1,3 +1,5 @@
+import { DEFAULT_CITATION_STYLE } from "../../../domain/assignment/answerKeys";
+import { clampWordLimit, WORD_LIMIT_DEFAULT, WORD_LIMIT_MAX, WORD_LIMIT_MIN, WORD_LIMIT_STEP } from "../../../domain/assignment/wordLimit";
 import { safeParseAnswerField } from "../../../shared/projectStateSchema";
 import { tonePresetOf } from "../types";
 import { UnderstandAgentPanel } from "../components/AgentPanels";
@@ -111,7 +113,7 @@ export default function AssignmentUnderstandStage({
     if (raw > 50000) return 2000; // Auto-heal runaway values
     return Math.max(100, Math.min(50000, Math.round(raw)));
   });
-  const [localCitation, setLocalCitation] = useState<string>(citationStyle || "apa7");
+  const [localCitation, setLocalCitation] = useState<string>(citationStyle || DEFAULT_CITATION_STYLE);
   const [localBrief, setLocalBrief] = useState(
     cleanAnswerString(assignmentBriefText) || cleanAnswerString(question)
   );
@@ -139,7 +141,6 @@ export default function AssignmentUnderstandStage({
       setLocalTone(targetTone);
       saveAnswers({
         writing_tone: targetTone,
-        writingTone: targetTone,
         academicTone: targetTone,
         academic_tone: targetTone,
       });
@@ -184,7 +185,7 @@ export default function AssignmentUnderstandStage({
     if (academicLevel) setLocalLevel((prev) => (prev !== academicLevel ? academicLevel : prev));
     if (assignmentType) setLocalType((prev) => (prev !== assignmentType ? assignmentType : prev));
     if (targetWordCount > 0) {
-      const sanitized = targetWordCount > 50000 ? 2000 : Math.max(100, Math.min(50000, Number(targetWordCount) || 2000));
+      const sanitized = clampWordLimit(targetWordCount);
       setLocalWordCount((prev) => (prev !== sanitized ? sanitized : prev));
     }
     if (citationStyle) setLocalCitation((prev) => (prev !== citationStyle ? citationStyle : prev));
@@ -314,8 +315,7 @@ export default function AssignmentUnderstandStage({
     if (academicLevel) setLocalLevel((prev) => (prev !== academicLevel ? academicLevel : prev));
     if (assignmentType) setLocalType((prev) => (prev !== assignmentType ? assignmentType : prev));
     if (targetWordCount > 0) {
-      const sanitized =
-        targetWordCount > 50000 ? 2000 : Math.max(100, Math.min(50000, Number(targetWordCount) || 2000));
+      const sanitized = clampWordLimit(targetWordCount);
       setLocalWordCount((prev) => (prev !== sanitized ? sanitized : prev));
     }
     if (citationStyle) setLocalCitation((prev) => (prev !== citationStyle ? citationStyle : prev));
@@ -408,8 +408,6 @@ export default function AssignmentUnderstandStage({
         raw_prompt: trimmed,
         instructions: trimmed,
         assignment_question: trimmed,
-        assignment_brief_text: trimmed,
-        research_topic: trimmed,
         assignment_brief: trimmed,
       };
 
@@ -442,8 +440,7 @@ export default function AssignmentUnderstandStage({
   };
 
   const handleTargetWordCountChange = (newCount: number) => {
-    const rawNum = Number(newCount);
-    const validCount = isNaN(rawNum) || rawNum <= 0 ? 2000 : Math.min(50000, Math.max(100, Math.round(rawNum)));
+    const validCount = clampWordLimit(newCount);
     setLocalWordCount(validCount);
 
     if (validCount <= 0) return;
@@ -473,9 +470,6 @@ export default function AssignmentUnderstandStage({
     const internalSecs = structureToInternalSections(updated);
 
     const updates: Record<string, unknown> = {
-      targetWordCount: validCount,
-      target_word_count: validCount,
-      word_count: validCount,
       word_limit: validCount,
     };
 
@@ -509,11 +503,8 @@ export default function AssignmentUnderstandStage({
     const internalSecs = structureToInternalSections(balanced);
     saveAnswers({
       assignment_structure: balanced,
-      structure: balanced,
-      sectionBudgets: budgets,
       section_budgets: budgets,
       assignment_internal_sections: internalSecs,
-      assignment_outline: internalSecs,
       wordBudget: computeWordBudgetFromSections(localWordCount, budgets),
       word_budget: computeWordBudgetFromSections(localWordCount, budgets),
       sections: computeSectionBreakdown(localWordCount, budgets),
@@ -544,10 +535,8 @@ export default function AssignmentUnderstandStage({
     const defaultTone = ARCHETYPE_DEFAULT_TONES[t] || "formal_academic";
     handleToneChange(defaultTone);
     saveAnswers({
-      assignmentType: t,
       assignment_type: t,
       writing_tone: defaultTone,
-      writingTone: defaultTone,
       academicTone: defaultTone,
       academic_tone: defaultTone,
     });
@@ -649,27 +638,15 @@ export default function AssignmentUnderstandStage({
       assignment_prompt: trimmed,
       rawPrompt: trimmed,
       raw_prompt: trimmed,
-      instructions: trimmed,
-      assignment_question: trimmed,
-      assignment_brief_text: localBrief || trimmed,
-      research_topic: trimmed,
       assignment_brief: trimmed,
       academic_level: localLevel,
-      academicLevel: localLevel,
       assignment_type: localType,
-      assignmentType: localType,
-      word_count: localWordCount,
       word_limit: localWordCount,
-      targetWordCount: localWordCount,
-      target_word_count: localWordCount,
       wordBudget: computeWordBudgetFromSections(localWordCount, budgets),
       word_budget: computeWordBudgetFromSections(localWordCount, budgets),
       assignment_structure: confirmedStructure,
-      structure: confirmedStructure,
-      sectionBudgets: budgets,
       section_budgets: budgets,
       assignment_internal_sections: internalSecs,
-      assignment_outline: internalSecs,
       sections: computeSectionBreakdown(localWordCount, budgets),
       writingStyle: {
         ...localStyle,
@@ -679,10 +656,8 @@ export default function AssignmentUnderstandStage({
         ...localStyle,
         preset: localTone as WritingStylePreset,
       },
-      writingTone: localTone,
       writing_tone: localTone,
       citation_style: localCitation,
-      citationStyle: localCitation,
       rubricCriteria: parsedCriteria,
       rubric_criteria: parsedCriteria,
       marking_rubric: rubricText || markingRubricText,
@@ -901,7 +876,6 @@ export default function AssignmentUnderstandStage({
       let dynamicStruct = generateDynamicAssignmentStructure({
         question: cleanPrompt,
         assignmentType: localType,
-        academicLevel: nextLevel,
         targetWordCount: newWordCount,
         writingTone: localTone,
         citationStyle: nextCitation,
@@ -919,16 +893,12 @@ export default function AssignmentUnderstandStage({
         assignment_question: cleanPrompt,
         assignment_prompt: cleanPrompt,
         assignment_brief_text: cleanPrompt,
-        academicLevel: nextLevel,
         academic_level: nextLevel,
         targetWordCount: newWordCount,
         target_word_count: newWordCount,
         word_count: newWordCount,
-        citationStyle: nextCitation,
         citation_style: nextCitation,
         assignment_structure: dynamicStruct,
-        structure: dynamicStruct,
-        sectionBudgets: budgets,
         section_budgets: budgets,
         assignment_internal_sections: internalSecs,
         wordBudget: computeWordBudgetFromSections(newWordCount, budgets),
