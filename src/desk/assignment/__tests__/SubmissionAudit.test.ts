@@ -190,7 +190,7 @@ describe("evaluateRubricCompliance: missing sections", () => {
 
 describe("submission phase completion", () => {
   it("is complete only when the last check left nothing to fix", async () => {
-    const { submissionPasses } = await import("../context/AssignmentContext");
+    const { submissionPasses } = await import("../context/assignmentState");
     expect(submissionPasses(null)).toBe(false);
     expect(submissionPasses({ missingRequirements: ["1 approved source is not cited"] } as never)).toBe(false);
     expect(submissionPasses({ missingRequirements: [] } as never)).toBe(true);

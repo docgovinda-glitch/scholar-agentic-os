@@ -1,7 +1,6 @@
 import { countProseWords } from "../../../shared/proseBlocks";
 import { canonicalizeAssignmentUpdate,normalizeAssignmentAnswers } from "../../../domain/assignment/answerKeys";
 import { selectApprovedSources } from "../../../domain/assignment/approvedSources";
-import { clipHeadingWords } from "../../../utils/briefQuestions";
 import { createContext,useContext,useState,useCallback,useEffect,ReactNode,useMemo,useRef } from "react";
 import { purgeLegacyTemplateText } from "../../../domain/assignment/legacyPurge";
 import type { CanonicalDocument,OutputTypeSpec,ProjectView,RubricReport } from "../../types";
@@ -44,7 +43,6 @@ AssignmentDraftingSection,
 structureToInternalSections,
 structureToSectionBudgets
 } from "../types";
-import { generateDynamicAssignmentStructure } from "../services/dynamicStructure";
 import {
 decomposeWordBudget,
 tuneSectionsToQuestion,
@@ -56,6 +54,8 @@ import { stripCircularReferences } from "../../../utils/briefExtractor";
 import type { CourseworkExecutionMode } from "../../../features/coursework/types/orchestrator";
 import { safeParseAnswerField } from "../../../shared/projectStateSchema";
 import { useCourseworkAgent,type CourseworkAgent } from "./useCourseworkAgent";
+import { buildAssignmentProjectState,computePhaseStatuses } from "./assignmentState";
+import { readInternalSections,readRubricCriteria,readStructure,readSectionBudgets,readApprovedSourceIds,readWritingStyle } from "./answerReaders";
 
 export interface AssignmentContextValue {
   projectId: string;
@@ -183,13 +183,6 @@ export function useAssignmentWorkspace() {
     throw new Error("useAssignmentWorkspace must be used within an AssignmentProvider");
   }
   return context;
-}
-
-/** A submission phase is complete only when its last check found nothing left to fix. */
-export function submissionPasses(report: RubricScoreReport | SubmissionCheckReport | null): boolean {
-  if (!report) return false;
-  if ("missingRequirements" in report && Array.isArray(report.missingRequirements)) return report.missingRequirements.length === 0;
-  return "readyForSubmission" in report ? Boolean(report.readyForSubmission) : false;
 }
 
 export function AssignmentProvider({
@@ -495,16 +488,7 @@ export function AssignmentProvider({
     answers["writing_tone"];
   const rawStyleKey =
     typeof rawStyle === "object" ? JSON.stringify(rawStyle) : String(rawStyle ?? "");
-  const writingStyle: WritingStyleConfig = useMemo(() => {
-    if (rawStyle) {
-      const parsed = safeParseAnswerField<WritingStyleConfig | undefined>(rawStyle, undefined);
-      if (parsed && parsed.preset) return parsed;
-    }
-    return {
-      preset: "analytical",
-      description: "Breaks down causes, patterns, and connections between concepts.",
-    };
-  }, [rawStyleKey]);
+  const writingStyle: WritingStyleConfig = useMemo(() => readWritingStyle({ rawStyle }), [rawStyleKey]);
 
   const setWritingStyle = useCallback(
     async (style: WritingStyleConfig) => {
@@ -537,33 +521,7 @@ export function AssignmentProvider({
     question;
   const assignmentBriefText = briefText;
 
-  const structure: AssignmentStructure = useMemo(() => {
-    const raw = answers["assignment_structure"];
-    if (raw) {
-      const parsed = safeParseAnswerField<AssignmentStructure | undefined>(raw, undefined);
-      if (parsed?.headings && Array.isArray(parsed.headings) && parsed.headings.length > 0) {
-        const isNonMLTopic = !/\b(machine learning|deep learning|neural network|transformer|foundation model)\b/i.test(`${question} ${briefText}`);
-        const hasLeakedML = parsed.headings.some((h: any) =>
-          /Mathematical Formulations|Loss Optimization Landscapes|Algorithmic Architectures/i.test(h.title || "") ||
-          (h.subheadings || []).some((sub: any) => /Mathematical Formulations|Loss Optimization Landscapes|empirical risk minimization/i.test(sub.title || sub.guidance || ""))
-        );
-        const hasClassroomLogistics = parsed.headings.some((h: any) =>
-          /Divide Yourself in Teams|teams of 2|in classroom discussion/i.test(h.title || "")
-        );
-
-        if (!((isNonMLTopic && hasLeakedML) || hasClassroomLogistics)) {
-          return parsed;
-        }
-      }
-    }
-    return generateDynamicAssignmentStructure({
-      question: cleanAnswerString(question),
-      assignmentType,
-      academicLevel,
-      targetWordCount: targetWordCount > 0 ? targetWordCount : 2000,
-      briefText: cleanAnswerString(briefText),
-    });
-  }, [answers, question, assignmentType, academicLevel, targetWordCount, briefText]);
+  const structure: AssignmentStructure = useMemo(() => readStructure({ academicLevel, answers, assignmentType, briefText, question, targetWordCount }), [answers, question, assignmentType, academicLevel, targetWordCount, briefText]);
 
   const setStructure = useCallback(
     async (newStructure: AssignmentStructure) => {
@@ -584,26 +542,7 @@ export function AssignmentProvider({
   const rawBudgets = answers["section_budgets"];
   const rawBudgetsKey =
     typeof rawBudgets === "object" ? JSON.stringify(rawBudgets) : String(rawBudgets ?? "");
-  const sectionBudgets: SectionBudgetItem[] = useMemo(() => {
-    if (structure?.headings && structure.headings.length > 0) {
-      const converted = structureToSectionBudgets(structure);
-      if (converted.length > 0) return converted;
-    }
-    if (rawBudgets) {
-      const parsed = safeParseAnswerField<SectionBudgetItem[]>(rawBudgets, []);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    }
-    // Baseline allocation
-    const total = targetWordCount > 0 ? targetWordCount : 2000;
-    const intro = Math.round(total * 0.10);
-    const conclusion = Math.round(total * 0.10);
-    const body = Math.max(0, total - intro - conclusion);
-    return [
-      { id: "intro", title: "Introduction", targetWordCount: intro, isCustom: false },
-      { id: "body", title: "Body Paragraphs", targetWordCount: body, isCustom: false },
-      { id: "conclusion", title: "Conclusion", targetWordCount: conclusion, isCustom: false },
-    ];
-  }, [rawBudgetsKey, rawBudgets, structure, targetWordCount]);
+  const sectionBudgets: SectionBudgetItem[] = useMemo(() => readSectionBudgets({ rawBudgets, structure, targetWordCount }), [rawBudgetsKey, rawBudgets, structure, targetWordCount]);
 
   const addCustomSection = useCallback(
     async (title: string, targetWordCountVal: number) => {
@@ -687,53 +626,9 @@ export function AssignmentProvider({
     return safeParseAnswerField<UploadedSourceDocument[]>(raw, []);
   }, [answers]);
 
-  const approvedSourceIds: string[] = useMemo(() => {
-    const raw = answers["approved_source_ids"];
-    if (raw !== undefined && raw !== null) {
-      try {
-        const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-        if (Array.isArray(parsed)) return parsed;
-      } catch {
-        // fallback
-      }
-    }
-    // Until the student approves sources, only the brief's own prescribed
-    // references count as approved; discovered papers wait for a decision.
-    const fromSources = (sources ?? [])
-      .filter((s) => s.status !== "removed" && !s.isExcluded && s.prescribedInBrief)
-      .map((s) => s.id);
-    const fromUploaded = userUploadedSources.map((u) => u.id);
-    return Array.from(new Set([...fromSources, ...fromUploaded]));
-  }, [answers, sources, userUploadedSources, question, citationStyle]);
+  const approvedSourceIds: string[] = useMemo(() => readApprovedSourceIds({ answers, sources, userUploadedSources }), [answers, sources, userUploadedSources, question, citationStyle]);
 
-  const rubricCriteriaList: AssignmentBriefRubricCriterion[] = useMemo(() => {
-    const raw = answers["rubricCriteria"] || answers["rubric_criteria"];
-    if (raw) {
-      try {
-        const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch {
-        // fallback
-      }
-    }
-    // "provisional" is the intake placeholder, not a rubric.
-    const rubricText = cleanAnswerString(answers["marking_rubric"]) || cleanAnswerString(answers["rubric"]);
-    if (rubricText && rubricText.trim()) {
-      const lines = rubricText.split("\n").map((l: string) => l.trim()).filter(Boolean);
-      return lines.slice(0, 8).map((line: string, idx: number) => {
-        const match = line.match(/(.*?)(?:[:\-–—]\s*(\d+)%?|(?:\((\d+)%\)))/);
-        return {
-          id: `rc-${idx + 1}`,
-          title: match ? match[1].replace(/^[0-9]+[.)\s]*/, "").trim() : line.slice(0, 50),
-          criterion: match ? match[1].replace(/^[0-9]+[.)\s]*/, "").trim() : line.slice(0, 50),
-          description: line,
-          weightPercentage: match ? parseInt(match[2] || match[3] || "0", 10) || undefined : undefined,
-          weightPercent: match ? parseInt(match[2] || match[3] || "0", 10) || undefined : undefined,
-        };
-      });
-    }
-    return [];
-  }, [answers]);
+  const rubricCriteriaList: AssignmentBriefRubricCriterion[] = useMemo(() => readRubricCriteria({ answers }), [answers]);
 
   const evidenceItems: EvidenceItem[] = useMemo(() => {
     const raw = answers["assignment_evidence_items"];
@@ -751,50 +646,7 @@ export function AssignmentProvider({
     return safeParseAnswerField<OutlineSection[]>(raw, []);
   }, [answers]);
 
-  const internalSections: AssignmentDraftingSection[] = useMemo(() => {
-    const isNonML = !/\b(machine learning|deep learning|neural network|transformer|foundation model)\b/i.test(`${question} ${briefText}`);
-    const isCorrupted = (list: any[]) =>
-      list.some((sec: any) =>
-        (isNonML && /Mathematical Formulations|Loss Optimization Landscapes|Algorithmic Architectures/i.test(sec.title || "")) ||
-        /Divide Yourself in Teams|teams of 2|in classroom discussion/i.test(sec.title || "")
-      );
-
-    const rawInternal = answers["assignment_internal_sections"];
-    if (rawInternal) {
-      const parsed = safeParseAnswerField<any[]>(rawInternal, []);
-      // Word counts always come from the text: a stored count can be stale after
-      // a write that did not refresh it (server-side revisions, older saves).
-      if (Array.isArray(parsed) && parsed.length > 0 && !isCorrupted(parsed)) {
-        return parsed.map((sec) => ({
-          ...sec,
-          // Older saves clipped titles with a trailing "…"; show them cut at a clean word.
-          ...(typeof sec?.title === "string" && /…\s*$/.test(sec.title) ? { title: clipHeadingWords(sec.title) } : {}),
-          currentWordCount: countProseWords(sec?.draftContent || ""),
-        }));
-      }
-    }
-    const rawOutline = answers["assignment_internal_sections"];
-    if (rawOutline) {
-      const parsed = safeParseAnswerField<any[]>(rawOutline, []);
-      if (Array.isArray(parsed) && parsed.length > 0 && !isCorrupted(parsed)) {
-        return parsed.map((sec: any) => ({
-          id: sec.id,
-          title: sec.title,
-          targetWordCount: sec.targetWordCount,
-          currentWordCount: countProseWords(sec.draftContent || ""),
-          guidance: sec.guidance || "",
-          draftContent: sec.draftContent || "",
-          status: sec.draftContent?.trim() ? "completed" : sec.status || "pending",
-          keyPoints: sec.keyPoints,
-          linkedEvidenceIds: sec.linkedEvidenceIds,
-          boundSourceIds: sec.boundSourceIds || [],
-          academicFunction: sec.academicFunction,
-          sectionType: sec.sectionType || (sec.id.includes("intro") ? "intro" : sec.id.includes("conclusion") ? "conclusion" : "body"),
-        }));
-      }
-    }
-    return [];
-  }, [answers, question, briefText]);
+  const internalSections: AssignmentDraftingSection[] = useMemo(() => readInternalSections({ answers, briefText, question }), [answers, question, briefText]);
 
   const submissionReport: RubricScoreReport | SubmissionCheckReport | null = answers["assignment_submission_report"]
     ? safeParseAnswerField<RubricScoreReport | SubmissionCheckReport | null>(answers["assignment_submission_report"], null)
@@ -1245,19 +1097,7 @@ export function AssignmentProvider({
 
   // Compute 5-phase status
   const phaseStatuses: Record<AssignmentPhaseId, "active" | "completed" | "upcoming"> = useMemo(() => {
-    const hasExtract = Boolean(question && targetWordCount > 0 && citationStyle);
-    const hasUnderstand = Boolean(structure?.isConfirmed || (hasExtract && analysis?.approvedByUser));
-    const hasSources = selectApprovedSources(sources, approvedSourceIds).length > 0;
-    const hasDrafting = currentWordCount >= Math.min(200, targetWordCount * 0.3);
-    const hasSubmission = submissionPasses(submissionReport);
-
-    return {
-      extract: currentPhase === "extract" ? "active" : hasExtract ? "completed" : "upcoming",
-      understand: currentPhase === "understand" ? "active" : hasUnderstand ? "completed" : "upcoming",
-      sources: currentPhase === "sources" ? "active" : hasSources ? "completed" : "upcoming",
-      drafting: currentPhase === "drafting" ? "active" : hasDrafting ? "completed" : "upcoming",
-      submission: currentPhase === "submission" ? "active" : hasSubmission ? "completed" : "upcoming",
-    };
+    return computePhaseStatuses({ question, targetWordCount, citationStyle, structure, analysis, sources, approvedSourceIds, currentWordCount, submissionReport, currentPhase });
   }, [
     question,
     targetWordCount,
@@ -1273,70 +1113,7 @@ export function AssignmentProvider({
 
   // Unified 4-Phase Project State Model (Section 4.2)
   const projectState: AssignmentProjectState = useMemo(() => {
-    return {
-      projectId: activeProjectId,
-      currentPhase,
-      brief: {
-        rawPrompt: question,
-        instructions: question,
-        assignmentTopic: question,
-        targetWordCount,
-        wordBudget: {
-          intro: sections?.intro?.targetWords ?? Math.round(targetWordCount * 0.10),
-          conclusion: sections?.conclusion?.targetWords ?? Math.round(targetWordCount * 0.15),
-          body: sections?.body?.targetWords ?? Math.max(0, targetWordCount - (sections?.intro?.targetWords ?? Math.round(targetWordCount * 0.10)) - (sections?.conclusion?.targetWords ?? Math.round(targetWordCount * 0.15))),
-        },
-        academicLevel,
-        assignmentType,
-        citationStyle,
-        sections,
-        sectionBudgets,
-        writingStyle,
-        writingTone,
-        rubricCriteria: rubricCriteriaList,
-        analysis,
-        briefLedger: analysis?.briefLedger,
-      },
-      sources: {
-        curated: sources,
-        userUploaded: userUploadedSources,
-        approvedSourceIds,
-        evidenceItems,
-      },
-      drafting: {
-        internalSections: internalSections.length > 0 ? internalSections : outline.map((sec) => ({
-          id: sec.id,
-          title: sec.title,
-          targetWordCount: sec.targetWordCount,
-          currentWordCount: sec.currentWordCount,
-          guidance: sec.guidance,
-          draftContent: sec.draftContent || "",
-          status: sec.status,
-          keyPoints: sec.keyPoints,
-          linkedEvidenceIds: sec.linkedEvidenceIds,
-        })),
-        activeSectionId: activeSectionId || internalSections[0]?.id || outline[0]?.id || null,
-        fullDocumentMarkdown: (internalSections.length > 0 ? internalSections : outline)
-          .map((s) => `## ${s.title}\n\n${s.draftContent || ""}`)
-          .join("\n\n"),
-        overallWordCount: currentWordCount,
-        canonicalDocument: document,
-        thinkingMap,
-      },
-      submission: {
-        rubricScoreReport: submissionReport,
-        citationAudit: citationAuditResult,
-        flowAudit: flowAuditResult,
-        isReadyForSubmission: Boolean(
-          submissionReport &&
-          // Ready only when nothing checkable is outstanding (no score threshold).
-          Array.isArray((submissionReport as { missingRequirements?: unknown[] }).missingRequirements) &&
-          (submissionReport as { missingRequirements: unknown[] }).missingRequirements.length === 0 &&
-          (!citationAuditResult || citationAuditResult.isReconciled)
-        ),
-      },
-      updatedAt: new Date().toISOString(),
-    };
+    return buildAssignmentProjectState({ activeProjectId, currentPhase, question, targetWordCount, sections, academicLevel, assignmentType, citationStyle, sectionBudgets, writingStyle, writingTone, rubricCriteriaList, analysis, sources, userUploadedSources, approvedSourceIds, evidenceItems, internalSections, outline, activeSectionId, currentWordCount, document, thinkingMap, submissionReport, citationAuditResult, flowAuditResult });
   }, [
     activeProjectId,
     currentPhase,
@@ -1534,3 +1311,4 @@ export function AssignmentProvider({
 }
 
 export default AssignmentContext;
+
