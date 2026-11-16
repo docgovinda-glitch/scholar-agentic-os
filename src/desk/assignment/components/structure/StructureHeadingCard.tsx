@@ -67,7 +67,7 @@ export function StructureHeadingCard({ expandedBlueprintHeadings, expandedBluepr
                         }}
                         placeholder="Main Heading Title"
                         aria-label={`Heading ${heading.number}: ${heading.title}`}
-                        className="text-xs sm:text-sm font-semibold text-[color:var(--text-primary)] bg-transparent border-b border-transparent hover:border-neutral-300 dark:hover:border-white/20 focus:border-neutral-500 focus:outline-none py-1 w-full pr-6"
+                        className="text-xs sm:text-sm font-semibold text-[color:var(--text-primary)] bg-transparent border-b border-transparent hover:border-[color:var(--border-default)] focus:border-neutral-500 focus:outline-none py-1 w-full pr-6"
                       />
                       <Edit2 className="w-3 h-3 text-[color:var(--text-muted)] absolute right-1 pointer-events-none opacity-40 group-hover/heading:opacity-100 transition-opacity" />
                     </div>
@@ -131,7 +131,7 @@ export function StructureHeadingCard({ expandedBlueprintHeadings, expandedBluepr
                           onClick={() => handleMoveHeading(hIdx, hIdx - 1)}
                           disabled={hIdx === 0}
                           title="Move heading up"
-                          className="p-1.5 min-w-6 min-h-6 inline-flex items-center justify-center rounded hover:text-neutral-700 dark:hover:text-white hover:bg-[color:var(--surface-hover)] disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
+                          className="p-1.5 min-w-6 min-h-6 inline-flex items-center justify-center rounded hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
                         >
                           <ArrowUp className="w-3 h-3" />
                         </button>
@@ -140,7 +140,7 @@ export function StructureHeadingCard({ expandedBlueprintHeadings, expandedBluepr
                           onClick={() => handleMoveHeading(hIdx, hIdx + 1)}
                           disabled={hIdx === structure.headings.length - 1}
                           title="Move heading down"
-                          className="p-1.5 min-w-6 min-h-6 inline-flex items-center justify-center rounded hover:text-neutral-700 dark:hover:text-white hover:bg-[color:var(--surface-hover)] disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
+                          className="p-1.5 min-w-6 min-h-6 inline-flex items-center justify-center rounded hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
                         >
                           <ArrowDown className="w-3 h-3" />
                         </button>
@@ -171,7 +171,7 @@ export function StructureHeadingCard({ expandedBlueprintHeadings, expandedBluepr
                       <button
                         type="button"
                         onClick={() => handleCreateSubheading(heading.id)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-[color:var(--surface-sunken)]/70 hover:bg-neutral-300 dark:hover:bg-white/15 text-[color:var(--text-secondary)] transition-colors cursor-pointer"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-[color:var(--surface-sunken)]/70 hover:bg-[color:var(--surface-hover)] text-[color:var(--text-secondary)] transition-colors cursor-pointer"
                         title="Add a subheading to this section"
                         aria-label={`Add subheading to section ${heading.number}`}
                       >
@@ -306,7 +306,7 @@ export function StructureHeadingCard({ expandedBlueprintHeadings, expandedBluepr
                       return (
                         <div
                           key={sub.id}
-                          className="p-2.5 sm:p-3 rounded-lg border border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]/70 hover:border-neutral-300 dark:hover:border-white/15 transition-all space-y-2 group/sub"
+                          className="p-2.5 sm:p-3 rounded-lg border border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]/70 hover:border-[color:var(--border-default)] transition-all space-y-2 group/sub"
                         >
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                             {/* Subheading Title & Number */}
@@ -325,7 +325,7 @@ export function StructureHeadingCard({ expandedBlueprintHeadings, expandedBluepr
                                   }}
                                   placeholder="Subheading Title"
                                   aria-label={`Subheading ${sub.numberStr}: ${sub.title}`}
-                                  className="text-xs font-medium text-[color:var(--text-primary)] bg-transparent border-b border-transparent hover:border-neutral-300 dark:hover:border-white/20 focus:border-neutral-500 focus:outline-none py-0.5 truncate w-full pr-5"
+                                  className="text-xs font-medium text-[color:var(--text-primary)] bg-transparent border-b border-transparent hover:border-[color:var(--border-default)] focus:border-neutral-500 focus:outline-none py-0.5 truncate w-full pr-5"
                                 />
                                 <Edit2 className="w-2.5 h-2.5 text-[color:var(--text-muted)] absolute right-1 pointer-events-none opacity-30 group-hover/sub:opacity-100 transition-opacity" />
                               </div>
@@ -341,7 +341,7 @@ export function StructureHeadingCard({ expandedBlueprintHeadings, expandedBluepr
                               <button
                                 type="button"
                                 onClick={() => handleAdjustWords(sub.id, -50)}
-                                className="px-1.5 py-1 text-xs font-mono font-semibold rounded bg-[color:var(--surface-sunken)]/60 hover:bg-neutral-300 dark:hover:bg-white/15 text-[color:var(--text-secondary)] transition-colors cursor-pointer"
+                                className="px-1.5 py-1 text-xs font-mono font-semibold rounded bg-[color:var(--surface-sunken)]/60 hover:bg-[color:var(--surface-hover)] text-[color:var(--text-secondary)] transition-colors cursor-pointer"
                                 title="Decrease by 50 words"
                                 aria-label="-50"
                               >
@@ -359,7 +359,7 @@ export function StructureHeadingCard({ expandedBlueprintHeadings, expandedBluepr
                                     handleExactWords(sub.id, parseInt(e.target.value, 10) || 0)
                                   }
                                   aria-label={`Word count for ${sub.title}`}
-                                  className="w-20 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-md px-2 py-1 text-right text-xs font-semibold text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white pr-6 tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  className="w-20 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-md px-2 py-1 text-right text-xs font-semibold text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-solid)] pr-6 tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 />
                                 <span className="pointer-events-none absolute right-1.5 text-xs text-[color:var(--text-muted)]">
                                   w
@@ -370,7 +370,7 @@ export function StructureHeadingCard({ expandedBlueprintHeadings, expandedBluepr
                               <button
                                 type="button"
                                 onClick={() => handleAdjustWords(sub.id, 50)}
-                                className="px-1.5 py-1 text-xs font-mono font-semibold rounded bg-[color:var(--surface-sunken)]/60 hover:bg-neutral-300 dark:hover:bg-white/15 text-[color:var(--text-secondary)] transition-colors cursor-pointer"
+                                className="px-1.5 py-1 text-xs font-mono font-semibold rounded bg-[color:var(--surface-sunken)]/60 hover:bg-[color:var(--surface-hover)] text-[color:var(--text-secondary)] transition-colors cursor-pointer"
                                 title="Increase by 50 words"
                                 aria-label="+50"
                               >
@@ -384,7 +384,7 @@ export function StructureHeadingCard({ expandedBlueprintHeadings, expandedBluepr
                                   onClick={() => handleMoveSubheading(heading.id, sIdx, sIdx - 1)}
                                   disabled={sIdx === 0}
                                   title="Move subheading up"
-                                  className="p-1.5 min-w-6 min-h-6 inline-flex items-center justify-center rounded hover:text-neutral-700 dark:hover:text-white hover:bg-[color:var(--surface-hover)] disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
+                                  className="p-1.5 min-w-6 min-h-6 inline-flex items-center justify-center rounded hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
                                 >
                                   <ArrowUp className="w-2.5 h-2.5" />
                                 </button>
@@ -393,7 +393,7 @@ export function StructureHeadingCard({ expandedBlueprintHeadings, expandedBluepr
                                   onClick={() => handleMoveSubheading(heading.id, sIdx, sIdx + 1)}
                                   disabled={sIdx === heading.subheadings.length - 1}
                                   title="Move subheading down"
-                                  className="p-1.5 min-w-6 min-h-6 inline-flex items-center justify-center rounded hover:text-neutral-700 dark:hover:text-white hover:bg-[color:var(--surface-hover)] disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
+                                  className="p-1.5 min-w-6 min-h-6 inline-flex items-center justify-center rounded hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
                                 >
                                   <ArrowDown className="w-2.5 h-2.5" />
                                 </button>
@@ -466,7 +466,7 @@ export function StructureHeadingCard({ expandedBlueprintHeadings, expandedBluepr
                                       notifyChange(updated);
                                     }}
                                     placeholder="Focus argument or evidence point..."
-                                    className="flex-1 text-xs py-0.5 px-1.5 rounded bg-transparent border border-transparent hover:border-neutral-200 dark:hover:border-white/10 focus:border-neutral-400 dark:focus:border-white/20 focus:bg-white dark:focus:bg-ink-500 text-[color:var(--text-primary)] transition-colors"
+                                    className="flex-1 text-xs py-0.5 px-1.5 rounded bg-transparent border border-transparent hover:border-[color:var(--border-default)] focus:border-neutral-400 dark:focus:border-white/20 focus:bg-white dark:focus:bg-ink-500 text-[color:var(--text-primary)] transition-colors"
                                   />
                                   <button
                                     type="button"

@@ -821,7 +821,7 @@ export function DraftingActiveEditor({
           <div className="prose prose-neutral dark:prose-invert max-w-none">
             {renderAcademicProseWithCitations(liveContent, handleCitationClick)}
             {isStreaming && (
-              <span className="inline-block w-2 h-4 ml-1 bg-neutral-900 dark:bg-white animate-pulse" />
+              <span className="inline-block w-2 h-4 ml-1 bg-[color:var(--accent-solid)] animate-pulse" />
             )}
           </div>
         ) : (

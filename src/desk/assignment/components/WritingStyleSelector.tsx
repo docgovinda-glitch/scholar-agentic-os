@@ -221,7 +221,7 @@ export default function WritingStyleSelector({
           value={currentPreset}
           onChange={(e) => handleSelect(e.target.value as WritingStylePreset)}
           onFocus={handleFocus}
-          className="w-full max-w-lg bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-xl px-4 py-3 pr-10 text-sm text-[color:var(--text-primary)] shadow-xs dark:shadow-none hover:border-neutral-300 dark:hover:border-white/20 transition-all cursor-pointer focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white appearance-none"
+          className="w-full max-w-lg bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-xl px-4 py-3 pr-10 text-sm text-[color:var(--text-primary)] shadow-xs dark:shadow-none hover:border-[color:var(--border-default)] transition-all cursor-pointer focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-solid)] appearance-none"
         >
           {WRITING_STYLE_OPTIONS.map((opt) => (
             <option
@@ -281,7 +281,7 @@ export default function WritingStyleSelector({
                 onChange={(e) => handleTextChange(e.target.value)}
                 rows={5}
                 placeholder="Paste an excerpt from an essay or paper you have previously written. The drafting engine will analyze your syntactic rhythm, transition words, and vocabulary choice..."
-                className="w-full bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-xl p-3 text-xs text-[color:var(--text-primary)] placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all resize-y leading-relaxed font-sans"
+                className="w-full bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-xl p-3 text-xs text-[color:var(--text-primary)] placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-solid)] transition-all resize-y leading-relaxed font-sans"
               />
             </div>
 
@@ -304,7 +304,7 @@ export default function WritingStyleSelector({
                 onDrop={handleDrop}
                 className={`border border-dashed rounded-xl p-4 flex flex-col items-center justify-center text-center transition-all h-[126px] ${
                   isDragOver
-                    ? "border-neutral-900 dark:border-white bg-[color:var(--surface-inset)]"
+                    ? "border-[color:var(--accent-solid)] bg-[color:var(--surface-inset)]"
                     : "border-[color:var(--border-default)] bg-[color:var(--surface-raised)] hover:border-neutral-400"
                 }`}
               >

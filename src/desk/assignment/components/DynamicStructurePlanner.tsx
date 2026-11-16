@@ -275,7 +275,7 @@ export function DynamicStructurePlanner({
                 onTargetWordCountChange?.(isNaN(val) ? 0 : Math.min(50000, Math.max(0, val)));
               }}
               aria-label="Target Word Count"
-              className="w-32 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-xl px-3 py-1.5 text-right text-xs font-semibold text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white tabular-nums pr-12 shadow-2xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              className="w-32 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-xl px-3 py-1.5 text-right text-xs font-semibold text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-solid)] tabular-nums pr-12 shadow-2xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               placeholder="e.g. 2000"
             />
             <span className="pointer-events-none absolute right-3 text-xs font-medium text-[color:var(--text-muted)]">

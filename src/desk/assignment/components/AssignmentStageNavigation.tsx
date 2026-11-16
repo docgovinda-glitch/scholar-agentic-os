@@ -185,7 +185,7 @@ export default function AssignmentStageNavigation({
                   ? "bg-amber-500"
                   : isOptimal
                   ? "bg-emerald-500"
-                  : "bg-neutral-900 dark:bg-white"
+                  : "bg-[color:var(--accent-solid)]"
               }`}
               style={{ width: `${Math.min(100, wordCountPercentage)}%` }}
             />

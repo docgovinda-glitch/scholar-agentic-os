@@ -397,7 +397,7 @@ export function AssignmentDraftingStage({
           </div>
           <div className="w-full bg-[color:var(--surface-sunken)] h-1.5 rounded-full overflow-hidden">
             <div
-              className={`h-full rounded-full transition-all duration-300 ${isWordCountCompliant ? "bg-emerald-500" : "bg-neutral-900 dark:bg-white"}`}
+              className={`h-full rounded-full transition-all duration-300 ${isWordCountCompliant ? "bg-emerald-500" : "bg-[color:var(--accent-solid)]"}`}
               style={{ width: `${Math.min(100, wordCountPercentage)}%` }}
             />
           </div>

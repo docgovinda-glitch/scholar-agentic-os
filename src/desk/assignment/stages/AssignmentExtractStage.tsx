@@ -781,7 +781,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
               }}
               rows={4}
               placeholder="Paste your assignment prompt, essay title, or question here..."
-              className="w-full bg-[color:var(--surface-inset)]/70 border border-[color:var(--border-subtle)] rounded-xl p-3.5 text-xs sm:text-sm text-[color:var(--text-primary)] placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all leading-relaxed resize-y"
+              className="w-full bg-[color:var(--surface-inset)]/70 border border-[color:var(--border-subtle)] rounded-xl p-3.5 text-xs sm:text-sm text-[color:var(--text-primary)] placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-solid)] transition-all leading-relaxed resize-y"
             />
           ) : (
             <DropzoneErrorBoundary onError={() => setParseNotice("Could not parse this document. Please verify the file format or paste the brief text manually.")}>
@@ -820,7 +820,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
 
                 {uploadingBrief ? (
                   <div className="flex flex-col items-center justify-center space-y-2.5">
-                    <div className="w-5 h-5 border-2 border-neutral-900 dark:border-white border-t-transparent rounded-full animate-spin" />
+                    <div className="w-5 h-5 border-2 border-[color:var(--accent-solid)] border-t-transparent rounded-full animate-spin" />
                     <p className="text-xs font-medium text-[color:var(--text-primary)]">
                       Extracting assignment questions, word limits &amp; criteria...
                     </p>
@@ -942,7 +942,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                   setLocalLevel(val);
                   saveAnswers({ academic_level: val, academicLevel: val });
                 }}
-                className="w-full h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-3 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
+                className="w-full h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-3 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-solid)] transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
               >
                 {ACADEMIC_LEVEL_OPTIONS.map((lvl) => (
                   <option key={lvl.id} value={lvl.id}>
@@ -1006,7 +1006,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                     academic_tone: matchedTone,
                   });
                 }}
-                className="w-full h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-3 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
+                className="w-full h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-3 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-solid)] transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
               >
                 {ASSIGNMENT_TYPE_OPTIONS.map((t) => (
                   <option key={t.id} value={t.id}>
@@ -1037,7 +1037,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                   setLocalCitation(val);
                   saveAnswers({ citation_style: val, citationStyle: val });
                 }}
-                className="w-full h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-3 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs"
+                className="w-full h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-3 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-solid)] transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs"
               >
                 {CITATION_STYLES.map((st) => (
                   <option key={st.id} value={st.id}>
@@ -1068,7 +1068,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                   setLocalTone(val);
                   saveAnswers({ writing_tone: val, writingTone: val });
                 }}
-                className="w-full h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-3 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
+                className="w-full h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-3 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-solid)] transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
               >
                 {WRITING_TONE_OPTIONS.map((tn) => (
                   <option key={tn.id} value={tn.id}>
@@ -1133,7 +1133,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                   }}
                   aria-label="Target Word Count"
                   placeholder="2,000 words"
-                  className="w-full min-w-[115px] whitespace-nowrap h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-2 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all font-semibold shadow-2xs text-center tabular-nums"
+                  className="w-full min-w-[115px] whitespace-nowrap h-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg px-2 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-solid)] transition-all font-semibold shadow-2xs text-center tabular-nums"
                 />
               </div>
               <button

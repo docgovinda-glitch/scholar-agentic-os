@@ -19,7 +19,7 @@ export function SourcesCustomReferenceForm({ customForm, handleAddCustomSource, 
     <>
             {/* Expandable Custom Reference Creation Form */}
             {isAddingCustom && (
-              <div className="p-5 rounded-2xl border-2 border-neutral-900 dark:border-white bg-[color:var(--surface-raised)] shadow-md space-y-4 animate-in fade-in duration-150">
+              <div className="p-5 rounded-2xl border-2 border-[color:var(--accent-solid)] bg-[color:var(--surface-raised)] shadow-md space-y-4 animate-in fade-in duration-150">
                 <div className="flex items-center justify-between border-b border-[color:var(--border-subtle)] pb-3">
                   <div className="flex items-center gap-2">
                     <Plus className="w-4 h-4 text-emerald-600" />
@@ -160,7 +160,7 @@ export function SourcesCustomReferenceForm({ customForm, handleAddCustomSource, 
                     type="button"
                     onClick={handleAddCustomSource}
                     disabled={!customForm.title.trim()}
-                    className="px-5 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer transition-colors shadow-xs disabled:opacity-40"
+                    className="px-5 py-2 rounded-lg text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white cursor-pointer transition-colors shadow-xs disabled:opacity-40"
                   >
                     Add & Approve Reference
                   </button>

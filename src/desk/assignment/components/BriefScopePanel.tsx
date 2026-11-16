@@ -79,7 +79,7 @@ export default function BriefScopePanel({
                 key={o.id}
                 type="button"
                 onClick={() => onAnswer(q.id, o.id)}
-                className="px-2.5 py-1 rounded-lg text-xs border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] hover:border-neutral-400 dark:hover:border-white/30 text-[color:var(--text-primary)] cursor-pointer"
+                className="px-2.5 py-1 rounded-lg text-xs border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] hover:border-[color:var(--border-default)] text-[color:var(--text-primary)] cursor-pointer"
               >
                 {o.label}
               </button>

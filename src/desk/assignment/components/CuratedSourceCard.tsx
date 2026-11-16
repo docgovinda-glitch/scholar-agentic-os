@@ -92,7 +92,7 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
       className={`relative p-5 rounded-2xl border transition-all duration-200 flex flex-col justify-between space-y-4 bg-[color:var(--surface-raised)] shadow-xs ${
         isApproved
           ? "border-emerald-500/60 ring-1 ring-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/10"
-          : "border-[color:var(--border-subtle)] hover:border-neutral-300 dark:hover:border-white/20"
+          : "border-[color:var(--border-subtle)] hover:border-[color:var(--border-default)]"
       } ${className}`}
     >
       {/* Top Bar: Badges, Relevance & Bookmark */}
@@ -462,7 +462,7 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
           aria-label={isApproved ? `Remove ${source.title} from approved` : `Approve ${source.title}`}
           className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs ${
             isApproved
-              ? "bg-emerald-600 text-white hover:bg-emerald-700"
+              ? "bg-emerald-700 text-white hover:bg-emerald-800"
               : "bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)]"
           }`}
         >
