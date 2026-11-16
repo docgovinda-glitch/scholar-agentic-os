@@ -5,10 +5,9 @@ import {
   parseUnderstanding,
   parseSourceAnalysis,
   parseReview,
-  extractUserPrompt,
-  understandUserPrompt,
   type Extraction,
 } from "../assignmentAgent";
+import { extractUserPrompt, understandUserPrompt } from "../../../../server/src/services/prompts/courseworkPrompts";
 
 const BRIEF =
   "MSc Marketing. Assessment 1 (60%): Write a 2,500-word report evaluating how a UK retailer of your choice uses social media to build customer engagement. Use at least 8 academic sources and Harvard referencing. Marking criteria: critical analysis 40%, use of theory 25%.";
@@ -103,5 +102,37 @@ describe("Review", () => {
     expect(r.unsupportedClaims.map((c) => c.quote)).toEqual(["Engagement rose by 40% in 2023"]);
     expect(r.argument[0].quote).toBeUndefined();
     expect(r.language).toHaveLength(1);
+  });
+});
+
+describe("parseEvidenceExtraction", () => {
+  const input = {
+    question: "Evaluate how central banks steer inflation expectations.",
+    title: "Week 3 slides",
+    sourceType: "pptx",
+    passages: [{ location: "Slide 4", text: "Forward guidance shapes expectations of future policy rates. It works when the bank is credible." }],
+  };
+
+  it("keeps only excerpts that appear word for word in the passages", async () => {
+    const { parseEvidenceExtraction } = await import("../assignmentAgent");
+    const out = parseEvidenceExtraction(
+      JSON.stringify({
+        title: "Monetary policy, week 3",
+        excerpts: [
+          { excerpt: "Forward guidance shapes expectations of future policy rates.", claim: "Guidance matters" },
+          { excerpt: "Quantitative easing doubled bank lending in 2010.", claim: "Invented" },
+        ],
+      }),
+      input
+    )!;
+    expect(out.excerpts.map((e) => e.claim)).toEqual(["Guidance matters"]);
+    expect(out.title).toBe("Monetary policy, week 3");
+  });
+
+  it("drops an author or year the passages do not support as a plain value", async () => {
+    const { parseEvidenceExtraction } = await import("../assignmentAgent");
+    const out = parseEvidenceExtraction(JSON.stringify({ author: "unknown", year: "around 2020", excerpts: [] }), input)!;
+    expect(out.author).toBeUndefined();
+    expect(out.year).toBeUndefined();
   });
 });

@@ -1,78 +1,45 @@
 import { routedCompletion } from "../../../src/ai/routerBridge.ts";
-import { sendAiFailure, UnusableAiResponseError } from "../../../src/ai/aiRouteErrors.ts";
-import { assignmentOutlinePrompt, assignmentOutlineUserPrompt, structureFromAi } from "../../../../src/domain/assignment/aiAssignmentOutline.ts";
+import { sendAiFailure,UnusableAiResponseError } from "../../../src/ai/aiRouteErrors.ts";
+import { structureFromAi } from "../../../../src/domain/assignment/aiAssignmentOutline.ts";
 import { scopeBrief } from "../../../../src/domain/assignment/briefScoping.ts";
 import type { AssignmentDraftingSection } from "../../../../src/desk/assignment/types.ts";
 import express from "express";
 import { parseDocument } from "../../../../src/document_intelligence/index.ts";
 import {
-  buildScholarlyVoiceSystemPrompt,
-  sanitizeScholarlyText,
-  normalizeUnicodeNFC,
+normalizeUnicodeNFC
 } from "../../../src/utils/scholarlyVoiceGuard.ts";
 import { getProjectStore } from "../../../../src/services/store/projectStore.ts";
-import { callOpenRouterJSON, callOpenRouterText } from "../../../src/services/scholarBrain.ts";
-import { requestKeyring } from "../../../src/ai/routerBridge.ts";
 import { scholarBrain } from "../../../src/services/scholarBrain.ts";
 import {
-  auditDocumentLineByLine,
-  runBriefScannerGraph,
-  COMMAND_VERB_MAP,
-  type DocumentRequirement,
+auditDocumentLineByLine,COMMAND_VERB_MAP,
+type DocumentRequirement
 } from "../../../services/briefScannerGraph.ts";
 import type {
-  AssignmentAnalysis,
-  CommandVerbDetail,
-  CoreResearchQuestion,
-  RecommendedSearchStrategy,
-  ResearchPlan,
-  TutorWorkspacePatch,
-  DiscoveredSource,
+AssignmentAnalysis,
+CommandVerbDetail
 } from "../../../../src/desk/assignment/types.ts";
 import {
-  cleanAnswerString,
-  extractStandardizedInstructions,
-  normalizeProjectAnswers,
-  getSectionPromptGuidelines,
-  structureToInternalSections,
+cleanAnswerString,
+extractStandardizedInstructions
 } from "../../../../src/desk/assignment/types.ts";
 import {
-  generateDynamicAssignmentStructure,
-  extractBriefInquiriesAndConcepts,
-  sanitizeOutlineHeadings,
-  assignmentStructureToOutlineTree,
-  outlineTreeToAssignmentStructure,
+generateDynamicAssignmentStructure,
+extractBriefInquiriesAndConcepts,assignmentStructureToOutlineTree
 } from "../../../../src/desk/assignment/services/outlineService.ts";
 import { sanitizeBrief } from "../../../../src/features/understand/services/briefSanitizer.ts";
-import { classifyScopeBoundaries, stripLineTags } from "../../../../src/features/understand/services/scopeClassifier.ts";
+import { classifyScopeBoundaries } from "../../../../src/features/understand/services/scopeClassifier.ts";
 import {
-  isClassroomLogisticsLine,
-  isTutorialOrShortQABrief,
-  extractSubstantiveBriefQuestions,
-  stripSlideArtifacts,
-  stripCourseCodes,
+isClassroomLogisticsLine,
+isTutorialOrShortQABrief,
+extractSubstantiveBriefQuestions,
+stripSlideArtifacts,
+stripCourseCodes,
 } from "../../../../src/utils/briefExtractor.ts";
-import { buildBriefSummary, extractPrescribedReferences } from "../../../../src/utils/briefQuestions.ts";
-import { discoverMultiPortalSources, type DiscoveredSourceDraft } from "../../../src/discovery/discovery.ts";
+import { buildBriefSummary,extractPrescribedReferences } from "../../../../src/utils/briefQuestions.ts";
 import {
-  replaceBracketTokensWithDeterministicCitations,
-  compileDeterministicBibliographyMarkdown,
-  formatAskScholarInText,
-  formatAskScholarBibliographyEntry,
-  type WebsiteCitationItem,
-} from "../../../../src/desk/scholarCitationEngine.ts";
-import {
-  upload,
-  getProjectSafe,
-  persistSourcesToSupabase,
-  isCorruptedOutlineHeadings,
-  healCorruptedProjectStructure,
-  safeParseObject,
-  extractProjectInstructions,
-  deriveHeuristicTitle,
-  deriveSemanticAcademicTitle,
-  autoUpdateProjectTitleIfUntitled,
-  buildDeterministicResearchPlan,
+upload,
+getProjectSafe,safeParseObject,deriveSemanticAcademicTitle,
+autoUpdateProjectTitleIfUntitled
 } from "./helpers.ts";
 
 const router = express.Router({ mergeParams: true });
@@ -484,8 +451,8 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
     try {
       const aiText = await routedCompletion(req, {
         task: "drafting",
-        systemPrompt: assignmentOutlinePrompt(),
-        userPrompt: assignmentOutlineUserPrompt({
+        systemPrompt: scholarBrain.courseworkPrompts.assignmentOutlinePrompt(),
+        userPrompt: scholarBrain.courseworkPrompts.assignmentOutlineUserPrompt({
           brief: briefText,
           question,
           assignmentType: String(assignmentType),
@@ -574,8 +541,8 @@ export async function writeOutlineForProject(
 
   const aiText = await routedCompletion(req, {
     task: "drafting",
-    systemPrompt: assignmentOutlinePrompt(),
-    userPrompt: assignmentOutlineUserPrompt({
+    systemPrompt: scholarBrain.courseworkPrompts.assignmentOutlinePrompt(),
+    userPrompt: scholarBrain.courseworkPrompts.assignmentOutlineUserPrompt({
       brief: briefText,
       question,
       assignmentType,
@@ -619,6 +586,5 @@ router.post("/outline", async (req: express.Request<{ id: string }>, res: expres
     sendAiFailure(res, err, "Outline");
   }
 });
-router.post("/deconstruct", handleDeconstruct);
 
 export default router;

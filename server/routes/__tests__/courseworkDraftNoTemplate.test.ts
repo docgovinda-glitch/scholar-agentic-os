@@ -197,23 +197,6 @@ describe("Coursework stream-section", () => {
   });
 });
 
-describe("Coursework draft-section", () => {
-  it("an empty AI answer is a 502 with no draft", async () => {
-    const id = await createProject();
-    vi.mocked(callOpenRouterText).mockResolvedValue("");
-    const res = await request(app).post(`/api/projects/${id}/assignment/draft-section`).send({ sectionTitle: "Introduction" });
-    expect(res.status).toBe(502);
-    expect(res.body.draft).toBeUndefined();
-  });
-
-  it("without the user's AI, hands off with a 426", async () => {
-    const id = await createProject();
-    handOffToBrowser();
-    const res = await request(app).post(`/api/projects/${id}/assignment/draft-section`).send({ sectionTitle: "Introduction" });
-    expect(res.status).toBe(426);
-  });
-});
-
 describe("/api/drafting/section", () => {
   it("an empty AI answer is a 502, not a template draft", async () => {
     vi.mocked(callOpenRouterText).mockResolvedValue("");

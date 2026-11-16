@@ -8,7 +8,7 @@ describe("routeUsesClientAi: the user's AI key is sent only to AI routes", () =>
     "/api/drafting/section",
     "/api/projects/p1/agent/draft",
     "/api/projects/p1/agentic/literature",
-    "/api/projects/p1/assignment/research",
+    "/api/projects/p1/assignment/stream-section",
     "/api/projects/p1/thesis/audit",
     "/api/projects/p1/proposal/audit-aims",
     "/api/projects/p1/presentation/generate-deck",

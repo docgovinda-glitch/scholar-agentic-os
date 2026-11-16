@@ -14,6 +14,8 @@ describe("Evidence & Knowledge Panel Traceability", () => {
     fileSize: 2450000,
     uploadedAt: new Date().toISOString(),
     citation: "Smith, J. (2024). Empirical analysis of autonomous systems. Oxford University Press.",
+    author: "Smith, J.",
+    publicationDate: "2024",
     abstract: "A comprehensive investigation of algorithmic governance and structural accountability.",
     keyFindings: [
       "Algorithmic decision-making systems require independent forensic audit standards.",
@@ -95,19 +97,19 @@ describe("Evidence & Knowledge Panel Traceability", () => {
     expect(within(panel).getByText(/1. Uploaded Material/i)).toBeInTheDocument();
     expect(within(panel).getAllByText("Research_Paper.pdf").length).toBeGreaterThan(0);
     expect(within(panel).getAllByText(/Processed/i).length).toBeGreaterThan(0);
-    expect(within(panel).getByText(/PDF Document/i)).toBeInTheDocument();
+    expect(within(panel).getAllByText(/PDF Document/i).length).toBeGreaterThan(0);
 
     // 2. Engine Extracted Layer
     expect(within(panel).getByText(/2. Engine Extracted/i)).toBeInTheDocument();
     expect(within(panel).getByText(/Abstract:/i)).toBeInTheDocument();
     expect(within(panel).getByText(/Key Findings:/i)).toBeInTheDocument();
-    expect(within(panel).getByText(/Methodology:/i)).toBeInTheDocument();
+    expect(within(panel).getAllByText(/Material:/i).length).toBeGreaterThan(0);
 
     // 3. Used in Assignment Layer
     expect(within(panel).getByText(/3. Used in Assignment/i)).toBeInTheDocument();
-    expect(within(panel).getByText(/3 relevant passages/i)).toBeInTheDocument();
+    expect(within(panel).getByText(/2 relevant passages/i)).toBeInTheDocument();
     expect(within(panel).getByText(/2 findings/i)).toBeInTheDocument();
-    expect(within(panel).getByText(/4 citations/i)).toBeInTheDocument();
+    expect(within(panel).getByText(/1 citations/i)).toBeInTheDocument();
   });
 
   it("allows clicking to expand and inspect extracted excerpts, locators, and assignment usage", () => {
@@ -133,8 +135,9 @@ describe("Evidence & Knowledge Panel Traceability", () => {
     const usedTabBtn = screen.getByRole("button", { name: /Used in Assignment/i });
     fireEvent.click(usedTabBtn);
 
-    expect(screen.getByText(/Passages Mapped into Assignment Sections/i)).toBeInTheDocument();
-    expect(screen.getByText(/Section: Literature Review/i)).toBeInTheDocument();
+    // Only real passages: no invented section mapping.
+    expect(screen.getByText(/Relevant passages from this material/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Section: Literature Review/i)).toBeNull();
     expect(screen.getByText(/In-Text Citation Format/i)).toBeInTheDocument();
     expect(screen.getByText(/\(Smith, 2024\)/i)).toBeInTheDocument();
   });

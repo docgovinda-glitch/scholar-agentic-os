@@ -9,297 +9,10 @@ type Loose = any;
 
 import { buildSectionContract, type ContractSource } from "../../utils/sectionContract.ts";
 import { paragraphRange } from "../../utils/sectionStream.ts";
+import type { EvidenceInput, ExtractInput, Extraction, ReviewInput, SourceForAnalysis } from "../../../../src/domain/assignment/assignmentAgent.ts";
+import type { AssignmentOutlineContext } from "../../../../src/domain/assignment/aiAssignmentOutline.ts";
+import { structureLens } from "../../../../src/domain/assignment/briefScoping.ts";
 
-
-export function auditExportPrompt({ question, assignmentType, academicLevel, targetWordCount, actualWordCount, minWords, maxWords, citationStyle, deconstruction, fullDraft, isWordCountCompliant }: { question: unknown; assignmentType: unknown; academicLevel: unknown; targetWordCount: number; actualWordCount: number; minWords: number; maxWords: unknown; citationStyle: unknown; deconstruction: unknown; fullDraft: string; isWordCountCompliant: unknown }): string {
-  return `You are the Scholar Core Senior Examiner & Rubric Audit Agent.
-Conduct a rigorous submission check on this assignment against university grading standards:
-
-Question: "${question}"
-Type: ${assignmentType}
-Level: ${academicLevel}
-Target Word Count: ${targetWordCount} words (Actual: ${actualWordCount} words, Allowed: ${minWords} - ${maxWords})
-Citation Standard: ${citationStyle}
-Deconstruction Context: ${JSON.stringify(deconstruction || {})}
-
-Full Assignment Draft:
-"""
-${fullDraft.slice(0, 10000)}
-"""
-
-Evaluate strictly across 10 academic dimensions:
-1. question_addressed (Did the student answer all parts of the question?)
-2. argument_logic (Is the central thesis rigorously defended?)
-3. peel_matrix_depth (Are body themes structured with clear Point-Evidence-Explanation-Link?)
-4. counterargument_critique (Were counterarguments proactively addressed?)
-5. evidence_sufficiency (Are claims grounded in peer-reviewed scholarship?)
-6. academic_level (Appropriate for ${academicLevel}?)
-7. word_count (Within ±10% tolerance?)
-8. citation_accuracy (Consistent ${citationStyle} referencing?)
-9. structure_coherence (Smooth transitions and clear introduction/conclusion?)
-10. originality (Independent analysis vs passive summarisation?)
-
-Assign an overall percentage mark (0-100) and grade band:
-- First Class (1st): 70%+
-- Upper Second (2:1): 60-69%
-- Lower Second (2:2): 50-59%
-- Third / Pass: 40-49%
-
-Return ONLY valid JSON matching:
-{
-  "overallScore": 76,
-  "overallBand": "1st_class",
-  "bandLabel": "First Class (1st) — 76%",
-  "summary": "...",
-  "rubricAlignmentScore": 85,
-  "wordCountAdherence": {
-    "actual": ${actualWordCount},
-    "target": ${targetWordCount},
-    "minAllowed": ${minWords},
-    "maxAllowed": ${maxWords},
-    "status": "${isWordCountCompliant ? "compliant" : actualWordCount < minWords ? "under_budget" : "over_budget"}",
-    "deviationPercent": ${Math.round(Math.abs(actualWordCount - targetWordCount) / targetWordCount * 100)}
-  },
-  "criteriaResults": [
-    {
-      "category": "question_addressed",
-      "label": "Question Addressed",
-      "status": "pass",
-      "summary": "...",
-      "feedback": "..."
-    }
-  ],
-  "strengths": ["...", "..."],
-  "priorityFixes": ["..."],
-  "readyForSubmission": true
-}`;
-}
-
-export function draftSectionPrompt({ sectionTitle, assignmentType, genreGuidance, sectionGuidance, userSpecificGuidance, targetWordCount, academicLevel, citationStyle, thesis, keyPoints, evidenceContext, tutorialOrPeelRules }: { sectionTitle: unknown; assignmentType: unknown; genreGuidance: unknown; sectionGuidance: unknown; userSpecificGuidance: unknown; targetWordCount: unknown; academicLevel: unknown; citationStyle: unknown; thesis: unknown; keyPoints: string[]; evidenceContext: unknown; tutorialOrPeelRules: unknown }): string {
-  return `You are the Scholar Core Grounded Academic Drafting Agent.
-Write the draft for section: "${sectionTitle}".
-
-Assignment Type: ${assignmentType}
-${genreGuidance}
-
-Section Guidance: ${sectionGuidance}
-${userSpecificGuidance ? `\n${userSpecificGuidance}\n` : ""}
-Target Word Count: Approximately ${targetWordCount} words
-Academic Level: ${academicLevel} (${academicLevel === "postgraduate" ? "Write with advanced theoretical synthesis, nuanced evaluation, and sophisticated academic prose." : "Write with clear, coherent argumentation, conceptual accuracy, and formal academic tone."})
-Citation Style: ${citationStyle}
-Central Thesis / Stance: "${thesis}"
-Key Points to cover: ${keyPoints.join(", ")}
-
-${evidenceContext}
-
-${tutorialOrPeelRules}`;
-}
-
-export function estimateRubricPrompt({ question, assignmentType, academicLevel, targetWordCount, targetText }: { question: unknown; assignmentType: unknown; academicLevel: unknown; targetWordCount: unknown; targetText: unknown }): string {
-  return `You are the Scholar Core Senior Examiner & Rubric Grading Estimator.
-Grade and estimate marks for this university submission draft based on rigorous UK / International university grading standards:
-- First Class (1st): 70-100%
-- Upper Second Class (2:1): 60-69%
-- Lower Second Class (2:2): 50-59%
-- Third Class (3rd): 40-49%
-- Fail: <40%
-
-Assignment Details:
-Question: "${question}"
-Type: ${assignmentType}
-Level: ${academicLevel}
-Target Word Count: ${targetWordCount}
-
-Draft Content:
-${targetText}
-
-Assess all 4 primary dimensions:
-1. Critical Argumentation & Thesis Depth
-2. Evidence Grounding & Source Synthesis
-3. Structure, Academic Style & Coherence
-4. Command of Theoretical Frameworks & Originality
-
-Return ONLY valid JSON matching:
-{
-  "overallScore": 72,
-  "overallBand": "1st_class",
-  "bandLabel": "First Class (1st) — 72%",
-  "summary": "...",
-  "criteria": [
-    {
-      "id": "crit-1",
-      "criterion": "Critical Argumentation & Thesis Depth",
-      "weightPercent": 30,
-      "currentBand": "1st_class",
-      "score": 72,
-      "maxScore": 100,
-      "critique": "...",
-      "howToReachNextBand": "..."
-    },
-    {
-      "id": "crit-2",
-      "criterion": "Evidence Grounding & Source Synthesis",
-      "weightPercent": 30,
-      "currentBand": "2_1_upper_second",
-      "score": 68,
-      "maxScore": 100,
-      "critique": "...",
-      "howToReachNextBand": "..."
-    },
-    {
-      "id": "crit-3",
-      "criterion": "Structure, Academic Style & Coherence",
-      "weightPercent": 20,
-      "currentBand": "1st_class",
-      "score": 74,
-      "maxScore": 100,
-      "critique": "...",
-      "howToReachNextBand": "..."
-    },
-    {
-      "id": "crit-4",
-      "criterion": "Theoretical Rigour & Academic Level",
-      "weightPercent": 20,
-      "currentBand": "1st_class",
-      "score": 70,
-      "maxScore": 100,
-      "critique": "...",
-      "howToReachNextBand": "..."
-    }
-  ],
-  "keyStrengths": ["...", "..."],
-  "keyRecommendations": ["...", "..."],
-  "targetBandRoadmap": {
-    "targetBand": "High First Class (80%+)",
-    "actionableSteps": ["...", "..."]
-  }
-}`;
-}
-
-export function peelMatrixPrompt({ themeTitle, thesis, targetWords, academicLevel, citationStyle, keyPoints }: { themeTitle: unknown; thesis: unknown; targetWords: unknown; academicLevel: unknown; citationStyle: unknown; keyPoints: unknown }): string {
-  return `You are the Scholar Core PEEL Argument Matrix Agent.
-Construct an academically rigorous, dialectical body theme using the Point-Evidence-Explanation-Link structure:
-
-Theme Title: "${themeTitle}"
-Central Thesis Defended: "${thesis}"
-Target Word Count: ${targetWords} words
-Academic Level: ${academicLevel} (${academicLevel === "postgraduate" ? "Write with advanced theoretical synthesis, nuanced critique, and seamless scholarly integration." : "Ensure clear logical claims, substantiated evidence, critical evaluation, and clear prose."})
-Citation Style: ${citationStyle}
-Key Points to Cover: ${JSON.stringify(keyPoints)}
-
-STRUCTURE TO GENERATE:
-1. P (Point): A precise, declarative topic sentence that directly advances and defends the central thesis.
-2. E (Evidence): Academic grounding, empirical research, or theoretical models (cite realistic peer-reviewed literature in ${citationStyle}).
-3. E (Explanation & Dialectical Critique):
-   - Critical mechanism: Explain why and how this evidence proves the point.
-   - Counterargument: What would a critical scholar, competing school, or opposing framework object?
-   - Rebuttal: How does the argument answer or assimilate that counterargument without weakening the thesis?
-4. L (Link): A synthesising sentence that connects the analysis back to the overall thesis and creates a transition.
-5. Draft Content: The complete, publication-ready academic paragraph (~${targetWords} words) combining these elements with flawless academic prose.
-
-Return ONLY valid JSON matching:
-{
-  "themeTitle": "${themeTitle}",
-  "targetWords": ${targetWords},
-  "currentWords": 0,
-  "point": "Clear topic sentence claim...",
-  "evidence": "Empirical study / theoretical grounding in ${citationStyle}...",
-  "explanation": "Critical mechanism analysis...",
-  "counterargument": "Opposing viewpoint or limitation...",
-  "rebuttal": "Substantiated defense answering the objection...",
-  "link": "Synthesising sentence connecting to thesis...",
-  "draftContent": "Full polished academic prose for this section...",
-  "status": "complete",
-  "linkedSourceIds": []
-}`;
-}
-
-export function planPrompt({ question, assignmentType, academicLevel, analysis, sectionGuidanceNotes }: { question: unknown; assignmentType: unknown; academicLevel: unknown; analysis: unknown; sectionGuidanceNotes: unknown }): string {
-  return `You are the Scholar Core Assignment Research Planning Agent.
-Develop an actionable research plan for this university assignment:
-
-Question: "${question}"
-Type: ${assignmentType}
-Level: ${academicLevel}
-Analysis Context: ${typeof analysis === "string" ? analysis : JSON.stringify(analysis || {})}
-${sectionGuidanceNotes ? `Student Section-Specific Guidance Notes: ${sectionGuidanceNotes}\n` : ""}
-
-Formulate:
-1. 3 to 5 dialectical Core Research Questions (id, question, rationale, category).
-2. 4 to 6 Recommended Search Strategies (id, database, searchQuery with Boolean operators, relevanceTarget).
-3. Main theoretical and empirical concepts.
-4. Key scholarly debates or points of contention.
-5. Specific evidence types needed (peer-reviewed articles, institutional data, case studies).
-6. Clear out-of-scope topics that the student should NOT spend time researching.
-
-Return ONLY valid JSON matching:
-{
-  "coreQuestions": [
-    {
-      "id": "q-1",
-      "question": "...",
-      "rationale": "...",
-      "category": "Theoretical Foundation"
-    }
-  ],
-  "mainConcepts": ["...", "..."],
-  "keyDebates": ["...", "..."],
-  "evidenceTypesNeeded": ["...", "..."],
-  "searchStrategies": [
-    {
-      "id": "strat-1",
-      "database": "Google Scholar",
-      "searchQuery": "\\"...\\" AND \\"...\\"",
-      "relevanceTarget": "..."
-    }
-  ],
-  "outOfScopeTopics": ["...", "..."],
-  "approvedByUser": false
-}`;
-}
-
-export function reviewPrompt({ question, assignmentType, academicLevel, targetWordCount, citationStyle, fullText }: { question: unknown; assignmentType: unknown; academicLevel: unknown; targetWordCount: unknown; citationStyle: unknown; fullText: unknown }): string {
-  return `You are the Scholar Core Senior Academic Reviewer.
-Conduct a rigorous submission check on this assignment draft across the 10 university assessment dimensions:
-
-Question: "${question}"
-Type: ${assignmentType}
-Level: ${academicLevel}
-Target Word Count: ${targetWordCount} words
-Citation Style: ${citationStyle}
-
-Draft Document:
-${fullText}
-
-Evaluate each of the 10 criteria strictly:
-1. question_addressed (Does it fully answer the prompt?)
-2. argument_logic (Is there a clear, reasoned response?)
-3. evidence_sufficiency (Are claims substantiated?)
-4. critical_thinking (Does it analyse rather than merely describe?)
-5. structure_coherence (Does every section contribute?)
-6. rubric_alignment (Satisfies university expectations?)
-7. academic_level (Depth appropriate for ${academicLevel}?)
-8. word_count (Within required limit?)
-9. citation_accuracy (Consistent in ${citationStyle}?)
-10. originality (Academic integrity & authentic argumentation?)
-
-Return ONLY valid JSON matching:
-{
-  "overallScore": 88,
-  "readyForSubmission": true,
-  "criteriaResults": [
-    {
-      "category": "question_addressed",
-      "label": "Question Addressed",
-      "status": "pass",
-      "summary": "...",
-      "feedback": "..."
-    }
-  ],
-  "strengths": ["...", "..."],
-  "priorityFixes": ["..."]
-}`;
-}
 
 export function streamSectionPrompt({ sectionTitle, academicFunction, targetWordCount, budgetRange, academicLevel, citationStyle, thesis, project, assignmentTopic, revisionInstruction, existingBlock, evidencePackPrompt, evidenceBlock, agentBlock, sectionGuidance, sectionIndex, sectionCount, outlineTitles, previousTail, mappedSources, writingStyle, frameworkGuidelines, isShortQA,  }: { sectionTitle: unknown; academicFunction: unknown; targetWordCount: number; budgetRange: { min: number; max: number }; academicLevel: unknown; citationStyle: unknown; thesis: unknown; project: { answers: Record<string, unknown> }; assignmentTopic: unknown; revisionInstruction: unknown; existingBlock: unknown; evidencePackPrompt: unknown; evidenceBlock: unknown; agentBlock: unknown; sectionGuidance: unknown; sectionIndex: unknown; sectionCount: unknown; outlineTitles: unknown; previousTail: unknown; mappedSources: ContractSource[]; writingStyle: unknown; frameworkGuidelines: unknown; isShortQA: unknown;  }): string {
   return `You are the Scholar Core Grounded Academic Drafting Agent.
@@ -348,238 +61,6 @@ export function streamSectionSystemPrompt({ scholarlyDirectives }: { scholarlyDi
   return `You are the Scholar Core Grounded Academic Drafting Agent.\n\n${scholarlyDirectives}`;
 }
 
-export function thesisBudgetPrompt({ question, assignmentType, academicLevel, totalWords, deconstruction, introWords, theme1Words, theme2Words, theme3Words, conclusionWords }: { question: unknown; assignmentType: unknown; academicLevel: unknown; totalWords: unknown; deconstruction: unknown; introWords: unknown; theme1Words: unknown; theme2Words: unknown; theme3Words: unknown; conclusionWords: unknown }): string {
-  return `You are the Scholar Core Thesis Formulation & Word Budgeting Agent.
-For this academic assignment:
-Question: "${question}"
-Type: ${assignmentType}
-Academic Level: ${academicLevel} (${academicLevel === "postgraduate" ? "Demonstrate high theoretical sophistication, critical synthesis, and defensible stance" : "Ensure clarity, logical structure, and strong evidence"})
-Target Word Count: ${totalWords} words
-Deconstruction Context: ${JSON.stringify(deconstruction || {})}
-
-TASKS:
-1. Formulate 3 distinct argumentative, defensible thesis statements:
-   - Stance A (Dialectical Synthesis): Bridges and synthesizes opposing theories/evidence.
-   - Stance B (Critical Challenge): Directly challenges common assumptions or mainstream discourse.
-   - Stance C (Nuanced Contextual / Empirical): Emphasizes situational constraints, empirical boundary conditions, or structural determinants.
-   For each, provide a clear academic rationale and explain how it defends against major counterarguments.
-
-2. Propose 3 focused, dialectical body themes that systematically prove this thesis.
-
-3. Allocate word budget mathematically:
-   - Introduction: ${introWords} words
-   - Body Theme 1: ${theme1Words} words
-   - Body Theme 2: ${theme2Words} words
-   - Body Theme 3: ${theme3Words} words
-   - Conclusion: ${conclusionWords} words
-   Sum: ${totalWords} words (Tolerance: ±10%).
-
-Return ONLY valid JSON matching:
-{
-  "selectedThesis": "...",
-  "thesisRationale": "...",
-  "counterargumentHandling": "...",
-  "alternativeTheses": [
-    {
-      "id": "thesis-synthesis",
-      "statement": "...",
-      "stance": "Dialectical Synthesis",
-      "rationale": "..."
-    },
-    {
-      "id": "thesis-challenge",
-      "statement": "...",
-      "stance": "Critical Challenge",
-      "rationale": "..."
-    },
-    {
-      "id": "thesis-empirical",
-      "statement": "...",
-      "stance": "Nuanced Empirical",
-      "rationale": "..."
-    }
-  ],
-  "totalTargetWords": ${totalWords},
-  "tolerancePercent": 10,
-  "sections": [
-    {
-      "id": "sec-intro",
-      "title": "Introduction & Thesis Statement",
-      "type": "introduction",
-      "targetWordCount": ${introWords},
-      "currentWordCount": 0,
-      "targetPercent": 10,
-      "guidance": "Hook the reader, provide contextual background, articulate central thesis, and define scope.",
-      "keyPoints": ["Historical/theoretical context", "Explicit thesis statement", "Scope and roadmap"]
-    },
-    {
-      "id": "sec-theme-1",
-      "title": "Theme 1: ...",
-      "type": "body_theme",
-      "targetWordCount": ${theme1Words},
-      "currentWordCount": 0,
-      "targetPercent": 25,
-      "guidance": "Examine foundational theoretical premises and initial empirical evidence.",
-      "keyPoints": ["...", "..."]
-    },
-    {
-      "id": "sec-theme-2",
-      "title": "Theme 2: ...",
-      "type": "body_theme",
-      "targetWordCount": ${theme2Words},
-      "currentWordCount": 0,
-      "targetPercent": 25,
-      "guidance": "Evaluate core empirical mechanisms, contradictions, and dialectical tensions.",
-      "keyPoints": ["...", "..."]
-    },
-    {
-      "id": "sec-theme-3",
-      "title": "Theme 3: ...",
-      "type": "body_theme",
-      "targetWordCount": ${theme3Words},
-      "currentWordCount": 0,
-      "targetPercent": 25,
-      "guidance": "Analyze systemic counterarguments, policy/practical implications, and syntheses.",
-      "keyPoints": ["...", "..."]
-    },
-    {
-      "id": "sec-conclusion",
-      "title": "Conclusion & Synthesis",
-      "type": "conclusion",
-      "targetWordCount": ${conclusionWords},
-      "currentWordCount": 0,
-      "targetPercent": 15,
-      "guidance": "Synthesize body findings, reaffirm thesis without mere repetition, state broader scholarly implications.",
-      "keyPoints": ["Synthesis of findings", "Reaffirmation of thesis", "Broader scholarly implications"]
-    }
-  ],
-  "approvedByUser": false
-}`;
-}
-
-export function thinkPrompt({ question, assignmentType, academicLevel, evidence }: { question: unknown; assignmentType: unknown; academicLevel: unknown; evidence: unknown }): string {
-  return `You are the Scholar Core Academic Thinking & Critique Agent.
-Synthesize the scholarly landscape and help the student construct their critical argument and thesis.
-
-Question: "${question}"
-Assignment Type: ${assignmentType}
-Academic Level: ${academicLevel}
-Approved Sources/Evidence: ${JSON.stringify(evidence)}
-
-Identify:
-1. 2-4 distinct scholarly perspectives / schools of thought on this question. For each, identify their core argument, strengths, weaknesses, and underlying assumptions.
-2. Key points of consensus and major points of theoretical/empirical disagreement.
-3. 3 distinct, academically rigorous Thesis Statement options (from moderate to bold/critical), with explanations of how they defend against counterarguments.
-
-Return ONLY valid JSON matching:
-{
-  "perspectives": [
-    {
-      "id": "persp-1",
-      "schoolOfThought": "...",
-      "keyProponents": ["..."],
-      "coreArgument": "...",
-      "strengths": ["..."],
-      "weaknesses": ["..."],
-      "underlyingAssumptions": ["..."]
-    }
-  ],
-  "agreements": ["...", "..."],
-  "disagreements": ["...", "..."],
-  "contradictions": ["...", "..."],
-  "thesisOptions": [
-    {
-      "id": "thesis-1",
-      "statement": "...",
-      "rationale": "...",
-      "counterargumentHandling": "..."
-    }
-  ]
-}`;
-}
-
-export function tutorChatPrompt({ message, mode, stage, academicLevel, assignmentType, question, thesis, targetWordCount, currentWordCount, analysisContext, planContext, draftContext, modeInstruction }: { message: unknown; mode: unknown; stage: unknown; academicLevel: unknown; assignmentType: unknown; question: unknown; thesis: unknown; targetWordCount: unknown; currentWordCount: unknown; analysisContext: unknown; planContext: unknown; draftContext: unknown; modeInstruction: unknown }): string {
-  return `You are the Scholar Core Live Academic Tutor & Rubric Estimator.
-Student's Query: "${message}"
-Active Mode: ${mode}
-Current Phase: ${stage}
-Academic Level: ${academicLevel} (${academicLevel === "postgraduate" ? "Expect deep theoretical critique, counterarguments, and advanced academic vocabulary" : "Focus on conceptual clarity, rigorous evidence, clear argument, and accurate referencing"})
-Assignment Type: ${assignmentType}
-Assignment Question: "${question}"
-Central Thesis: "${thesis}"
-Target Word Count: ${targetWordCount} (Current: ${currentWordCount})
-
-${analysisContext}
-${planContext}
-${draftContext}
-
-${modeInstruction}
-
-BIDIRECTIONAL WORKSPACE SYNCHRONIZATION:
-If the student asks to modify, refine, refocus, or add research questions, search queries, scope boundaries, or assignment parameters
-(e.g., "Focus question 2 on EU AI Act compliance", "Add a search query for algorithmic transparency in JSTOR", "Exclude pre-2015 papers"):
-You MUST populate the "patch" object in your JSON response alongside your conversational advice:
-
-Return ONLY valid JSON matching:
-{
-  "reply": "Conversational, constructive academic response explaining the tutor's advice and any updates made...",
-  "mode": "${mode}",
-  "patch": {
-    "plan": {
-      "coreQuestions": [
-        { "id": "q-1", "question": "...", "rationale": "...", "category": "..." }
-      ],
-      "searchStrategies": [
-        { "id": "strat-1", "database": "...", "searchQuery": "...", "relevanceTarget": "..." }
-      ],
-      "outOfScopeTopics": ["...", "..."]
-    },
-    "analysis": {
-      "keyConcepts": ["...", "..."]
-    },
-    "question": "..."
-  },
-  "socraticQuestions": [ ... ],
-  "rubricEstimation": { ... },
-  "counterArguments": [ ... ],
-  "suggestion": {
-    "type": "rephrase" | "replace_text" | "reduce_words" | "add_evidence",
-    "suggestedText": "..."
-  }
-}`;
-}
-
-export function draftSectionGenreGuidance({ assignmentType }: { assignmentType: unknown }): string {
-  return assignmentType === "reflection"
-        ? "Format: Reflective academic analysis. First-person reflective voice is appropriate where recounting personal or professional experience, tightly integrated with third-person analytical frameworks and literature (e.g. Gibbs' Reflective Cycle)."
-        : assignmentType === "case_study"
-        ? "Format: Strategic case study analysis. Use clear analytical headings, direct evaluation of organizational problems, and evidence-grounded strategic recommendations."
-        : assignmentType === "report" || assignmentType === "business_assignment"
-        ? "Format: Formal report prose. Use structured numbered subheadings, concise analytical paragraphs, and evidence-based recommendations."
-        : assignmentType === "lab_report"
-        ? "Format: Scientific laboratory report. Use objective, empirical scientific terminology with precision."
-        : assignmentType === "policy_analysis"
-        ? "Format: Policy analysis briefing paper. Frame policy options with criteria-based evaluation (feasibility, cost, equity) and concrete recommendations."
-        : "Format: Academic essay. Maintain rigorous paragraph structure (Topic sentence → Evidence & Explanation → Critical Analysis → Transition).";
-}
-
-export function draftSectionRules({ isShortQA, mappedCitationItems, citationStyle }: { isShortQA: unknown; mappedCitationItems: ReadonlyArray<{ id?: unknown }>; citationStyle: unknown }): string {
-  return isShortQA
-      ? `CRITICAL TUTORIAL Q&A GUIDELINES:
-1. Directly answer the question in concise, conversational, and analytically grounded prose (~100-150 words).
-2. Do NOT write generic dissertation introductions, conclusion filler, artificial section summaries, or meta-commentary.
-3. STRICT CITATION CONVENTION: You are strictly PROHIBITED from formatting in-text citations yourself (do NOT write "(Author, Year)" or author names with years) and strictly PROHIBITED from outputting a "References" or "Bibliography" section. When citing approved evidence, insert ONLY bracket tokens [1], [2], or token IDs like [${mappedCitationItems[0]?.id || "ev-id"}]. The citation interceptor will compile all citations deterministically.
-4. Adhere strictly to any custom section guidance provided by the student above.
-5. Provide ONLY the section draft text.`
-      : `CRITICAL RULES:
-1. ONLY cite from the approved evidence provided above. Do NOT fabricate citations, authors, or statistics.
-2. STRICT CITATION CONVENTION: You are strictly PROHIBITED from formatting in-text citations yourself (do NOT write "(Author, Year)", "(Author Year)", or author names with years) and strictly PROHIBITED from outputting any "References", "Bibliography", or "Works Cited" section at the end.
-3. When referencing approved evidence, you MUST insert ONLY bracket tokens like [1], [2], or bracket IDs like [${mappedCitationItems[0]?.id || "ev-id"}]. The deterministic Scholar Citation Interceptor will convert all bracket tokens into certified ${citationStyle} in-text citations and append references.
-4. Maintain rigorous paragraph structure and academic tone.
-5. Adhere strictly to any custom section guidance provided by the student above.
-6. Provide ONLY the section draft text.`;
-}
-
 export function streamSectionRevisionInstruction({ revisionPrompt }: { revisionPrompt: unknown }): string {
   return revisionPrompt === "deepen"
       ? "REVISION FOCUS: Deepen analytical critique. Minimize passive descriptive text and amplify dialectical interrogation of theoretical assumptions (target 70% analysis / 30% description)."
@@ -610,99 +91,6 @@ export function streamSectionFrameworkGuidelines({ isShortQA, mappedSources, cit
 - STRICT CITATION CONVENTION: Do NOT format author-year in-text citations or include a "References" section. All citations will be compiled deterministically by the Citation Interceptor according to ${citationStyle}.
 - Explanation: 70% critical analysis & evaluation / 30% descriptive exposition.
 - Link: Clear concluding transition linking back to the primary assessment prompt.`;
-}
-
-/** The tutor chat's mode-specific instruction block. */
-export function tutorModeInstruction({ mode }: { mode: unknown }): string {
-  let modeInstruction = "";
-  if (mode === "socratic") {
-    modeInstruction = `
-ROLE & SOCRATIC METHOD:
-- You are a Classical Socratic Academic Advisor.
-- Do NOT simply provide finished answers or write the essay for the student.
-- Instead, formulate 2-3 deep, dialectical, thought-provoking questions that challenge underlying premises, identify logical gaps, prompt synthesis across theoretical traditions, or expose unexamined assumptions.
-- Provide "socraticQuestions" array where each object has: { id, question, targetConcept, challengeType ("probe_assumptions" | "request_evidence" | "explore_implications" | "counter_perspective" | "clarify_concepts"), rationale }.`;
-  } else if (mode === "rubric") {
-    modeInstruction = `
-ROLE & RUBRIC GRADING ESTIMATOR:
-- Evaluate the student's current work against standard University Marking Criteria (First Class 70%+, 2:1 Upper Second 60-69%, 2:2 Lower Second 50-59%, 3rd 40-49%, Fail <40%).
-- Provide a rigorous, realistic assessment.
-- Populate "rubricEstimation" with:
-{
-  "overallScore": number (0-100),
-  "overallBand": "1st_class" | "2_1_upper_second" | "2_2_lower_second" | "3rd_class" | "fail",
-  "bandLabel": "First Class (1st) — 74%" (or appropriate),
-  "summary": "...",
-  "criteria": [
-    {
-      "id": "crit-1",
-      "criterion": "Critical Argumentation & Thesis",
-      "weightPercent": 30,
-      "currentBand": "2_1_upper_second",
-      "score": 67,
-      "maxScore": 100,
-      "critique": "...",
-      "howToReachNextBand": "..."
-    },
-    {
-      "id": "crit-2",
-      "criterion": "Evidence Grounding & Source Synthesis",
-      "weightPercent": 30,
-      "currentBand": "1st_class",
-      "score": 75,
-      "maxScore": 100,
-      "critique": "...",
-      "howToReachNextBand": "..."
-    },
-    {
-      "id": "crit-3",
-      "criterion": "Structure, Academic Style & Clarity",
-      "weightPercent": 20,
-      "currentBand": "2_1_upper_second",
-      "score": 68,
-      "maxScore": 100,
-      "critique": "...",
-      "howToReachNextBand": "..."
-    },
-    {
-      "id": "crit-4",
-      "criterion": "Command of Theoretical Frameworks",
-      "weightPercent": 20,
-      "currentBand": "2_1_upper_second",
-      "score": 64,
-      "maxScore": 100,
-      "critique": "...",
-      "howToReachNextBand": "..."
-    }
-  ],
-  "keyStrengths": ["...", "..."],
-  "keyRecommendations": ["...", "..."],
-  "targetBandRoadmap": {
-    "targetBand": "First Class (1st)",
-    "actionableSteps": ["...", "..."]
-  }
-}`;
-  } else if (mode === "counterargument") {
-    modeInstruction = `
-ROLE & COUNTERARGUMENT GENERATOR:
-- Formulate 2-3 rigorous scholarly counterarguments and objections from competing schools of thought or empirical findings.
-- Populate "counterArguments" array with:
-[
-  {
-    "id": "ca-1",
-    "opposingViewpoint": "...",
-    "theoreticalGrounding": "...",
-    "keyScholarsOrSchools": ["...", "..."],
-    "suggestedRebuttalStrategy": "..."
-  }
-]`;
-  } else {
-    modeInstruction = `
-ROLE & ACADEMIC POLISH:
-- Refine prose for formal academic tone, clarity, and conciseness.
-- If applicable, populate "suggestion" with: { "type": "rephrase", "suggestedText": "..." }`;
-  }
-  return modeInstruction;
 }
 
 /**
@@ -792,17 +180,156 @@ Explain predicted marks, highlight priority fixes needed to step up to the next 
 
 /** One-line role prompts for the Coursework agents. */
 export const ROLES = {
-  reviewer: "You are the Scholar Core Senior Academic Reviewer.",
-  tutor: "You are the Scholar Core Pedagogical Academic Tutor.",
-  peelMatrix: "You are the Scholar Core PEEL Argument Matrix Agent.",
-  rubricAudit: "You are the Scholar Core Senior Examiner & Rubric Audit Agent.",
-  researchPlanner: "You are the Scholar Core Assignment Research Planning Agent.",
-  thinkingCritique: "You are the Scholar Core Academic Thinking & Critique Agent.",
-  rubricEstimator: "You are the Scholar Core Senior Examiner & Rubric Grading Estimator.",
-  thesisBudget: "You are the Scholar Core Thesis Formulation & Word Budgeting Agent.",
   titleRegistrar: "You are an expert academic research registrar. Craft a concise, formal academic title (3-7 words).",
 } as const;
 
 export function academicTitlePrompt({ briefText }: { briefText: string }): string {
   return `Generate a concise, academic title (3 to 7 words, e.g. "Quantum Computing Cryptographic Architectures", "Algorithmic Bias in Healthcare") based on this assignment brief. Output ONLY the plain text title, with NO punctuation, NO quotes, NO explanation:\n\n${briefText.slice(0, 1500)}`;
 }
+
+/* ------------------- Coursework agent steps (extract, understand, sources, review) ------------------- */
+// The domain modules keep the types and the parsers that validate the AI's answers;
+// the prompt text lives here, reached through scholarBrain.courseworkPrompts.
+
+const clip = (s: string | undefined, n: number) => (s ?? "").replace(/\s+/g, " ").trim().slice(0, n);
+
+export function extractPrompt(): string {
+  return [
+    "You read a student's assignment brief and any materials they added, and record what the assignment asks for.",
+    "Quote the brief word for word for every question, requirement and marking criterion (the exact words, at least a few words long). Never add a requirement the brief does not state.",
+    "List what is missing that the student must decide or ask their tutor (for example no word count, no referencing style, an unclear question), with why it matters. Do not invent answers to these.",
+    "For each added material, say in one sentence what it contains, from its text only.",
+    'Respond with ONLY JSON: {"task": "<one sentence: what must be produced>", "questions": [{"text": "...", "quote": "<exact words>"}], "requirements": [{"text": "...", "quote": "<exact words>", "kind": "content|format|length|referencing|submission|other"}], "objectives": ["..."], "constraints": {"wordCount": <number or omit>, "citationStyle": "...", "deadline": "...", "format": "...", "level": "..."}, "criteria": [{"criterion": "...", "weight": <percent or omit>, "quote": "<exact words>"}], "materials": [{"name": "...", "summary": "..."}], "missing": [{"question": "...", "why": "..."}]}',
+  ].join("\n");
+}
+
+export function extractUserPrompt(i: ExtractInput): string {
+  const parts = [`Assignment brief:\n${clip(i.brief, 12000) || "(empty)"}`];
+  for (const m of (i.materials ?? []).slice(0, 6)) parts.push(`Material "${clip(m.name, 120)}":\n${clip(m.text, 4000)}`);
+  if (i.clarifications?.trim()) parts.push(`The student's clarifications:\n${clip(i.clarifications, 2000)}`);
+  return parts.join("\n\n");
+}
+
+export function understandPrompt(): string {
+  return [
+    "You are planning a piece of student coursework before any writing starts. From the brief's extraction, work out what must be produced and how.",
+    "Be specific to this assignment: its subject, its question, its marking criteria. Do not state facts, findings or sources; those come from research later.",
+    "knowledgeGaps are what the student must find evidence about. searchQueries are 2 to 5 short scholarly search queries (keywords, not sentences) that would find that evidence.",
+    "thesisDirection is a provisional line of argument to test, phrased tentatively. blockers are things that must be settled before writing (from the missing information), or empty.",
+    'Respond with ONLY JSON: {"discipline": "...", "assignmentType": "...", "produce": "<what the finished piece is>", "approach": "<how to tackle it>", "structure": "<the shape the piece should take>", "criteria": [{"criterion": "...", "howToMeet": "..."}], "knowledgeGaps": ["..."], "searchQueries": ["..."], "thesisDirection": "...", "blockers": ["..."]}',
+  ].join("\n");
+}
+
+export function understandUserPrompt(e: Extraction, brief: string, extra?: { level?: string; citationStyle?: string; words?: number }): string {
+  return [
+    `Brief (for reference):\n${clip(brief, 6000)}`,
+    `Task: ${e.task}`,
+    e.questions.length ? `Questions:\n- ${e.questions.map((q) => q.text).join("\n- ")}` : "",
+    e.requirements.length ? `Requirements:\n- ${e.requirements.map((r) => `${r.text} [${r.kind}]`).join("\n- ")}` : "",
+    e.criteria.length ? `Marking criteria:\n- ${e.criteria.map((c) => `${c.criterion}${c.weight ? ` (${c.weight}%)` : ""}`).join("\n- ")}` : "No marking criteria were given.",
+    e.missing.length ? `Missing information:\n- ${e.missing.map((m) => m.question).join("\n- ")}` : "",
+    `Level: ${extra?.level || e.constraints.level || "not stated"}. Length: ${extra?.words || e.constraints.wordCount || "not stated"} words. Referencing: ${extra?.citationStyle || e.constraints.citationStyle || "not stated"}.`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+export function sourcesPrompt(): string {
+  return [
+    "You assess real search results for a student's coursework. You see each source's title, authors, year, venue and abstract only, not the full text; say nothing beyond what these show.",
+    "For each source: relevance to this assignment (high, medium or low); credibility in one short phrase based on the venue, peer review and citations shown; its main point from the abstract; up to 2 pieces of evidence, each a claim with an exact quote from the abstract; and which outline sections (by id) it supports.",
+    "If a source has no abstract, give no evidence and judge relevance from the title only.",
+    'Respond with ONLY JSON: {"sources": [{"id": "...", "relevance": "high|medium|low", "credibility": "...", "mainPoint": "...", "evidence": [{"claim": "...", "quote": "<exact words from the abstract>"}], "sections": ["<section id>"]}]}',
+  ].join("\n");
+}
+
+export function sourcesUserPrompt(task: string, sections: Array<{ id: string; title: string }>, sources: SourceForAnalysis[]): string {
+  return [
+    `Assignment: ${clip(task, 800)}`,
+    `Outline sections:\n${sections.slice(0, 30).map((s) => `- ${s.id}: ${clip(s.title, 140)}`).join("\n") || "(none yet)"}`,
+    `Sources:\n${sources
+      .slice(0, 20)
+      .map(
+        (s) =>
+          `[${s.id}] ${clip(s.title, 300)} — ${clip((s.authors ?? []).slice(0, 4).join(", "), 160)} (${s.year || "n.d."}). ${clip(s.venue, 160)}${s.peerReviewed ? ", peer-reviewed" : ""}${typeof s.citationCount === "number" ? `, cited ${s.citationCount} times` : ""}\nAbstract: ${clip(s.abstract, 1500) || "(none)"}`
+      )
+      .join("\n\n")}`,
+  ].join("\n\n");
+}
+
+export function reviewPrompt(): string {
+  return [
+    "You review a student's draft before submission against their brief. Be specific and fair; do not predict a mark.",
+    "For each numbered requirement: met, partly or missing, with an exact quote from the draft that shows it (omit the quote if missing) and what to fix.",
+    "unsupportedClaims: sentences stating facts or findings without a citation, quoted exactly. argument: weaknesses in reasoning or evidence use. structure: problems with order, flow or balance. language: grammar, clarity or register problems, each an exact quote and a corrected version.",
+    "Every quote must be copied exactly from the draft. Give at most 8 items per list.",
+    'Respond with ONLY JSON: {"summary": "<two sentences>", "requirements": [{"index": <number>, "status": "met|partly|missing", "quote": "...", "fix": "..."}], "unsupportedClaims": [{"quote": "...", "why": "..."}], "argument": [{"comment": "...", "quote": "..."}], "structure": [{"comment": "...", "quote": "..."}], "language": [{"quote": "...", "suggestion": "..."}]}',
+  ].join("\n");
+}
+
+export function reviewUserPrompt(i: ReviewInput): string {
+  return [
+    i.question ? `Question: ${clip(i.question, 1000)}` : "",
+    `Requirements:\n${i.requirements.map((r, n) => `${n + 1}. ${clip(r.text, 300)}`).join("\n") || "(none extracted)"}`,
+    i.criteria.length ? `Marking criteria: ${i.criteria.map((c) => `${c.criterion}${c.weight ? ` (${c.weight}%)` : ""}`).join("; ")}` : "",
+    `Referencing style: ${i.citationStyle || "not stated"}. Target length: ${i.targetWords || "not stated"} words.`,
+    `Draft:\n${clip(i.draft, 30000)}`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+/* -------------------------------------- Outline -------------------------------------- */
+
+export function assignmentOutlinePrompt(): string {
+  return [
+    "You design the outline of one piece of student coursework from its brief.",
+    "Decide the structure this brief needs; do not use a fixed template. A report or case study usually has an introduction, analysis sections and conclusions or recommendations; an essay has an introduction, a line of argument in several sections and a conclusion; a literature review is organised by themes or debates. Follow any structure the brief itself asks for.",
+    "Name sections after what this assignment is about (its organisation, case, theory, question), not generic labels like 'Body' or 'Main points' alone.",
+    "Give 2 to 7 sections with 1 to 4 sub-sections each. Each sub-section is a writing unit of about 150 to 700 words, with one sentence of guidance on what it must do. Word targets must add up to the target total.",
+    "Weight sections by the marking criteria when the brief gives them (a criterion worth 40% deserves about 40% of the effort).",
+    "Do not state findings, figures, sources or quotations that are not in the brief.",
+    "When the student asks for a change, apply it to the current outline and keep everything else, especially sections that already have text. If they ask for a new total length, set totalWords to it.",
+    'Respond with ONLY JSON: {"totalWords": <number, only if the student asked for a new total>, "thesis": "<one-sentence working answer to the question, or empty>", "sections": [{"title": "...", "subsections": [{"title": "...", "words": <number>, "guidance": "..."}]}]}',
+  ].join("\n");
+}
+
+export function assignmentOutlineUserPrompt(c: AssignmentOutlineContext): string {
+  const lines = [
+    `Brief:\n${clip(c.brief || c.question, 6000) || "(no brief text)"}`,
+    c.question && c.question !== c.brief ? `Question or task: ${clip(c.question, 600)}` : "",
+    `Form: ${c.assignmentType || "essay"}. Level: ${c.academicLevel || "undergraduate"}. Referencing: ${c.citationStyle || "as the brief says"}.`,
+    `Target length: ${c.targetWords} words.`,
+    c.criteria?.length ? `Marking criteria from the brief:\n- ${c.criteria.slice(0, 10).map((x) => clip(x, 200)).join("\n- ")}` : "The brief gives no marking criteria.",
+    structureLens(c.discipline, c.assignmentType),
+    c.plan ? `Plan for this assignment (from reading the brief):\n${clip(c.plan, 2500)}` : "",
+  ];
+  if (c.current?.headings?.length) {
+    lines.push(
+      "Current outline:\n" +
+        c.current.headings
+          .map((h) => `${h.title}\n${h.subheadings.map((s) => `  - ${s.title} (${s.targetWordCount} words${c.written?.includes(s.id) ? ", has text" : ""})`).join("\n")}`)
+          .join("\n")
+    );
+  }
+  if (c.instruction) lines.push(`The student asks: ${clip(c.instruction, 600)}`);
+  return lines.filter(Boolean).join("\n\n");
+}
+
+/* ------------------------------- Evidence from an upload ------------------------------- */
+
+/** Read a student's uploaded material for evidence: exact quotes only, nothing invented. */
+export function evidencePrompt(): string {
+  return [
+    "You read a document a student uploaded for their coursework (lecture slides, notes, a reading or data) and pick out the passages that bear on their assignment question.",
+    "Quote the document exactly: every excerpt must be copied word for word from the passages given. Never paraphrase inside an excerpt, never invent a quotation, a page or slide number, an author or a year.",
+    "Give an author or year only when the passages state it; otherwise omit the field.",
+    'Respond with ONLY JSON: {"title": "<clean title of the material, or omit>", "author": "<only if stated>", "year": "<four digits, only if stated>", "mainFinding": "<one or two sentences: what this material says that matters for the question>", "excerpts": [{"excerpt": "<exact words>", "context": "<why it matters for the question>", "sourceLocation": "<the location label of the passage it came from>", "claim": "<the point in the assignment it supports>"}]}',
+  ].join("\n");
+}
+
+export function evidenceUserPrompt(i: EvidenceInput): string {
+  const passages = i.passages.map((p) => `[Location: ${clip(p.location, 80)}]\n${p.text}`).join("\n\n---\n\n");
+  return `Assignment question: ${clip(i.question, 1500)}\nMaterial: "${clip(i.title, 200)}" (${clip(i.sourceType, 40)})\n\nPassages:\n${passages}`;
+}
+

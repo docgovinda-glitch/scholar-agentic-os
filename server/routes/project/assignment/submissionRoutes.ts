@@ -2,75 +2,17 @@ import express from "express";
 import { selectApprovedSources } from "../../../../src/domain/assignment/approvedSources.ts";
 import { exportDocument } from "../../../../src/app/export/export.ts";
 import {
-  AssignmentPdfRequestSchema,
-  buildAssignmentCanonicalDocument,
+AssignmentPdfRequestSchema,
+buildAssignmentCanonicalDocument,
 } from "../../../../src/desk/assignment/services/assignmentDocument.ts";
-import { parseDocument } from "../../../../src/document_intelligence/index.ts";
 import {
-  buildScholarlyVoiceSystemPrompt,
-  sanitizeScholarlyText,
-  normalizeUnicodeNFC,
+sanitizeScholarlyText,
+normalizeUnicodeNFC
 } from "../../../src/utils/scholarlyVoiceGuard.ts";
-import { getProjectStore } from "../../../../src/services/store/projectStore.ts";
-import { callOpenRouterJSON, callOpenRouterText } from "../../../src/services/scholarBrain.ts";
-import { requestKeyring } from "../../../src/ai/routerBridge.ts";
+import { callOpenRouterText } from "../../../src/services/scholarBrain.ts";
 import { scholarBrain } from "../../../src/services/scholarBrain.ts";
 import {
-  auditDocumentLineByLine,
-  runBriefScannerGraph,
-  COMMAND_VERB_MAP,
-  type DocumentRequirement,
-} from "../../../services/briefScannerGraph.ts";
-import type {
-  AssignmentAnalysis,
-  CommandVerbDetail,
-  CoreResearchQuestion,
-  RecommendedSearchStrategy,
-  ResearchPlan,
-  TutorWorkspacePatch,
-  DiscoveredSource,
-} from "../../../../src/desk/assignment/types.ts";
-import {
-  cleanAnswerString,
-  extractStandardizedInstructions,
-  normalizeProjectAnswers,
-  getSectionPromptGuidelines,
-  structureToInternalSections,
-} from "../../../../src/desk/assignment/types.ts";
-import {
-  generateDynamicAssignmentStructure,
-  sanitizeOutlineHeadings,
-  assignmentStructureToOutlineTree,
-  outlineTreeToAssignmentStructure,
-} from "../../../../src/desk/assignment/services/outlineService.ts";
-import { sanitizeBrief } from "../../../../src/features/understand/services/briefSanitizer.ts";
-import { classifyScopeBoundaries, stripLineTags } from "../../../../src/features/understand/services/scopeClassifier.ts";
-import {
-  isClassroomLogisticsLine,
-  isTutorialOrShortQABrief,
-  extractSubstantiveBriefQuestions,
-  stripSlideArtifacts,
-} from "../../../../src/utils/briefExtractor.ts";
-import { discoverMultiPortalSources, type DiscoveredSourceDraft } from "../../../src/discovery/discovery.ts";
-import {
-  replaceBracketTokensWithDeterministicCitations,
-  compileDeterministicBibliographyMarkdown,
-  formatAskScholarInText,
-  formatAskScholarBibliographyEntry,
-  type WebsiteCitationItem,
-} from "../../../../src/desk/scholarCitationEngine.ts";
-import {
-  upload,
-  getProjectSafe,
-  persistSourcesToSupabase,
-  isCorruptedOutlineHeadings,
-  healCorruptedProjectStructure,
-  safeParseObject,
-  extractProjectInstructions,
-  deriveHeuristicTitle,
-  deriveSemanticAcademicTitle,
-  autoUpdateProjectTitleIfUntitled,
-  buildDeterministicResearchPlan,
+getProjectSafe,safeParseObject
 } from "./helpers.ts";
 
 const router = express.Router({ mergeParams: true });
@@ -109,150 +51,8 @@ router.post("/export-pdf", async (req: express.Request<{ id: string }>, res) => 
   }
 });
 
-router.post("/audit-export", async (req: express.Request<{ id: string }>, res) => {
-  const project = await getProjectSafe(req, res);
-  if (!project) return;
-
-  const {
-    question = project.answers["assignment_question"] || "",
-    academicLevel = project.answers["academic_level"] || "undergraduate",
-    assignmentType = project.answers["assignment_type"] || "essay",
-    targetWordCount = Number(project.answers["word_count"]) || 2000,
-    citationStyle = project.answers["citation_style"] || "apa7",
-    fullDraft = "",
-    deconstruction = project.answers["assignment_deconstruction"],
-  } = req.body || {};
-
-  try {
-    const actualWordCount = fullDraft.trim().split(/\s+/).filter(Boolean).length;
-    const minWords = Math.round(targetWordCount * 0.90);
-    const maxWords = Math.round(targetWordCount * 1.10);
-    const isWordCountCompliant = actualWordCount >= minWords && actualWordCount <= maxWords;
-
-    const prompt = scholarBrain.courseworkPrompts.auditExportPrompt({ question, assignmentType, academicLevel, targetWordCount, actualWordCount, minWords, maxWords, citationStyle, deconstruction, fullDraft, isWordCountCompliant });
-
-    const data = await callOpenRouterJSON(
-      req,
-      res,
-      scholarBrain.courseworkPrompts.ROLES.rubricAudit,
-      prompt,
-      undefined,
-      "verification"
-    );
-    if (!data) return;
-    res.json(data);
-  } catch (err: any) {
-    if (err?.message === "RequireFrontendLLMException") return;
-    console.error("Audit export error:", err);
-    if (!res.headersSent) {
-      res.status(500).json({ error: err.message || "Failed to generate submission audit" });
-    }
-  }
-});
 
 // Deterministic Grounded Fallback Response Generator
-function buildDeterministicCopilotResponse(
-  phase: "understand" | "sources" | "drafting" | "submission",
-  message: string,
-  ctx: {
-    question: string;
-    targetWordCount: number;
-    academicLevel: string;
-    citationStyle: string;
-    analysis: any;
-    keptSources: any[];
-    lectureSlides: any[];
-    evidenceItems: any[];
-    outline: any[];
-    peelSections: any[];
-    rubricAudit: any;
-    unresolvedCitations: any[];
-  }
-): string {
-  const query = message.toLowerCase();
-
-  if (phase === "understand") {
-    if (query.includes("command verb") || query.includes("verb") || query.includes("meaning")) {
-      const verbs = ctx.analysis?.commandVerbs || [];
-      const verbList = verbs.length > 0
-        ? verbs.map((v: any) => `- **${v.verb}**: ${v.meaning}\n  *Academic Expectation*: ${v.academicExpectation}`).join("\n")
-        : `- **Critically evaluate**: Weigh competing theoretical perspectives and empirical findings to substantiate a reasoned academic judgment, rather than merely summarizing descriptions.`;
-      return `### Command Verb Breakdown\n\nWhen addressing your assignment prompt ("*${ctx.question}*"), pay close attention to the operative command verbs:\n\n${verbList}\n\n**Strategy**: Allocate roughly 70% of your body word count to critical argumentation and synthesis, reserving only ~30% for factual description and conceptual exposition.`;
-    }
-
-    if (query.includes("rubric") || query.includes("criteria") || query.includes("mark")) {
-      return `### Rubric Alignment Guidelines (${ctx.academicLevel.toUpperCase()})\n\nTo achieve a **First Class (70%+)** on this ${ctx.targetWordCount.toLocaleString()}-word assignment:\n\n1. **Critical Evaluation**: Move beyond descriptive narration by interrogating theoretical assumptions and conflicting evidence.\n2. **Evidence Grounding**: Ensure 100% of factual assertions cite credible scholarly literature formatted in ${ctx.citationStyle.toUpperCase()}.\n3. **Argumentative Coherence**: Use explicit topic sentences and linking transitions connecting back to your core thesis statement.\n4. **Word Budget**: Maintain sections within ±10% of their allocated targets.`;
-    }
-
-    if (query.includes("question") || query.includes("research question") || query.includes("suggest")) {
-      return `### Recommended Research Sub-Questions\n\nTo unpack "*${ctx.question}*" within your ${ctx.targetWordCount.toLocaleString()}-word limit, consider organizing your inquiry around these 3 focal questions:\n\n1. *Theoretical Foundation*: What are the fundamental epistemological assumptions underpinning this domain?\n2. *Empirical Examination*: What empirical evidence supports or complicates these claims in recent literature?\n3. *Critical Synthesis*: How do recent counter-perspectives challenge the orthodoxy, and what balanced conclusion emerges?`;
-    }
-
-    return `### Academic Advisor Guidance\n\nWelcome to **Phase 1: Understand**. We are analyzing your assignment prompt:\n> "*${ctx.question}*"\n\n- **Target Word Count**: ${ctx.targetWordCount.toLocaleString()} words\n- **Academic Level**: ${ctx.academicLevel}\n- **Citation Style**: ${ctx.citationStyle.toUpperCase()}\n\nTo succeed, ensure your thesis directly responds to the command verbs in the prompt. Would you like me to unpack the command verbs, clarify marking criteria, or formulate targeted research sub-questions?`;
-  }
-
-  if (phase === "sources") {
-    if (query.includes("empirical") || query.includes("recommend") || query.includes("literature")) {
-      const approvedCount = ctx.keptSources.length;
-      const sourcesSummary = approvedCount > 0
-        ? ctx.keptSources.map((s, i) => `${i + 1}. **${s.title}** (${s.authors?.join(", ") || "Scholarly source"}, ${s.year || "n.d."}) — *${s.venue || "Peer-Reviewed"}*`).join("\n")
-        : `No sources approved yet. Search across CrossRef, Semantic Scholar, and your Knowledge Vault to curate 4–8 foundational papers.`;
-      return `### Empirical Sourcing Recommendations\n\nYour assignment currently has **${approvedCount} approved source(s)**:\n\n${sourcesSummary}\n\n**Search Strategy Recommendation**:\n- Query high-impact databases (Scopus, JSTOR, Web of Science) using Boolean combinations of key concepts from your brief.\n- Prioritize peer-reviewed empirical studies and systematic reviews published in the last 5 years.\n- Ensure each source provides distinct empirical claims to bind into your PEEL evidence ledger.`;
-    }
-
-    if (query.includes("slide") || query.includes("lecture") || query.includes("concept")) {
-      const slidesCount = ctx.lectureSlides.length;
-      const slidesSummary = slidesCount > 0
-        ? ctx.lectureSlides.map((d: any) => `- **${d.title || d.fileName}**: Concepts extracted — ${(d.extractedConcepts || []).slice(0, 4).join(", ") || "Lecture themes"}`).join("\n")
-        : `Upload lecture slides in the Phase 2 dropzone to automatically extract course-specific concepts and integrate them into your evidence ledger.`;
-      return `### Lecture Slide Concept Integration\n\n${slidesSummary}\n\n**Librarian Tip**: Examiners look for synthesis between lecture material and independent peer-reviewed literature. Use lecture slides to establish module-specific terminology, then substantiate each concept with independent academic citations.`;
-    }
-
-    if (query.includes("credential") || query.includes("verify") || query.includes("author")) {
-      return `### Author Credibility & Source Verification\n\nWhen evaluating sources for your evidence cards:\n\n1. **Peer-Review Status**: Confirm the journal is indexed in Scopus / Web of Science (Q1 or Q2 preferred).\n2. **Author Authority**: Check the authors' academic affiliations and citation indices (h-index).\n3. **Methodological Rigor**: Verify sample sizes, control mechanisms, and acknowledgment of study limitations.\n4. **Timeliness**: For dynamic topics, emphasize studies from the past 3–5 years while anchoring classical foundations.`;
-    }
-
-    return `### Scholarly Librarian Guidance\n\nWelcome to **Phase 2: Sources & Evidence**. You currently have **${ctx.keptSources.length} approved source(s)** and **${ctx.evidenceItems.length} verified evidence claim(s)**.\n\nI can help you:\n- Recommend empirical sources and refine search strings\n- Extract key concepts from uploaded lecture slide decks\n- Verify author credentials and methodological credibility\n\nWhat literature would you like to explore?`;
-  }
-
-  if (phase === "drafting") {
-    if (query.includes("deepen") || query.includes("critique") || query.includes("analysis")) {
-      return `### Deepening Critical Evaluation (70/30 Balance)\n\nTo turn descriptive prose into high-scoring critical analysis:\n\n1. **Avoid mere summary**: Rather than explaining *what* happened or *what* an author said (descriptive), interrogate *why* it matters and *to what extent* their conclusions are valid (analytical).\n2. **Question Assumptions**: Identify underlying assumptions in the evidence: Does the methodology generalize? Are there confounding variables?\n3. **Juxtapose Conflicting Evidence**: Place two scholar perspectives in tension: "*While [Author A] demonstrates X, [Author B]'s longitudinal findings suggest that X holds only when Y is present...*"\n4. **Substantiate Judgment**: Conclude each paragraph with an analytical verdict that directly answers your central question.`;
-    }
-
-    if (query.includes("peel") || query.includes("structure") || query.includes("strengthen")) {
-      return `### Strengthening PEEL Section Architecture\n\nEvery substantive paragraph should follow the **PEEL** framework:\n\n- **Point (P)**: A clear, analytical topic sentence asserting an argument (not a fact).\n- **Evidence (E)**: Precise citation of approved literature or empirical data supporting the assertion.\n- **Explanation (E)**: Rigorous theoretical analysis (70% of the paragraph) unpacking the mechanism, limitations, and implications.\n- **Link (L)**: A synthetic conclusion connecting this point back to the overarching assignment question.\n\nCheck your section drafts in the center editor to verify each section maintains these 4 components.`;
-    }
-
-    if (query.includes("counterargument") || query.includes("counter") || query.includes("rebuttal")) {
-      return `### Synthesizing Counter-Arguments\n\nTop-tier academic writing actively tests itself against opposing viewpoints:\n\n1. **Formulate the Strongest Counter-Position**: Avoid setting up a strawman. Present the rival school of thought with scholarly fairness.\n2. **Identify the Point of Divergence**: Highlight whether the dispute is empirical (data interpretation), methodological, or normative (value premises).\n3. **Deploy a Grounded Rebuttal**: Rebut the objection using superior empirical evidence or by demonstrating that the objection only applies under narrow boundary conditions.`;
-    }
-
-    return `### Academic Scribe Guidance\n\nWelcome to **Phase 3: Sequential Drafting**. Your target budget is **${ctx.targetWordCount.toLocaleString()} words** across **${ctx.outline.length} sections**.\n\nI can assist you with:\n- Deepening analytical critique (enforcing the 70% evaluation / 30% description rule)\n- Structuring rigorous PEEL paragraphs\n- Synthesizing academic counter-arguments and rebuttals\n\nWhich section would you like to refine?`;
-  }
-
-  // Phase 4: Submission
-  if (query.includes("grade") || query.includes("predicted") || query.includes("explain")) {
-    const score = ctx.rubricAudit?.overallScore || 78;
-    const band = ctx.rubricAudit?.bandLabel || "First Class (1st)";
-    return `### Predicted Grade Breakdown: ${band} (${score}%)\n\nBased on your submission audit:\n\n- **Rubric Alignment Score**: ${ctx.rubricAudit?.rubricAlignmentScore || 85}%\n- **Strengths**: Strong evidence synthesis, rigorous PEEL paragraph structure, and direct answering of the assignment question.\n- **Key Areas to Elevate**: Review any priority fixes highlighted in the audit to maximize marks in critical argumentation.\n\nThis draft demonstrates solid command of academic scholarship.`;
-  }
-
-  if (query.includes("citation") || query.includes("unresolved") || query.includes("audit")) {
-    const unresolved = ctx.unresolvedCitations || [];
-    if (unresolved.length > 0) {
-      const list = unresolved.map((c: any) => `- \`${c.rawCitation || c}\`: Missing matching entry in bibliography`).join("\n");
-      return `### Citation Reconciliation Audit\n\nFound **${unresolved.length} unresolved citation(s)**:\n\n${list}\n\n**Action Required**: Ensure each in-text citation maps exactly to a corresponding reference in your bibliography matching ${ctx.citationStyle.toUpperCase()} format.`;
-    }
-    return `### Citation Reconciliation Audit: 100% Verified\n\nAll in-text citations successfully map to verified entries in your auto-generated reference list formatted in **${ctx.citationStyle.toUpperCase()}**.\n\nNo orphan citations or missing bibliographic entries detected.`;
-  }
-
-  if (query.includes("format") || query.includes("formatting") || query.includes("university")) {
-    return `### University Submission Formatting Checklist\n\nBefore exporting your camera-ready submission:\n\n1. **Typography & Margins**: Standard 1-inch (2.54 cm) margins, standard academic font (Times New Roman or Calibri, 12pt), 1.5 or double line spacing.\n2. **Title Page & Running Headers**: Clear assignment title, module code, candidate number, and word count.\n3. **Word Count Adherence**: Ensure final text falls within the university's ±10% margin.\n4. **Bibliography**: Formatted in **${ctx.citationStyle.toUpperCase()}** with hanging indents and active DOIs.`;
-  }
-
-  return `### Senior Examiner Guidance\n\nWelcome to **Phase 4: Submission Quality Audit**. I have audited your draft against standard University Marking Criteria.\n\n- **Predicted Grade**: ${ctx.rubricAudit?.bandLabel || "First Class (1st) — 76%"}\n- **Citation Status**: ${ctx.unresolvedCitations.length === 0 ? "100% Reconciled" : `${ctx.unresolvedCitations.length} Unresolved`}\n- **Formatting**: Verified for Word (.docx) & PDF export\n\nWould you like me to explain your predicted grade, review unresolved citations, or check university formatting requirements?`;
-}
 
 // 15. POST /api/projects/:id/assignment/copilot-chat
 router.post("/copilot-chat", async (req: express.Request<{ id: string }>, res) => {
@@ -386,58 +186,26 @@ router.post("/copilot-chat", async (req: express.Request<{ id: string }>, res) =
   }
   userPrompt += `CURRENT STUDENT QUERY / ACTION:\n"${message}"\n\nRespond as ${personaName} (${personaRole}). Provide concise, highly actionable, academically rigorous markdown advice.`;
 
-  // Attempt live LLM candidate invocation if configured
-  if ((await requestKeyring(req as never)).length > 0) {
-    try {
-      const brainResult = await scholarBrain.complete({
-        req,
-        systemPrompt,
-        userPrompt,
-        taskClass: "chat",
-        dialect: "en-GB",
-        stripCliches: true,
+  // The student's own AI answers (server-side, or in the browser through the
+  // 426 hand-off). There is no canned fallback: a failure is reported as one.
+  try {
+    const text = (await callOpenRouterText(req, res, systemPrompt, userPrompt, undefined, "chat"))?.trim();
+    if (!text) throw new Error("empty");
+    return res.json({
+      ok: true,
+      response: normalizeUnicodeNFC(sanitizeScholarlyText(text, { dialect: "en-GB", stripCliches: true })),
+      persona: { name: personaName, role: personaRole },
+    });
+  } catch (err: unknown) {
+    if ((err as Error)?.message === "RequireFrontendLLMException") return;
+    console.warn("Coursework copilot: the AI did not answer:", (err as Error)?.message);
+    if (!res.headersSent) {
+      return res.status(502).json({
+        error: "Your AI did not answer, so the Copilot has no reply. Nothing was changed. Try again, or check AI Access.",
+        code: "ai_unavailable",
       });
-      if (brainResult.text) {
-        return res.json({
-          ok: true,
-          response: brainResult.text,
-          persona: { name: personaName, role: personaRole },
-        });
-      }
-    } catch (llmErr: any) {
-      console.warn("scholarBrain copilot chat failed, falling back to deterministic grounding:", llmErr?.message);
     }
   }
-
-  // Deterministic Grounded Fallback Response
-  const fallbackResponse = buildDeterministicCopilotResponse(
-    normalizedPhase,
-    message,
-    {
-      question,
-      targetWordCount,
-      academicLevel,
-      citationStyle,
-      analysis,
-      keptSources,
-      lectureSlides,
-      evidenceItems,
-      outline,
-      peelSections,
-      rubricAudit,
-      unresolvedCitations,
-    }
-  );
-
-  const sanitizedFallback = normalizeUnicodeNFC(
-    sanitizeScholarlyText(fallbackResponse, { dialect: "en-GB", stripCliches: true })
-  );
-
-  return res.json({
-    ok: true,
-    response: sanitizedFallback,
-    persona: { name: personaName, role: personaRole },
-  });
 });
 
 export default router;

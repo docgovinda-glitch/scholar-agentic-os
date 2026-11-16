@@ -1,20 +1,16 @@
+import { z } from "zod";
+import { scholarBrain } from "../../../src/services/scholarBrain.ts";
 import express from "express";
 import { routedCompletion } from "../../../src/ai/routerBridge.ts";
 import { sendAiFailure, UnusableAiResponseError } from "../../../src/ai/aiRouteErrors.ts";
 import { getProjectStore } from "../../../../src/services/store/projectStore.ts";
 import {
-  extractPrompt,
-  extractUserPrompt,
   parseExtraction,
-  understandPrompt,
-  understandUserPrompt,
   parseUnderstanding,
-  sourcesPrompt,
-  sourcesUserPrompt,
   parseSourceAnalysis,
-  reviewPrompt,
-  reviewUserPrompt,
   parseReview,
+  parseEvidenceExtraction,
+  type EvidenceInput,
   type Extraction,
   type Understanding,
   type SourceForAnalysis,
@@ -61,7 +57,7 @@ router.post("/agent/extract", async (req: Req, res: express.Response) => {
   const clarifications = typeof raw === "string" ? raw.trim().slice(0, 2000) : String(a["assignment_clarifications"] ?? "");
   const input = { brief, materials: materialsOf(a), clarifications };
   try {
-    const text = await routedCompletion(req, { task: "reasoning", systemPrompt: extractPrompt(), userPrompt: extractUserPrompt(input) });
+    const text = await routedCompletion(req, { task: "reasoning", systemPrompt: scholarBrain.courseworkPrompts.extractPrompt(), userPrompt: scholarBrain.courseworkPrompts.extractUserPrompt(input) });
     const extraction = parseExtraction(text ?? "", input);
     if (!extraction) return sendAiFailure(res, new UnusableAiResponseError("brief extraction"), "Extract");
     project.answers.assignment_extraction = JSON.stringify({ ...extraction, at: now() });
@@ -87,8 +83,8 @@ router.post("/agent/understand", async (req: Req, res: express.Response) => {
   try {
     const text = await routedCompletion(req, {
       task: "reasoning",
-      systemPrompt: understandPrompt(),
-      userPrompt: understandUserPrompt(extraction, briefOf(a), {
+      systemPrompt: scholarBrain.courseworkPrompts.understandPrompt(),
+      userPrompt: scholarBrain.courseworkPrompts.understandUserPrompt(extraction, briefOf(a), {
         level: String(a["academicLevel"] || a["academic_level"] || ""),
         citationStyle: String(a["citationStyle"] || a["citation_style"] || ""),
         words: Number(a["targetWordCount"] || a["word_count"]) || undefined,
@@ -152,7 +148,7 @@ router.post("/agent/sources", async (req: Req, res: express.Response) => {
   const sections = (structure?.headings ?? []).flatMap((h) => h.subheadings ?? []).map((s) => ({ id: s.id, title: `${s.numberStr ?? ""} ${s.title}`.trim() }));
   const task = understanding?.produce || extraction?.task || briefOf(a).slice(0, 600);
   try {
-    const text = await routedCompletion(req, { task: "reasoning", systemPrompt: sourcesPrompt(), userPrompt: sourcesUserPrompt(task, sections, sources) });
+    const text = await routedCompletion(req, { task: "reasoning", systemPrompt: scholarBrain.courseworkPrompts.sourcesPrompt(), userPrompt: scholarBrain.courseworkPrompts.sourcesUserPrompt(task, sections, sources) });
     const analyses = parseSourceAnalysis(text ?? "", sources, sections.map((s) => s.id));
     if (!analyses) return sendAiFailure(res, new UnusableAiResponseError("source analysis"), "Sources");
     const prev = (safeParseObject(a["assignment_source_analysis"]) as Record<string, unknown> | null) ?? {};
@@ -161,6 +157,46 @@ router.post("/agent/sources", async (req: Req, res: express.Response) => {
     res.json({ analyses });
   } catch (err) {
     sendAiFailure(res, err, "Sources");
+  }
+});
+
+/**
+ * POST /agent/evidence  { title, sourceType, passages: [{ location, text }] }
+ * Reads passages of a document the student uploaded and returns the excerpts
+ * that bear on the brief. Only excerpts found word for word in the passages are
+ * kept; nothing is saved here (the upload itself is saved by the client).
+ */
+const EvidenceBody = z.object({
+  title: z.string().trim().min(1).max(300),
+  sourceType: z.string().trim().max(40).default("text"),
+  passages: z
+    .array(z.object({ location: z.string().trim().max(120).default(""), text: z.string().max(4000) }))
+    .min(1)
+    .max(4),
+});
+
+router.post("/agent/evidence", async (req: Req, res: express.Response) => {
+  const project = await getProjectSafe(req, res);
+  if (!project) return;
+  const body = EvidenceBody.safeParse(req.body ?? {});
+  if (!body.success) return res.status(400).json({ error: "Send the document's title and up to four passages.", code: "invalid_body" });
+  const a = project.answers;
+  const question = cleanAnswerString(a["assignment_brief_text"]) || cleanAnswerString(a["assignment_question"]) || extractStandardizedInstructions(a);
+  if (!question || question.trim().length < 10) {
+    return res.status(400).json({ error: "Add your assignment brief first.", code: "missing_brief" });
+  }
+  const input: EvidenceInput = { question, ...body.data };
+  try {
+    const text = await routedCompletion(req, {
+      task: "reasoning",
+      systemPrompt: scholarBrain.courseworkPrompts.evidencePrompt(),
+      userPrompt: scholarBrain.courseworkPrompts.evidenceUserPrompt(input),
+    });
+    const evidence = parseEvidenceExtraction(text ?? "", input);
+    if (!evidence) return sendAiFailure(res, new UnusableAiResponseError("document evidence"), "Evidence");
+    res.json({ evidence });
+  } catch (err) {
+    sendAiFailure(res, err, "Evidence");
   }
 });
 
@@ -186,7 +222,7 @@ router.post("/agent/review", async (req: Req, res: express.Response) => {
     targetWords: Number(a["targetWordCount"] || a["word_count"]) || undefined,
   };
   try {
-    const text = await routedCompletion(req, { task: "long-context", systemPrompt: reviewPrompt(), userPrompt: reviewUserPrompt(input) });
+    const text = await routedCompletion(req, { task: "long-context", systemPrompt: scholarBrain.courseworkPrompts.reviewPrompt(), userPrompt: scholarBrain.courseworkPrompts.reviewUserPrompt(input) });
     const review = parseReview(text ?? "", input);
     if (!review) return sendAiFailure(res, new UnusableAiResponseError("draft review"), "Review");
     project.answers.assignment_ai_review = JSON.stringify({ ...review, at: now(), words: draft.split(/\s+/).length });

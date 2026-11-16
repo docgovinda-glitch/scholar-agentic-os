@@ -1,74 +1,63 @@
 import { countProseWords } from "../../../shared/proseBlocks";
 import { selectApprovedSources } from "../../../domain/assignment/approvedSources";
 import { clipHeadingWords } from "../../../utils/briefQuestions";
-import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode, useMemo, useRef } from "react";
+import { createContext,useContext,useState,useCallback,useEffect,ReactNode,useMemo,useRef } from "react";
 import { purgeLegacyTemplateText } from "../../../domain/assignment/legacyPurge";
-import type { CanonicalDocument, OutputTypeSpec, ProjectView, RubricReport } from "../../types";
+import type { CanonicalDocument,OutputTypeSpec,ProjectView,RubricReport } from "../../types";
 import {
-  getDocument,
-  getOutputTypeSpec,
-  getProject,
-  getRubric,
-  saveIntakeAnswers,
-  commitProjectToDatabase,
-  isEphemeralProject,
-  authedJsonFetch,
-  UnauthenticatedError,
+getDocument,
+getOutputTypeSpec,
+getProject,
+getRubric,
+saveIntakeAnswers,
+commitProjectToDatabase,
+isEphemeralProject,
+authedJsonFetch,
+UnauthenticatedError,
 } from "../../api";
 import type {
-  AssignmentPhaseId,
-  AssignmentStage,
-  StageStatus,
-  AcademicLevel,
-  AssignmentType,
-  AssignmentAnalysis,
-  ResearchPlan,
-  DiscoveredSource,
-  EvidenceItem,
-  ThinkingMap,
-  OutlineSection,
-  SubmissionCheckReport,
-  TutorChatMessage,
-  TutorMode,
-  RubricGradeEstimation,
-  SectionBreakdown,
-  AssignmentProjectState,
-  UploadedSourceDocument,
-  AssignmentBriefRubricCriterion,
-  CitationAuditResult,
-  RubricScoreReport,
-  SectionBudgetItem,
-  WritingToneConfig,
-  WritingTonePreset,
-  WritingStyleConfig,
-  WritingStylePreset,
-  AssignmentStructure,
-  FlowAuditResult,
+AssignmentPhaseId,
+AssignmentStage,
+StageStatus,
+AcademicLevel,
+AssignmentType,
+AssignmentAnalysis,
+ResearchPlan,
+DiscoveredSource,
+EvidenceItem,
+ThinkingMap,
+OutlineSection,
+SubmissionCheckReport,SectionBreakdown,
+AssignmentProjectState,
+UploadedSourceDocument,
+AssignmentBriefRubricCriterion,
+CitationAuditResult,
+RubricScoreReport,
+SectionBudgetItem,
+WritingToneConfig,WritingStyleConfig,AssignmentStructure,
+FlowAuditResult
 } from "../types";
 import {
-  ASSIGNMENT_PHASES,
-  ASSIGNMENT_STAGES,
-  cleanAnswerString,
-  extractStandardizedInstructions,
-  normalizeProjectAnswers,
-  normalizeAssignmentPhase,
-  AssignmentDraftingSection,
-  structureToInternalSections,
-  structureToSectionBudgets,
+ASSIGNMENT_PHASES,cleanAnswerString,
+extractStandardizedInstructions,
+normalizeProjectAnswers,
+normalizeAssignmentPhase,
+AssignmentDraftingSection,
+structureToInternalSections,
+structureToSectionBudgets
 } from "../types";
 import { generateDynamicAssignmentStructure } from "../services/outlineService";
 import {
-  decomposeWordBudget,
-  tuneSectionsToQuestion,
-  type InternalSectionPlan,
+decomposeWordBudget,
+tuneSectionsToQuestion,
+type InternalSectionPlan,
 } from "../services/invisibleChunkerService";
-import { auditCitations, evaluateRubricCompliance, auditFlowAndTransitions } from "../services/submissionAuditService";
+import { auditCitations,evaluateRubricCompliance,auditFlowAndTransitions } from "../services/submissionAuditService";
 import { getCitationCoverage } from "../services/citationAnchoringService";
-import { generateReferenceListBlock } from "../services/referenceListGenerator";
 import { stripCircularReferences } from "../../../utils/briefExtractor";
 import type { CourseworkExecutionMode } from "../../../features/coursework/types/orchestrator";
 import { safeParseAnswerField } from "../../../shared/projectStateSchema";
-import { useCourseworkAgent, type CourseworkAgent } from "./useCourseworkAgent";
+import { useCourseworkAgent,type CourseworkAgent } from "./useCourseworkAgent";
 
 export interface AssignmentContextValue {
   projectId: string;
@@ -186,16 +175,6 @@ export interface AssignmentContextValue {
   citationAuditResult: CitationAuditResult | null;
   flowAuditResult: FlowAuditResult | null;
 
-  // AI Tutor & Rubric Estimator
-  tutorMode: TutorMode;
-  setTutorMode: (mode: TutorMode) => void;
-  tutorMessages: TutorChatMessage[];
-  sendTutorMessage: (message: string, overrideMode?: TutorMode, activeDraftText?: string) => Promise<void>;
-  isTutorReplying: boolean;
-  isEstimatingRubric: boolean;
-  lastRubricEstimation: RubricGradeEstimation | null;
-  estimateRubricGrade: (selectedSectionId?: string) => Promise<RubricGradeEstimation | null>;
-  applyTutorSuggestionToDraft: (suggestion: { targetSectionId?: string; suggestedText: string; type?: string }) => Promise<void>;
 
   // Save Answers Helper
   saveAnswers: (updates: Record<string, any>) => Promise<void>;
@@ -297,12 +276,6 @@ export function AssignmentProvider({
 
   const currentStage: AssignmentStage = activeStage;
 
-  // AI Tutor & Rubric Estimator state
-  const [tutorMode, setTutorMode] = useState<TutorMode>("socratic");
-  const [tutorMessages, setTutorMessages] = useState<TutorChatMessage[]>([]);
-  const [isTutorReplying, setIsTutorReplying] = useState(false);
-  const [isEstimatingRubric, setIsEstimatingRubric] = useState(false);
-  const [lastRubricEstimation, setLastRubricEstimation] = useState<RubricGradeEstimation | null>(null);
 
   // Phase 3 Drafting Engine state
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
@@ -340,22 +313,6 @@ export function AssignmentProvider({
         setActiveStage(targetPhase);
         onStageChangeCallback(targetPhase, { replace: true });
       }
-
-      // Initialize AI Tutor greeting if empty
-      setTutorMessages((prev) => {
-        if (prev.length === 0) {
-          return [
-            {
-              id: "greeting",
-              sender: "tutor",
-              mode: "socratic",
-              text: `👋 Hello! I am your Scholar Core Socratic Academic Tutor & Rubric Estimator.\n\nChoose an advising mode above: Engage in deep Socratic questioning, estimate your marking rubric grade band (1st / 2:1 / 2:2), stress-test counterarguments, or polish academic prose.`,
-              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-            },
-          ];
-        }
-        return prev;
-      });
     } catch (e) {
       setError(
         e instanceof UnauthenticatedError
@@ -1354,157 +1311,8 @@ export function AssignmentProvider({
     }
   }, [currentPhase, isLoading, internalSections.length, targetWordCount, initializeDraftingPlan]);
 
-  // AI Tutor chat
-  const sendTutorMessage = useCallback(
-    async (text: string, overrideMode?: TutorMode, activeDraftText?: string) => {
-      const modeToUse = overrideMode || tutorMode;
-      const userMsg: TutorChatMessage = {
-        id: `msg-${Date.now()}`,
-        sender: "user",
-        mode: modeToUse,
-        text,
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      };
-      setTutorMessages((prev) => [...prev, userMsg]);
-      setIsTutorReplying(true);
 
-      try {
-        const response = await authedJsonFetch(`/api/projects/${projectId}/assignment/tutor-chat`, "POST", {
-          message: text,
-          mode: modeToUse,
-          stage: currentPhase,
-          academicLevel,
-          assignmentType,
-          question,
-          targetWordCount,
-          currentWordCount,
-          analysis,
-          plan: researchPlan,
-          outline,
-          evidence: evidenceItems.filter((e) => e.status === "approved"),
-          thesis: thinkingMap?.customThesis || thinkingMap?.thesisOptions?.find((t) => t.id === thinkingMap?.selectedThesisId)?.statement,
-          activeDraftText,
-        });
 
-        if (!response.ok) throw new Error("Failed to reach AI Tutor");
-        const data = await response.json();
-
-        // Apply bidirectional patch if returned by the tutor
-        if (data.patch) {
-          if (data.patch.plan) {
-            await updatePlan(data.patch.plan);
-          }
-          if (data.patch.analysis) {
-            await updateAnalysis(data.patch.analysis);
-          }
-          if (data.patch.question) {
-            await setQuestion(data.patch.question);
-          }
-        }
-
-        const replyMsg: TutorChatMessage = {
-          id: `reply-${Date.now()}`,
-          sender: "tutor",
-          mode: modeToUse,
-          text: data.reply || "I am thinking through your research problem. Let us review the next step.",
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          socraticQuestions: data.socraticQuestions,
-          rubricEstimation: data.rubricEstimation,
-          counterArguments: data.counterArguments,
-          actionableSuggestion: data.actionableSuggestion,
-          patch: data.patch,
-        };
-        setTutorMessages((prev) => [...prev, replyMsg]);
-      } catch (err) {
-        console.error("Failed to send message to AI Tutor:", err);
-        const errMsg: TutorChatMessage = {
-          id: `err-${Date.now()}`,
-          sender: "tutor",
-          mode: modeToUse,
-          text: "I encountered an error connecting to Scholar Core. Please check your network or try again shortly.",
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        };
-        setTutorMessages((prev) => [...prev, errMsg]);
-      } finally {
-        setIsTutorReplying(false);
-      }
-    },
-    [
-      projectId,
-      tutorMode,
-      currentPhase,
-      academicLevel,
-      assignmentType,
-      question,
-      targetWordCount,
-      currentWordCount,
-      analysis,
-      researchPlan,
-      outline,
-      evidenceItems,
-      thinkingMap,
-      updatePlan,
-      updateAnalysis,
-      setQuestion,
-    ]
-  );
-
-  // Rubric Grade Estimator
-  const estimateRubricGrade = useCallback(
-    async (selectedSectionId?: string): Promise<RubricGradeEstimation | null> => {
-      setIsEstimatingRubric(true);
-      try {
-        const res = await authedJsonFetch(`/api/projects/${projectId}/assignment/estimate-rubric`, "POST", {
-          question,
-          academicLevel,
-          assignmentType,
-          targetWordCount,
-          outline,
-          selectedSectionId,
-        });
-        if (!res.ok) throw new Error("Failed to estimate rubric grade");
-        const data: RubricGradeEstimation = await res.json();
-        setLastRubricEstimation(data);
-
-        // Also add a tutor message with this estimation
-        const estMsg: TutorChatMessage = {
-          id: `rubric-est-${Date.now()}`,
-          sender: "tutor",
-          mode: "rubric",
-          text: `📊 **AI rubric feedback** (the model's view against your criteria, not a mark; your marker decides the grade): **${data.bandLabel}**.\n\n${data.summary}`,
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          rubricEstimation: data,
-        };
-        setTutorMessages((prev) => [...prev, estMsg]);
-        return data;
-      } catch (err) {
-        console.error("Failed to estimate rubric grade:", err);
-        return null;
-      } finally {
-        setIsEstimatingRubric(false);
-      }
-    },
-    [projectId, question, academicLevel, assignmentType, targetWordCount, outline]
-  );
-
-  // Apply Tutor Suggestion to Draft
-  const applyTutorSuggestionToDraft = useCallback(
-    async (suggestion: { targetSectionId?: string; suggestedText: string; type?: string }) => {
-      if (!suggestion.suggestedText) return;
-      const targetSec = suggestion.targetSectionId
-        ? outline.find((s) => s.id === suggestion.targetSectionId)
-        : outline[0];
-      if (!targetSec) return;
-
-      const currentText = targetSec.draftContent || "";
-      const updatedText = currentText
-        ? `${currentText}\n\n${suggestion.suggestedText}`
-        : suggestion.suggestedText;
-
-      await updateSectionDraft(targetSec.id, updatedText);
-    },
-    [outline, updateSectionDraft]
-  );
 
   // Compute 5-phase status
   const phaseStatuses: Record<AssignmentPhaseId, "active" | "completed" | "upcoming"> = useMemo(() => {
@@ -1835,15 +1643,6 @@ export function AssignmentProvider({
         isAuditingSubmission,
         citationAuditResult,
         flowAuditResult,
-        tutorMode,
-        setTutorMode,
-        tutorMessages,
-        sendTutorMessage,
-        isTutorReplying,
-        isEstimatingRubric,
-        lastRubricEstimation,
-        estimateRubricGrade,
-        applyTutorSuggestionToDraft,
         executionMode,
         saveAnswers,
         updateProjectAnswers: saveAnswers,

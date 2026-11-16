@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { assignmentOutlinePrompt, assignmentOutlineUserPrompt, structureFromAi, isAiAssignmentOutline } from "../aiAssignmentOutline";
+import { structureFromAi, isAiAssignmentOutline } from "../aiAssignmentOutline";
+import { assignmentOutlinePrompt, assignmentOutlineUserPrompt } from "../../../../server/src/services/prompts/courseworkPrompts";
 import type { AssignmentDraftingSection } from "../../../desk/assignment/types";
 
 const AI = JSON.stringify({
@@ -79,5 +80,12 @@ describe("coursework outline written by the student's AI", () => {
   it("returns nothing for an unusable answer", () => {
     expect(structureFromAi("Sorry, I can't help.", 2000)).toBeUndefined();
     expect(structureFromAi('{"sections": []}', 2000)).toBeUndefined();
+  });
+
+  it("tells the AI how to structure a STEM piece when the student chose that subject", () => {
+    const u = assignmentOutlineUserPrompt({ brief: "Evaluate the design of an experiment on enzyme activity.", targetWords: 2000, discipline: "stem", assignmentType: "report" });
+    expect(u).toContain("SUBJECT AREA: Science, technology, engineering or maths.");
+    expect(u).toContain("hypothesis, method or design, results or analysis");
+    expect(u).toContain("FORM: a report");
   });
 });

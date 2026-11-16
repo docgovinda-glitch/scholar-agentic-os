@@ -671,7 +671,7 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
                           </li>
                           <li className="flex items-center gap-1.5">
                             <CheckCircle2 className="w-3 h-3 text-blue-500 shrink-0" />
-                            <span className="truncate"><strong>Methodology:</strong> {traceability.methodology.split("&")[0]}</span>
+                            <span className="truncate"><strong>Material:</strong> {traceability.methodology}</span>
                           </li>
                           <li className="flex items-center gap-1.5">
                             <CheckCircle2 className="w-3 h-3 text-blue-500 shrink-0" />
@@ -820,11 +820,11 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
                             </div>
                           </div>
 
-                          {/* Methodology and Dataset Summary */}
+                          {/* Material type and dataset summary */}
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div className="p-3 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/60 dark:border-white/5 space-y-1">
                               <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-                                Methodology
+                                Material
                               </span>
                               <p className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">
                                 {traceability.methodology}
@@ -918,7 +918,7 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
                           <div className="space-y-2">
                             <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 flex items-center gap-1">
                               <Target className="w-3 h-3 text-emerald-500" />
-                              <span>Passages Mapped into Assignment Sections</span>
+                              <span>Relevant passages from this material</span>
                             </span>
 
                             <div className="space-y-2">
@@ -928,9 +928,11 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
                                   className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-900/80 border border-neutral-200/60 dark:border-neutral-800 text-xs space-y-1.5"
                                 >
                                   <div className="flex items-center justify-between gap-2">
-                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
-                                      Section: {p.targetSection}
-                                    </span>
+                                    {p.targetSection ? (
+                                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                                        Section: {p.targetSection}
+                                      </span>
+                                    ) : <span />}
                                     <span className="text-[10px] font-mono text-neutral-400">
                                       📍 {p.location}
                                     </span>
@@ -957,12 +959,12 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
                                     In-Text Citation Format
                                   </span>
                                   <p className="font-mono text-neutral-800 dark:text-neutral-200 mt-0.5">
-                                    {traceability.citationsList[1] || `(${doc.name}, 2024)`}
+                                    {traceability.inTextCitation}
                                   </p>
                                 </div>
                                 <button
                                   type="button"
-                                  onClick={() => handleCopyCitation(doc.id + "-intext", traceability.citationsList[1] || `(${doc.name}, 2024)`)}
+                                  onClick={() => handleCopyCitation(doc.id + "-intext", traceability.inTextCitation)}
                                   className="px-2.5 py-1 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-[11px] font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 transition-colors flex items-center gap-1 cursor-pointer"
                                 >
                                   {copiedDocId === doc.id + "-intext" ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}

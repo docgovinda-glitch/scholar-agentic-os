@@ -2,117 +2,18 @@ import { routedCompletion } from "../../../src/ai/routerBridge.ts";
 import type { ProjectRecord } from "../../../../src/services/store/types.ts";
 import express from "express";
 import { createUploadInstance } from "../../../src/middleware/uploadGuard.ts";
-import { parseDocument } from "../../../../src/document_intelligence/index.ts";
-import {
-  buildScholarlyVoiceSystemPrompt,
-  sanitizeScholarlyText,
-  normalizeUnicodeNFC,
-} from "../../../src/utils/scholarlyVoiceGuard.ts";
 import { getProjectStore } from "../../../../src/services/store/projectStore.ts";
-import { callOpenRouterJSON, callOpenRouterText } from "../../../src/services/scholarBrain.ts";
-import { requestKeyring } from "../../../src/ai/routerBridge.ts";
 import { scholarBrain } from "../../../src/services/scholarBrain.ts";
-import { rejectClientCredentials } from "../../../src/middleware/rejectClientCredentials.ts";
 import {
-  auditDocumentLineByLine,
-  runBriefScannerGraph,
-  COMMAND_VERB_MAP,
-  type DocumentRequirement,
-} from "../../../services/briefScannerGraph.ts";
-import type {
-  AssignmentAnalysis,
-  CommandVerbDetail,
-  CoreResearchQuestion,
-  RecommendedSearchStrategy,
-  ResearchPlan,
-  TutorWorkspacePatch,
+cleanAnswerString
 } from "../../../../src/desk/assignment/types.ts";
 import {
-  cleanAnswerString,
-  extractStandardizedInstructions,
-  normalizeProjectAnswers,
-  getSectionPromptGuidelines,
-  structureToInternalSections,
-} from "../../../../src/desk/assignment/types.ts";
-import {
-  generateDynamicAssignmentStructure,
-  extractBriefInquiriesAndConcepts,
-  sanitizeOutlineHeadings,
-  assignmentStructureToOutlineTree,
-  outlineTreeToAssignmentStructure,
+generateDynamicAssignmentStructure
 } from "../../../../src/desk/assignment/services/outlineService.ts";
-import { parseBriefQuestions } from "../../../../src/utils/briefQuestions.ts";
-import { buildSourceSearchQueries } from "../../../../src/utils/briefSourceQueries.ts";
-import { sanitizeBrief } from "../../../../src/features/understand/services/briefSanitizer.ts";
-import { classifyScopeBoundaries, stripLineTags } from "../../../../src/features/understand/services/scopeClassifier.ts";
 import {
-  isClassroomLogisticsLine,
-  isTutorialOrShortQABrief,
-  extractSubstantiveBriefQuestions,
-  stripSlideArtifacts,
+isClassroomLogisticsLine,
+isTutorialOrShortQABrief
 } from "../../../../src/utils/briefExtractor.ts";
-import { discoverMultiPortalSources, type DiscoveredSourceDraft } from "../../../src/discovery/discovery.ts";
-import { getSupabaseRestConfig, SupabaseTable, type SupabaseRestConfig } from "../../../src/supabaseRest.ts";
-import {
-  replaceBracketTokensWithDeterministicCitations,
-  compileDeterministicBibliographyMarkdown,
-  formatAskScholarInText,
-  formatAskScholarBibliographyEntry,
-  type WebsiteCitationItem,
-} from "../../../../src/desk/scholarCitationEngine.ts";
-import type { DiscoveredSource } from "../../../../src/desk/assignment/types.ts";
-
-interface SupabaseProjectSourceRecord extends Record<string, unknown> {
-  project_id: string;
-  source_id: string;
-  title: string;
-  authors: string[];
-  year?: number;
-  doi?: string;
-  venue?: string;
-  url?: string;
-  source_type: string;
-  authority_tier: string;
-  discovered_via: string;
-  discovered_at: string;
-}
-
-function getCourseworkSupabaseConfig(): SupabaseRestConfig | null {
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceRoleKey) return null;
-  return { supabaseUrl, serviceRoleKey };
-}
-
-export async function persistSourcesToSupabase(projectId: string, sources: DiscoveredSource[]): Promise<void> {
-  if (process.env.NODE_ENV === "test") return;
-  const config = getCourseworkSupabaseConfig();
-  if (!config) return;
-
-  const table = new SupabaseTable<SupabaseProjectSourceRecord>(config, "project_sources");
-  for (const src of sources) {
-    const yearNum = typeof src.year === "number" ? src.year : parseInt(String(src.year || ""), 10) || undefined;
-    const venue = src.journal || ((src as unknown as Record<string, unknown>).venue as string | undefined);
-    await table.upsert({
-      project_id: projectId,
-      source_id: src.id,
-      title: src.title,
-      authors: src.authors,
-      year: yearNum,
-      doi: src.doi,
-      venue,
-      url: src.url,
-      source_type: typeof src.type === "string" ? src.type : "scholarly",
-      authority_tier: ((src as unknown as Record<string, unknown>).authorityTier as string) || "A",
-      discovered_via: src.retrievalSource || "openalex",
-      discovered_at: src.retrievedAt || new Date().toISOString(),
-    }, "project_id,source_id").catch((dbErr: unknown) => {
-      console.warn("Failed to persist source to Supabase project_sources:", dbErr);
-    });
-  }
-}
-
-
 
 export function isCorruptedOutlineHeadings(headings: any[], topic: string): boolean {
   if (!headings || !Array.isArray(headings) || headings.length === 0) return false;
@@ -201,14 +102,6 @@ export function safeParseObject<T = any>(val: any): T | null {
     }
   }
   return null;
-}
-
-export function extractProjectInstructions(project: any, reqBody?: any): string {
-  const candidate =
-    reqBody?.instructions ||
-    reqBody?.question ||
-    extractStandardizedInstructions(project?.answers);
-  return cleanAnswerString(candidate);
 }
 
 function capitalizeTitleWords(str: string): string {
@@ -414,68 +307,5 @@ export async function getProjectSafe(req: express.Request<unknown>, res: express
   return project;
 }
 
-
-export function buildDeterministicResearchPlan(
-  question: string,
-  assignmentType: string,
-  academicLevel: string,
-  analysis?: any
-) {
-  const qClean = question?.trim() || "Academic Coursework Assignment";
-  let parsedAnalysis: any = {};
-  try {
-    parsedAnalysis = typeof analysis === "string" ? JSON.parse(analysis) : analysis || {};
-  } catch {
-    parsedAnalysis = {};
-  }
-
-  // Everything below is derived from the brief itself; no subject lookup.
-  const briefQuestions = parseBriefQuestions(qClean);
-  const inquiries = extractBriefInquiriesAndConcepts(qClean);
-  const questionTexts: Array<{ text: string; label: string; marks?: number }> =
-    briefQuestions.length > 0
-      ? briefQuestions.slice(0, 6).map((q) => ({ text: q.text, label: q.label, marks: q.marks }))
-      : [...inquiries.extractedTasks, ...inquiries.subQuestions].slice(0, 6).map((t, i) => ({ text: t, label: `Q${i + 1}` }));
-  if (questionTexts.length === 0) questionTexts.push({ text: qClean.slice(0, 200), label: "Q1" });
-
-  const concepts: string[] =
-    parsedAnalysis.keyConcepts?.length > 0 ? parsedAnalysis.keyConcepts : inquiries.keyConcepts.slice(0, 5);
-
-  const coreQuestions: CoreResearchQuestion[] = questionTexts.map((q, i) => ({
-    id: `q-${i + 1}`,
-    question: q.text,
-    rationale: q.marks ? `Asked directly in the brief (${q.marks} marks).` : "Asked directly in the brief.",
-    category: q.label,
-  }));
-
-  const phrases = buildSourceSearchQueries(qClean, 4);
-  const searchStrategies: RecommendedSearchStrategy[] = phrases.map((phrase, i) => ({
-    id: `strat-${i + 1}`,
-    database: "OpenAlex / Crossref / Semantic Scholar",
-    searchQuery: phrase,
-    relevanceTarget: questionTexts[i] ? `Evidence for ${questionTexts[i].label}: ${questionTexts[i].text.slice(0, 90)}` : "Evidence for the brief's questions",
-  }));
-
-  const keyDebates: string[] = [];
-
-  const evidenceTypesNeeded = [
-    "Peer-reviewed academic journal publications",
-    "Authoritative institutional or standards publications relevant to the brief",
-    "Primary data or case evidence named in the brief",
-  ];
-
-  return {
-    coreQuestions,
-    mainConcepts: concepts,
-    keyDebates,
-    evidenceTypesNeeded,
-    searchStrategies,
-    outOfScopeTopics: [
-      "Unverified blog posts, speculative trade journalism, or marketing collateral",
-      "Broad historical surveys that do not directly address post-2015 modern frameworks",
-    ],
-    approvedByUser: false,
-  };
-}
 
 // 2. POST /api/projects/:id/assignment/plan
