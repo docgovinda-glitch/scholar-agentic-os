@@ -426,7 +426,6 @@ export function SignUpScreen({
           />
           <PhoneField
             idPrefix="signup-phone"
-            label="Mobile number"
             countryCode={fields.phoneCountryCode}
             onCountryCodeChange={set("phoneCountryCode")}
             number={fields.phone}
