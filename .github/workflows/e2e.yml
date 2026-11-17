@@ -34,10 +34,12 @@ jobs:
         run: npx playwright install --with-deps chromium
       - uses: supabase/setup-cli@v1
         with:
-          # Pinned to the devDependency version (package.json "supabase").
-          # "latest" resolves through the unauthenticated GitHub API, which
-          # rate-limits CI runners and fails the job before any test runs.
-          version: 2.115.0
+          # Pinned: "latest" resolves through the unauthenticated GitHub API,
+          # which rate-limits CI runners and fails the job before any test
+          # runs. v3.2.0 is the current release (as reported by the CLI); the
+          # 2.x pin started a local stack whose service key was rejected
+          # (HTTP 403 in scripts/e2e-setup.mjs).
+          version: 3.2.0
       - name: Start local Supabase
         run: |
           mkdir -p "$RUNNER_TEMP/supa" && cd "$RUNNER_TEMP/supa"
