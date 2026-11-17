@@ -36,7 +36,7 @@ This document establishes the authoritative completion baseline for **Scholar Co
 | **Auth Verification** | `/api/auth/*` | Production Ready | Cloudflare Turnstile token verification |
 | **Project Core** | `/api/projects/*` | Production Ready | Dual-engine (`pgProjectStore` / `restProjectStore`), CRUD, authors, intake, rubric evaluation |
 | **Coursework Engine** | `/api/projects/:id/assignment/*` | Production Ready | Brief parsing, outline generation, section streaming (SSE), rubric estimation, copilot chat |
-| **Journal Pipeline (1-19)** | `/api/projects/:id/agent/*` | Production Ready | Literature discovery, gap analysis, title generation, external research, peer review simulation |
+| **Journal Pipeline (1-19)** | `/api/projects/:id/agentic/*` | Production Ready | Literature discovery, gap analysis, title generation, external research, peer review simulation |
 | **Knowledge Vault** | `/api/vault/*` | Production Ready | Crossref/OpenAlex DOI lookup, PDF/DOCX extraction, SSRF-guarded HTML parser, hybrid BM25/cosine search |
 | **Multi-Portal Harvester** | `/api/search/multi-portal` | Production Ready | OpenAlex, Crossref, DOAJ, arXiv, DataCite aggregators |
 | **Supabase Reverse Proxy** | `/api/supabase/*` | Production Ready | Streaming HTTP & WebSocket proxy to Supabase PostgREST & Realtime |
@@ -51,9 +51,9 @@ This document establishes the authoritative completion baseline for **Scholar Co
 | `/api/projects/:id/proposal/aims-audit` | `POST` | Canned 4 check items | Specific Aims structural & word count analyzer | Medium |
 | `/api/projects/:id/presentation/generate-deck` | `POST` | Canned 5 static slides | Integration with `features/slides` slide generation engine | High |
 | `/api/projects/:id/presentation/qa-simulate` | `POST` | Canned 2 audience questions | LLM defense simulator based on slide deck content | Medium |
-| `/api/projects/:id/agent/final-editor` | `POST` | 1s `setTimeout` stub | Formal editing & academic tone enhancement pipeline | Low |
-| `/api/projects/:id/agent/publication-readiness` | `POST` | 3s `setTimeout` stub | Rule-based pre-flight & compliance validator | Medium |
-| `/api/projects/:id/agent/export` | `POST` | 3.5s `setTimeout` returning fake URLs | Direct delegation to `/api/projects/:id/export` | Low |
+| `/api/projects/:id/agentic/final-editor` | `POST` | 1s `setTimeout` stub | Formal editing & academic tone enhancement pipeline | Low |
+| `/api/projects/:id/agentic/publication-readiness` | `POST` | 3s `setTimeout` stub | Rule-based pre-flight & compliance validator | Medium |
+| `/api/projects/:id/agentic/export` | `POST` | 3.5s `setTimeout` returning fake URLs | Direct delegation to `/api/projects/:id/export` | Low |
 | `/api/presentations/*` | `GET/POST/PUT/DELETE` | In-memory `Map` fallback or unscoped table | User authentication (`requireAuth`) and project binding | Critical (Security) |
 | `/api/drafting/section` | `POST` | Reads project by ID from store | Missing `requireAuth` and project ownership verification | Critical (Security) |
 

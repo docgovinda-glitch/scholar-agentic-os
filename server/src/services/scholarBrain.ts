@@ -13,6 +13,7 @@
  */
 
 import * as courseworkPrompts from "./prompts/courseworkPrompts.ts";
+import * as journalPrompts from "./prompts/journalPrompts.ts";
 import { searchEuropePmc } from "../../../src/shared/retrieval/providers.ts";
 import { buildAskGeneralPrompt, buildAskSearchPrompt } from "../../../src/shared/askPrompts.ts";
 import { NoAiConnectedError, routedCompletion as rawRoutedCompletion, routedText, RouterHandoffError, toRouterTask } from "../ai/routerBridge.ts";
@@ -281,7 +282,7 @@ async function runGatewayCall<T>(kind: string, taskType: string | undefined, fn:
   }
 }
 
-/** The router call the Coursework agent steps use: timed and logged like the other gateway calls, NFC-normalised, errors rethrown unchanged. */
+/** The router call routes use (Coursework agent steps, the Journal studio): timed and logged like the other gateway calls, NFC-normalised, errors rethrown unchanged. */
 export function routedCompletion(...args: Parameters<typeof rawRoutedCompletion>): ReturnType<typeof rawRoutedCompletion> {
   return runGatewayCall("routed", args[1]?.task, async () => {
     const text = await rawRoutedCompletion(...args);
@@ -455,6 +456,9 @@ Return ONLY valid JSON matching:
 export const scholarBrain = {
   /** Coursework (OT-01) prompt text: routes read prompts from here, never write their own. */
   courseworkPrompts,
+
+  /** Journal (OT-10) Writing Studio prompt text: section drafting and polishing. */
+  journalPrompts,
 
   /** System prompt for AskScholar answers (search-grounded or general). One owner for the text, every surface shares it. */
   askSystemPrompt(opts: { kind: "search"; style: string; length: string } | { kind: "general"; base: string; style: string; length: string }): string {

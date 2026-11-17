@@ -31,7 +31,7 @@ describe("live AI status for workspace steps", () => {
       ["done", { ok: true }],
     ]));
     const seen: string[] = [];
-    await authedStreamFetch("/api/projects/p1/agent/draft", "POST", {}, (e) => { seen.push(e); });
+    await authedStreamFetch("/api/projects/p1/agentic/draft-subsection", "POST", {}, (e) => { seen.push(e); });
     const s = liveAiStatus.get();
     expect(s.phase).toBe("done");
     expect(s.model?.label).toBe("B · Premium");
@@ -53,7 +53,7 @@ describe("live AI status for workspace steps", () => {
       signal = init.signal ?? undefined;
       return new Promise((_resolve, reject) => signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError"))));
     });
-    const run = authedStreamFetch("/api/projects/p1/agent/draft", "POST", {}, () => {});
+    const run = authedStreamFetch("/api/projects/p1/agentic/draft-subsection", "POST", {}, () => {});
     await vi.waitFor(() => expect(signal).toBeDefined());
     liveAiStatus.cancel();
     await expect(run).rejects.toThrow();

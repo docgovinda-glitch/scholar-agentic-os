@@ -85,10 +85,10 @@ describe("Stages 20-22: 5-Referee Peer Review & Point-by-Point Rebuttal Matrix",
   // with the author's response left for the author.
   it("builds the rebuttal matrix from the project's own critiques and persists author revisions", async () => {
     const empty = await createStageProject();
-    const none = await request(app).get(`/api/projects/${empty}/agent/rebuttal-matrix`);
+    const none = await request(app).get(`/api/projects/${empty}/agentic/rebuttal-matrix`);
     expect(none.status).toBe(200);
     expect(none.body.data).toEqual([]);
-    const noCritiques = await request(app).post(`/api/projects/${empty}/agent/rebuttal-matrix`).send({});
+    const noCritiques = await request(app).post(`/api/projects/${empty}/agentic/rebuttal-matrix`).send({});
     expect(noCritiques.status).toBe(400);
 
     const projectId = await createStageProject({
@@ -97,7 +97,7 @@ describe("Stages 20-22: 5-Referee Peer Review & Point-by-Point Rebuttal Matrix",
         { id: "c2", refereeRole: "Formal Editor", critiqueLens: "Style", section: "Abstract", severity: "Minor", critique: "Abstract exceeds 250 words." },
       ]),
     });
-    const getRes = await request(app).get(`/api/projects/${projectId}/agent/rebuttal-matrix`);
+    const getRes = await request(app).get(`/api/projects/${projectId}/agentic/rebuttal-matrix`);
     expect(getRes.status).toBe(200);
     expect(getRes.body.data.map((r: { critique: string }) => r.critique)).toEqual([
       "Sample size is not justified.",
@@ -126,7 +126,7 @@ describe("Stages 20-22: 5-Referee Peer Review & Point-by-Point Rebuttal Matrix",
     ];
 
     const postRes = await request(app)
-      .post(`/api/projects/${projectId}/agent/rebuttal-matrix`)
+      .post(`/api/projects/${projectId}/agentic/rebuttal-matrix`)
       .send({ matrix: customMatrix });
 
     expect(postRes.status).toBe(200);
@@ -146,7 +146,7 @@ describe("Stages 20-22: 5-Referee Peer Review & Point-by-Point Rebuttal Matrix",
 describe("Stage 23: Discourse-Level Humanized Copy-Editing (/final-editor)", () => {
   it("refuses to polish anything when the project has no manuscript (no demo stand-in text)", async () => {
     const projectId = await createStageProject({ manuscript_draft: "", manuscript_markdown: "" });
-    const res = await request(app).post(`/api/projects/${projectId}/agent/final-editor`).send({});
+    const res = await request(app).post(`/api/projects/${projectId}/agentic/final-editor`).send({});
     expect(res.status).toBe(400);
     expect(JSON.stringify(res.body)).not.toMatch(/94\.2%|p < 0\.001|Vaswani/);
   });
@@ -157,7 +157,7 @@ describe("Stage 23: Discourse-Level Humanized Copy-Editing (/final-editor)", () 
     const sampleSection = "We delve into the intricate tapestry of consensus systems (Smith, 2024). It is worth noting that this underscores pivotal bounds [1] with DOI 10.1038/s41586-024-0001. We generalize the behavior under p < 0.001 and Schrödinger wave equation.";
 
     const res = await request(app)
-      .post(`/api/projects/${projectId}/agent/final-editor`)
+      .post(`/api/projects/${projectId}/agentic/final-editor`)
       .send({
         manuscript: sampleSection,
       });
@@ -194,6 +194,44 @@ describe("Stage 23: Discourse-Level Humanized Copy-Editing (/final-editor)", () 
     const store = getProjectStore();
     const updated = await store.get(projectId);
     expect(updated?.answers?.["final_editor_telemetry"]).toBeDefined();
+    // A whole-manuscript polish is saved under the canonical key only; older copies are blanked.
+    expect(updated?.answers?.["manuscript_markdown"]).toBe(polishedText);
+    expect(updated?.answers?.["manuscript_draft"]).toBe("");
+  });
+
+  it("polishes a passage (text) and returns it at the top level without saving anything", async () => {
+    const projectId = await createStageProject();
+    const before = await getProjectStore().get(projectId);
+    const passage = "We delve into decoding latency [CITE:src_1] as shown in [FIG:f1]. We generalize the bound.";
+
+    const res = await request(app).post(`/api/projects/${projectId}/agentic/final-editor`).send({ text: passage, dialect: "en-GB" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.scope).toBe("passage");
+    expect(res.body.saved).toBe(false);
+    expect(typeof res.body.polishedText).toBe("string");
+    expect(res.body.polishedText).toContain("[CITE:src_1]");
+    expect(res.body.polishedText).toContain("[FIG:f1]");
+    expect(res.body.polishedText).not.toMatch(/Preserved Citation Lock/);
+    expect(res.body.polishedText.toLowerCase()).not.toContain("delve into");
+    // Only the passage was edited: the saved manuscript is untouched.
+    const after = await getProjectStore().get(projectId);
+    expect(after?.answers?.["manuscript_markdown"]).toBe(before?.answers?.["manuscript_markdown"]);
+    expect(after?.answers?.["final_editor_telemetry"]).toBeUndefined();
+  });
+
+  it("reports American spelling when asked for en-US and never claims a check it did not make", async () => {
+    const projectId = await createStageProject();
+    const res = await request(app).post(`/api/projects/${projectId}/agentic/final-editor`).send({ text: "We analyse the colour model.", dialect: "en-US" });
+    expect(res.status).toBe(200);
+    expect(res.body.styleCorrections.join(" ")).toMatch(/American English/);
+    expect(res.body.styleCorrections.join(" ")).not.toMatch(/British|100%/);
+  });
+
+  it("rejects a request that sends both a passage and a manuscript", async () => {
+    const projectId = await createStageProject();
+    const res = await request(app).post(`/api/projects/${projectId}/agentic/final-editor`).send({ text: "a", manuscript: "b" });
+    expect(res.status).toBe(400);
   });
 });
 
@@ -217,7 +255,7 @@ describe("Stage 24: Conductor Gate G7 Audit & Citation Reconciliation (/publicat
     });
 
     const res = await request(app)
-      .post(`/api/projects/${projectId}/agent/publication-readiness`)
+      .post(`/api/projects/${projectId}/agentic/publication-readiness`)
       .send({});
 
     expect(res.status).toBe(200);
@@ -260,7 +298,7 @@ describe("Stage 25: Canonical Multi-Format Scholarly Exporter (/export & /export
 
     // 1. Agent export configuration pass
     const exportRes = await request(app)
-      .post(`/api/projects/${projectId}/agent/export`)
+      .post(`/api/projects/${projectId}/agentic/export`)
       .send({
         template: "nature",
         citationStyle: "apa7",

@@ -50,7 +50,7 @@ const doneEvent = (text: string) => {
   return m ? JSON.parse(m[1]) : null;
 };
 
-describe("POST /api/projects/:id/agent/external-research (P0-2)", () => {
+describe("POST /api/projects/:id/agentic/external-research (P0-2)", () => {
   beforeEach(async () => {
     __resetProjectStoreForTests();
     vi.clearAllMocks();
@@ -72,7 +72,7 @@ describe("POST /api/projects/:id/agent/external-research (P0-2)", () => {
     ] as any);
 
     const res = await request(app)
-      .post(`/api/projects/${PROJECT_ID}/agent/external-research`)
+      .post(`/api/projects/${PROJECT_ID}/agentic/external-research`)
       .send({ query: "self-attention" });
 
     expect(res.status).toBe(200);
@@ -89,7 +89,7 @@ describe("POST /api/projects/:id/agent/external-research (P0-2)", () => {
   it("returns an empty list when the indexes find nothing", async () => {
     vi.mocked(discoverMultiPortalSources).mockResolvedValueOnce([]);
     const res = await request(app)
-      .post(`/api/projects/${PROJECT_ID}/agent/external-research`)
+      .post(`/api/projects/${PROJECT_ID}/agentic/external-research`)
       .send({ query: "nothing matches this" });
     expect(doneEvent(res.text).data).toEqual([]);
     expect(llmCalls).not.toHaveBeenCalled();
@@ -98,14 +98,14 @@ describe("POST /api/projects/:id/agent/external-research (P0-2)", () => {
   it("streams an error, not invented results, when the search fails", async () => {
     vi.mocked(discoverMultiPortalSources).mockRejectedValueOnce(new Error("upstream down"));
     const res = await request(app)
-      .post(`/api/projects/${PROJECT_ID}/agent/external-research`)
+      .post(`/api/projects/${PROJECT_ID}/agentic/external-research`)
       .send({ query: "anything" });
     expect(res.text).toMatch(/event: error/);
     expect(doneEvent(res.text)).toBeNull();
   });
 });
 
-describe("POST /api/projects/:id/agent/literature (P1-7, retired)", () => {
+describe("POST /api/projects/:id/agentic/literature (P1-7, retired)", () => {
   beforeEach(async () => {
     __resetProjectStoreForTests();
     vi.clearAllMocks();
@@ -114,7 +114,7 @@ describe("POST /api/projects/:id/agent/literature (P1-7, retired)", () => {
 
   it("no longer exists, so no LLM can be asked to generate sources", async () => {
     const res = await request(app)
-      .post(`/api/projects/${PROJECT_ID}/agent/literature`)
+      .post(`/api/projects/${PROJECT_ID}/agentic/literature`)
       .set(keyringHeader("ollama"))
       .send({});
     expect(res.status).toBe(404);

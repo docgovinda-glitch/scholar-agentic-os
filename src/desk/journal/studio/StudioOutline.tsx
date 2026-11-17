@@ -1,4 +1,6 @@
-import { countWords, groupUnits, writingRank, type ManuscriptTexts, type ManuscriptUnit } from "../manuscriptModel";
+import { memo } from "react";
+import { Check } from "lucide-react";
+import { countWords, groupUnits, isUnitWritten, writingRank, type ManuscriptTexts, type ManuscriptUnit } from "../../../domain/journal/manuscriptModel";
 
 export const UNSORTED_ID = "__unsorted__";
 
@@ -8,7 +10,7 @@ const ORDINAL = ["1st", "2nd", "3rd", "4th", "5th", "6th"];
  * The manuscript's sections and sub-sections with words written against each
  * target. Shown in manuscript order, or in the order authors usually write.
  */
-export default function StudioOutline({
+function StudioOutline({
   units,
   texts,
   activeId,
@@ -85,6 +87,7 @@ export default function StudioOutline({
                 {g.units.map((u) => {
                   const words = countWords(texts.texts[u.id]);
                   const pct = u.targetWords > 0 ? Math.min(100, Math.round((words / u.targetWords) * 100)) : 0;
+                  const done = isUnitWritten(words, u.targetWords);
                   const active = u.id === activeId;
                   return (
                     <li key={u.id}>
@@ -98,7 +101,10 @@ export default function StudioOutline({
                           <span className={`truncate min-w-0 ${active ? "font-semibold text-[color:var(--text-primary)]" : "text-[color:var(--text-secondary)]"}`}>
                             {u.isWholeSection ? "Whole section" : u.title}
                           </span>
-                          <span className="text-[10px] tabular-nums text-[color:var(--text-muted)] shrink-0">{words}/{u.targetWords}</span>
+                          <span className="flex items-center gap-1 text-[10px] tabular-nums text-[color:var(--text-muted)] shrink-0">
+                            {done && <Check className="w-3 h-3 text-[color:var(--state-success)]" aria-label="Written" />}
+                            {words}/{u.targetWords}
+                          </span>
                         </span>
                         <span className="mt-1 block h-1 rounded-full bg-[color:var(--surface-sunken)] overflow-hidden" aria-hidden="true">
                           <span className="block h-full rounded-full bg-[color:var(--accent)]" style={{ width: `${pct}%` }} />
@@ -115,3 +121,5 @@ export default function StudioOutline({
     </nav>
   );
 }
+
+export default memo(StudioOutline);

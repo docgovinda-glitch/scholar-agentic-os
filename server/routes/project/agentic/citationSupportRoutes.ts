@@ -1,7 +1,8 @@
 import express from "express";
 import { routedCompletion } from "../../../src/ai/routerBridge.ts";
 import { sendAiFailure } from "../../../src/ai/aiRouteErrors.ts";
-import { studioEvidence } from "../../../../src/desk/journal/studioEvidence.ts";
+import { studioEvidence } from "../../../../src/domain/journal/studioEvidence.ts";
+import { readManuscriptMarkdown } from "../../../../src/domain/journal/manuscriptText.ts";
 import {
   buildPairs,
   groundSupport,
@@ -25,7 +26,7 @@ citationSupportRoutes.post("/citations/support", async (req: express.Request<{ i
   const project = await getProjectSafe(req, res);
   if (!project) return;
   const answers = (project.answers ?? {}) as Record<string, unknown>;
-  const markdown = String(answers["manuscript_markdown"] || answers["full_text_markdown"] || answers["assembled_draft"] || "");
+  const markdown = readManuscriptMarkdown(answers);
   const sources = studioEvidence(answers).map((e) => ({ id: e.id, title: e.title, text: e.findings }));
   const { pairs, truncated } = buildPairs(markdown, sources);
   if (pairs.length === 0) {

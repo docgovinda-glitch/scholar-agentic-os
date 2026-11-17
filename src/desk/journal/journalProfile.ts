@@ -4,7 +4,7 @@
  * style and the word target. Pure; no React, no I/O.
  */
 import type { WordBudgetBlueprint } from "../workspace/types";
-import { sectionKind, type SectionKind } from "./manuscriptModel";
+import { sectionKind, type SectionKind } from "../../domain/journal/manuscriptModel";
 
 /** Relative share of the main text by kind of section (abstract handled separately). */
 const SHARE: Record<SectionKind, number> = {

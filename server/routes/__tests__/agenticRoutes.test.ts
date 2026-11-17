@@ -63,7 +63,7 @@ describe("Agentic Routes & Relational Table Persistence", () => {
   it("rejects unsigned LLM override requests with HTTP 403", async () => {
     const projectId = await createProject();
     const res = await request(app)
-      .post(`/api/projects/${projectId}/agent/vault-sources`)
+      .post(`/api/projects/${projectId}/agentic/vault-sources`)
       .send({
         llmResult: JSON.stringify({ data: [] }),
       });
@@ -83,7 +83,7 @@ describe("Agentic Routes & Relational Table Persistence", () => {
     });
 
     const res = await request(app)
-      .post(`/api/projects/${projectId}/agent/vault-sources`)
+      .post(`/api/projects/${projectId}/agentic/vault-sources`)
       .send({
         challengeToken: makeChallengeToken(),
         llmResult: JSON.stringify({
@@ -130,7 +130,7 @@ describe("Agentic Routes & Relational Table Persistence", () => {
     });
 
     const res = await request(app)
-      .post(`/api/projects/${projectId}/agent/evidence-extraction`)
+      .post(`/api/projects/${projectId}/agentic/evidence-extraction`)
       .send({
         challengeToken: makeChallengeToken(),
         llmResult: JSON.stringify({
@@ -164,43 +164,12 @@ describe("Agentic Routes & Relational Table Persistence", () => {
     expect(sectionInsert).toBeUndefined();
   });
 
-  it("POST /draft snapshots manuscript_versions and inserts into manuscript_sections", async () => {
+  it("the retired whole-manuscript routes (/draft, /draft-preview, /manuscript) are gone", async () => {
     const projectId = await createProject();
-
-    const fetchCalls: { url: string; body: any }[] = [];
-    global.fetch = vi.fn().mockImplementation(async (url: string, init?: any) => {
-      const body = init?.body ? JSON.parse(init.body) : null;
-      fetchCalls.push({ url: url.toString(), body });
-      return new Response(JSON.stringify([]), { status: 200 });
-    });
-
-    const res = await request(app)
-      .post(`/api/projects/${projectId}/agent/draft`)
-      .send({
-        challengeToken: makeChallengeToken(),
-        llmResult: JSON.stringify({
-          data: [
-            {
-              section: "Introduction",
-              status: "Drafted",
-              length: 1200,
-              content: "Quantum communication represents...",
-            },
-          ],
-        }),
-      });
-
-    expect(res.status).toBe(200);
-
-    const supabaseCalls = fetchCalls.filter((c) => c.url.includes("supabase.co"));
-    const sectionInsert = supabaseCalls.find((c) => c.url.includes("manuscript_sections") && c.body);
-    expect(sectionInsert).toBeDefined();
-    expect(sectionInsert?.body).toMatchObject({
-      project_id: projectId,
-      section_name: "Introduction",
-      content: "Quantum communication represents...",
-      status: "Drafted",
-    });
+    for (const [method, path] of [["post", "draft"], ["post", "draft-preview"], ["get", "manuscript"], ["put", "manuscript"]] as const) {
+      const res = await request(app)[method](`/api/projects/${projectId}/agentic/${path}`).send({});
+      expect(res.status).toBe(404);
+    }
   });
 
   it("POST /peer-review inserts into peer_review_critiques with strict lens validation", async () => {
@@ -214,7 +183,7 @@ describe("Agentic Routes & Relational Table Persistence", () => {
     });
 
     const res = await request(app)
-      .post(`/api/projects/${projectId}/agent/peer-review`)
+      .post(`/api/projects/${projectId}/agentic/peer-review`)
       .send({
         challengeToken: makeChallengeToken(),
         llmResult: JSON.stringify({

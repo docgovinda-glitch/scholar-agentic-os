@@ -25,7 +25,8 @@ import { parseFigures, placeFigures } from "../../domain/journal/figures";
 import AuthorsEditor from "../journal/AuthorsEditor";
 import { checkAuthors, creditStatement as creditFromRoles, fullName, type ManuscriptAuthor } from "../../domain/journal/authorship";
 import { checkDois, lookupDoi } from "../journal/referenceApi";
-import { studioEvidence } from "../journal/studioEvidence";
+import { studioEvidence } from "../../domain/journal/studioEvidence";
+import { manuscriptAnswerPatch, readManuscriptMarkdown } from "../../domain/journal/manuscriptText";
 import { auditCitations, recordsForSources } from "../../domain/journal/referenceAudit";
 import { cleanDoi, parseReferenceRecords, type ReferenceRecord } from "../../domain/journal/references";
 import { isNumeric, renderManuscript, styleKey, type StyleKey } from "../../domain/journal/citationStyles";
@@ -66,14 +67,7 @@ export default function AuditExportMode() {
   const targetJournalName = String(answers.target_journal || "").trim() || "Target journal not yet selected";
 
   // Assembled manuscript markdown
-  const manuscriptMarkdown = useMemo(() => {
-    return (
-      answers["manuscript_markdown"] ||
-      answers["full_text_markdown"] ||
-      answers["assembled_draft"] ||
-      ""
-    );
-  }, [answers]);
+  const manuscriptMarkdown = useMemo(() => readManuscriptMarkdown(answers), [answers]);
 
   // Mode 1 Word budget blueprint
   const blueprint: WordBudgetBlueprint | null = useMemo(() => {
@@ -326,7 +320,7 @@ export default function AuditExportMode() {
 
     const nextAnswers = {
       ...answers,
-      manuscript_markdown: updatedMarkdown,
+      ...manuscriptAnswerPatch(updatedMarkdown, answers),
       data_availability_statement: dataAvailabilityStatement,
       competing_interests_statement: competingInterestsStatement,
       credit_statement: creditStatement,

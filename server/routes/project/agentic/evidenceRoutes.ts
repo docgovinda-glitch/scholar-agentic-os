@@ -15,7 +15,7 @@ export const evidenceRoutes = express.Router({ mergeParams: true });
 // invent 15 sources and had no client. Literature comes from
 // /agent/external-research and the multi-portal harvester (real indexes only).
 
-// POST /api/projects/:id/agent/gaps
+// POST /api/projects/:id/agentic/gaps
 evidenceRoutes.post("/gaps", async (req: express.Request<{ id: string }>, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
@@ -64,7 +64,7 @@ Make sure every single gap explicitly mentions concepts from the working title.`
   }
 });
 
-// POST /api/projects/:id/agent/titles
+// POST /api/projects/:id/agentic/titles
 evidenceRoutes.post("/titles", async (req: express.Request<{ id: string }>, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
@@ -108,7 +108,7 @@ Return ONLY valid JSON in this exact format:
   }
 });
 
-// POST /api/projects/:id/agent/vault-sources
+// POST /api/projects/:id/agentic/vault-sources
 evidenceRoutes.post("/vault-sources", async (req: express.Request<{ id: string }>, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
@@ -180,7 +180,7 @@ Return ONLY valid JSON in this exact format:
   }
 });
 
-// POST /api/projects/:id/agent/evidence-extraction
+// POST /api/projects/:id/agentic/evidence-extraction
 evidenceRoutes.post("/evidence-extraction", async (req: express.Request<{ id: string }>, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
@@ -287,7 +287,7 @@ Return ONLY valid JSON in this exact format:
   }
 });
 
-// POST /api/projects/:id/agent/external-research
+// POST /api/projects/:id/agentic/external-research
 evidenceRoutes.post("/external-research", async (req: express.Request<{ id: string }>, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
@@ -333,7 +333,7 @@ evidenceRoutes.post("/external-research", async (req: express.Request<{ id: stri
   }
 });
 
-// POST /api/projects/:id/agent/evidence-analysis
+// POST /api/projects/:id/agentic/evidence-analysis
 evidenceRoutes.post("/evidence-analysis", async (req: express.Request<{ id: string }>, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
@@ -374,7 +374,7 @@ Return ONLY valid JSON in this exact format:
   }
 });
 
-// POST /api/projects/:id/agent/journal-discovery
+// POST /api/projects/:id/agentic/journal-discovery
 evidenceRoutes.post("/journal-discovery", async (req: express.Request<{ id: string }>, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
@@ -406,7 +406,7 @@ Return ONLY valid JSON in this exact format:
   }
 });
 
-// POST /api/projects/:id/agent/journal-requirements
+// POST /api/projects/:id/agentic/journal-requirements
 evidenceRoutes.post("/journal-requirements", async (req: express.Request<{ id: string }>, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;

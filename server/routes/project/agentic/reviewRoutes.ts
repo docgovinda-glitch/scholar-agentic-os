@@ -1,10 +1,7 @@
-import { routedCompletion } from "../../../src/ai/routerBridge.ts";
 import express from "express";
 import { getProjectStore } from "../../../../src/services/store/projectStore.ts";
 import { safeParseAnswerField } from "../../../../src/shared/projectStateSchema.ts";
-import {
-  streamOpenRouterJSON,
-} from "../../../src/services/scholarBrain.ts";
+import { routedCompletion, scholarBrain, streamOpenRouterJSON } from "../../../src/services/scholarBrain.ts";
 import {
   buildScholarlyVoiceSystemPrompt,
   sanitizeScholarlyText,
@@ -26,10 +23,13 @@ import {
   manuscriptToCanonicalDocument,
 } from "./helpers.ts";
 import type { RefereeRole, AcademicCritiqueItem, RebuttalMatrixItem } from "./types.ts";
+import { countManuscriptWords, manuscriptAnswerPatch, readManuscriptMarkdown } from "../../../../src/domain/journal/manuscriptText.ts";
+import { finalEditorBodySchema } from "./journalStudioSchemas.ts";
+import { citationLockTokens, withCitationTokensMasked } from "../../../src/utils/citationLock.ts";
 
 export const reviewRoutes = express.Router({ mergeParams: true });
 
-// POST /api/projects/:id/agent/peer-review
+// POST /api/projects/:id/agentic/peer-review
 reviewRoutes.post("/peer-review", async (req: express.Request<{ id: string }>, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
@@ -181,7 +181,7 @@ Return ONLY valid JSON in this exact format:
   }
 });
 
-// POST /api/projects/:id/agent/revision
+// POST /api/projects/:id/agentic/revision
 reviewRoutes.post("/revision", async (req: express.Request<{ id: string }>, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
@@ -215,7 +215,7 @@ Return ONLY valid JSON in this exact format:
   }
 });
 
-// POST /api/projects/:id/agent/rebuttal-matrix
+// POST /api/projects/:id/agentic/rebuttal-matrix
 reviewRoutes.post("/rebuttal-matrix", async (req: express.Request<{ id: string }>, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
@@ -330,7 +330,7 @@ Return ONLY valid JSON matching this schema:
   }
 });
 
-// GET /api/projects/:id/agent/rebuttal-matrix
+// GET /api/projects/:id/agentic/rebuttal-matrix
 reviewRoutes.get("/rebuttal-matrix", async (req: express.Request<{ id: string }>, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
@@ -357,7 +357,7 @@ reviewRoutes.get("/rebuttal-matrix", async (req: express.Request<{ id: string }>
   }
 });
 
-// POST /api/projects/:id/agent/citation-audit
+// POST /api/projects/:id/agentic/citation-audit
 reviewRoutes.post("/citation-audit", async (req: express.Request<{ id: string }>, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
@@ -396,7 +396,7 @@ Use 'verified' or 'flagged' for the status.`;
   }
 });
 
-// POST /api/projects/:id/agent/originality-check
+// POST /api/projects/:id/agentic/originality-check
 reviewRoutes.post("/originality-check", async (req: express.Request<{ id: string }>, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
@@ -438,107 +438,95 @@ Return ONLY valid JSON in this exact format:
   }
 });
 
-// POST /api/projects/:id/agent/final-editor
+// POST /api/projects/:id/agentic/final-editor
+// Polishes a passage (`text`: returned for the author to review, nothing is
+// saved) or the whole manuscript (`manuscript`, else the saved one: saved).
 reviewRoutes.post("/final-editor", async (req: express.Request<{ id: string }>, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
 
-  const { manuscript, dialect = "en-GB", lockedTerms = [] } = req.body || {};
-  const targetDialect: ScholarlyDialect = dialect === "en-US" ? "en-US" : "en-GB";
-  let textToPolish =
-    typeof manuscript === "string" && manuscript.trim().length > 0
-      ? manuscript
-      : project.answers?.["manuscript_markdown"] ||
-        project.answers?.["full_text_markdown"] ||
-        project.answers?.["assembled_draft"] ||
-        "";
-
-  if (!textToPolish.trim() && project.answers?.["manuscript_draft"]) {
-    const parsed = safeParseAnswerField<Array<{ section?: string; section_name?: string; content?: string }>>(project.answers["manuscript_draft"], []);
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      textToPolish = parsed
-        .map((s) => `## ${s.section || s.section_name || "Section"}\n\n${s.content || ""}`)
-        .join("\n\n");
-    }
+  const parsedBody = finalEditorBodySchema.safeParse(req.body ?? {});
+  if (!parsedBody.success) {
+    return res.status(400).json({ error: parsedBody.error.issues[0]?.message || "Invalid polish request." });
   }
+  const { text, manuscript, dialect, lockedTerms = [] } = parsedBody.data;
+  const targetDialect: ScholarlyDialect = dialect === "en-US" ? "en-US" : "en-GB";
+  const scope: "passage" | "manuscript" = text !== undefined ? "passage" : "manuscript";
+  const textToPolish =
+    scope === "passage" ? text ?? "" : manuscript?.trim() ? manuscript : readManuscriptMarkdown(project.answers);
 
   if (!textToPolish.trim()) {
     // Never polish a stand-in manuscript (this used to be a hardcoded demo
     // paper with invented statistics and references).
-    return res.status(400).json({ error: "Nothing to edit yet: write or generate your manuscript sections first." });
+    return res.status(400).json({
+      error: scope === "passage" ? "Select or write some text to polish first." : "Nothing to edit yet: write or generate your manuscript sections first.",
+    });
   }
 
-  // 1. Before telemetry
-  const burstinessBefore = evaluateBurstiness(textToPolish);
   const bannedBefore = detectBannedTokens(textToPolish);
+  const lockedTokens = citationLockTokens(textToPolish);
 
-  // 2. Term-Locked Humanization via AI Gateway or deterministic fallback
+  // 1. AI copy-edit (skipped under test), then the rule-based pass either way.
   const isTest = process.env.NODE_ENV === "test" || Boolean(process.env.VITEST);
-
-  let polished = "";
+  let aiText = "";
   if (!isTest) {
     try {
-      const systemPrompt = `${buildScholarlyVoiceSystemPrompt({ dialect: targetDialect, lockedTerms })}
-You are an elite academic copy-editor performing a Stage 23 Final Editorial Pass over a scholarly manuscript.
-CRITICAL MANDATES:
-1. STRICT CITATION & DATA LOCK: Never delete, alter, or rephrase any inline citations (such as [@...], (Author, Year), [1], [ev-...]), DOIs, numerical measurements, statistical values (e.g. p < 0.001, 95% CI: [...]), or technical terms.
-2. TERM-LOCKED HUMANIZATION: Eliminate all AI lexical clichés ("delve", "tapestry", "testament", "underscores", "pivotal", "it is worth noting").
-3. SYNTACTIC BURSTINESS: Alternate concise empirical declaratives with complex, multi-clause analytical sentences.
-4. ORTHOGRAPHY & UNICODE: Enforce British English (-ise, -our, -re, modelling) and maintain NFC Unicode / IAST diacritic integrity.
-Return ONLY the polished manuscript text without code block wrappers.`;
-
-      polished = (await routedCompletion(req, {
-        task: "drafting",
-        systemPrompt,
-        userPrompt: `Polish this scholarly manuscript:\n\n${textToPolish}`,
-      })).trim();
+      aiText = (
+        await routedCompletion(req, {
+          task: "drafting",
+          systemPrompt: scholarBrain.journalPrompts.polishSystemPrompt({
+            voicePrompt: buildScholarlyVoiceSystemPrompt({ dialect: targetDialect, lockedTerms }),
+            dialect: targetDialect,
+            scope,
+          }),
+          userPrompt: scholarBrain.journalPrompts.polishUserPrompt(textToPolish, scope),
+        })
+      ).trim();
     } catch (e) {
-      console.warn("AI Final Editor gateway call failed, using deterministic copy-editor:", e);
+      console.warn("AI final editor call failed; using the rule-based copy-editor:", e instanceof Error ? e.message : e);
     }
   }
 
-  // 3. Deterministic rule-based copy-editing pass
-  if (!polished) {
-    polished = sanitizeScholarlyText(textToPolish, { dialect: targetDialect, stripCliches: true });
-  } else {
-    polished = sanitizeScholarlyText(polished, { dialect: targetDialect, stripCliches: true });
-  }
-  polished = normalizeUnicodeNFC(polished);
-
-  // 4. Citation and Data Lock verification
-  const originalCitations =
-    textToPolish.match(
-      /\[@[^\]]+\]|\([A-Z][a-zA-Z\s]+,\s*(?:19|20)\d{2}[a-z]?\)|\[\d+\]|\[ev-[a-zA-Z0-9_-]+\]/g
-    ) || [];
-  for (const cit of originalCitations) {
-    if (!polished.includes(cit)) {
-      polished += `\n\n<!-- Preserved Citation Lock: ${cit} -->`;
+  // 2. Citation and data lock: an AI rewrite that lost a citation, figure
+  // reference, DOI or statistic is discarded, never patched with comments.
+  const notes: string[] = [];
+  let usedAi = Boolean(aiText);
+  if (aiText) {
+    const lost = lockedTokens.filter((t) => !aiText.includes(t));
+    if (lost.length > 0) {
+      usedAi = false;
+      notes.push(
+        `The AI rewrite changed ${lost.length === 1 ? "1 citation or value" : `${lost.length} citations or values`} (${lost.slice(0, 3).join(", ")}${lost.length > 3 ? ", …" : ""}), so it was discarded and only the rule-based pass was applied.`
+      );
     }
   }
-
-  // 5. After telemetry
-  const burstinessAfter = evaluateBurstiness(polished);
-  const bannedAfter = detectBannedTokens(polished);
-
-  const styleCorrections: string[] = [];
-  if (bannedBefore.matches.length > 0) {
-    styleCorrections.push(
-      `Purged ${bannedBefore.matches.length} AI lexical cliché(s): ${bannedBefore.matches.slice(0, 5).join(", ")}`
-    );
-  }
-  if (dialect === "en-GB") {
-    styleCorrections.push(
-      "Standardized orthography to British/Oxford conventions (-ise, -our, -re, modelling)"
-    );
-  }
-  styleCorrections.push("Normalized all Unicode characters and IAST diacritics to canonical NFC");
-  styleCorrections.push(
-    "Strict citation and data lock enforced: 100% of statistical values and citations preserved"
+  let polished = withCitationTokensMasked(usedAi ? aiText : textToPolish, (t) =>
+    sanitizeScholarlyText(t, { dialect: targetDialect, stripCliches: true })
   );
+  polished = normalizeUnicodeNFC(polished);
+  const stillLost = lockedTokens.filter((t) => !polished.includes(t));
+  if (stillLost.length > 0) {
+    // The rule-based pass must never touch a locked token either; if it did, keep the author's text.
+    polished = textToPolish;
+    notes.push("The copy-edit would have changed a citation or value, so your text was kept as it was.");
+  }
 
-  const wordCountBefore = textToPolish.split(/\s+/).filter(Boolean).length;
-  const wordCountAfter = polished.split(/\s+/).filter(Boolean).length;
+  // 3. What actually changed, reported as counted facts.
+  const bannedAfter = detectBannedTokens(polished);
+  const cliches = bannedBefore.matches.filter((m) => !bannedAfter.matches.includes(m));
+  if (usedAi) notes.unshift("Copy-edited by your AI, then checked by the rule-based pass.");
+  if (cliches.length > 0) notes.push(`Removed ${cliches.length} AI cliché${cliches.length === 1 ? "" : "s"}: ${cliches.slice(0, 5).join(", ")}`);
+  notes.push(`Spelling follows ${targetDialect === "en-US" ? "American" : "British"} English.`);
+  if (lockedTokens.length > 0 && stillLost.length === 0) {
+    notes.push(`All ${lockedTokens.length} citation${lockedTokens.length === 1 ? "" : "s"} and values in the text are unchanged.`);
+  }
+  if (polished === textToPolish) notes.push("No changes were needed.");
+  const styleCorrections = notes;
 
+  const burstinessBefore = evaluateBurstiness(textToPolish);
+  const burstinessAfter = evaluateBurstiness(polished);
+  const wordCountBefore = countManuscriptWords(textToPolish);
+  const wordCountAfter = countManuscriptWords(polished);
   const telemetry = {
     wordCountBefore,
     wordCountAfter,
@@ -546,42 +534,42 @@ Return ONLY the polished manuscript text without code block wrappers.`;
     burstinessAfter,
     bannedTokensBefore: bannedBefore.matches,
     bannedTokensAfter: bannedAfter.matches,
-    fleschKincaidGrade: Math.round(
-      0.39 * (wordCountAfter / Math.max(1, burstinessAfter.averageLength)) + 11.8
-    ),
+    fleschKincaidGrade: Math.round(0.39 * (wordCountAfter / Math.max(1, burstinessAfter.averageLength)) + 11.8),
     readingTimeMinutes: Math.max(1, Math.ceil(wordCountAfter / 220)),
     styleCorrectionsCount: styleCorrections.length,
-    citationIntegrity: "100% Preserved",
+    lockedTokens: lockedTokens.length,
+    usedAi,
   };
 
-  // 6. Persist to project answers
-  const nextAnswers = {
-    ...project.answers,
-    assembled_draft: polished,
-    manuscript_markdown: polished,
-    full_text_markdown: polished,
-    final_editor_telemetry: JSON.stringify(telemetry),
-    final_editor_completed: "true",
-    final_editor_status: "approved",
-    final_editor_word_count: wordCountAfter.toString(),
-    final_editor_saved_at: new Date().toISOString(),
+  // 4. A whole-manuscript polish is saved; a passage is only returned (the studio applies it once the author accepts it).
+  if (scope === "manuscript") {
+    const nextAnswers = {
+      ...project.answers,
+      ...manuscriptAnswerPatch(polished, project.answers),
+      final_editor_telemetry: JSON.stringify(telemetry),
+      final_editor_completed: "true",
+      final_editor_status: "approved",
+      final_editor_word_count: wordCountAfter.toString(),
+      final_editor_saved_at: new Date().toISOString(),
+    };
+    await getProjectStore().save({ ...project, answers: nextAnswers });
+  }
+
+  const payload = {
+    scope,
+    saved: scope === "manuscript",
+    polishedText: polished,
+    burstinessBefore,
+    burstinessAfter,
+    burstinessDelta: burstinessAfter.burstinessScore - burstinessBefore.burstinessScore,
+    styleCorrections,
+    telemetry,
   };
-
-  await getProjectStore().save({ ...project, answers: nextAnswers });
-
-  res.json({
-    ok: true,
-    data: {
-      editorState: "Loaded",
-      status: "Ready for publication audit",
-      polishedText: polished,
-      telemetry,
-      styleCorrections,
-    },
-  });
+  // `data` keeps the shape older callers read; the studio reads the top level.
+  res.json({ ok: true, ...payload, data: { editorState: "Loaded", status: "Ready for publication audit", ...payload } });
 });
 
-// POST /api/projects/:id/agent/publication-readiness
+// POST /api/projects/:id/agentic/publication-readiness
 reviewRoutes.post("/publication-readiness", async (req: express.Request<{ id: string }>, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
@@ -594,19 +582,7 @@ reviewRoutes.post("/publication-readiness", async (req: express.Request<{ id: st
     "";
 
   // 1. Get or synthesize CanonicalDocument
-  let manuscriptText =
-    project.answers?.["manuscript_markdown"] ||
-    project.answers?.["full_text_markdown"] ||
-    project.answers?.["assembled_draft"] ||
-    "";
-  if (!manuscriptText && project.answers?.["manuscript_draft"]) {
-    const parsed = safeParseAnswerField<Array<{ section?: string; section_name?: string; content?: string }>>(project.answers["manuscript_draft"], []);
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      manuscriptText = parsed
-        .map((s) => `## ${s.section || s.section_name || "Section"}\n\n${s.content || ""}`)
-        .join("\n\n");
-    }
-  }
+  const manuscriptText = readManuscriptMarkdown(project.answers);
 
   // No demo manuscript is ever substituted for the user's own text.
   if (!manuscriptText) {
@@ -860,7 +836,7 @@ reviewRoutes.post("/publication-readiness", async (req: express.Request<{ id: st
   res.json({ ok: true, data: scorecard });
 });
 
-// POST /api/projects/:id/agent/export
+// POST /api/projects/:id/agentic/export
 reviewRoutes.post("/export", async (req: express.Request<{ id: string }>, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
@@ -874,21 +850,8 @@ reviewRoutes.post("/export", async (req: express.Request<{ id: string }>, res) =
   } = req.body || {};
 
   let textToExport =
-    typeof manuscript === "string" && manuscript.trim().length > 0
-      ? manuscript
-      : project.answers?.["manuscript_markdown"] ||
-        project.answers?.["full_text_markdown"] ||
-        project.answers?.["assembled_draft"] ||
-        "";
+    typeof manuscript === "string" && manuscript.trim().length > 0 ? manuscript : readManuscriptMarkdown(project.answers);
 
-  if (!textToExport.trim() && project.answers?.["manuscript_draft"]) {
-    const parsed = safeParseAnswerField<Array<{ section?: string; section_name?: string; content?: string }>>(project.answers["manuscript_draft"], []);
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      textToExport = parsed
-        .map((s) => `## ${s.section || s.section_name || "Section"}\n\n${s.content || ""}`)
-        .join("\n\n");
-    }
-  }
 
   // No demo manuscript is ever substituted for the user's own text.
   if (!textToExport.trim()) {
@@ -996,7 +959,7 @@ reviewRoutes.post("/export", async (req: express.Request<{ id: string }>, res) =
   });
 });
 
-// GET /api/projects/:id/agent/export/rebuttal-letter
+// GET /api/projects/:id/agentic/export/rebuttal-letter
 reviewRoutes.get("/export/rebuttal-letter", async (req: express.Request<{ id: string }>, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
@@ -1034,7 +997,7 @@ reviewRoutes.get("/export/rebuttal-letter", async (req: express.Request<{ id: st
   res.send(buffer);
 });
 
-// POST /api/projects/:id/agent/export/rebuttal-letter
+// POST /api/projects/:id/agentic/export/rebuttal-letter
 reviewRoutes.post("/export/rebuttal-letter", async (req: express.Request<{ id: string }>, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
@@ -1074,7 +1037,7 @@ reviewRoutes.post("/export/rebuttal-letter", async (req: express.Request<{ id: s
   res.send(buffer);
 });
 
-// PUT /api/projects/:id/agent/critiques/:critiqueId/waive
+// PUT /api/projects/:id/agentic/critiques/:critiqueId/waive
 reviewRoutes.put("/critiques/:critiqueId/waive", async (req, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
@@ -1113,7 +1076,7 @@ reviewRoutes.put("/critiques/:critiqueId/waive", async (req, res) => {
   }
 });
 
-// GET /api/projects/:id/agent/critiques
+// GET /api/projects/:id/agentic/critiques
 reviewRoutes.get("/critiques", async (req, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;

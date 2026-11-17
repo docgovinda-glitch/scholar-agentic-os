@@ -6,7 +6,7 @@
  * target. Pure; no I/O.
  */
 import { z } from "zod";
-import { sectionKind } from "../../desk/journal/manuscriptModel";
+import { sectionKind } from "./manuscriptModel";
 import type { WordBudgetBlueprint } from "../../desk/workspace/types";
 
 export interface OutlineContext {

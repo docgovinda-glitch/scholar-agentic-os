@@ -122,7 +122,7 @@ export async function authHeaders(): Promise<Record<string, string>> {
 export const AI_ROUTE_PATTERNS: RegExp[] = [
   /^\/api\/ai(\/|$)/,
   /^\/api\/drafting(\/|$)/,
-  /^\/api\/projects\/[^/]+\/(agent|agentic|assignment|thesis|proposal|presentation|manuscript|journal-requirements|cover-letter|anonymization)(\/|$)/,
+  /^\/api\/projects\/[^/]+\/(agentic|assignment|thesis|proposal|presentation|manuscript|journal-requirements|cover-letter|anonymization)(\/|$)/,
   /^\/api\/studio\/refine(\/|$)/,
 ];
 

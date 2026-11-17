@@ -8,7 +8,9 @@ import Tray from "../regions/Tray";
 import AiExhaustedModal from "./AiExhaustedModal";
 import { useUnsavedChangesGuard } from "../../hooks/useUnsavedChangesGuard";
 import AppleStudioHeader, { type AppleStudioPhaseId } from "../../components/ui/AppleStudioShell";
-import { safeParseAnswerField } from "../../shared/projectStateSchema";
+import { studioEvidence } from "../../domain/journal/studioEvidence";
+import { countManuscriptWords, journalTargetWords, readManuscriptMarkdown } from "../../domain/journal/manuscriptText";
+import type { AutosaveState } from "../../components/ui/WorkspaceAutosaveBadge";
 
 import ProtocolBlueprintMode from "./ProtocolBlueprintMode";
 import EvidenceMatrixMode from "./EvidenceMatrixMode";
@@ -49,6 +51,8 @@ function ResearchWorkspaceInner({
   );
   const [trayOpen, setTrayOpen] = useState(false);
   const [isZenMode, setIsZenMode] = useState(false);
+  // The Writing Studio saves as the author types; the header shows that state while it is open.
+  const [studioSaveStatus, setStudioSaveStatus] = useState<AutosaveState>("saved");
 
   useUnsavedChangesGuard(Boolean(isLoading));
 
@@ -73,42 +77,12 @@ function ResearchWorkspaceInner({
     ? (defaultProvider.selectedModel ? `${defaultProvider.name} - ${defaultProvider.selectedModel}` : defaultProvider.name) 
     : "Automatic";
 
-  // Live Header Telemetry Strip Metrics
-  const targetWords = React.useMemo(() => {
-    const bp = safeParseAnswerField<{ targetTotalWords?: number } | null>(
-      project?.answers?.["word_budget_blueprint"],
-      null
-    );
-    if (bp && typeof bp.targetTotalWords === "number" && bp.targetTotalWords > 0) {
-      return bp.targetTotalWords;
-    }
-    const rawCount = project?.answers?.["target_word_count"];
-    return rawCount ? parseInt(String(rawCount), 10) || 6000 : 6000;
-  }, [project?.answers]);
+  // Header figures: the same target and the same word count the Writing Studio shows.
+  const targetWords = React.useMemo(() => journalTargetWords(project?.answers), [project?.answers]);
+  const actualWords = React.useMemo(() => countManuscriptWords(readManuscriptMarkdown(project?.answers)), [project?.answers]);
 
-  const actualWords = React.useMemo(() => {
-    const rawDraft = project?.answers?.["manuscript_draft"] || project?.answers?.["assembled_draft"];
-    if (rawDraft) {
-      const parsed = safeParseAnswerField<unknown>(rawDraft, null);
-      if (Array.isArray(parsed)) {
-        return parsed.reduce((acc: number, sec: Record<string, unknown>) => {
-          const content = String(sec?.content || "");
-          return acc + (content ? content.trim().split(/\s+/).filter(Boolean).length : 0);
-        }, 0);
-      }
-      return String(rawDraft).trim().split(/\s+/).filter(Boolean).length;
-    }
-    return 0;
-  }, [project?.answers]);
-
-  const totalVerifiedSourcesAndData = React.useMemo(() => {
-    const datasets = safeParseAnswerField<unknown[]>(project?.answers?.["user_datasets"], []);
-    const vault = safeParseAnswerField<unknown[]>(
-      project?.answers?.["approved_vault_sources"] || project?.answers?.["vault_sources"],
-      []
-    );
-    return (Array.isArray(datasets) ? datasets.length : 0) + (Array.isArray(vault) ? vault.length : 0);
-  }, [project?.answers]);
+  // The sources the Writing Studio can cite: the same list, counted once.
+  const totalVerifiedSourcesAndData = React.useMemo(() => studioEvidence(project?.answers ?? {}).length, [project?.answers]);
 
   const autosaveVersion = project?.version || 1;
   // The assistant follows the view on screen, not the last saved stage.
@@ -190,7 +164,7 @@ function ResearchWorkspaceInner({
         // Words, sources and the model are shown by the journal's own header controls below.
         onOpenAiAccess={onOpenAiAccess}
         aiWorkspace="journal"
-        autosaveStatus="saved"
+        autosaveStatus={currentMode === "studio" ? studioSaveStatus : "saved"}
         projectVersion={autosaveVersion}
         zenMode={isZenMode}
         onToggleZenMode={() => setIsZenMode((z) => !z)}
@@ -221,7 +195,11 @@ function ResearchWorkspaceInner({
             {currentMode === "evidence" ? (
               <EvidenceMatrixMode />
             ) : currentMode === "studio" ? (
-              <ManuscriptStudioMode />
+              <ManuscriptStudioMode
+                focus={isZenMode}
+                onToggleFocus={() => setIsZenMode((z) => !z)}
+                onSaveStatusChange={setStudioSaveStatus}
+              />
             ) : currentMode === "referee" ? (
               <RefereeRebuttalMode />
             ) : currentMode === "audit" || currentMode === "audit_export" ? (

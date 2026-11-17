@@ -42,6 +42,7 @@ import { proposeAnonymization } from "../../../../src/app/anonymization/proposeA
 import { applyAnonymization, AnonymizationApplyError } from "../../../../src/app/anonymization/applyAnonymization.ts";
 import { resolveCitations, isKnownCitationStyle, knownCitationStyleIds } from "../../../../src/app/citation/resolveCitations.ts";
 import { withProjectLock } from "../../../src/concurrency/projectLock.ts";
+import { readManuscriptMarkdown } from "../../../../src/domain/journal/manuscriptText.ts";
 import {
   isGateId,
   buildSectionContextPacket,
@@ -592,11 +593,7 @@ export function registerManuscriptAndGateRoutes(
         )
       : record.document;
     if (!documentToExport) {
-      const rawManuscript =
-        record.answers?.["manuscript_markdown"] ||
-        record.answers?.["full_text_markdown"] ||
-        record.answers?.["assembled_draft"] ||
-        record.answers?.["manuscript_draft"];
+      const rawManuscript = readManuscriptMarkdown(record.answers);
       if (rawManuscript) {
         documentToExport = manuscriptToCanonicalDocument(
           record.projectId,
@@ -631,8 +628,7 @@ export function registerManuscriptAndGateRoutes(
     if (format === "markdown" || format === "md") {
       let mdContent =
         supplied ||
-        record.answers?.["manuscript_markdown"] ||
-        record.answers?.["full_text_markdown"] ||
+        readManuscriptMarkdown(record.answers) ||
         documentToExport.blocks.map((b) => b.text).join("\n\n");
 
       const title = record.answers?.["working_title"] || (record as { title?: string }).title || "Manuscript";

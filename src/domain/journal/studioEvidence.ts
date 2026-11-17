@@ -4,6 +4,9 @@
  * list built from the [CITE:id] tokens in the text. Pure; no React, no I/O.
  */
 import { safeParseAnswerField } from "../../shared/projectStateSchema";
+import { citedIds, formatEntry, styleKey } from "./citationStyles";
+import type { ReferenceRecord } from "./references";
+import { recordsForSources } from "./referenceAudit";
 
 export interface StudioEvidence {
   id: string;
@@ -73,24 +76,41 @@ export function evidenceFor(all: StudioEvidence[], unitId: string, sectionId: st
   return all.filter((e) => e.assignedSectionId === unitId || e.assignedSectionId === sectionId || assignedIds.includes(e.id));
 }
 
-/** A plain reference entry from what is recorded; nothing is added. */
-export function formatReference(e: StudioEvidence): string {
-  const head = `${e.author} (${e.year ?? "n.d."}). ${e.title.replace(/\.$/, "")}.`;
-  if (e.isUserData) return `${head} [Dataset].`;
-  return e.doi ? `${head} https://doi.org/${e.doi.replace(/^https?:\/\/(dx\.)?doi\.org\//, "")}` : head;
-}
-
-/** References for every [CITE:id] token in the text, alphabetical, plus tokens that match no source. */
-export function citedReferences(text: string, all: StudioEvidence[]): { entries: Array<{ evidence: StudioEvidence; reference: string }>; unknownTokens: string[] } {
-  const tokens = Array.from(new Set(text.match(/\[CITE:[a-zA-Z0-9_.:-]+\]/g) || []));
+/**
+ * References for every [CITE:id] token in the text, in the project's citation
+ * style (the same formatter Delivery and export use), alphabetical, plus the
+ * ids that match no source. A saved registry record wins over what was typed.
+ */
+export function citedReferences(
+  text: string,
+  all: StudioEvidence[],
+  options: { records?: Record<string, ReferenceRecord>; citationStyle?: string } = {}
+): { entries: Array<{ evidence: StudioEvidence; reference: string }>; unknownTokens: string[] } {
+  const style = styleKey(options.citationStyle);
+  const byId = new Map(all.map((e) => [e.id, e]));
+  const records = recordsForSources(all, options.records ?? {});
   const entries: Array<{ evidence: StudioEvidence; reference: string }> = [];
   const unknownTokens: string[] = [];
-  for (const tok of tokens) {
-    const id = tok.slice(6, -1);
-    const e = all.find((x) => x.id === id || x.citationToken === tok);
-    if (e) entries.push({ evidence: e, reference: formatReference(e) });
-    else unknownTokens.push(tok);
+  for (const id of citedIds(text)) {
+    const e = byId.get(id) ?? all.find((x) => x.citationToken === `[CITE:${id}]`);
+    if (e) entries.push({ evidence: e, reference: formatEntry(records[e.id], style) });
+    else unknownTokens.push(`[CITE:${id}]`);
   }
-  entries.sort((a, b) => a.evidence.author.localeCompare(b.evidence.author));
+  entries.sort((a, b) => a.reference.localeCompare(b.reference));
   return { entries, unknownTokens };
+}
+
+/**
+ * The sources the AI may cite when drafting a section: the ones the author
+ * assigned to it (or to its section). Nothing else is added.
+ */
+export function draftingSources(evidence: StudioEvidence[]) {
+  return evidence.map((e) => ({
+    id: e.id,
+    authors: e.authors.length > 0 ? e.authors : e.author,
+    year: e.year ?? "n.d.",
+    title: e.title,
+    doi: e.doi,
+    keyFindings: e.findings || undefined,
+  }));
 }

@@ -210,7 +210,8 @@ describe("Automated Express Route Authz & Ownership Matrix", () => {
         r.path.startsWith("/api/presentations/:id"),
     );
 
-    expect(resourceRoutes.length).toBeGreaterThan(150);
+    // The journal pipeline is mounted once (/agentic); the old /agent alias doubled its routes.
+    expect(resourceRoutes.length).toBeGreaterThan(130);
 
     const failures: string[] = [];
 

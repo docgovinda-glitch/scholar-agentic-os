@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { WordBudgetBlueprint } from "../../workspace/types";
+import type { WordBudgetBlueprint } from "../../../desk/workspace/types";
 import {
   assembleManuscript,
   countWords,
@@ -7,6 +7,7 @@ import {
   loadTexts,
   manuscriptUnits,
   nextToWrite,
+  isUnitWritten,
   resolveTexts,
   sectionKind,
   serializeTexts,
@@ -104,7 +105,11 @@ describe("manuscriptModel", () => {
   it("suggests the next unit to write in writing order", () => {
     const units = manuscriptUnits(blueprint);
     expect(nextToWrite(units, { texts: {}, unsorted: "" })?.id).toBe("s2a");
-    expect(nextToWrite(units, { texts: { s2a: "w ".repeat(300) }, unsorted: "" })?.id).toBe("s1a");
+    // A unit counts as written at 90% of its target (the outline marks it the same way).
+    expect(nextToWrite(units, { texts: { s2a: "w ".repeat(300) }, unsorted: "" })?.id).toBe("s2a");
+    expect(nextToWrite(units, { texts: { s2a: "w ".repeat(360) }, unsorted: "" })?.id).toBe("s1a");
+    expect(isUnitWritten(359, 400)).toBe(false);
+    expect(isUnitWritten(360, 400)).toBe(true);
   });
 });
 
