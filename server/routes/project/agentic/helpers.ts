@@ -142,7 +142,7 @@ export function reconcileManuscriptCitations(
   const authorYearMatches = Array.from(
     normalized.matchAll(/\(([A-Z][a-zA-Z\s]+(?:et\s+al\.?)?,\s*(?:19|20)\d{2}[a-z]?)\)/g)
   ).map((m) => m[1]);
-  const evMatches = Array.from(normalized.matchAll(/\[(ev-[a-zA-Z0-9_\-]+)\]/g)).map((m) => m[1]);
+  const evMatches = Array.from(normalized.matchAll(/\[(?:CITE:)?(ev-[a-zA-Z0-9_\-]+)\]/g)).map((m) => m[1]);
   const numericMatches = Array.from(normalized.matchAll(/\[(\d+)\]/g)).map((m) => m[1]);
 
   const allInTextKeys = Array.from(

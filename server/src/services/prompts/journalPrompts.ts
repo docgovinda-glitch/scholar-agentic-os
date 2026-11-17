@@ -1,7 +1,8 @@
 /**
- * Journal (OT-10) Writing Studio prompt text: drafting a section and polishing
- * text. Routes reach these only through `scholarBrain.journalPrompts`; no
- * route writes its own prompt.
+ * Manuscript prompt text: drafting one section (the one section drafter,
+ * `scholarBrain.draftSection`, used by the Journal Writing Studio and the
+ * desk's manuscript generation job) and polishing text. Routes reach these
+ * only through `scholarBrain`; no route writes its own prompt.
  */
 import type { ScholarlyDialect } from "../../utils/scholarlyVoiceGuard.ts";
 
@@ -42,13 +43,15 @@ CRITICAL CITATION RULES:
 
 export interface SectionDraftUserInput {
   sectionTitle: string;
-  workingTitle: string;
-  coreProblem: string;
-  /** What this kind of section has to do (shown to the author above the editor too). */
+  /** What the article is about: title, research problem and the like (bounded). */
+  researchContext: string;
+  /** The target journal, when one is chosen. */
+  journal?: { name: string; citationStyle?: string };
+  /** What this kind of section has to do (shown to the author too). */
   sectionBrief?: string;
   /** What the author typed for this draft. */
   authorGuidance?: string;
-  /** Excerpts of sections the author has already written. */
+  /** Excerpts of sections already written. */
   writtenSections?: string;
   targetWords: number;
 }
@@ -57,12 +60,12 @@ export function sectionDraftUserPrompt(input: SectionDraftUserInput): string {
   return [
     `Draft the manuscript section "${input.sectionTitle}".`,
     "Research Context:",
-    `- Working Title: ${input.workingTitle}`,
-    `- Core Research Problem: ${input.coreProblem || "(not provided)"}`,
-    input.sectionBrief ? `- What this section has to do: ${input.sectionBrief}` : "",
-    input.authorGuidance ? `- Author Guidance (follow it): ${input.authorGuidance}` : "",
+    input.researchContext || "(not provided)",
+    input.journal ? `Target journal: ${input.journal.name}${input.journal.citationStyle ? ` (citation style: ${input.journal.citationStyle})` : ""}` : "",
+    input.sectionBrief ? `What this section has to do: ${input.sectionBrief}` : "",
+    input.authorGuidance ? `Author Guidance (follow it): ${input.authorGuidance}` : "",
     input.writtenSections
-      ? `\nSections the author has already written. Stay consistent with them and do not contradict their methods or results:\n${input.writtenSections}`
+      ? `\nSections already written. Stay consistent with them, do not repeat them, and do not contradict their methods or results:\n${input.writtenSections}`
       : "",
     `\nTarget Word Budget: ${input.targetWords} words.`,
   ]

@@ -23,6 +23,13 @@ vi.mock("../../src/ai/routerBridge.ts", async (importOriginal) => {
       if (!r?.ok) throw new Error(r?.error?.message ?? "AI call failed");
       return r.value.text as string;
     },
+    // The section drafter runs through requestCompleter, which calls routedResult.
+    routedResult: async (req: Parameters<typeof real.routedResult>[0], call: Parameters<typeof real.routedResult>[1]) => {
+      if ((await real.aiAvailability(req, call.task)) === "none") throw new NoClientAiProviderError();
+      const r = await aiCallMock({ systemPrompt: call.systemPrompt, userPrompt: call.userPrompt, task: call.task });
+      if (!r?.ok) throw new Error(r?.error?.message ?? "AI call failed");
+      return { text: r.value.text as string, provider: "openai", model: "gpt-4o-mini", label: "openai", lane: "byok", usage: { inputTokens: 0, outputTokens: 0 } };
+    },
   };
 });
 

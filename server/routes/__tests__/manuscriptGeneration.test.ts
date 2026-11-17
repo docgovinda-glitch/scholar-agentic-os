@@ -53,11 +53,16 @@ async function grantConsent(projectId: string, provider: string) {
   await request(app).post("/api/studio/consent").send({ sessionId: `manuscript:${projectId}`, provider });
 }
 
-function sectionResponse(text: string, memory: string, citedEvidenceIds: string[] = []) {
+/**
+ * A model reply: the section's prose. The section drafter (shared with the
+ * Journal Writing Studio) derives the memory and the cited ids itself, so
+ * the extra arguments only document what each test expects.
+ */
+function sectionResponse(text: string, _memory?: string, _citedEvidenceIds: string[] = []) {
   return {
     ok: true,
     status: 200,
-    json: async () => ({ choices: [{ message: { content: JSON.stringify({ text, memory, citedEvidenceIds }) } }] } ),
+    json: async () => ({ choices: [{ message: { content: text } }] } ),
   } as Response;
 }
 
@@ -122,7 +127,8 @@ describe("POST /api/projects/:id/manuscript/next-section — BYOK path", () => {
     expect(res.status).toBe(200);
     expect(res.body.generationJob.sections).toHaveLength(1);
     expect(res.body.generationJob.sections[0].key).toBe("introduction");
-    expect(res.body.generationJob.sections[0].memory).toBe("Introduces the gap.");
+    // The memory is the section's own opening, not a model-written summary.
+    expect(res.body.generationJob.sections[0].memory).toBe("The gap in the literature is X.");
     expect(res.body.generationJob.state).toBe("running");
   });
 
@@ -164,7 +170,7 @@ describe("POST /api/projects/:id/manuscript/next-section — BYOK path", () => {
     let capturedPrompt = "";
     global.fetch = vi.fn((_url: RequestInfo | URL, init?: RequestInit) => {
       capturedPrompt = JSON.stringify(init?.body ?? "");
-      return Promise.resolve(sectionResponse(`As shown [${evidenceId}], X is true.`, "Summary.", [evidenceId]));
+      return Promise.resolve(sectionResponse(`As shown [CITE:${evidenceId}] and [CITE:ev-invented], X is true.`, "Summary.", [evidenceId]));
     }) as unknown as typeof fetch;
 
     const res = await request(app)
@@ -174,6 +180,9 @@ describe("POST /api/projects/:id/manuscript/next-section — BYOK path", () => {
     expect(res.status).toBe(200);
     expect(capturedPrompt).toContain("X was observed in 40% of cases.");
     expect(res.body.generationJob.sections[0].citedEvidenceIds).toEqual([evidenceId]);
+    // Same token as the Journal Writing Studio; an id outside the citable evidence is removed.
+    expect(res.body.generationJob.sections[0].text).toContain(`[CITE:${evidenceId}]`);
+    expect(res.body.generationJob.sections[0].text).not.toContain("ev-invented");
   });
 
   it("two overlapping requests for the same project each generate a DIFFERENT section rather than one clobbering the other's checkpoint", async () => {

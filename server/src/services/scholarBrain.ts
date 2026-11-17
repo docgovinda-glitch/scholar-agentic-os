@@ -14,6 +14,7 @@
 
 import * as courseworkPrompts from "./prompts/courseworkPrompts.ts";
 import * as journalPrompts from "./prompts/journalPrompts.ts";
+import { draftSection, priorSectionsContext, researchContextFromAnswers } from "./sectionDrafter.ts";
 import { searchEuropePmc } from "../../../src/shared/retrieval/providers.ts";
 import { buildAskGeneralPrompt, buildAskSearchPrompt } from "../../../src/shared/askPrompts.ts";
 import { NoAiConnectedError, routedCompletion as rawRoutedCompletion, routedText, RouterHandoffError, toRouterTask } from "../ai/routerBridge.ts";
@@ -457,8 +458,19 @@ export const scholarBrain = {
   /** Coursework (OT-01) prompt text: routes read prompts from here, never write their own. */
   courseworkPrompts,
 
-  /** Journal (OT-10) Writing Studio prompt text: section drafting and polishing. */
+  /** Manuscript prompt text: section drafting and polishing. */
   journalPrompts,
+
+  /**
+   * The one section drafter: every manuscript section the AI writes (the
+   * Journal Writing Studio and the desk's generation job) goes through it.
+   * See sectionDrafter.ts.
+   */
+  draftSection,
+  /** The research context a section draft is given, from a project's answers. */
+  researchContextFromAnswers,
+  /** Excerpts of sections already written, for drafting the next one. */
+  priorSectionsContext,
 
   /** System prompt for AskScholar answers (search-grounded or general). One owner for the text, every surface shares it. */
   askSystemPrompt(opts: { kind: "search"; style: string; length: string } | { kind: "general"; base: string; style: string; length: string }): string {

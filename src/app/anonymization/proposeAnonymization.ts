@@ -89,7 +89,7 @@ export async function proposeAnonymization(input: ProposeAnonymizationInput): Pr
   // Never trust a proposal referencing a block that doesn't exist, or
   // originalText that isn't actually present in that block's text — same
   // "verify, don't just trust the model's self-report" discipline as
-  // app/manuscript/generate.ts's citation-id stripping.
+  // the section drafter's citation-id stripping (server/src/services/sectionDrafter.ts).
   const blockText = new Map(input.document.blocks.map((b) => [b.id, b.text]));
   const proposals = parsed.filter((p) => blockText.get(p.blockId)?.includes(p.originalText) ?? false);
 

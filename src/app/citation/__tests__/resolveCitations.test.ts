@@ -102,6 +102,18 @@ describe("app/citation: resolveCitations", () => {
     expect(result.citedSourceIds).toEqual(["s2", "s1"]); // citation order for a numbered-bibliography style
   });
 
+  it("reads the section drafter's [CITE:ev-x] token the same as the older bare [ev-x]", () => {
+    let doc = emptyDocument("d1", "T");
+    doc = appendBlock(doc, "introduction", "paragraph", "First point [CITE:ev-2]. Second point [ev-1].");
+    doc = appendBlock(doc, "references", "paragraph", "");
+    const result = resolveCitations(
+      doc,
+      ledger([source("s1", { title: "First Source" }), source("s2", { title: "Second Source" })], [item("ev-1", "s1"), item("ev-2", "s2")]),
+      "vancouver"
+    );
+    expect(result.document.blocks.find((b) => b.id === "introduction")!.text).toBe("First point [1]. Second point [2].");
+  });
+
   it("replaces a bracket-id with an author-date in-text citation for APA 7, and alphabetizes the bibliography by author", () => {
     let doc = emptyDocument("d1", "T");
     doc = appendBlock(doc, "introduction", "paragraph", "Zebra's finding [ev-z]. Also Apple's finding [ev-a].");

@@ -1,27 +1,13 @@
 import express from "express";
 import { getProjectStore } from "../../../../src/services/store/projectStore.ts";
-import { callOpenRouterText, routedCompletion, scholarBrain } from "../../../src/services/scholarBrain.ts";
-import {
-  buildScholarlyVoiceSystemPrompt,
-  sanitizeScholarlyText,
-  evaluateBurstiness,
-  type ScholarlyDialect,
-} from "../../../src/utils/scholarlyVoiceGuard.ts";
-import {
-  allocateWordBudget,
-  countExactWords,
-  type ManuscriptTemplate,
-} from "../../../src/utils/wordBudgetAllocator.ts";
-import {
-  formatCitationLedger,
-  scrubCitations,
-  type VerifiedSourceItem,
-} from "../../../src/utils/citationLockScrubber.ts";
-import { chunkAndRerankEvidence } from "../../../src/services/semanticRagEngine.ts";
+import { callOpenRouterText, scholarBrain } from "../../../src/services/scholarBrain.ts";
+import type { ScholarlyDialect } from "../../../src/utils/scholarlyVoiceGuard.ts";
+import { allocateWordBudget, type ManuscriptTemplate } from "../../../src/utils/wordBudgetAllocator.ts";
+import type { VerifiedSourceItem } from "../../../src/utils/citationLockScrubber.ts";
 import { getProjectSafe } from "./helpers.ts";
-import { sendAiFailure, UnusableAiResponseError } from "../../../src/ai/aiRouteErrors.ts";
+import { sendAiFailure } from "../../../src/ai/aiRouteErrors.ts";
+import { requestCompleter } from "../../../src/ai/browserHandoff.ts";
 import { draftSubSectionBodySchema } from "./journalStudioSchemas.ts";
-import { withCitationTokensMasked } from "../../../src/utils/citationLock.ts";
 import { draftingSources, studioEvidence } from "../../../../src/domain/journal/studioEvidence.ts";
 
 export const draftingRoutes = express.Router({ mergeParams: true });
@@ -82,92 +68,45 @@ draftingRoutes.post("/draft-subsection", async (req: express.Request<{ id: strin
     ? body.assignedSources
     : draftingSources(studioEvidence((project.answers ?? {}) as Record<string, unknown>));
 
-  // 2. Format Citation Ledger & Rerank Evidence with Semantic BM25
-  const { ledgerPrompt, sourceMap } = formatCitationLedger(assignedSources);
-  const ragResult = chunkAndRerankEvidence(subSectionTitle, assignedSources, 2500);
+  // What the article is about (bounded; never the whole answer set), and the target journal.
+  const answers = (project.answers ?? {}) as Record<string, unknown>;
+  const researchContext = scholarBrain.researchContextFromAnswers(answers);
+  const journalName = String(answers["target_journal"] || answers["selected_journal_name"] || "").trim();
+  const journal = journalName ? { name: journalName, citationStyle: String(answers["citation_style"] || "") || undefined } : undefined;
 
-  // 3. Prompts (owned by scholarBrain.journalPrompts)
-  const prompts = scholarBrain.journalPrompts;
-  const systemPrompt = prompts.sectionDraftSystemPrompt({
-    voicePrompt: buildScholarlyVoiceSystemPrompt({ dialect: targetDialect }),
-    ledgerPrompt,
-    evidenceContext: ragResult.formattedContext,
-    sectionTitle: subSectionTitle,
-    targetWords,
-  });
-  const userPrompt = prompts.sectionDraftUserPrompt({
-    sectionTitle: subSectionTitle,
-    workingTitle: String(project.answers?.["working_title"] || project.answers?.["title"] || "Scholarly Manuscript"),
-    coreProblem: String(project.answers?.["core_problem"] || ""),
-    sectionBrief: body.sectionBrief,
-    authorGuidance: body.authorGuidance,
-    writtenSections: body.writtenSections,
-    targetWords,
-  });
-
-  const wantsStream = req.headers.accept?.includes("text/event-stream") || req.query.stream === "true";
-  if (wantsStream) {
-    await scholarBrain.stream(req, { systemPrompt, userPrompt, taskClass: "drafting", dialect: targetDialect }, res);
-    return;
-  }
-
-  // Pass 1 needs a real AI draft. Without one, nothing is written: no template
-  // prose (which would put invented findings next to the user's real sources).
-  let draftText = "";
+  // 2. The one section drafter (also used by the desk's generation job).
+  let result: Awaited<ReturnType<typeof scholarBrain.draftSection>>;
   try {
-    draftText = await routedCompletion(req, { task: "drafting", systemPrompt, userPrompt });
-    if (!draftText.trim()) throw new UnusableAiResponseError("section draft");
+    result = await scholarBrain.draftSection(requestCompleter(req), {
+      title: subSectionTitle,
+      targetWords,
+      dialect: targetDialect,
+      researchContext,
+      journal,
+      sectionBrief: body.sectionBrief,
+      authorGuidance: body.authorGuidance,
+      writtenSections: body.writtenSections,
+      sources: assignedSources,
+    });
   } catch (e) {
     return sendAiFailure(res, e, "Section draft");
   }
-
-  // 4. Pass 2: if the draft is more than 8% short, ask the AI to expand it.
-  // If that fails, the shorter real draft is kept; it is never padded with filler.
-  const wordCountPass1 = countExactWords(draftText);
-  if (wordCountPass1 < targetWords * 0.92) {
-    try {
-      const expanded = await routedCompletion(req, {
-        task: "drafting",
-        systemPrompt,
-        userPrompt: prompts.sectionExpansionPrompt({
-          sectionTitle: subSectionTitle,
-          draft: draftText,
-          draftWords: wordCountPass1,
-          targetWords,
-          citationIds: assignedSources.map((s) => s.id),
-        }),
-      });
-      if (countExactWords(expanded) > wordCountPass1) draftText = expanded;
-    } catch (e) {
-      console.warn("Pass 2 AI expansion failed; keeping the shorter draft", e instanceof Error ? e.message : e);
-    }
-  }
-
-  // 5. Post-generation scrubber & voice guard: citations outside the ledger are removed.
-  // Verified citations stay as [CITE:id] tokens: the studio shows them as chips and formats them in the project's style.
-  const scrubResult = scrubCitations(draftText, sourceMap, { dialect: targetDialect, keepTokens: true });
-  const sanitized = withCitationTokensMasked(scrubResult.scrubbedText, (t) =>
-    sanitizeScholarlyText(t, { dialect: targetDialect, stripCliches: true })
-  );
-  const burstinessMetrics = evaluateBurstiness(sanitized);
-  const actualWords = countExactWords(sanitized);
-  const deviationPercentage = Math.round(((actualWords - targetWords) / targetWords) * 100 * 10) / 10;
 
   res.json({
     ok: true,
     sectionId: body.sectionId,
     subSectionId: body.subSectionId,
     title: subSectionTitle,
-    content: sanitized,
-    actualWords,
+    content: result.text,
+    actualWords: result.wordCount,
     targetWords,
-    deviationPercentage,
-    burstinessMetrics,
-    warnings: scrubResult.chronologicalWarnings,
-    unverifiedClaimsCount: scrubResult.unverifiedClaimsCount,
-    resolvedCitationsCount: scrubResult.resolvedCitationsCount,
-    strippedCitations: scrubResult.strippedCitations,
-    citedSources: scrubResult.citedSources,
+    deviationPercentage: Math.round(((result.wordCount - targetWords) / targetWords) * 1000) / 10,
+    burstinessMetrics: result.burstinessMetrics,
+    warnings: result.chronologicalWarnings,
+    unverifiedClaimsCount: result.unverifiedClaimsCount,
+    resolvedCitationsCount: result.resolvedCitationsCount,
+    strippedCitations: result.strippedCitations,
+    citedSources: assignedSources.filter((s) => result.citedIds.includes(s.id)),
   });
 });
 
