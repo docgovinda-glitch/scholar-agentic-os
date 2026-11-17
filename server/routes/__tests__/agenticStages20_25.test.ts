@@ -228,6 +228,14 @@ describe("Stage 23: Discourse-Level Humanized Copy-Editing (/final-editor)", () 
     expect(res.body.styleCorrections.join(" ")).not.toMatch(/British|100%/);
   });
 
+  it("still answers a tab running the old client, which calls /agent/ instead of /agentic/", async () => {
+    const projectId = await createStageProject();
+    const res = await request(app).post(`/api/projects/${projectId}/agent/final-editor`).send({ text: "We delve into it." });
+    expect(res.status).toBe(200);
+    expect(res.body.scope).toBe("passage");
+    expect(res.headers.deprecation).toBe("true");
+  });
+
   it("rejects a request that sends both a passage and a manuscript", async () => {
     const projectId = await createStageProject();
     const res = await request(app).post(`/api/projects/${projectId}/agentic/final-editor`).send({ text: "a", manuscript: "b" });

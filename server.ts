@@ -34,6 +34,7 @@ import http from "node:http";
 import { LOCAL_RUNNERS } from "./src/config/localRunnerCatalog.ts";
 import { registerAiRunRoutes } from "./server/routes/aiRun.ts";
 import { aiRouteDecorator } from "./server/src/ai/routerBridge.ts";
+import { legacyAgentPath } from "./server/src/middleware/legacyAgentPath.ts";
 import { onProjectSaved } from "./src/services/store/projectStore.ts";
 import { mirrorAssignmentProject } from "./server/src/assignmentRelational.ts";
 import { registerHealthRoutes, registerAdminRoutes, registerAuthRoutes, registerAIRoutes, registerStudioRoutes, registerProjectRoutes, registerDraftingRoutes, registerAiAccessRoutes, registerSearchRoutes, registerVaultRoutes, registerPresentationRoutes, registerSupabaseProxy, registerSupabaseWsProxy } from "./server/routes/index.ts";
@@ -158,6 +159,9 @@ app.use((req, _res, next) => {
   next();
 });
 
+
+// Old browser tabs still call /api/projects/:id/agent/...; serve them from /agentic.
+app.use(legacyAgentPath);
 
 // Body parser middleware.
 //
