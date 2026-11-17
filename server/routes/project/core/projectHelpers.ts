@@ -85,8 +85,7 @@ import {
   pauseJob,
   GenerationJobError,
 } from "../../../../src/domain/manuscript/stateMachine.ts";
-import { generateSection } from "../../../../src/app/manuscript/generate.ts";
-import type { SectionContextPacket } from "../../../../src/app/manuscript/generate.ts";
+import { priorSectionsContext, researchContextFromAnswers, type DraftSectionInput } from "../../../src/services/sectionDrafter.ts";
 import { checkCoherence } from "../../../../src/app/coherence/checkCoherence.ts";
 import type { CoherenceDimension } from "../../../../src/domain/coherence/types.ts";
 import { COHERENCE_DIMENSIONS } from "../../../../src/domain/coherence/types.ts";
@@ -140,39 +139,44 @@ export function isValidJournalRequirementsInput(
 }
 
 /**
- * Builds one section's context packet (src/app/manuscript/generate.ts) from
- * the project's own state: intake answers as the research context, the
- * target journal's requirements if captured, every already-generated
- * section's short memory (never full text — "Section Memory" per the
- * spec), and ONLY evidence whose domain/evidence state is "citable". This
- * last filter is the actual enforcement point for "no user approval, no
- * citation" reaching the generation engine: nothing discovered, extracted,
- * verified, or merely proposed ever appears in citableEvidence.
+ * The input for drafting the job's next planned section with the one section
+ * drafter (`scholarBrain.draftSection`, server/src/services/sectionDrafter.ts):
+ * a bounded research context from the intake answers (never the whole answer
+ * set), the target journal if captured, excerpts of the sections already
+ * generated, and ONLY evidence whose domain/evidence state is "citable". That
+ * last filter is the enforcement point for "no user approval, no citation":
+ * nothing discovered, extracted, verified or merely proposed is citable here.
  */
-export function buildSectionContextPacket(record: ProjectRecord, section: SectionPlan): SectionContextPacket {
-  const researchContext = Object.entries(record.answers)
-    .filter(([, v]) => v !== "provisional" && v.trim().length > 0)
-    .map(([k, v]) => `${k}: ${v}`)
-    .join("\n");
-
-  const citableEvidence = record.evidenceLedger.items
+export function buildSectionDraftInput(record: ProjectRecord, section: SectionPlan): DraftSectionInput {
+  const sourceById = new Map(record.evidenceLedger.sources.map((s) => [s.id, s]));
+  const sources = record.evidenceLedger.items
     .filter((i) => i.state === "citable")
-    .map((i) => ({
-      id: i.id,
-      quote: i.quote ?? "",
-      sourceTitle: record.evidenceLedger.sources.find((s) => s.id === i.sourceId)?.title ?? i.sourceId,
-    }));
+    .map((i) => {
+      const src = sourceById.get(i.sourceId);
+      return {
+        id: i.id,
+        authors: src?.authors?.length ? src.authors : "Unknown author",
+        year: src?.year ?? "n.d.",
+        title: src?.title ?? i.sourceId,
+        doi: src?.doi,
+        url: src?.url,
+        journal: src?.venue,
+        keyFindings: i.quote ?? undefined,
+      };
+    });
 
-  const priorSectionMemory = (record.generationJob?.sections ?? []).map((s) => ({ title: s.title, memory: s.memory }));
-
+  const answers = record.answers as Record<string, unknown>;
   return {
-    researchContext,
-    journalRequirements: record.journalRequirements
-      ? { journalName: record.journalRequirements.journalName, citationStyle: record.journalRequirements.citationStyle }
+    title: section.title,
+    targetWords: section.targetWords,
+    dialect: String(answers["orthography"] ?? "").includes("US") ? "en-US" : "en-GB",
+    researchContext: researchContextFromAnswers(answers),
+    journal: record.journalRequirements
+      ? { name: record.journalRequirements.journalName, citationStyle: record.journalRequirements.citationStyle }
       : undefined,
-    section,
-    priorSectionMemory,
-    citableEvidence,
+    sectionBrief: section.guidance,
+    writtenSections: priorSectionsContext((record.generationJob?.sections ?? []).map((s) => ({ title: s.title, text: s.text }))),
+    sources,
   };
 }
 

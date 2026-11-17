@@ -22,12 +22,7 @@ const PROSE = `${STUB_MARKER} This paragraph was written by the test stand-in AI
 let calls = 0;
 
 function answerFor(body) {
-  const messages = Array.isArray(body?.messages) ? body.messages : [];
-  const system = messages.filter((m) => m.role === "system").map((m) => String(m.content)).join("\n");
-  // Manuscript drafting asks for {"data": [{ section, status, length, content }]}.
-  if (/"data"\s*:\s*\[/.test(system) && /"section"/.test(system)) {
-    return JSON.stringify({ data: [{ section: "Introduction", status: "Drafted", length: 20, content: PROSE }] });
-  }
+  // Manuscript sections (the one section drafter) are plain prose, like every other draft.
   if (body?.response_format?.type === "json_object") return JSON.stringify({ text: PROSE });
   return PROSE;
 }

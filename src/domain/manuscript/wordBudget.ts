@@ -1,6 +1,6 @@
 /**
  * Allocates a per-section word target across a manuscript's body sections —
- * the sections the long-form generation engine (app/manuscript/generate.ts)
+ * the sections the long-form generation engine (server/src/services/sectionDrafter.ts)
  * is actually responsible for drafting.
  *
  * Duck-typed against Atlas's SectionSpec/BudgetSpec shape (src/app/atlas/

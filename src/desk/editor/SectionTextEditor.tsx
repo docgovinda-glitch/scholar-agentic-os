@@ -15,6 +15,13 @@ export interface SectionEditorHandle {
   insertCitation: (id: string) => void;
   /** The selected part as stored text, or null when nothing is selected. */
   selectedText: () => string | null;
+  /** The selection as stored text with its document range, or null when nothing is selected. */
+  selection: () => { text: string; from: number; to: number } | null;
+  /**
+   * Replaces the range with new stored text, only if the range still holds
+   * `expected` (so a change made meanwhile is never overwritten). Undoable.
+   */
+  replaceRange: (from: number, to: number, expected: string, text: string) => boolean;
 }
 
 /** A citation sits in the text as one object; it is saved as [CITE:id]. */
@@ -209,8 +216,26 @@ const SectionTextEditor = forwardRef<SectionEditorHandle, {
         const slice = editor.state.doc.cut(from, to).toJSON() as PMNode;
         return docToText(slice) || null;
       },
+      selection: () => {
+        if (!editor) return null;
+        const { from, to, empty } = editor.state.selection;
+        if (empty) return null;
+        const text = docToText(editor.state.doc.cut(from, to).toJSON() as PMNode);
+        return text ? { text, from, to } : null;
+      },
+      replaceRange: (from, to, expected, text) => {
+        if (!editor) return false;
+        const size = editor.state.doc.content.size;
+        if (from < 0 || to > size || from >= to) return false;
+        if (docToText(editor.state.doc.cut(from, to).toJSON() as PMNode) !== expected) return false;
+        const blocks = (textToDoc(text, { richBlocks }).content ?? []) as unknown as Array<Record<string, unknown>>;
+        // One paragraph goes in inline, so the surrounding paragraph is not split.
+        const content =
+          blocks.length === 1 && blocks[0].type === "paragraph" ? ((blocks[0].content as Array<Record<string, unknown>> | undefined) ?? []) : blocks;
+        return editor.chain().focus().insertContentAt({ from, to }, content).run();
+      },
     }),
-    [editor]
+    [editor, richBlocks]
   );
 
   if (!editor) return null;

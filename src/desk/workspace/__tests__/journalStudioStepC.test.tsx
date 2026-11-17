@@ -222,8 +222,14 @@ describe("Journal Rebuild Step C — Mode 3 Grounded Manuscript Studio & Mode 4 
         targetWords: 450,
         dialect: "en-GB",
       });
-      // The AI sees the Introduction text already written, to stay consistent.
-      expect(payload.contextPrompt).toContain("Scalable surface code quantum error correction");
+      // The AI sees the Introduction text already written, to stay consistent, and only this section's sources.
+      expect(payload.writtenSections).toContain("Scalable surface code quantum error correction");
+      expect(payload.sectionBrief).toMatch(/gap/);
+      expect(Array.isArray(payload.assignedSources)).toBe(true);
+      // The draft keeps the citation as a token, shown as a chip.
+      await waitFor(() =>
+        expect(screen.getByRole("textbox", { name: "Research Questions & Novelty text" }).querySelectorAll('[data-cite="src_f101"]')).toHaveLength(1)
+      );
       await waitFor(() =>
         expect(screen.getByRole("textbox", { name: "Research Questions & Novelty text" })).toHaveTextContent(
           "We ask whether pipelined FPGA decoders stay under 100ns"
@@ -234,8 +240,10 @@ describe("Journal Rebuild Step C — Mode 3 Grounded Manuscript Studio & Mode 4 
       expect(JSON.parse(saved.manuscript_sections).texts["sub-intro-2"]).toContain("pipelined FPGA decoders");
       expect(saved.manuscript_markdown).toContain("## Introduction\n\n### § Problem Domain & Background");
       expect(saved.manuscript_markdown).toContain("### § Research Questions & Novelty\n\nWe ask whether");
-      // Only the studio's own fields are sent, not a stale copy of every answer.
-      expect(Object.keys(saved).sort()).toEqual(["assembled_draft", "full_text_markdown", "manuscript_markdown", "manuscript_sections"]);
+      // Only the studio's own fields are sent: the canonical manuscript, its sections,
+      // and a blank for the older copy so it can never shadow the current text.
+      expect(Object.keys(saved).sort()).toEqual(["assembled_draft", "manuscript_markdown", "manuscript_sections"]);
+      expect(saved.assembled_draft).toBe("");
     });
 
     it("asks before an AI draft replaces text the author wrote, and keeps it when declined", async () => {
@@ -269,7 +277,8 @@ describe("Journal Rebuild Step C — Mode 3 Grounded Manuscript Studio & Mode 4 
       expect(within(panel).getByText("Your data")).toBeInTheDocument();
       expect(within(panel).getByText("Literature")).toBeInTheDocument();
       // References from the citations already in the text: nothing claimed beyond the record.
-      expect(within(panel).getByText("Kovacs, L. (2026). FPGA Latency Benchmark Data. [Dataset].")).toBeInTheDocument();
+      // In the project's style (APA 7 by default), from the same formatter as Delivery.
+      expect(within(panel).getByText("Kovacs, L. (2026). FPGA Latency Benchmark Data [Data set].")).toBeInTheDocument();
       expect(within(panel).getByText("Smith, J. (2024). Real-Time Syndrome Decoding in Surface Codes.")).toBeInTheDocument();
       expect(panel.textContent).not.toMatch(/Verified Scholarly Publication|Primary User Ingestion/);
 
@@ -282,9 +291,78 @@ describe("Journal Rebuild Step C — Mode 3 Grounded Manuscript Studio & Mode 4 
         expect(saved && JSON.parse(saved.manuscript_sections).texts["sub-intro-1"].match(/\[CITE:src_f101\]/g)).toHaveLength(2);
       }, { timeout: 3000 });
 
-      fireEvent.click(screen.getByRole("button", { name: /Diacritics/ }));
+      fireEvent.click(screen.getByRole("button", { name: "Special characters" }));
       fireEvent.click(screen.getByRole("button", { name: "Insert Long a" }));
       await waitFor(() => expect(box).toHaveTextContent("ā"));
+    });
+
+    it("saves an edit made just before leaving the studio, without waiting for the pause", async () => {
+      const { unmount } = renderStudio();
+      await openUnit(/Problem Domain & Background/);
+      fireEvent.click(screen.getByRole("button", { name: /^Sources$/ }));
+      const panel = screen.getByRole("complementary", { name: "Sources panel" });
+      vi.mocked(api.saveIntakeAnswers).mockClear();
+      fireEvent.click(within(panel).getByRole("button", { name: "Cite Real-Time Syndrome Decoding in Surface Codes" }));
+      await waitFor(() =>
+        expect(screen.getByRole("textbox", { name: "Problem Domain & Background text" }).querySelectorAll('[data-cite="src_f101"]')).toHaveLength(2)
+      );
+      unmount();
+      expect(api.saveIntakeAnswers).toHaveBeenCalledTimes(1);
+      const saved = vi.mocked(api.saveIntakeAnswers).mock.calls[0][1] as Record<string, string>;
+      expect(JSON.parse(saved.manuscript_sections).texts["sub-intro-1"].match(/\[CITE:src_f101\]/g)).toHaveLength(2);
+    });
+
+    it("polishes the section as a passage, shows the changes, applies them, and can restore the author's text", async () => {
+      vi.mocked(api.polishProjectManuscript).mockImplementation(async (_id, payload) => ({
+        ok: true,
+        scope: "passage",
+        saved: false,
+        polishedText: (payload as { text: string }).text.replace("Scalable surface code", "Scalable surface-code"),
+        styleCorrections: ["Spelling follows British English."],
+      }));
+      renderStudio();
+      await openUnit(/Problem Domain & Background/);
+      fireEvent.click(screen.getByRole("button", { name: /^Polish$/ }));
+      await waitFor(() => expect(api.polishProjectManuscript).toHaveBeenCalled());
+      // The section's own text is sent as a passage: the server returns it and saves nothing.
+      const payload = vi.mocked(api.polishProjectManuscript).mock.calls[0][1] as Record<string, unknown>;
+      expect(payload.text).toContain("Scalable surface code quantum error correction");
+      expect(payload).not.toHaveProperty("manuscript");
+
+      const dialog = await screen.findByRole("dialog", { name: /review before applying/ });
+      expect(within(dialog).getByText(/1 change to the whole section/)).toBeInTheDocument();
+      fireEvent.click(within(dialog).getByRole("button", { name: "Apply polished text" }));
+      const box = screen.getByRole("textbox", { name: "Problem Domain & Background text" });
+      await waitFor(() => expect(box).toHaveTextContent("Scalable surface-code"));
+
+      fireEvent.click(screen.getByRole("button", { name: /Restore my previous text/ }));
+      await waitFor(() => expect(box).toHaveTextContent("Scalable surface code quantum"));
+      expect(box).not.toHaveTextContent("surface-code");
+    });
+
+    it("Esc closes the polish review without changing the text", async () => {
+      vi.mocked(api.polishProjectManuscript).mockResolvedValue({ ok: true, scope: "passage", saved: false, polishedText: "Different text.", styleCorrections: [] });
+      renderStudio();
+      await openUnit(/Problem Domain & Background/);
+      fireEvent.click(screen.getByRole("button", { name: /^Polish$/ }));
+      await screen.findByRole("dialog", { name: /review before applying/ });
+      // The dialog's key handler is attached once it has mounted; keep pressing until it closes.
+      await waitFor(() => {
+        fireEvent.keyDown(document, { key: "Escape" });
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      });
+      expect(screen.getByRole("textbox", { name: "Problem Domain & Background text" })).toHaveTextContent("Scalable surface code");
+    });
+
+    it("after an AI redraft replaces text, the author's previous text can be restored", async () => {
+      vi.mocked(api.draftProjectSubSection).mockResolvedValueOnce({ ok: true, subSectionId: "sub-intro-1", content: "A new AI paragraph.", actualWords: 4 });
+      renderStudio();
+      await openUnit(/Problem Domain & Background/);
+      fireEvent.click(screen.getByRole("button", { name: /Redraft Problem Domain & Background with AI/i }));
+      const box = screen.getByRole("textbox", { name: "Problem Domain & Background text" });
+      await waitFor(() => expect(box).toHaveTextContent("A new AI paragraph."));
+      fireEvent.click(screen.getByRole("button", { name: /Restore my previous text/ }));
+      await waitFor(() => expect(box).toHaveTextContent("Scalable surface code quantum"));
     });
   });
 

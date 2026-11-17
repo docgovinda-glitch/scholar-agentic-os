@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { blueprintFromStructure, citationStyleOption } from "../journalProfile";
-import { manuscriptUnits } from "../manuscriptModel";
+import { manuscriptUnits } from "../../../domain/journal/manuscriptModel";
 
 describe("journal profile → plan", () => {
   it("builds the outline from the journal's own sections, sized to its word limit", () => {

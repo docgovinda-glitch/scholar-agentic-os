@@ -236,7 +236,13 @@ export async function draftProjectSubSection(
     subSectionTitle: string;
     targetWords?: number;
     dialect?: "en-GB" | "en-US";
-    contextPrompt?: string;
+    /** What this kind of section has to do. */
+    sectionBrief?: string;
+    /** What the author typed for this draft. */
+    authorGuidance?: string;
+    /** Excerpts of the sections already written, so the draft agrees with them. */
+    writtenSections?: string;
+    /** The only sources the draft may cite (an empty list means none). */
     assignedSources?: Array<{
       id: string;
       authors: string[] | string;
@@ -270,11 +276,18 @@ export async function draftProjectSubSection(
   return res.json();
 }
 
+/**
+ * Polishes a passage (`text`): the result comes back for the author to review
+ * and nothing is saved. `manuscript` (or neither) polishes and saves the
+ * whole manuscript.
+ */
 export async function polishProjectManuscript(
   projectId: string,
-  payload: { text: string; dialect?: "en-GB" | "en-US" }
+  payload: { text: string; dialect?: "en-GB" | "en-US" } | { manuscript?: string; dialect?: "en-GB" | "en-US" }
 ): Promise<{
   ok: boolean;
+  scope: "passage" | "manuscript";
+  saved: boolean;
   polishedText: string;
   burstinessBefore?: { burstinessScore: number; isSufficientlyBurst: boolean };
   burstinessAfter?: { burstinessScore: number; isSufficientlyBurst: boolean };
@@ -377,7 +390,7 @@ export async function runPreFlightComplianceAudit(projectId: string): Promise<{
   ok: boolean;
   data: PreFlightGateScorecard;
 }> {
-  const res = await authedFetch(`/api/projects/${encodeURIComponent(projectId)}/agent/publication-readiness`, {
+  const res = await authedFetch(`/api/projects/${encodeURIComponent(projectId)}/agentic/publication-readiness`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({}),
@@ -414,7 +427,7 @@ export async function exportProjectManuscript(
     generatedAt: string;
   };
 }> {
-  const res = await authedFetch(`/api/projects/${encodeURIComponent(projectId)}/agent/export`, {
+  const res = await authedFetch(`/api/projects/${encodeURIComponent(projectId)}/agentic/export`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),

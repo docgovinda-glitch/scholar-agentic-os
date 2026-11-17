@@ -5,7 +5,8 @@
  * manuscript the rest of the workspace (Review, Delivery) reads.
  * No React, no I/O.
  */
-import type { WordBudgetBlueprint } from "../workspace/types";
+import type { WordBudgetBlueprint } from "../../desk/workspace/types";
+import { countManuscriptWords } from "./manuscriptText";
 
 export type SectionKind =
   | "abstract"
@@ -50,8 +51,14 @@ export const EMPTY_TEXTS: ManuscriptTexts = { texts: {}, unsorted: "" };
 
 const BACK_MATTER = /^(declarations?|references|bibliography|acknowledg(e)?ments?|appendi(x|ces)|funding|conflicts? of interest|competing interests|data availability|author contributions?)\b/i;
 
-export function countWords(text: string | undefined): number {
-  return (text ?? "").trim().split(/\s+/).filter(Boolean).length;
+/** Words as the rest of the journal workspace counts them (markup and citation tokens excluded). */
+export const countWords = countManuscriptWords;
+
+/** A unit counts as written once it reaches this share of its target; the outline and "next to write" agree. */
+export const UNIT_WRITTEN_RATIO = 0.9;
+
+export function isUnitWritten(words: number, targetWords: number): boolean {
+  return words > 0 && words >= Math.max(1, Math.round(targetWords * UNIT_WRITTEN_RATIO));
 }
 
 export function sectionKind(title: string): SectionKind {
@@ -105,6 +112,8 @@ export const SECTION_GUIDANCE: Record<SectionKind, string> = {
   other: "",
 };
 
+const DEFAULT_ID_PREFIX = "default-";
+
 const DEFAULT_OUTLINE: Array<{ key: string; title: string; share: number }> = [
   { key: "abstract", title: "Abstract", share: 0.04 },
   { key: "introduction", title: "Introduction", share: 0.16 },
@@ -151,8 +160,8 @@ export function manuscriptUnits(blueprint: WordBudgetBlueprint | null, targetTot
   }
   const total = targetTotalWords > 0 ? targetTotalWords : 6000;
   return DEFAULT_OUTLINE.map((s) => ({
-    id: `default-${s.key}`,
-    sectionId: `default-${s.key}`,
+    id: `${DEFAULT_ID_PREFIX}${s.key}`,
+    sectionId: `${DEFAULT_ID_PREFIX}${s.key}`,
     sectionTitle: s.title,
     title: s.title,
     isWholeSection: true,
@@ -281,7 +290,7 @@ export function writtenContext(units: ManuscriptUnit[], t: ManuscriptTexts, exce
       const room = maxChars - used;
       if (room < 200) return parts.join("\n\n");
       const excerpt = body.length > Math.min(1500, room) ? `${body.slice(0, Math.min(1500, room)).trimEnd()} …` : body;
-      parts.push(`[${u.isWholeSection ? u.title : `${u.sectionTitle} — ${u.title}`}]\n${excerpt}`);
+      parts.push(`[${unitLabel(u, " — ")}]\n${excerpt}`);
       used += excerpt.length;
     }
   }
@@ -292,14 +301,24 @@ export function totalWords(t: ManuscriptTexts): number {
   return Object.values(t.texts).reduce((n, s) => n + countWords(s), 0) + countWords(t.unsorted) + countWords(t.backMatter);
 }
 
-/** The next unit to write, following the writing order: the first one not yet near its target. */
+/** The next unit to write, following the writing order: the first one not yet written (see isUnitWritten). */
 export function nextToWrite(units: ManuscriptUnit[], t: ManuscriptTexts): ManuscriptUnit | null {
   for (const g of groupUnits(units, "writing")) {
     for (const u of g.units) {
-      if (countWords(t.texts[u.id]) < Math.max(1, Math.round(u.targetWords * 0.5))) return u;
+      if (!isUnitWritten(countWords(t.texts[u.id]), u.targetWords)) return u;
     }
   }
   return null;
+}
+
+/** True when the units are the stand-in IMRaD outline (no word budget blueprint yet). */
+export function isDefaultOutline(units: ManuscriptUnit[]): boolean {
+  return units.length > 0 && units.every((u) => u.id.startsWith(DEFAULT_ID_PREFIX));
+}
+
+/** The display title of a unit, with its section when it is a sub-section. */
+export function unitLabel(u: ManuscriptUnit, sep = " › "): string {
+  return u.isWholeSection ? u.title : `${u.sectionTitle}${sep}${u.title}`;
 }
 
 

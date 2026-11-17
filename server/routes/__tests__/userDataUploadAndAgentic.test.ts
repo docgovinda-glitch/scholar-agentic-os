@@ -23,6 +23,13 @@ vi.mock("../../src/ai/routerBridge.ts", async (importOriginal) => {
       if (!r?.ok) throw new Error(r?.error?.message ?? "AI call failed");
       return r.value.text as string;
     },
+    // The section drafter runs through requestCompleter, which calls routedResult.
+    routedResult: async (req: Parameters<typeof real.routedResult>[0], call: Parameters<typeof real.routedResult>[1]) => {
+      if ((await real.aiAvailability(req, call.task)) === "none") throw new NoClientAiProviderError();
+      const r = await aiCallMock({ systemPrompt: call.systemPrompt, userPrompt: call.userPrompt, task: call.task });
+      if (!r?.ok) throw new Error(r?.error?.message ?? "AI call failed");
+      return { text: r.value.text as string, provider: "openai", model: "gpt-4o-mini", label: "openai", lane: "byok", usage: { inputTokens: 0, outputTokens: 0 } };
+    },
   };
 });
 
@@ -270,8 +277,40 @@ describe("Journal Rebuild Step B — Primary User Data Ingestion & Agentic Ledge
     // The uploaded dataset is in the citation ledger the AI is given...
     const sentPrompt = aiCallMock.mock.calls[0][0].systemPrompt as string;
     expect(sentPrompt).toContain("user_data_42");
-    // ...and the ledger resolves user_data_42 to (Team, 2026) in APA 7
-    expect(content).toContain("Team, 2026");
+    // ...and the verified citation comes back as a token the Writing Studio formats in the project's style.
+    expect(content).toContain("[CITE:user_data_42]");
     expect(actualWords).toBeGreaterThanOrEqual(350);
+  });
+
+  it("6. cites only the sources the studio sends: an empty list means no citations", async () => {
+    const store = getProjectStore();
+    await store.save({
+      projectId: "proj-user-data-6",
+      ownerId: TEST_USER_ID,
+      title: "Quantum Decoder Paper",
+      intakeData: {},
+      answers: {
+        user_datasets: JSON.stringify([{ id: "user_data_42", title: "Benchmarks", author: "Team", year: 2026 }]),
+        vault_sources: JSON.stringify([{ id: "unapproved_1", title: "Not approved", author: "Doe", year: 2020 }]),
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    } as ProjectRecord);
+    aiCallMock.mockResolvedValue({
+      ok: true,
+      value: { text: fakeAiDraft("Latency was low [CITE:user_data_42] and prior work agreed [CITE:unapproved_1].", 395) },
+    });
+    const res = await request(app)
+      .post("/api/projects/proj-user-data-6/agentic/draft-subsection")
+      .set(AI_HEADERS)
+      .send({ sectionId: "sec-1", subSectionId: "sec-1-sub-1", subSectionTitle: "Results", targetWords: 400, assignedSources: [] });
+
+    expect(res.status).toBe(200);
+    expect(aiCallMock.mock.calls[0][0].systemPrompt).not.toContain("unapproved_1");
+    expect(res.body.content).not.toContain("[CITE:");
+    expect(res.body.strippedCitations).toEqual(expect.arrayContaining(["[CITE:user_data_42]", "[CITE:unapproved_1]"]));
+    // The studio owns the text: the draft route saves nothing.
+    const saved = await store.get("proj-user-data-6");
+    expect(saved?.answers?.["drafted_subsections"]).toBeUndefined();
   });
 });

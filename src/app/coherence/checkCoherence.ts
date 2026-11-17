@@ -1,5 +1,5 @@
 /**
- * The global coherence pass. Mirrors src/app/manuscript/generate.ts's shape
+ * The global coherence pass. Mirrors the app modules' shape
  * (plain provider/apiKey/model params, BYOK-vs-Premium left to the route
  * layer) but runs MULTIPLE bounded calls, one per
  * domain/coherence/types.ts's CoherenceDimension, rather than a single call

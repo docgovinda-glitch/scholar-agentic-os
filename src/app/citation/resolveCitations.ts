@@ -5,10 +5,11 @@
  *
  *   - domain/evidence's provenance ledger, which is the only source of
  *     truth for which sources are "citable" (user-approved);
- *   - src/app/manuscript/generate.ts's bracket-id convention — the model
- *     cites evidence in prose as a literal `[ev-xxxx]` token, and never
- *     anything else (server-side stripping already removes any id not
- *     actually in the approved corpus, before this module ever runs);
+ *   - the section drafter's citation tokens (server/src/services/
+ *     sectionDrafter.ts) — the model cites evidence in prose as a literal
+ *     `[CITE:ev-xxxx]` token (documents drafted before it carry the bare
+ *     `[ev-xxxx]` form, which is read the same way); any id not in the
+ *     approved corpus is removed before this module ever runs;
  *   - src/citation_compliance's seven real style formatters (APA 7, MLA 9,
  *     Chicago author-date, Chicago Notes-Bibliography, Harvard, IEEE,
  *     Vancouver), which until now were only reachable from Vault imports
@@ -126,7 +127,8 @@ export interface ResolveCitationsResult {
   unresolvedIds: string[];
 }
 
-const BRACKET_ID_PATTERN = /\[(ev-[a-zA-Z0-9-]+)\]/g;
+/** `[CITE:ev-xxxx]` (the section drafter's token) or the older bare `[ev-xxxx]`. */
+const BRACKET_ID_PATTERN = /\[(?:CITE:)?(ev-[a-zA-Z0-9_-]+)\]/g;
 
 /**
  * Resolve every `[ev-xxxx]` bracket-id currently in `document`'s blocks into

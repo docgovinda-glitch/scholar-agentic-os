@@ -112,7 +112,6 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
   router.use("/:id/evidence-ledger", evidenceRouter(projectLimit));
   router.use("/:id/activity", activityRouter);
   router.use("/:id/files", filesRouter);
-  router.use("/:id/agent", agenticRouter);
   router.use("/:id/agentic", agenticRouter);
   router.use("/:id/assignment", assignmentRouter);
   router.use("/:id/thesis", thesisRouter);

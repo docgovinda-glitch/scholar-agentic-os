@@ -1,5 +1,6 @@
 import express from "express";
 import { requestCompleter } from "../../../src/ai/browserHandoff.ts";
+import { scholarBrain } from "../../../src/services/scholarBrain.ts";
 import { sendAiFailure, BrowserAiRequiredError } from "../../../src/ai/aiRouteErrors.ts";
 import { catalog } from "../../../../src/app/atlas/atlas.ts";
 import {
@@ -30,7 +31,6 @@ import {
   pauseJob,
   GenerationJobError,
 } from "../../../../src/domain/manuscript/stateMachine.ts";
-import { generateSection } from "../../../../src/app/manuscript/generate.ts";
 import { checkCoherence } from "../../../../src/app/coherence/checkCoherence.ts";
 import type { CoherenceDimension } from "../../../../src/domain/coherence/types.ts";
 import { COHERENCE_DIMENSIONS } from "../../../../src/domain/coherence/types.ts";
@@ -42,9 +42,10 @@ import { proposeAnonymization } from "../../../../src/app/anonymization/proposeA
 import { applyAnonymization, AnonymizationApplyError } from "../../../../src/app/anonymization/applyAnonymization.ts";
 import { resolveCitations, isKnownCitationStyle, knownCitationStyleIds } from "../../../../src/app/citation/resolveCitations.ts";
 import { withProjectLock } from "../../../src/concurrency/projectLock.ts";
+import { readManuscriptMarkdown } from "../../../../src/domain/journal/manuscriptText.ts";
 import {
   isGateId,
-  buildSectionContextPacket,
+  buildSectionDraftInput,
   recomputeG3,
   recomputeG4,
   recomputeG6,
@@ -147,20 +148,24 @@ export function registerManuscriptAndGateRoutes(
         return res.status(409).json({ error: "Every planned section is already generated." });
       }
 
-      const packet = buildSectionContextPacket(record, planned);
-
-      async function checkpoint(generatedSection: Awaited<ReturnType<typeof generateSection>>["section"]) {
+      async function checkpoint(generatedSection: GeneratedSection) {
         const generationJob = appendSection(record!.generationJob!, generatedSection);
         return store.save({ ...record!, generationJob });
       }
 
-
       try {
-        const result = await generateSection({
-          packet,
-        complete: requestCompleter(req),
+        // The one section drafter, shared with the Journal Writing Studio.
+        const drafted = await scholarBrain.draftSection(requestCompleter(req), buildSectionDraftInput(record, planned));
+        const updated = await checkpoint({
+          key: planned.key,
+          title: planned.title,
+          text: drafted.text,
+          wordCount: drafted.wordCount,
+          memory: drafted.memory,
+          citedEvidenceIds: drafted.citedIds,
+          generatedAt: new Date().toISOString(),
+          usage: drafted.usage,
         });
-        const updated = await checkpoint(result.section);
         return res.json({ generationJob: updated.generationJob });
       } catch (err) {
         // A browser hand-off is not a failure: the job stays as it was until the browser answers.
@@ -592,11 +597,7 @@ export function registerManuscriptAndGateRoutes(
         )
       : record.document;
     if (!documentToExport) {
-      const rawManuscript =
-        record.answers?.["manuscript_markdown"] ||
-        record.answers?.["full_text_markdown"] ||
-        record.answers?.["assembled_draft"] ||
-        record.answers?.["manuscript_draft"];
+      const rawManuscript = readManuscriptMarkdown(record.answers);
       if (rawManuscript) {
         documentToExport = manuscriptToCanonicalDocument(
           record.projectId,
@@ -631,8 +632,7 @@ export function registerManuscriptAndGateRoutes(
     if (format === "markdown" || format === "md") {
       let mdContent =
         supplied ||
-        record.answers?.["manuscript_markdown"] ||
-        record.answers?.["full_text_markdown"] ||
+        readManuscriptMarkdown(record.answers) ||
         documentToExport.blocks.map((b) => b.text).join("\n\n");
 
       const title = record.answers?.["working_title"] || (record as { title?: string }).title || "Manuscript";

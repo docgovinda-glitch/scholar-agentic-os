@@ -1,6 +1,6 @@
 /**
  * Cover letter generation — a single bounded model call, unlike
- * src/app/manuscript/generate.ts's per-section checkpointed engine, because
+ * the per-section checkpointed generation job (server/src/services/sectionDrafter.ts), because
  * a cover letter is one short document with no cross-call state to
  * checkpoint. Mirrors src/app/journal/extract.ts's shape: a plain pipeline
  * function taking provider/apiKey/model as opaque input, calling complete()

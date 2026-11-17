@@ -79,14 +79,14 @@ Export formats: `docx`, `odt`, `pdf`, `latex`, `typst`, `camera_ready_pdf`, `mar
 | `/submissions` | GET, POST `/`; PATCH, DELETE `/:submissionId` |
 | `/mesh` | GET `/agents`; POST `/run` |
 
-### 5.3 Journal pipeline (`/api/projects/:id/agentic/*`, also mounted at `/agent/*`)
+### 5.3 Journal pipeline (`/api/projects/:id/agentic/*`)
 
 `server/routes/project/agentic/`, all POST unless noted.
 
 - Evidence: `/gaps`, `/titles`, `/vault-sources`, `/evidence-extraction`, `/external-research`, `/evidence-analysis`, `/journal-discovery`, `/journal-requirements`, `/upload-user-data`; PUT `/user-data/:dataId`; PUT, GET `/evidence`.
 - Blueprint: `/blueprint/gaps`, `/blueprint/questions`, `/blueprint/journals`, `/blueprint/outline`.
-- Drafting: `/allocate-budget`, `/draft-subsection`, `/draft`, `/draft-preview`, `/copilot-chat`; PUT, GET `/manuscript`.
-- Review: `/peer-review`, `/revision`, `/rebuttal-matrix` (also GET), `/citation-audit`, `/originality-check`, `/final-editor`, `/publication-readiness`, `/export`; GET, POST `/export/rebuttal-letter`; PUT `/critiques/:critiqueId/waive`; GET `/critiques`.
+- Drafting: `/allocate-budget`, `/draft-subsection`, `/copilot-chat`. `/draft-subsection` (zod body, `journalStudioSchemas.ts`) drafts one Writing Studio section from `sectionBrief`, `authorGuidance`, `writtenSections` and `assignedSources` (when sent, even empty, the only citable sources); it returns the text with verified citations kept as `[CITE:id]` tokens and saves nothing.
+- Review: `/peer-review`, `/revision`, `/rebuttal-matrix` (also GET), `/citation-audit`, `/originality-check`, `/final-editor` (`{ text }` polishes a passage and returns `polishedText` without saving; `{ manuscript }` or an empty body polishes and saves the whole manuscript; an AI rewrite that changes a citation, figure reference, DOI or statistic is discarded), `/publication-readiness`, `/export`; GET, POST `/export/rebuttal-letter`; PUT `/critiques/:critiqueId/waive`; GET `/critiques`.
 - Other: `/journal-profile/extract`, `/references/lookup`, `/references/check`, `/citations/support`.
 
 ### 5.4 Coursework (`/api/projects/:id/assignment/*`)

@@ -184,13 +184,9 @@ describe("Hotfix Containment (Part A & Part A2): Authz, IDOR, 10MB Limit, Concur
             .send({ targetTotalWords: 5000 }),
         () =>
           request(app)
-            .get(`/api/projects/${aliceProjectId}/agentic/manuscript`)
-            .set(asBob()),
-        () =>
-          request(app)
-            .put(`/api/projects/${aliceProjectId}/agentic/manuscript`)
+            .post(`/api/projects/${aliceProjectId}/agentic/final-editor`)
             .set(asBob())
-            .send([{ section_name: "Intro", content: "Hacked" }]),
+            .send({ text: "Injected passage" }),
         () =>
           request(app)
             .post(`/api/projects/${aliceProjectId}/agentic/upload-user-data`)

@@ -61,6 +61,12 @@ export interface ScrubberOptions {
   style?: "apa-7";
   unverifiedPlaceholder?: string;
   checkEntailment?: boolean;
+  /**
+   * Keep verified citations as `[CITE:id]` tokens (with the ledger id) instead
+   * of printing them. The Journal Writing Studio stores tokens and formats
+   * them later in the project's own citation style.
+   */
+  keepTokens?: boolean;
 }
 
 // Unmatched citations are removed silently: no placeholder tag is ever written into student prose.
@@ -337,7 +343,7 @@ export function scrubCitations(
         doi: source.doi,
         url: source.url,
       });
-      resolvedTokens.push(formatted);
+      resolvedTokens.push(options.keepTokens ? `[CITE:${source.id}]` : formatted);
       return `__RESOLVED_CITE_${resolvedTokens.length - 1}__`;
     }
 
@@ -374,7 +380,7 @@ export function scrubCitations(
           doi: source.doi,
           url: source.url,
         });
-        formattedList.push(formatted);
+        formattedList.push(options.keepTokens ? `[CITE:${source.id}]` : formatted);
       } else {
         unverifiedClaimsCount += 1;
         strippedCitations.push(`[${num}]`);
@@ -384,7 +390,7 @@ export function scrubCitations(
       }
     }
 
-    return formattedList.filter(Boolean).join("; ");
+    return formattedList.filter(Boolean).join(options.keepTokens ? " " : "; ");
   });
 
   // Pass 3: Narrative citations: Author (2021) or Author et al. (2022)
@@ -424,6 +430,10 @@ export function scrubCitations(
     if (matchedSource) {
       resolvedCitationsCount += 1;
       citedSourcesSet.add(matchedSource);
+      if (options.keepTokens) {
+        resolvedTokens.push(`[CITE:${matchedSource.id}]`);
+        return `__RESOLVED_CITE_${resolvedTokens.length - 1}__`;
+      }
       return fullMatch;
     }
 

@@ -16,6 +16,7 @@ import { normalizeUnicodeNFC } from "../../document_intelligence/index";
 import { safeParseAnswerField } from "../../shared/projectStateSchema";
 import RevisionRoundPanel from "../journal/RevisionRoundPanel";
 import type { RevisionRound } from "../../domain/journal/revision";
+import { manuscriptAnswerPatch, readManuscriptMarkdown } from "../../domain/journal/manuscriptText";
 
 export const REFEREE_PERSONAS: Array<{
   role: RefereeRole;
@@ -67,7 +68,7 @@ export default function RefereeRebuttalMode() {
   const answers = useMemo(() => project?.answers || {}, [project?.answers]);
 
   const workingTitle = answers["working_title"] || answers["title"] || "Grounded Manuscript";
-  const manuscriptText = answers["manuscript_markdown"] || answers["assembled_draft"] || "";
+  const manuscriptText = readManuscriptMarkdown(answers);
 
   // State: Critiques from the 5 Referees
   const [critiques, setCritiques] = useState<RefereeCritique[]>(() => {
@@ -193,9 +194,7 @@ export default function RefereeRebuttalMode() {
     try {
       const nextAnswers = {
         ...answers,
-        manuscript_markdown: updatedManuscript,
-        assembled_draft: updatedManuscript,
-        full_text_markdown: updatedManuscript,
+        ...manuscriptAnswerPatch(updatedManuscript, answers),
         rebuttal_matrix: JSON.stringify(updatedMatrix),
         applied_patch_ids: JSON.stringify(Array.from(nextApplied)),
       };

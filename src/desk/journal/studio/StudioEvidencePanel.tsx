@@ -1,13 +1,16 @@
-import { useState } from "react";
-import type { StudioEvidence } from "../studioEvidence";
-import { citedReferences } from "../studioEvidence";
+import { memo, useMemo, useState } from "react";
+import type { StudioEvidence } from "../../../domain/journal/studioEvidence";
+import { citedReferences } from "../../../domain/journal/studioEvidence";
 import { figureToken, numberFigures, type ManuscriptFigure } from "../../../domain/journal/figures";
+import type { ReferenceRecord } from "../../../domain/journal/references";
 
 /**
  * Sources for the section being written (or all of them), each insertable as a
- * citation, and the reference list for what the manuscript cites so far.
+ * citation, and the reference list for what the manuscript cites so far, in
+ * the project's citation style. Remount it per section (key) so the tab
+ * starts on that section's sources.
  */
-export default function StudioEvidencePanel({
+function StudioEvidencePanel({
   forUnit,
   all,
   manuscript,
@@ -15,6 +18,8 @@ export default function StudioEvidencePanel({
   onGoToEvidence,
   figures = [],
   onInsertText,
+  records,
+  citationStyle,
 }: {
   forUnit: StudioEvidence[];
   all: StudioEvidence[];
@@ -24,11 +29,18 @@ export default function StudioEvidencePanel({
   figures?: ManuscriptFigure[];
   /** Inserts plain text (a figure or table reference) at the cursor. */
   onInsertText?: (text: string) => void;
+  /** Registry records saved on the project (they win over what was typed). */
+  records?: Record<string, ReferenceRecord>;
+  /** The project's citation style ("APA 7", "IEEE", …). */
+  citationStyle?: string;
 }) {
-  const numbering = numberFigures(manuscript, figures);
+  const numbering = useMemo(() => numberFigures(manuscript, figures), [manuscript, figures]);
   const [tab, setTab] = useState<"unit" | "all">(forUnit.length > 0 ? "unit" : "all");
   const list = tab === "unit" ? forUnit : all;
-  const { entries, unknownTokens } = citedReferences(manuscript, all);
+  const { entries, unknownTokens } = useMemo(
+    () => citedReferences(manuscript, all, { records, citationStyle }),
+    [manuscript, all, records, citationStyle]
+  );
 
   return (
     <div className="flex flex-col h-full min-h-0" aria-label="Sources">
@@ -115,7 +127,9 @@ export default function StudioEvidencePanel({
           <p className="text-[11px] text-[color:var(--text-muted)]">Citations you insert appear here.</p>
         ) : (
           <ol className="space-y-1.5 text-[11px] leading-snug text-[color:var(--text-secondary)]">
-            {entries.map(({ evidence, reference }) => <li key={evidence.id}>{reference}</li>)}
+            {entries.map(({ evidence, reference }) => (
+              <li key={evidence.id}>{renderItalics(reference)}</li>
+            ))}
           </ol>
         )}
         {unknownTokens.length > 0 && (
@@ -127,3 +141,10 @@ export default function StudioEvidencePanel({
     </div>
   );
 }
+
+/** Reference entries mark container titles as *italic*. */
+function renderItalics(entry: string) {
+  return entry.split(/(\*[^*]+\*)/g).map((part, i) => (part.startsWith("*") && part.endsWith("*") && part.length > 2 ? <em key={i}>{part.slice(1, -1)}</em> : part));
+}
+
+export default memo(StudioEvidencePanel);

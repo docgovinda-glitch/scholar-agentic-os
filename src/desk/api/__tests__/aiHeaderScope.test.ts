@@ -6,13 +6,13 @@ describe("routeUsesClientAi: the user's AI key is sent only to AI routes", () =>
     "/api/ai/search",
     "/api/ai",
     "/api/drafting/section",
-    "/api/projects/p1/agent/draft",
+    "/api/projects/p1/agentic/draft-subsection",
     "/api/projects/p1/agentic/literature",
     "/api/projects/p1/assignment/stream-section",
     "/api/projects/p1/thesis/audit",
     "/api/projects/p1/proposal/audit-aims",
     "/api/projects/p1/presentation/generate-deck",
-    "https://scholar.example.org/api/projects/p1/agent/draft?x=1",
+    "https://scholar.example.org/api/projects/p1/agentic/draft-subsection?x=1",
   ])("sends for %s", (path) => {
     expect(routeUsesClientAi(path)).toBe(true);
   });

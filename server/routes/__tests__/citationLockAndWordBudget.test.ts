@@ -23,6 +23,13 @@ vi.mock("../../src/ai/routerBridge.ts", async (importOriginal) => {
       if (!r?.ok) throw new Error(r?.error?.message ?? "AI call failed");
       return r.value.text as string;
     },
+    // The section drafter runs through requestCompleter, which calls routedResult.
+    routedResult: async (req: Parameters<typeof real.routedResult>[0], call: Parameters<typeof real.routedResult>[1]) => {
+      if ((await real.aiAvailability(req, call.task)) === "none") throw new NoClientAiProviderError();
+      const r = await aiCallMock({ systemPrompt: call.systemPrompt, userPrompt: call.userPrompt, task: call.task });
+      if (!r?.ok) throw new Error(r?.error?.message ?? "AI call failed");
+      return { text: r.value.text as string, provider: "openai", model: "gpt-4o-mini", label: "openai", lane: "byok", usage: { inputTokens: 0, outputTokens: 0 } };
+    },
   };
 });
 
@@ -304,9 +311,9 @@ describe("Journal Step A: Two-Pass Sub-Section Drafting & Exact Word-Count Contr
     expect(content.normalize("NFC")).toBe(content);
     expect(content).toContain("Pramāṇa");
 
-    // 4. Citation resolution: [CITE:src_advaitic] converted to formatted citation
-    expect(content).not.toContain("[CITE:src_advaitic]");
-    expect(content).toMatch(/Śaṅkara/);
+    // 4. A verified citation stays a token (the Writing Studio formats it in the project's style)
+    expect(content).toContain("[CITE:src_advaitic]");
+    expect(res.body.resolvedCitationsCount).toBe(1);
 
     // 5. Burstiness telemetry is reported for the AI draft
     expect(res.body.burstinessMetrics).toBeDefined();

@@ -57,8 +57,8 @@ Coursework (OT-01) `answers` hold one key per setting (`src/domain/assignment/an
 | `project_research_gaps` | `id`, `project_id`, `gap_type`, `description`, `importance_score`, `status`, `created_at`, `updated_at` | Schema only |
 | `project_titles` | `id`, `project_id`, `title_text`, `subtitle_text`, `rationale`, `status`, `created_at`, `updated_at` | Schema only |
 | `project_journal_candidates` | `id`, `project_id`, `journal_name`, `publisher`, `impact_factor`, `match_score`, `rationale`, `status`, `created_at`, `updated_at` | Schema only |
-| `manuscript_sections` | `id`, `project_id`, `section_name`, `content`, `status`, `word_count`, `created_at`, `updated_at` | Yes |
-| `manuscript_versions` | `id`, `project_id`, `section_name`, `content`, `created_at` | Yes |
+| `manuscript_sections` | `id`, `project_id`, `section_name`, `content`, `status`, `word_count`, `created_at`, `updated_at` | Schema only (the Writing Studio keeps sections in `projects.answers.manuscript_sections`) |
+| `manuscript_versions` | `id`, `project_id`, `section_name`, `content`, `created_at` | Schema only |
 | `peer_review_critiques` | `id`, `project_id`, `lens`, `feedback`, `severity`, `created_at`, `waived` | Yes |
 
 The relational claim, evidence and source tables are written by `server/src/syncRelational.ts` alongside the JSONB graph in `projects`.

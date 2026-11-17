@@ -109,49 +109,69 @@ test("Proposal (OT-15): a section is drafted by the user's AI", async ({ page })
   });
 });
 
-test("Journal (OT-10): the manuscript draft is written by the user's AI and kept after a reload", async ({ page }) => {
-  await withProject(page, "OT-10", { title: "E2E journal" }, async (id) => {
-    const res = await api(page, "POST", `/api/projects/${id}/agentic/draft`, {}, AI_HEADERS);
-    expect(res.status, res.text.slice(0, 300)).toBe(200);
-    expect(res.text).toContain("event: done");
-    expect(res.text).not.toContain("event: error");
-    expect(res.text).toContain(MARKER);
+/**
+ * The Journal Writing Studio's flow: one section drafted by the user's AI
+ * (POST .../agentic/draft-subsection returns the text and saves nothing),
+ * then saved the way the studio saves it (sections + the canonical
+ * manuscript_markdown through PATCH .../intake).
+ */
+async function draftAndSaveIntroduction(page: Page, id: string): Promise<string> {
+  const res = await api(
+    page,
+    "POST",
+    `/api/projects/${id}/agentic/draft-subsection`,
+    { sectionId: "default-introduction", subSectionId: "default-introduction", subSectionTitle: "Introduction", targetWords: 60, assignedSources: [] },
+    AI_HEADERS
+  );
+  expect(res.status, res.text.slice(0, 300)).toBe(200);
+  const content = String(res.json?.content ?? "");
+  expect(content).toContain(MARKER);
+  const saved = await api(page, "PATCH", `/api/projects/${id}/intake`, {
+    answers: {
+      manuscript_sections: JSON.stringify({ version: 1, texts: { "default-introduction": content }, unsorted: "" }),
+      manuscript_markdown: `## Introduction\n\n${content}\n`,
+    },
+  });
+  expect(saved.status).toBe(200);
+  return content;
+}
 
+test("Journal (OT-10): a section is drafted by the user's AI, saves nothing by itself, and is kept after a reload once saved", async ({ page }) => {
+  await withProject(page, "OT-10", { title: "E2E journal" }, async (id) => {
+    const before = await stubCalls();
+    const res = await api(
+      page,
+      "POST",
+      `/api/projects/${id}/agentic/draft-subsection`,
+      { sectionId: "default-introduction", subSectionId: "default-introduction", subSectionTitle: "Introduction", targetWords: 60, assignedSources: [] },
+      AI_HEADERS
+    );
+    expect(res.status, res.text.slice(0, 300)).toBe(200);
+    expect(String(res.json?.content)).toContain(MARKER);
+    expect(await stubCalls()).toBeGreaterThan(before);
+    // The draft route only returns the text: the studio decides where it goes.
+    const untouched = await api(page, "GET", `/api/projects/${id}`);
+    expect(String(untouched.json?.answers?.manuscript_markdown ?? "")).not.toContain(MARKER);
+
+    await draftAndSaveIntroduction(page, id);
     await page.reload();
     const reread = await api(page, "GET", `/api/projects/${id}`);
     expect(reread.status).toBe(200);
-    expect(String(reread.json?.answers?.manuscript_draft ?? "")).toContain(MARKER);
+    expect(String(reread.json?.answers?.manuscript_markdown ?? "")).toContain(MARKER);
   });
 });
 
-// Server-side tables (manuscript_versions) have no client policies; the test
-// reads them with the LOCAL stack's service role, never production.
-const LOCAL_SUPABASE_URL = process.env.E2E_SUPABASE_URL;
-const LOCAL_SERVICE_ROLE = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY;
-
-async function serviceSelect(table: string, filter: string): Promise<Array<Record<string, unknown>>> {
-  const res = await fetch(`${LOCAL_SUPABASE_URL}/rest/v1/${table}?${filter}`, {
-    headers: { apikey: LOCAL_SERVICE_ROLE!, Authorization: `Bearer ${LOCAL_SERVICE_ROLE}` },
-  });
-  expect(res.status).toBe(200);
-  return (await res.json()) as Array<Record<string, unknown>>;
-}
-
-test("Journal (OT-10): drafting again keeps the previous draft as a version", async ({ page }) => {
-  test.skip(!LOCAL_SUPABASE_URL || !LOCAL_SERVICE_ROLE, "E2E_SUPABASE_URL / E2E_SUPABASE_SERVICE_ROLE_KEY not set");
-  await withProject(page, "OT-10", { title: "E2E journal versions" }, async (id) => {
-    for (const round of [1, 2]) {
-      const res = await api(page, "POST", `/api/projects/${id}/agentic/draft`, {}, AI_HEADERS);
-      expect(res.status, `round ${round}: ${res.text.slice(0, 300)}`).toBe(200);
-      expect(res.text, `round ${round}`).toContain("event: done");
-      expect(res.text, `round ${round}: ${res.text.slice(-400)}`).not.toContain("event: error");
-    }
-    const sections = await serviceSelect("manuscript_sections", `project_id=eq.${id}&select=section_name,content`);
-    expect(sections).toHaveLength(1);
-    expect(String(sections[0].content)).toContain(MARKER);
-    const versions = await serviceSelect("manuscript_versions", `project_id=eq.${id}&select=section_name,content`);
-    expect(versions.length).toBeGreaterThanOrEqual(1);
-    expect(String(versions[0].content)).toContain(MARKER);
+test("Journal (OT-10): polishing a passage returns it for review and leaves the saved manuscript alone", async ({ page }) => {
+  await withProject(page, "OT-10", { title: "E2E journal polish" }, async (id) => {
+    await draftAndSaveIntroduction(page, id);
+    const before = (await api(page, "GET", `/api/projects/${id}`)).json?.answers?.manuscript_markdown;
+    const res = await api(page, "POST", `/api/projects/${id}/agentic/final-editor`, { text: "We delve into the decoder latency." }, AI_HEADERS);
+    expect(res.status, res.text.slice(0, 300)).toBe(200);
+    expect(res.json?.scope).toBe("passage");
+    expect(res.json?.saved).toBe(false);
+    expect(typeof res.json?.polishedText).toBe("string");
+    const after = (await api(page, "GET", `/api/projects/${id}`)).json?.answers?.manuscript_markdown;
+    expect(after).toBe(before);
   });
 });
 
@@ -161,8 +181,7 @@ test("Journal (OT-10): the drafted manuscript exports to Markdown and Word, for 
     const empty = await api(page, "POST", `/api/projects/${id}/export/markdown`, {});
     expect(empty.status).toBe(400);
 
-    const drafted = await api(page, "POST", `/api/projects/${id}/agentic/draft`, {}, AI_HEADERS);
-    expect(drafted.status).toBe(200);
+    await draftAndSaveIntroduction(page, id);
 
     const md = await api(page, "POST", `/api/projects/${id}/export/markdown`, {});
     expect(md.status, md.text.slice(0, 300)).toBe(200);

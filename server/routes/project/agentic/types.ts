@@ -1,6 +1,5 @@
 import type { ProjectRecord } from "../../../../src/services/store/projectStore.ts";
 import type { ScholarlyDialect } from "../../../src/utils/scholarlyVoiceGuard.ts";
-import type { VerifiedSourceItem } from "../../../src/utils/citationLockScrubber.ts";
 
 export type RefereeRole =
   | "Methodologist"
@@ -87,13 +86,3 @@ export interface UserDatasetRecord {
   createdAt: string;
 }
 
-export interface DraftSubSectionRequestBody {
-  sectionId?: string;
-  subSectionId?: string;
-  subSectionTitle?: string;
-  targetWords?: number;
-  assignedSources?: VerifiedSourceItem[];
-  contextPrompt?: string;
-  dialect?: "en-GB" | "en-US";
-  thesisStatement?: string;
-}

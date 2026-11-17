@@ -151,7 +151,7 @@ export function sendCopilotMessage(
   message: string,
   history: Array<{ role: "user" | "assistant"; content: string }>
 ): Promise<{ ok: boolean; response: string }> {
-  return authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/agent/copilot-chat`, "POST", { stage, message, history }).then((r) =>
+  return authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/agentic/copilot-chat`, "POST", { stage, message, history }).then((r) =>
     json<{ ok: boolean; response: string }>(r)
   );
 }

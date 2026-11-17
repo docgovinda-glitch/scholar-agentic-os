@@ -5,7 +5,7 @@
  * server and browser and has no dependency on app/*, same rule every other
  * domain/* module here follows) — the catalog-aware word-budget allocation
  * lives in app/manuscript/wordBudget.ts, and the actual model-calling
- * pipeline in app/manuscript/generate.ts.
+ * pipeline in server/src/services/sectionDrafter.ts (scholarBrain.draftSection).
  *
  * "Next section to generate" is deliberately NOT a stored field — it is
  * always `plan[sections.length]`, so a checkpoint can never desync from the
@@ -28,7 +28,7 @@ export interface GeneratedSection {
   wordCount: number;
   /** A short summary of this section, used as context for generating LATER sections instead of replaying this section's full text — "Section Memory" per the spec. */
   memory: string;
-  /** Evidence Ledger item ids (domain/evidence) actually cited in this section — every one must have been "citable" at generation time; see app/manuscript/generate.ts's own citation-aware generation rules. */
+  /** Evidence Ledger item ids (domain/evidence) actually cited in this section — every one must have been "citable" at generation time; see server/src/services/sectionDrafter.ts. */
   citedEvidenceIds: string[];
   generatedAt: string;
   usage?: { provider: string; model: string; inputTokensEstimate: number; outputTokensEstimate: number };
