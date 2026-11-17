@@ -81,6 +81,8 @@ Export formats: `docx`, `odt`, `pdf`, `latex`, `typst`, `camera_ready_pdf`, `mar
 
 ### 5.3 Journal pipeline (`/api/projects/:id/agentic/*`)
 
+Requests to the old `/api/projects/:id/agent/*` address (browser tabs from before 2026-11-17) are rewritten to `/agentic/*` by `server/src/middleware/legacyAgentPath.ts` before routing, and answered with a `Deprecation: true` header.
+
 `server/routes/project/agentic/`, all POST unless noted.
 
 - Evidence: `/gaps`, `/titles`, `/vault-sources`, `/evidence-extraction`, `/external-research`, `/evidence-analysis`, `/journal-discovery`, `/journal-requirements`, `/upload-user-data`; PUT `/user-data/:dataId`; PUT, GET `/evidence`.
