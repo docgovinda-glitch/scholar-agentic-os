@@ -3,7 +3,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import "@testing-library/jest-dom/vitest";
 import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { executeTitleLockAndProceed } from "../titleLockContract";
 import { ResearchProvider, useResearchWorkspace } from "../ResearchContext";
 import * as api from "../../api";
 import type { ProjectView } from "../../types";
@@ -25,7 +24,7 @@ vi.mock("../../api", () => ({
   setGlobalManualModelOverride: vi.fn(),
 }));
 
-describe("Title Lock Contract & Stage Navigation System Integrity", () => {
+describe("Stage Navigation System Integrity", () => {
   const mockProject: ProjectView = {
     id: "proj-test-123",
     ownerId: "user-1",
@@ -49,68 +48,6 @@ describe("Title Lock Contract & Stage Navigation System Integrity", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  describe("executeTitleLockAndProceed (Shared Single Transition Contract)", () => {
-    it("rejects an empty or whitespace title without saving or navigating", async () => {
-      const onSaved = vi.fn();
-      const onAdvance = vi.fn();
-
-      await expect(
-        executeTitleLockAndProceed({
-          projectId: "p1",
-          title: "   ",
-          onSaved,
-          onAdvance,
-        })
-      ).rejects.toThrow("Please select or enter a valid title before locking.");
-
-      expect(api.saveIntakeAnswers).not.toHaveBeenCalled();
-      expect(onSaved).not.toHaveBeenCalled();
-      expect(onAdvance).not.toHaveBeenCalled();
-    });
-
-    it("atomically persists working_title, title_locked: 'true', and current_stage: 'vault_sources'", async () => {
-      const updatedMock: ProjectView = {
-        ...mockProject,
-        answers: {
-          ...mockProject.answers,
-          working_title: "Final Quantum Paper Title",
-          title_locked: "true",
-          current_stage: "vault_sources",
-        },
-      };
-
-      vi.mocked(api.saveIntakeAnswers).mockResolvedValueOnce(updatedMock);
-
-      const onSaved = vi.fn();
-      const onAdvance = vi.fn();
-
-      const result = await executeTitleLockAndProceed({
-        projectId: mockProject.id,
-        title: "Final Quantum Paper Title",
-        existingAnswers: mockProject.answers,
-        onSaved,
-        onAdvance,
-      });
-
-      // 1. Verify atomic payload to saveIntakeAnswers
-      expect(api.saveIntakeAnswers).toHaveBeenCalledWith(
-        mockProject.id,
-        expect.objectContaining({
-          working_title: "Final Quantum Paper Title",
-          title_locked: "true",
-          current_stage: "vault_sources",
-        })
-      );
-
-      // 2. Verify onSaved called with updated project
-      expect(onSaved).toHaveBeenCalledWith(updatedMock);
-
-      // 3. Verify deterministic navigation to vault_sources
-      expect(onAdvance).toHaveBeenCalledWith("vault_sources");
-      expect(result).toEqual(updatedMock);
-    });
   });
 
   describe("Negative regression tests & Guard against invalid stage identifiers", () => {

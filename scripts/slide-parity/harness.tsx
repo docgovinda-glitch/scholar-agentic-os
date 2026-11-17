@@ -4,7 +4,6 @@
  * and exposes a function that builds the matching .pptx in the same page, so
  * both outputs come from the same geometry code the app ships.
  */
-import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { GammaSlide } from '../../src/features/slides/gamma/GammaCard';
 import { GAMMA_LAYOUTS, writeCardContent } from '../../src/features/slides/gamma/content';

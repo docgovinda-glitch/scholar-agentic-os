@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import type { ThesisProjectData } from "../types";
 
 /** One examiner question, as returned by the viva-simulate route for this thesis. */

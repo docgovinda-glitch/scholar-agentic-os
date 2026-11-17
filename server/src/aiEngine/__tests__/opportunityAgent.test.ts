@@ -4,10 +4,10 @@ process.env.VITE_SUPABASE_URL = "https://test.supabase.co";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "sb_secret_test";
 process.env.OPENROUTER_API_KEY = "test-openrouter-key";
 
-// Mock the AI call (router bridge) so tests don't make real HTTP calls.
+// Mock the AI call (scholarBrain's routed completion) so tests don't make real HTTP calls.
 // The mock is set up before the module under test is imported.
 const mockRoutedCompletion = vi.fn();
-vi.mock("../../ai/routerBridge.ts", () => ({
+vi.mock("../../services/scholarBrain.ts", () => ({
   routedCompletion: mockRoutedCompletion,
 }));
 

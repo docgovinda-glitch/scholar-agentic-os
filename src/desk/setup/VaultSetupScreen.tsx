@@ -18,7 +18,6 @@ export default function VaultSetupScreen({
 }) {
   const [step, setStep] = useState<Step>("offer");
   const [tourStep, setTourStep] = useState(0);
-  const [storageMode, setStorageMode] = useState<"local" | "synced">("synced");
   const [passphrase, setPassphrase] = useState("");
   const [confirm, setConfirm] = useState("");
   const [saved, setSaved] = useState(false);
@@ -114,7 +113,6 @@ export default function VaultSetupScreen({
               <button
                 type="button"
                 onClick={() => {
-                  setStorageMode("synced");
                   handleCreate("synced");
                 }}
                 disabled={busy}
@@ -137,7 +135,6 @@ export default function VaultSetupScreen({
                 type="button"
                 aria-label="Create a Secure Vault"
                 onClick={() => {
-                  setStorageMode("local");
                   setStep("passphrase");
                 }}
                 className="rounded-[var(--radius-lg)] border border-[color:var(--border-default)] px-5 py-4 text-left hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer"

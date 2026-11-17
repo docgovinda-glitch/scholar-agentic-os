@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Plus,
   Database,
@@ -11,7 +11,6 @@ import {
   Sun,
   Moon,
   ChevronsLeft,
-  ChevronsRight,
   Pin,
 } from 'lucide-react';
 import ScholarCoreLogo from '../ScholarCoreLogo';

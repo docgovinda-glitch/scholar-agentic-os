@@ -10,7 +10,7 @@
  */
 
 import { decryptDataAsync, encryptDataAsync } from "../utils/crypto";
-import { verifyVaultPassphrase, getVaultStorageMode, hasVaultPassphraseOnThisDevice } from "./userVault";
+import { verifyVaultPassphrase, hasVaultPassphraseOnThisDevice } from "./userVault";
 import { getSupabaseClient, isSupabaseConfigured } from "./supabaseClient";
 import type { CanonicalReference } from "../citation_compliance/model/reference";
 
@@ -186,14 +186,6 @@ export async function clearVaultItems(userId: string): Promise<void> {
  * Vault Items CRUD (Universal Cloud + Local Encryption Fallback)
  * ---------------------------------------------------------------------- */
 
-async function getStorageModeSafe(): Promise<"local" | "synced"> {
-  try {
-    if (typeof getVaultStorageMode === "function") {
-      return await getVaultStorageMode();
-    }
-  } catch {}
-  return "local";
-}
 
 export async function addVaultItem(
   userId: string,

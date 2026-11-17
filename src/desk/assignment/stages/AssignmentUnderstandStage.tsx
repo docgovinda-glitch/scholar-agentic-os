@@ -1,5 +1,5 @@
 import { DEFAULT_CITATION_STYLE } from "../../../domain/assignment/answerKeys";
-import { clampWordLimit, WORD_LIMIT_DEFAULT, WORD_LIMIT_MAX, WORD_LIMIT_MIN, WORD_LIMIT_STEP } from "../../../domain/assignment/wordLimit";
+import { clampWordLimit } from "../../../domain/assignment/wordLimit";
 import { safeParseAnswerField } from "../../../shared/projectStateSchema";
 import { tonePresetOf } from "../types";
 import { UnderstandAgentPanel } from "../components/AgentPanels";
@@ -75,7 +75,6 @@ export default function AssignmentUnderstandStage({
     writingStyle,
     setWritingStyle,
     writingTone,
-    setWritingTone,
     structure,
     setStructure,
     saveAnswers,

@@ -81,14 +81,16 @@ Export formats: `docx`, `odt`, `pdf`, `latex`, `typst`, `camera_ready_pdf`, `mar
 
 ### 5.3 Journal pipeline (`/api/projects/:id/agentic/*`)
 
+Every endpoint listed here has a caller in the app. The older pipeline steps with no caller (gap, title and journal discovery, evidence extraction and analysis, citation audit, originality check, critique listing) were removed on 2026-11-17; the Blueprint endpoints cover those steps.
+
 Requests to the old `/api/projects/:id/agent/*` address (browser tabs from before 2026-11-17) are rewritten to `/agentic/*` by `server/src/middleware/legacyAgentPath.ts` before routing, and answered with a `Deprecation: true` header.
 
 `server/routes/project/agentic/`, all POST unless noted.
 
-- Evidence: `/gaps`, `/titles`, `/vault-sources`, `/evidence-extraction`, `/external-research`, `/evidence-analysis`, `/journal-discovery`, `/journal-requirements`, `/upload-user-data`; PUT `/user-data/:dataId`; PUT, GET `/evidence`.
+- The author's own data: `/upload-user-data` (multipart); PUT `/user-data/:dataId`.
 - Blueprint: `/blueprint/gaps`, `/blueprint/questions`, `/blueprint/journals`, `/blueprint/outline`.
 - Drafting: `/allocate-budget`, `/draft-subsection`, `/copilot-chat`. `/draft-subsection` (zod body, `journalStudioSchemas.ts`) drafts one Writing Studio section from `sectionBrief`, `authorGuidance`, `writtenSections` and `assignedSources` (when sent, even empty, the only citable sources); it returns the text with verified citations kept as `[CITE:id]` tokens and saves nothing.
-- Review: `/peer-review`, `/revision`, `/rebuttal-matrix` (also GET), `/citation-audit`, `/originality-check`, `/final-editor` (`{ text }` polishes a passage and returns `polishedText` without saving; `{ manuscript }` or an empty body polishes and saves the whole manuscript; an AI rewrite that changes a citation, figure reference, DOI or statistic is discarded), `/publication-readiness`, `/export`; GET, POST `/export/rebuttal-letter`; PUT `/critiques/:critiqueId/waive`; GET `/critiques`.
+- Review: `/peer-review`, `/rebuttal-matrix` (also GET), `/final-editor` (`{ text }` polishes a passage and returns `polishedText` without saving; `{ manuscript }` or an empty body polishes and saves the whole manuscript; an AI rewrite that changes a citation, figure reference, DOI or statistic is discarded), `/publication-readiness`, `/export` (the rebuttal letter itself is downloaded from `/api/projects/:id/export/rebuttal-letter`).
 - Other: `/journal-profile/extract`, `/references/lookup`, `/references/check`, `/citations/support`.
 
 ### 5.4 Coursework (`/api/projects/:id/assignment/*`)
@@ -120,10 +122,8 @@ Every body is validated with zod (`schemas.ts`); a bad body is a 400 `{ code: "i
 | POST | `/api/ai/verify` | Yes | Tests a key end to end (live model list + one real request) and recommends a model; key in `x-ai-api-key`; see [`AI-SYSTEM.md`](AI-SYSTEM.md) §2.0 |
 | GET | `/api/ai/status` | Public | AI availability |
 | POST | `/api/ai/search` | Yes | Web search |
-| POST | `/api/ai/deep-research` | Yes | Multi-step research |
-| POST | `/api/ai/agent` | Yes | Ask Scholar |
+| POST | `/api/ai/agent` | Yes | Ask Scholar: chat, grounded search and deep research (`mode`) |
 | GET, POST | `/api/ai/threads` | Yes | Ask Scholar threads (held in server memory per user, merged by thread id) |
-| POST | `/api/drafting/section` | Yes | Section drafting |
 | POST | `/api/studio/voice-profile`, `/refine` | Yes | Studio voice and refine (`/refine` runs on the keyring) |
 
 ### 6.1 AI Access (`/api/ai-access`, all `requireAuth`, user-scoped)
@@ -148,7 +148,6 @@ GET `/`, `/:id`; POST `/`; PUT `/:id`; DELETE `/:id`; POST `/parse-document` (mu
 ## 9. Admin (`/api/admin/ai`, `requireAuth` then `requireAdmin`; scopes in [`PRODUCT.md`](PRODUCT.md) §1)
 
 - Read: GET `/whoami`, `/opportunities`, `/admins`, `/users/search`, `/audit-log`.
-- Budget and credentials: PATCH `/budget`; POST `/platform-credentials`; PATCH `/platform-credentials/:id/status`; DELETE `/platform-credentials/:id`.
 - Opportunities: POST `/opportunities/research`, `/opportunities/:id/review`.
 - People: POST `/admins`; DELETE `/admins/:userId`; PATCH `/admins/:userId/scopes`, `/users/:userId/status`; DELETE `/users/:userId`.
 

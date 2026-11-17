@@ -1,4 +1,4 @@
-import { getSupabaseClient, isSupabaseConfigured } from "../../services/supabaseClient";
+import { authHeaders } from "./authHeaders";
 import { buildKeyring, encodeKeyring } from "../ai/keyring";
 import { inspectAiResponse } from "../ai/aiRouteNotices";
 import { liveAiStatus } from "../ai/liveAiStatus";
@@ -6,8 +6,9 @@ import { runAiText } from "../ai/aiRun";
 import type { TaskClass } from "../../platform/router/types";
 import type { RoutingTaskType } from "../aiAccess/aiAccessApi";
 import type { ProjectView } from "../types";
-import { readProviderKey, providersWithStoredKey } from "../../services/userAiSettings";
 import { originalFetch } from "../originalFetch";
+
+export { authHeaders };
 import {
   isEphemeralProject,
   getEphemeralProject,
@@ -106,22 +107,15 @@ export async function commitProjectToDatabase(projectId: string): Promise<Projec
   }
 }
 
-export async function authHeaders(): Promise<Record<string, string>> {
-  if (!isSupabaseConfigured()) return {};
-  const { data } = await getSupabaseClient().auth.getSession();
-  const token = data.session?.access_token;
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
 
 /**
  * Server routes that execute AI with the caller's own provider credentials
- * (server/routes/ai.ts, drafting.ts and the per-project agent/assignment/
+ * (server/routes/ai.ts and the per-project agentic/assignment/
  * thesis/proposal/presentation routers). Only these receive the transient
  * x-ai-* headers.
  */
 export const AI_ROUTE_PATTERNS: RegExp[] = [
   /^\/api\/ai(\/|$)/,
-  /^\/api\/drafting(\/|$)/,
   /^\/api\/projects\/[^/]+\/(agentic|assignment|thesis|proposal|presentation|manuscript|journal-requirements|cover-letter|anonymization)(\/|$)/,
   /^\/api\/studio\/refine(\/|$)/,
 ];

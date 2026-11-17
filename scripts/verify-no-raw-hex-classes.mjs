@@ -7,7 +7,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
 const ROOT = process.cwd();
-const SCAN = ["src/desk", "src/components", "src/layouts"];
+const SCAN = ["src/desk", "src/components", "src/admin", "src/features/coursework", "src/features/understand"];
 const PATTERN = /-\[#[0-9a-fA-F]{3,8}\]/;
 
 function* walk(p) {

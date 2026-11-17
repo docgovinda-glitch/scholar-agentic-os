@@ -4,14 +4,12 @@
  *
  *   dynamicStructure   generateDynamicAssignmentStructure (the brief-grounded outline)
  *   briefOutlineSpecs  buildBriefSpecificSpecs (one heading spec per question of the brief)
- *   adaptiveOutline    generateAdaptiveDefaultOutline (section list for the drafting stage)
  *   briefSemantics     reading the brief: question semantics, inquiries, headings, titles
  *   outlineEditing     the student's outline edits (add/remove/reorder/budget/frameworks)
  *   outlineTree        AssignmentStructure <-> outline tree, heading sanitising
  *
- * New code may import a module directly; this file keeps older imports working.
+ * Application code imports the modules directly; the test suites use this file.
  */
-export * from "./adaptiveOutline";
 export * from "./briefOutlineSpecs";
 export * from "./briefSemantics";
 export * from "./dynamicStructure";

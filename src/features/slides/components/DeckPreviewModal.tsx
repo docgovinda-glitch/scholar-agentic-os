@@ -1,4 +1,3 @@
-import React from 'react';
 import { X, Sparkles, Check } from 'lucide-react';
 import MultiSlideDeckPreview from './MultiSlideDeckPreview';
 import type { SlideThemeId } from '../types/themes';

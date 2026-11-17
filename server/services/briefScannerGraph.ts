@@ -3,8 +3,6 @@ import { z } from "zod";
 import type { AssignmentAnalysis, CommandVerbDetail } from "../../src/desk/assignment/types.ts";
 import {
   isClassroomNoise,
-  repairHyphenatedAndSoftLineBreaks,
-  filterPedagogicalNoise,
 } from "../../src/features/understand/services/briefSanitizer.ts";
 
 /**

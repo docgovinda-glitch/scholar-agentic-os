@@ -9,8 +9,8 @@ This folder describes the application as it exists on `main`. Where a document a
 | [`PRODUCT.md`](PRODUCT.md) | Capabilities, user roles, the output-type catalog and which workspaces exist |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | Runtime topology, server and client layers, security model, ML style engine |
 | [`WORKFLOWS.md`](WORKFLOWS.md) | Sign-in and onboarding, then each workspace step by step |
-| [`AI-SYSTEM.md`](AI-SYSTEM.md) | Single brain (`scholarBrain`), the two routers, providers, credentials, local models |
-| [`AI-CALL-MAP.md`](AI-CALL-MAP.md) | Entry layers that reach the AI gateway and where each gets its credentials |
+| [`AI-SYSTEM.md`](AI-SYSTEM.md) | Single brain (`scholarBrain`), the one router, providers, credentials, local models |
+| [`AI-CALL-MAP.md`](AI-CALL-MAP.md) | Entry layers that reach the AI router and where each gets its credentials |
 | [`DATA-MODEL.md`](DATA-MODEL.md) | Postgres tables (from `supabase/`), storage buckets, project state shapes |
 | [`API.md`](API.md) | Every HTTP endpoint registered by `server.ts`, with auth and rate-limit notes |
 | [`UI-UX.md`](UI-UX.md) | Design tokens, themes, shell and navigation, accessibility rules |
@@ -22,9 +22,9 @@ Related files at the repository root: [`README.md`](../README.md), [`CLAUDE.md`]
 
 ## Dated records (not kept in sync)
 
-These capture a point in time (incidents, audits, plans, status ledgers). Each starts with a banner saying so. Do not treat them as a description of current behaviour.
+These capture a point in time (incidents, audits, plans, status ledgers) and live in [`records/`](records/). Each starts with a banner saying so. Do not treat them as a description of current behaviour. `PRODUCT_BACKLOG.md` there lists ideas that are not built. [`ROTATION_RUNBOOK.md`](../ROTATION_RUNBOOK.md) stays at the repository root because operators still follow it.
 
-`AUDIT.md`, `COMPROMISE_CHECKS.md`, `HOTFIX_DEPLOY.md`, `HOTFIX2_DEPLOY.md`, `MERGE_PLAN.md`, `POST_DEPLOY_80.md`, `PROD_CHECKS.md`, `PRODUCT_AUDIT.md`, `ROTATION_RUNBOOK.md`, `STATUS.md`, `USER_NOTICE.md`, `docs/COMPLETION_ROADMAP.md`.
+`records/AUDIT.md`, `COMPROMISE_CHECKS.md`, `HOTFIX_DEPLOY.md`, `HOTFIX2_DEPLOY.md`, `MERGE_PLAN.md`, `POST_DEPLOY_80.md`, `PROD_CHECKS.md`, `PRODUCT_AUDIT.md`, `PRODUCT_BACKLOG.md`, `STATUS.md`, `USER_NOTICE.md`, `COMPLETION_ROADMAP.md`.
 
 ## Keeping docs correct
 

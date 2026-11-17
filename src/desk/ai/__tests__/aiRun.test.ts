@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-vi.mock("../../api/client", () => ({ authHeaders: async () => ({ Authorization: "Bearer t" }) }));
+vi.mock("../../api/authHeaders", () => ({ authHeaders: async () => ({ Authorization: "Bearer t" }) }));
 import { AiRunError, runAi, runAiText } from "../aiRun";
 import type { RouterEvent } from "../../../platform/router/types";
 

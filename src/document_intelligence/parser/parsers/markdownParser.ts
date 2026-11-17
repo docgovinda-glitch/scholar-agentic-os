@@ -80,7 +80,6 @@ export class MarkdownParser implements Parser {
       const blocks = this.parseBlocks(text);
 
       // Generate outline
-      const outline = this.generateOutline(blocks);
 
       // Extract links/images
       const references = this.extractReferences(text);
@@ -276,18 +275,6 @@ export class MarkdownParser implements Parser {
     return blocks;
   }
 
-  /**
-   * Generate document outline from headings.
-   */
-  private generateOutline(blocks: MarkdownBlock[]): MarkdownOutline[] {
-    return blocks
-      .filter((b) => b.type === "heading")
-      .map((block, index) => ({
-        heading: block.text,
-        level: block.level || 1,
-        position: index,
-      }));
-  }
 
   /**
    * Extract links and images from text.

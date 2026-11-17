@@ -19,7 +19,7 @@ For local work leave `VITE_CAPTCHA_SITE_KEY` empty: the placeholder value in `.e
 | Command | Purpose |
 | :--- | :--- |
 | `npm run dev` | `tsx server.ts`: Express plus Vite middleware (HMR) on port 3000; `PORT` overrides |
-| `npm run lint` | `tsc --noEmit`, `verify-contrast`, `verify-csp-hash`, `verify-no-pure-black`, `verify-no-raw-hex-classes` |
+| `npm run lint` | `tsc --noEmit` (strict, with `noUnusedLocals`: an unused import or local fails the gate), `verify-contrast`, `verify-csp-hash`, `verify-no-pure-black`, `verify-no-raw-hex-classes` |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm test` | `vitest run` (whole suite, several minutes) |
 | `npx vitest run <path>` | One file or folder; prefer this while iterating |
@@ -41,7 +41,7 @@ For local work leave `VITE_CAPTCHA_SITE_KEY` empty: the placeholder value in `.e
 
 - Unit and route tests live in `__tests__/` folders next to the code (`src/**`, `server/**`); Vitest 4 with jsdom, Testing Library and `src/testSetup.ts`. `e2e/**` is excluded from Vitest.
 - `src/__tests__/singleBrainGuardian.test.ts` fails the suite if the single-brain rules are broken ([`AI-SYSTEM.md`](AI-SYSTEM.md) §1).
-- Some tests need real credentials or network and fail without them (`authIntegration`, `liveNetworkDiagnostics`, `productionFinalAcceptance`, `AddSourceModal`, `selfServiceAuthConflict6`). Do not mock away their purpose; confirm your change adds no new failures.
+- Tests that need real credentials or network (`authIntegration`, `liveNetworkDiagnostics`, `productionFinalAcceptance`, the live provider tests) skip themselves when those are absent; the suite is expected to pass with no failures. Do not mock away their purpose.
 - Database SQL is exercised by `scripts/db/replay-migrations.sh` against a local Supabase (never hosted).
 - End-to-end specs: sign-in, privacy, every workspace, AI drafting with a stand-in AI server (`e2e/stub-ai/server.mjs`), Presentation Studio, accessibility and keyboard.
 - GitHub workflows: `ci.yml` (lint, `npm audit --omit=dev --audit-level=high`, test, build on PRs to `main`), `e2e.yml`, `slide-parity.yml`, `deploy.yml`, `uptime.yml` ([`DEPLOYMENT.md`](DEPLOYMENT.md)).
@@ -50,7 +50,7 @@ For local work leave `VITE_CAPTCHA_SITE_KEY` empty: the placeholder value in `.e
 
 - Strict TypeScript: no `any` without a reason, no `@ts-ignore` to hide a real error. `@/*` maps to the repository root, not `src/`. Validate external input with zod.
 - Keep components small; put pure logic in `src/domain/` or services; add or update tests beside the code.
-- Server code imports shared modules from `src/` (formatters, `document_intelligence`, mesh agents, platform gateway); keep them free of browser-only APIs.
+- Server code imports shared modules from `src/` (formatters, `document_intelligence`, mesh agents, the platform router); keep them free of browser-only APIs.
 - AI: add capability as a method on `scholarBrain` only; never import `server/utils/llm.ts` elsewhere; never add subject templates, canned outlines or keyword-to-framework tables.
 - Any server-side fetch of a user-supplied URL goes through `server/utils/ssrfGuard.ts`.
 - Request bodies must never carry provider credentials; a user's key is a transient `x-ai-*` header on AI routes only.
@@ -58,7 +58,7 @@ For local work leave `VITE_CAPTCHA_SITE_KEY` empty: the placeholder value in `.e
 - Do not store raw proprietary full texts beyond what a feature needs; the Vault keeps structured metadata and the parsed text required for the feature.
 - Comments explain why the current code works, not its history.
 - Database changes: a new timestamped file in `supabase/migrations/`; never edit an applied migration; prove it with `scripts/db/replay-migrations.sh` on a local database.
-- Security-sensitive areas (auth middleware, RLS and migrations, `credentialVault`, `ssrfGuard`, CSP, proxies): preserve fail-closed behaviour and add a test.
+- Security-sensitive areas (auth middleware, RLS and migrations, `userKeyVault`, `ssrfGuard`, CSP, proxies): preserve fail-closed behaviour and add a test.
 - Docs: update the matching file in `docs/` in the same pull request as the behaviour change.
 
 ## 6. Branch and release flow

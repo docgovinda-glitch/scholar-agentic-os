@@ -4,7 +4,7 @@ Project memory for Claude Code. Keep it short and accurate; update it when comma
 
 ## SINGLE-BRAIN ARCHITECTURE INVARIANT
 
-`server/src/services/scholarBrain.ts` is the ONLY AI brain, powering every workspace (OT-01, OT-07, OT-10, OT-15, OT-22). Only it may import `server/utils/llm.ts`; routes and services import `callOpenRouterJSON` / `callOpenRouterText` / `streamOpenRouterJSON` / `routedCompletion` from `scholarBrain.ts` (logged wrappers, not bare re-exports; Coursework routes never import `routerBridge` directly, guardian test). No workspace may add its own prompt engine, regex outline generator or subject-to-theory lookup table. New AI capability = new method on `scholarBrain`. Always follow `.claude/agents/single-brain-guardian.md` and `.claude/skills/single-brain-guardian/SKILL.md`.
+`server/src/services/scholarBrain.ts` is the ONLY AI brain, powering every workspace (OT-01, OT-07, OT-10, OT-15, OT-22). Only it may import `server/utils/llm.ts`; routes and services import `callOpenRouterJSON` / `callOpenRouterText` / `streamOpenRouterJSON` / `routedCompletion` from `scholarBrain.ts` (logged wrappers, not bare re-exports). No route or server module takes `routedCompletion` / `routedText` from `routerBridge` (guardian test; its keyring, availability and decorator exports are plumbing and fine to import). No file under `server/routes/` holds prompt text: prompts live in `server/src/services/prompts/` (`courseworkPrompts`, `journalPrompts`, `thesisPrompts`, `proposalPrompts`, `presentationPrompts`), reached as `scholarBrain.<workspace>Prompts` (guardian test). No workspace may add its own prompt engine, regex outline generator or subject-to-theory lookup table. New AI capability = new method on `scholarBrain`. Always follow `.claude/agents/single-brain-guardian.md` and `.claude/skills/single-brain-guardian/SKILL.md`.
 
 **Permanently banned** (enforced by `src/__tests__/singleBrainGuardian.test.ts`, which fails `npm test`): the Quantum literature catalog (`quantumComputingCatalog` / `QUANTUM_COMPUTING_CATALOG`), the Zappos/Schein canned content (any `Zappos` string anywhere in `src/**`, `server/**` or `server.ts`; brief sanitizer, scope classifier and slide generator included), keyword-to-framework tables (e.g. "Bilateral Economic Interdependence Model"), and any direct `utils/llm` import outside `scholarBrain.ts`. Target frameworks come only from AI output or the student's own edits.
 
@@ -18,7 +18,7 @@ Four phases plus submission; everything is derived from the student's brief, nev
 
 ## Journal Writing Studio (OT-10)
 
-`ManuscriptStudioMode.tsx` + `src/desk/journal/studio/` (`useManuscriptTexts`, `PolishDialog`, `ManuscriptReader`); pure logic in `src/domain/journal/` (`manuscriptModel.ts`, `manuscriptText.ts`, `studioEvidence.ts`). `manuscript_markdown` is the one manuscript key: read it only with `readManuscriptMarkdown`, write it only with `manuscriptAnswerPatch` (legacy `full_text_markdown` / `assembled_draft` / `manuscript_draft` are fallbacks, blanked on save). Count words with `countManuscriptWords`; format references with `citedReferences` (project style). Every AI-drafted manuscript section (this studio's `/agentic/draft-subsection` and the desk's `/manuscript/next-section` job) goes through the one section drafter, `scholarBrain.draftSection` (`server/src/services/sectionDrafter.ts`); do not add another. It returns `[CITE:id]` tokens and saves nothing; `/agentic/final-editor` with `{ text }` returns a passage and saves nothing. Journal prompt text lives in `server/src/services/prompts/journalPrompts.ts` (`scholarBrain.journalPrompts`). The pipeline is mounted only at `/api/projects/:id/agentic`.
+`ManuscriptStudioMode.tsx` + `src/desk/journal/studio/` (`useManuscriptTexts`, `PolishDialog`, `ManuscriptReader`); pure logic in `src/domain/journal/` (`manuscriptModel.ts`, `manuscriptText.ts`, `studioEvidence.ts`). `manuscript_markdown` is the one manuscript key: read it only with `readManuscriptMarkdown`, write it only with `manuscriptAnswerPatch` (legacy `full_text_markdown` / `assembled_draft` / `manuscript_draft` are fallbacks, blanked on save). Count words with `countManuscriptWords`; format references with `citedReferences` (project style). Every AI-drafted manuscript section (this studio's `/agentic/draft-subsection` and the desk's `/manuscript/next-section` job) goes through the one section drafter, `scholarBrain.draftSection` (`server/src/services/sectionDrafter.ts`); do not add another. It returns `[CITE:id]` tokens and saves nothing; `/agentic/final-editor` with `{ text }` returns a passage and saves nothing. Journal prompt text (section drafting, polish, peer review, rebuttal, copilot) lives in `server/src/services/prompts/journalPrompts.ts` (`scholarBrain.journalPrompts`). Every `/agentic` endpoint has a caller in the app; do not add one without it. The pipeline is mounted only at `/api/projects/:id/agentic`.
 
 ## Retrieval, Ask Scholar and hand-off
 
@@ -42,7 +42,7 @@ Node 22 (Dockerfile and every GitHub workflow; Node 20 has no global `WebSocket`
 ```bash
 npm ci                     # install (lockfile-exact)
 npm run dev                # tsx server.ts → Express + Vite middleware (HMR) on :3000
-npm run lint               # tsc --noEmit + contrast, CSP-hash, no-pure-black, no-raw-hex-class checks (== .husky/pre-commit & CI gate)
+npm run lint               # tsc --noEmit (noUnusedLocals) + contrast, CSP-hash, no-pure-black, no-raw-hex-class checks (== .husky/pre-commit & CI gate)
 npm run typecheck          # typecheck only (tsc --noEmit)
 npm test                   # vitest run (whole suite, ~3 min)
 npx vitest run path/to/file.test.ts   # single file — prefer this while iterating
@@ -52,7 +52,7 @@ npm run verify:contrast    # WCAG checks over tokens in src/index.css
 npm run verify:csp-hash    # inline theme script in index.html must match hash in server.ts
 ```
 
-Known baseline: ~18 tests in 5 files fail without real credentials/network (`authIntegration`, `liveNetworkDiagnostics`, `productionFinalAcceptance`, `AddSourceModal`, `selfServiceAuthConflict6`). Don't "fix" them by mocking away their purpose; just confirm your change doesn't add new failures.
+Baseline: `npm test` passes with no failures in a checkout without credentials (tests that need real credentials or network skip themselves: `authIntegration`, `liveNetworkDiagnostics`, `productionFinalAcceptance`, the live provider tests). Don't mock away their purpose; a new failure is yours.
 
 ## Architecture
 
@@ -75,7 +75,8 @@ src/app/                  Client-side engines: mesh/ (agent registry + executor,
 src/domain/               Pure domain models/schemas (zod) — no React, no I/O
 src/platform/             router/ (the one AI engine: adapters, fallback, key rotation, model listing/curation),
                           completion.ts (the Completer app modules receive), warden/ (policy/classification, used by the mesh)
-src/citation_compliance/  Formatters (APA7, IEEE, MLA9, Chicago, Harvard, Vancouver) + BibTeX/RIS importers
+src/citation_compliance/  The one citation engine: formatters (APA7, IEEE, MLA9, Chicago, Harvard, Vancouver) + BibTeX/RIS
+                          importers (the Vault's Add Source dialog reads pasted records through `src/desk/vault/referenceImport.ts`)
 src/services/             Client services (auth, vault, store, offline, crypto, serverWarmup …)
 supabase/                 schema*.sql, migrations/ (timestamped), functions/ (Deno Edge Functions,
                           excluded from tsconfig)
@@ -85,7 +86,7 @@ supabase/                 schema*.sql, migrations/ (timestamped), functions/ (De
 - Server code imports shared modules from `src/` (citation formatters, document_intelligence, mesh agents) — keep those modules free of browser-only APIs.
 - **Supabase**: Auth (GoTrue), Postgres with RLS, private storage buckets, Edge Functions (Resend email, search proxies). The server persists through Supabase's HTTPS Data API (`server/src/supabaseRest.ts`) using `VITE_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`; `DATABASE_URL` direct Postgres is an optional fallback only.
 - **AI**: AI Access has two tiers, Local and BYOK (Premium is "Coming soon" in the UI and has no code). One engine, `src/platform/router`; every workspace reads one central setting (keys + model per provider). 37 cloud providers (`src/config/providerCatalog.ts`) and the local runners map onto the router (`providerMap`); models are listed live from the provider (`/api/ai/models`), never named in code, and a provider with no chosen model uses the best one it lists ("auto"). The server also reads the signed-in user's saved keys (`accountAi`), so a new device works on its first request. App modules (`src/app/*`) take a `Completer` (`src/platform/completion.ts`): the server builds it in `server/src/ai/browserHandoff.ts`, the browser in `src/desk/ai/completer.ts`. LangChain/LangGraph for graph workflows. Request bodies must never carry provider credentials (`rejectClientCredentials`); a user's own key reaches the server only as transient `x-ai-*` headers on AI routes (`routeUsesClientAi` in `src/desk/api/client.ts`).
-- Deeper docs (kept in step with the code; update them in the same PR as the change): `docs/README.md` (index), `docs/ARCHITECTURE.md`, `docs/API.md`, `docs/DATA-MODEL.md`, `docs/WORKFLOWS.md`, `docs/AI-SYSTEM.md`, `docs/AI-CALL-MAP.md`, `docs/UI-UX.md`, `docs/DEVELOPMENT.md`, `docs/DEPLOYMENT.md`, `SYSTEM_MAP.md`, `SETUP.md`, `RUNBOOK.md`. Security history (dated records, not current behaviour): `AUDIT.md`, `ROTATION_RUNBOOK.md`, `HOTFIX*_DEPLOY.md`.
+- Deeper docs (kept in step with the code; update them in the same PR as the change): `docs/README.md` (index), `docs/ARCHITECTURE.md`, `docs/API.md`, `docs/DATA-MODEL.md`, `docs/WORKFLOWS.md`, `docs/AI-SYSTEM.md`, `docs/AI-CALL-MAP.md`, `docs/UI-UX.md`, `docs/DEVELOPMENT.md`, `docs/DEPLOYMENT.md`, `SYSTEM_MAP.md`, `SETUP.md`, `RUNBOOK.md`. Dated records (not current behaviour) live in `docs/records/` (`AUDIT.md`, `STATUS.md`, `PRODUCT_AUDIT.md`, `HOTFIX*_DEPLOY.md`, ...); `ROTATION_RUNBOOK.md` stays at the root.
 
 ## Slides & Keynotes (Presentation Studio, OT-22)
 
@@ -101,8 +102,8 @@ supabase/                 schema*.sql, migrations/ (timestamped), functions/ (De
 ## UI conventions
 
 - React 19 + TypeScript, Tailwind CSS v4 via `@tailwindcss/vite` (no tailwind.config; tokens live in `src/index.css` `@theme` / `:root`).
-- Use semantic CSS tokens (`--bg-*`, `--surface-*`, `--text-*`, `--border-*`, `--accent*`, `--state-*`, `--theme-*`), not raw hex colors; lint rejects `#000000` and raw hex Tailwind classes (`bg-[#…]`) in app code. Dark mode = `data-theme="dark"` / `.dark` (custom variant). Changing a token must still pass `verify:contrast`.
-- Icons: `lucide-react`; animation: `motion`; editor: TipTap.
+- Use semantic CSS tokens (`--bg-*`, `--surface-*`, `--text-*`, `--border-*`, `--accent*`, `--state-*`, `--theme-*`), not raw hex colors; lint rejects `#000000` and raw hex Tailwind classes (`bg-[#…]`) in app code (`src/desk`, `src/components`, `src/admin`, `src/features/coursework`, `src/features/understand`; deck themes carry colours as data). Dark mode = `data-theme="dark"` / `.dark` (custom variant). Changing a token must still pass `verify:contrast`.
+- Icons: `lucide-react`; animation: CSS transitions/keyframes in `src/index.css` (no animation library); editor: TipTap.
 - If you edit the inline theme script in `index.html`, update `INLINE_THEME_SCRIPT_CSP_HASH` in `server.ts` (lint will fail otherwise).
 - Heavy libs are split via `manualChunks` in `vite.config.ts`; lazy-load large features.
 
@@ -123,5 +124,6 @@ Template: `.env.example` (all real `.env*` files are gitignored). Full inventory
 2. **Never** push directly to `main`. Work on a branch; before pushing run `npm run lint` (must pass) and the relevant tests; run `npm run build` when touching build config, server entry, or imports shared between client and server.
 3. Strict TypeScript: no `any` without justification, no `@ts-ignore` to silence real errors. Validate external input with zod.
 4. Keep components small and modular; put pure logic in `src/domain` / services, not in components. Add or update tests next to the code (`__tests__/`).
-5. Security-sensitive areas (auth middleware, RLS/migrations, credentialVault, ssrfGuard, CSP, proxies) need extra care: preserve fail-closed behavior and add a test for the change.
-6. New DB changes go in a new timestamped file under `supabase/migrations/`; never edit an applied migration.
+5. Security-sensitive areas (auth middleware, RLS/migrations, userKeyVault, ssrfGuard, CSP, proxies) need extra care: preserve fail-closed behavior and add a test for the change.
+6. New DB changes go in a new timestamped file under `supabase/migrations/`; never edit an applied migration. Check it with `scripts/db/replay-migrations.sh` against a local Postgres or `supabase start` (never production).
+7. Dead code is not kept "for later": a module nothing reachable from `server.ts` or `src/main.tsx` imports, or an endpoint no client calls, is removed with its tests.

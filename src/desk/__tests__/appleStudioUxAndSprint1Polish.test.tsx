@@ -14,13 +14,8 @@ import assignmentRouter, {
   deriveHeuristicTitle,
   healCorruptedProjectStructure,
 } from "../../../server/routes/project/assignment";
-import {
-  registerProjectRoutes,
-  projectView,
-  recomputeG2,
-  recomputeG4,
-  recomputeG6,
-} from "../../../server/routes/project";
+import { registerProjectRoutes } from "../../../server/routes/project";
+import { projectView, recomputeG2, recomputeG4, recomputeG6 } from "../../../server/routes/project/core/projectHelpers";
 
 describe("Apple-Grade Studio UX Unification & Sprint 1 Production Polish", () => {
   beforeEach(() => {
@@ -164,7 +159,7 @@ describe("Apple-Grade Studio UX Unification & Sprint 1 Production Polish", () =>
       expect(deriveHeuristicTitle("CS 7015: Distributed Consensus Protocols")).toContain("CS7015");
     });
 
-    it("exports registerProjectRoutes and gate recomputers from modularized server/routes/project.ts", () => {
+    it("exports registerProjectRoutes from server/routes/project.ts and the gate recomputers from core/projectHelpers.ts", () => {
       expect(typeof registerProjectRoutes).toBe("function");
       expect(typeof projectView).toBe("function");
       expect(typeof recomputeG2).toBe("function");

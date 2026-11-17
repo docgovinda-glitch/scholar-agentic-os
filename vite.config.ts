@@ -53,7 +53,7 @@ export default defineConfig(() => {
               if (id.includes('@supabase')) {
                 return 'supabase';
               }
-              if (id.includes('lucide-react') || id.includes('/motion/') || id.includes('framer-motion')) {
+              if (id.includes('lucide-react')) {
                 return 'ui';
               }
               if (id.includes('node_modules/docx/')) {

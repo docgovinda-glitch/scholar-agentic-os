@@ -127,10 +127,10 @@ describe("SQL Runbooks & Hotfix Migrations — Schema & Column Verification", ()
 
   it("ensures COMPROMISE_CHECKS.md, PROD_CHECKS.md, and HOTFIX_DEPLOY.md do not reference any non-existent column names", () => {
     const docs = [
-      "COMPROMISE_CHECKS.md",
-      "PROD_CHECKS.md",
-      "HOTFIX_DEPLOY.md",
-      "HOTFIX2_DEPLOY.md",
+      "docs/records/COMPROMISE_CHECKS.md",
+      "docs/records/PROD_CHECKS.md",
+      "docs/records/HOTFIX_DEPLOY.md",
+      "docs/records/HOTFIX2_DEPLOY.md",
     ];
 
     const forbiddenPatterns = [

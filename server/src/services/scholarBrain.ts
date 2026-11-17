@@ -14,6 +14,9 @@
 
 import * as courseworkPrompts from "./prompts/courseworkPrompts.ts";
 import * as journalPrompts from "./prompts/journalPrompts.ts";
+import * as thesisPrompts from "./prompts/thesisPrompts.ts";
+import * as proposalPrompts from "./prompts/proposalPrompts.ts";
+import * as presentationPrompts from "./prompts/presentationPrompts.ts";
 import { draftSection, priorSectionsContext, researchContextFromAnswers } from "./sectionDrafter.ts";
 import { searchEuropePmc } from "../../../src/shared/retrieval/providers.ts";
 import { buildAskGeneralPrompt, buildAskSearchPrompt } from "../../../src/shared/askPrompts.ts";
@@ -27,7 +30,6 @@ import {
 import type { CompletionTask as TaskClass } from "../../../src/platform/completion.ts";
 import { applyScholarGuardrails } from "../../../src/shared/scholarGuardrails.ts";
 import { parseAndRepairLLMJson } from "../../../src/shared/llmJsonParser.ts";
-import { chunkAndRerankEvidence } from "./semanticRagEngine.ts";
 import { runAgent } from "../../../src/app/mesh/executor.ts";
 import { ag14CitationManager } from "../../../src/app/mesh/agents/ag14CitationManager.ts";
 import { ag18ReadabilityAnalyst } from "../../../src/app/mesh/agents/ag18ReadabilityAnalyst.ts";
@@ -57,7 +59,6 @@ import {
   formatCitationLedger,
   type VerifiedSourceItem,
   type ScrubResult,
-  type ChronologicalWarning,
 } from "../utils/citationLockScrubber.ts";
 import { CitationStyleRegistry } from "../../../src/citation_compliance/formattingEngine.ts";
 import type { CanonicalReference, ReferenceAuthor } from "../../../src/citation_compliance/model/reference.ts";
@@ -70,7 +71,6 @@ import {
   parseQuestionMarks,
   countExactWords,
   type BriefQuestionInput,
-  type QuestionWordBudget,
   type MarkAllocationResult,
 } from "../utils/wordBudgetAllocator.ts";
 
@@ -458,8 +458,13 @@ export const scholarBrain = {
   /** Coursework (OT-01) prompt text: routes read prompts from here, never write their own. */
   courseworkPrompts,
 
-  /** Manuscript prompt text: section drafting and polishing. */
+  /** Journal (OT-10) prompt text: section drafting, polishing, peer review, rebuttal, copilot. */
   journalPrompts,
+
+  /** Thesis (OT-07), Proposal (OT-15) and Presentation Studio (OT-22) prompt text. */
+  thesisPrompts,
+  proposalPrompts,
+  presentationPrompts,
 
   /**
    * The one section drafter: every manuscript section the AI writes (the

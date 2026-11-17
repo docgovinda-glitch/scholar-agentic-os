@@ -5,7 +5,7 @@
  */
 
 import { doiUrl, endSentence, familyGiven, givenFamily, journalOf, pageRange, publisherOf, quotedTitle, sortedAuthors } from "./bibParts";
-import type { CitationStyle, InTextOptions } from "../formattingEngine";
+import type { CitationStyle, InTextOptions } from "../styleTypes";
 import type { CanonicalReference } from "../model/reference";
 
 // ============================================================================

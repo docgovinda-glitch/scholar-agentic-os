@@ -5,6 +5,22 @@ All notable changes to the Scholar Agentic OS project are documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2026-11-17
+
+### Repository audit: one brain, less code, honest states
+- **Every AI completion goes through `scholarBrain`.** The journal blueprint, citation-support and journal-profile routes, the Ask routes and the admin opportunity agent called the router bridge directly; they now use the brain's logged wrapper, and a guardian test fails the suite if a route or server module does otherwise.
+- **Prompts in one place.** The system prompts that lived in the journal, thesis, proposal and presentation route files moved, unchanged, to `server/src/services/prompts/` (`journalPrompts`, `thesisPrompts`, `proposalPrompts`, `presentationPrompts`). No route file holds prompt text (guardian test).
+- **Endpoints with no caller removed.** The older journal pipeline steps under `/agentic` (`gaps`, `titles`, `vault-sources`, `evidence-extraction`, `external-research`, `evidence-analysis`, `journal-discovery`, `journal-requirements`, `evidence`, `revision`, `citation-audit`, `originality-check`, `critiques`, `export/rebuttal-letter`), `POST /api/drafting/section` and `POST /api/ai/deep-research` (deep research is a mode of `/api/ai/agent`). `PUT /agentic/evidence` answered `ok` without saving anything.
+- **Unreachable code removed.** 68 files that nothing reachable from `server.ts` or `src/main.tsx` imported (an older Vault screen and its import, OCR, transcription and export services, an unused job queue and text index, a second citation registry, a template-based outline generator, unused layouts), with the tests that only exercised them. Four unused dependencies (`@google/genai`, `@langchain/openai`, `motion`, `autoprefixer`) and the stale generated database types are gone.
+- **One BibTeX/RIS reader.** The Vault's Add Source dialog parsed BibTeX with its own regular expressions and could not read RIS. It now uses the shared citation importers for both; authors are filled one name each (`Yann LeCun`), where `LeCun, Yann` was saved as two authors.
+- **A failed save is not shown as saved.** Presentation Studio reported "All changes saved" when the save request failed and read the sign-in token from browser storage by hand. It now uses the shared authenticated client, shows "Not saved" on failure and "Sign in to save" to a signed-out visitor, and warns before leaving with an unsaved failure. The autosave badge uses the design tokens.
+- **Source Library** shows "Loading your sources" instead of "Your Source Library is empty" while it loads.
+- **Lint is stricter.** 300 unused imports and locals were removed and `noUnusedLocals` is on, so new ones fail `npm run lint`. The route modules and the API client no longer import each other in a cycle.
+- **Database.** Migration `20261117120000_index_project_foreign_keys.sql` indexes foreign keys that had no index (additive; not yet applied to production). The whole migration history was replayed on PostgreSQL 16 and on a local Supabase.
+- **Presentation header.** The save badge and labelled buttons no longer overlap or clip the step tabs; the badge collapses to its status dot until there is room, and a failed save stays visible at every width. The version chip regained AA contrast. The unreachable landing page and its route were removed; the runtime import cycle through it is gone.
+- **Database verified against production** (read-only): all 46 migrations applied, tables, columns, RLS, policies and effective privileges match the repo; only the new index migration is pending.
+- **Documentation.** Dated incident, audit and status records moved to `docs/records/`. The living documents were corrected against the code (removed Premium flows, modules and endpoints that no longer exist, the migration process).
+
 ## [Unreleased] - 2026-10-30
 
 ### Journal Article Workshop rebuild

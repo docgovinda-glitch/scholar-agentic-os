@@ -5,7 +5,7 @@
  */
 
 import { pageRange } from "./bibParts";
-import type { CitationStyle, InTextOptions } from "../formattingEngine";
+import type { CitationStyle, InTextOptions } from "../styleTypes";
 import { authorDateYear, type CanonicalReference, type ReferenceAuthor } from "../model/reference";
 
 // ============================================================================

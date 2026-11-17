@@ -1,4 +1,3 @@
-import React from 'react';
 import type { VisualMotif, SlideTheme } from '../types/themes';
 import SlideCreativeSketchIllustration from './SlideCreativeSketchIllustration';
 

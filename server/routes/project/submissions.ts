@@ -1,6 +1,6 @@
 import express from "express";
 import crypto from "crypto";
-import { asyncRoute, loadOwnedProject, getSharedStore } from "../project.ts";
+import { asyncRoute, loadOwnedProject, getSharedStore } from "./core/projectHelpers.ts";
 import { addSubmission, updateSubmission, deleteSubmission, SubmissionError } from "../../../src/domain/submission/submissions.ts";
 import { SUBMISSION_STATUSES } from "../../../src/domain/submission/types.ts";
 import type { SubmissionRecord } from "../../../src/domain/submission/types.ts";

@@ -4,11 +4,10 @@ import {
   asyncRoute, 
   loadOwnedProject, 
   getSharedStore, 
-  projectView, 
   recomputeG2,
   recomputeG4,
   recomputeG6
-} from "../project.ts";
+} from "./core/projectHelpers.ts";
 import { 
   discoverSource, 
   extractEvidence, 

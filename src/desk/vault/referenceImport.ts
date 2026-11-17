@@ -1,17 +1,16 @@
 /**
- * Turns a pasted BibTeX or RIS export into Vault items.
+ * Turns a pasted BibTeX or RIS record into Vault fields.
  *
- * VaultSetupScreen's "Import an existing library" option (Zotero, Mendeley,
- * EndNote, BibTeX — docs 25 §6.1) has been sitting there labelled "not
- * available yet" since Vault setup shipped. It still is, as an onboarding
- * path — but the parsing it needs already existed, complete and pure, in
- * src/citation_compliance's importers: BibTeX directly, and RIS covers
- * Zotero/Mendeley/EndNote's own export format. Nothing here re-implements
- * parsing; it only adapts `CanonicalReference` (that engine's model) into
- * the {title, content, citation} shape VaultItem uses.
+ * Parsing belongs to the shared citation engine (src/citation_compliance's
+ * importers: BibTeX directly, RIS for Zotero / Mendeley / EndNote exports).
+ * Nothing here re-implements it; this module only adapts `CanonicalReference`
+ * into the shapes the Vault UI uses. The Add Source dialog is the caller.
  */
 
-import { APA7Formatter, importBibTex, importRis, type CanonicalReference } from "../../citation_compliance";
+import { APA7Formatter } from "../../citation_compliance/formatters/apa7";
+import { importBibTex } from "../../citation_compliance/importers/bibtexImporter";
+import { importRis } from "../../citation_compliance/importers/risImporter";
+import type { CanonicalReference } from "../../citation_compliance/model/reference";
 
 export interface ParsedReferenceItem {
   title: string;
@@ -61,4 +60,39 @@ export function parseReferences(source: string): ImportPreview {
   }
   const result = format === "bibtex" ? importBibTex(source) : importRis(source);
   return { items: result.references.map(toItem), warnings: result.warnings };
+}
+
+/** The fields the Add Source form fills from one pasted reference. */
+export interface PastedReferenceFields {
+  format: "bibtex" | "ris";
+  title: string;
+  /** Full names in reading order ("Yann LeCun"), one per author. */
+  authors: string[];
+  year: string;
+  journal: string;
+  publisher: string;
+  doi: string;
+  url: string;
+}
+
+/** The first reference in a pasted BibTeX or RIS record, or null when the text is neither or holds no entry. */
+export function parsePastedReference(source: string): PastedReferenceFields | null {
+  const format = detectReferenceFormat(source);
+  if (format === null) return null;
+  // A single-line field flattens a pasted RIS record: put each tag back on its own line.
+  const ris = format === "ris" && !/\n/.test(source.trim()) ? source.replace(/\s+(?=[A-Z][A-Z0-9]\s{1,2}-(\s|$))/g, "\n") : source;
+  const ref = (format === "bibtex" ? importBibTex(source) : importRis(ris)).references[0];
+  if (!ref) return null;
+  return {
+    format,
+    title: ref.title ?? "",
+    authors: ref.authors
+      .map((a) => [a.firstName, a.middleName, a.lastName].filter(Boolean).join(" ").trim())
+      .filter((name) => name.length > 0),
+    year: ref.year ?? "",
+    journal: ref.journal ?? ref.source ?? "",
+    publisher: ref.publisher ?? "",
+    doi: ref.doi ?? "",
+    url: ref.url ?? "",
+  };
 }

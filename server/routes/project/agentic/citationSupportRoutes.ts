@@ -1,5 +1,5 @@
 import express from "express";
-import { routedCompletion } from "../../../src/ai/routerBridge.ts";
+import { routedCompletion } from "../../../src/services/scholarBrain.ts";
 import { sendAiFailure } from "../../../src/ai/aiRouteErrors.ts";
 import { studioEvidence } from "../../../../src/domain/journal/studioEvidence.ts";
 import { readManuscriptMarkdown } from "../../../../src/domain/journal/manuscriptText.ts";

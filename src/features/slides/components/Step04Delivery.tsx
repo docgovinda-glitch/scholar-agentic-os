@@ -2,7 +2,7 @@
  * Step 04 · Present — stage preview, leave-behind reading view and every
  * export path (PowerPoint, PDF, Markdown, JSON), all drawn by the gamma engine.
  */
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, FileJson, FileText, Play, Printer, Timer } from 'lucide-react';
 import type { SlideDeck, SlideViewMode } from '../types/slides';

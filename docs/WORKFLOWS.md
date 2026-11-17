@@ -74,7 +74,7 @@ Four steps (Understand, Design, Edit Slides, Present) and the card engine are do
 
 ## 8. Knowledge Vault (`/vault`)
 
-`VaultScreen` has tabs `projects`, `sources` and `settings`; `SourceLibraryScreen` and `KnowledgeVault` show sources, `AddSourceModal` adds them.
+`KnowledgeVault` and `SourceLibraryScreen` show sources; `AddSourceModal` adds them from a URL, DOI, pasted BibTeX or RIS record (read by the shared `citation_compliance` importers), cloud drive or manual entry.
 
 1. **Set-up**: passphrase and recovery code, storage mode `local` or `synced` (`src/services/userVault.ts`, table `user_vaults`). The vault can be locked and unlocked per session.
 2. **Add a source**: DOI (`POST /api/vault/lookup-doi`, or `POST /api/lookup-doi`), file upload (`POST /api/vault/parse-file`, ≤ 10 MB), URL (`POST /api/vault/parse-url`, SSRF-guarded), BibTeX or RIS (`src/citation_compliance/importers/`, `referenceImport.ts`), Zotero and Mendeley sync (`POST /api/vault/zotero/sync`, `/mendeley/sync`), Google Drive and OneDrive file listing (`GET /api/vault/drive/files`, `/onedrive/files`) with stored connections (`/api/vault/cloud/connections`).
@@ -87,7 +87,7 @@ Four steps (Understand, Design, Edit Slides, Present) and the card engine are do
 1. Overview shows what is connected and the active routing. Providers lists the catalogued cloud providers and local runners.
 2. For a cloud provider the user adds a key and verifies it (`POST /api/ai-access/models` discovers models from the provider with that key); the key can be saved to the account for other devices (`PUT /api/ai-access/keys/:providerId`).
 3. For a local runner the browser probes `localhost` (`src/services/localRunnerProbe.ts`) and hardware can be profiled (`hardwareProfiler.ts`).
-4. Subscription lets the user see Premium plans and send, view or cancel a request (`/api/ai-access/premium-*`).
+4. Premium is shown as "Coming soon"; there is no Premium code or endpoint.
 5. Preferences set default routing. During onboarding the same page appears with continue and skip actions.
 
 ## 10. Ask Scholar (`/projects`)

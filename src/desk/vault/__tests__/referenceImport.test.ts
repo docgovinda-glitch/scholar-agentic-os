@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { detectReferenceFormat, parseReferences } from "../referenceImport";
+import { detectReferenceFormat, parsePastedReference, parseReferences } from "../referenceImport";
 
 const BIBTEX = `@article{smith2020ai,
   author = {Smith, John and Doe, Jane},
@@ -70,5 +70,23 @@ describe("parsing into Vault items", () => {
     const noAuthor = `@misc{x, title = {Untitled Finding}, year = {2021}}`;
     const { items } = parseReferences(noAuthor);
     expect(items[0].content).toContain("Unknown author");
+  });
+});
+
+describe("one pasted reference for the Add Source form", () => {
+  it("reads a BibTeX entry with nested braces and several authors", () => {
+    const ref = parsePastedReference(BIBTEX);
+    expect(ref).toMatchObject({ format: "bibtex", title: "The Rise of AI in Research", year: "2020", journal: "Journal of Computing", doi: "10.1234/abcd" });
+    expect(ref?.authors).toEqual(["John Smith", "Jane Doe"]);
+  });
+
+  it("reads a RIS record, also when a single-line field flattened it", () => {
+    expect(parsePastedReference(RIS)).toMatchObject({ format: "ris", title: "The Rise of AI in Research", authors: ["John Smith"], year: "2020" });
+    expect(parsePastedReference(RIS.replace(/\n/g, " "))).toMatchObject({ format: "ris", title: "The Rise of AI in Research", authors: ["John Smith"], year: "2020" });
+  });
+
+  it("returns null for text that is not a reference record", () => {
+    expect(parsePastedReference("https://example.org/paper")).toBeNull();
+    expect(parsePastedReference("@article{broken")).toBeNull();
   });
 });

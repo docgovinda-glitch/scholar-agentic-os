@@ -5,7 +5,6 @@ describe("routeUsesClientAi: the user's AI key is sent only to AI routes", () =>
   it.each([
     "/api/ai/search",
     "/api/ai",
-    "/api/drafting/section",
     "/api/projects/p1/agentic/draft-subsection",
     "/api/projects/p1/agentic/literature",
     "/api/projects/p1/assignment/stream-section",

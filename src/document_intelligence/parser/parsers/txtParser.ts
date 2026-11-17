@@ -53,7 +53,6 @@ export class TXTParser implements Parser {
       const normalizedText = this.normalizeLineEndings(text).normalize("NFC");
 
       // Extract structure
-      const paragraphs = this.extractParagraphs(normalizedText);
       const pages = this.estimatePages(normalizedText);
 
       // Extract metadata
@@ -170,15 +169,6 @@ export class TXTParser implements Parser {
     return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   }
 
-  /**
-   * Extract paragraphs from text.
-   */
-  private extractParagraphs(text: string): Array<{ text: string }> {
-    return text
-      .split(/\n\n+/)
-      .filter((p) => p.trim().length > 0)
-      .map((p) => ({ text: p }));
-  }
 
   /**
    * Estimate pages based on content length.

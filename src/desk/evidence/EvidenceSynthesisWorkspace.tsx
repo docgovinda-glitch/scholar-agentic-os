@@ -1,28 +1,20 @@
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import {
   Table,
   BarChart3,
   Download,
-  Filter,
   Search,
   CheckCircle,
-  AlertTriangle,
   ExternalLink,
-  Edit3,
   Copy,
-  Plus,
   ArrowRight,
   BookOpen,
   Sparkles,
-  Layers,
   X,
   FileCode,
 } from "lucide-react";
 import {
   type EvidenceMatrixItem,
-  type StudyDesignType,
-  type EffectMetricType,
-  type RiskOfBiasType,
   extractEvidenceFromPaper,
   exportEvidenceMatrixToLatex,
 } from "../../services/evidence/evidenceExtractionService";
@@ -39,7 +31,6 @@ export interface EvidenceSynthesisWorkspaceProps {
 }
 
 export default function EvidenceSynthesisWorkspace({
-  projectId,
   seedPapers = [],
   initialItems,
   onOpenLiteratureDiscovery,
@@ -109,16 +100,13 @@ export default function EvidenceSynthesisWorkspace({
   const [searchQuery, setSearchQuery] = useState("");
   const [designFilter, setDesignFilter] = useState<string>("all");
   const [metricFilter, setMetricFilter] = useState<string>("all");
-  const [biasFilter, setBiasFilter] = useState<string>("all");
   const [copiedStatus, setCopiedStatus] = useState<string | null>(null);
-  const [editingItemId, setEditingItemId] = useState<string | null>(null);
 
   // Filtered items
   const filteredItems = useMemo(() => {
     return matrixItems.filter((item) => {
       if (designFilter !== "all" && item.studyDesign !== designFilter) return false;
       if (metricFilter !== "all" && item.effectMetric !== metricFilter) return false;
-      if (biasFilter !== "all" && item.riskOfBias !== biasFilter) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchesTitle = item.paperTitle.toLowerCase().includes(q);
@@ -128,7 +116,7 @@ export default function EvidenceSynthesisWorkspace({
       }
       return true;
     });
-  }, [matrixItems, designFilter, metricFilter, biasFilter, searchQuery]);
+  }, [matrixItems, designFilter, metricFilter, searchQuery]);
 
   // Verification status toggle
   const handleToggleVerification = (id: string) => {
@@ -142,11 +130,6 @@ export default function EvidenceSynthesisWorkspace({
   };
 
   // Inline value update
-  const handleUpdateItem = (id: string, updates: Partial<EvidenceMatrixItem>) => {
-    setMatrixItems((prev) =>
-      prev.map((it) => (it.id === id ? { ...it, ...updates, verificationStatus: "human_verified" } : it))
-    );
-  };
 
   // Export CSV
   const handleExportCsv = () => {
@@ -352,7 +335,6 @@ export default function EvidenceSynthesisWorkspace({
                 </thead>
                 <tbody className="divide-y divide-neutral-200/70 dark:divide-white/5">
                   {filteredItems.map((item, idx) => {
-                    const isEditing = editingItemId === item.id;
                     const rawAuthor = item.authors[0] || "Author";
                     const surname = rawAuthor.includes(",") ? rawAuthor.split(",")[0].trim() : rawAuthor.split(" ").pop()?.trim() || "Author";
                     const studyLabel = `${surname} (${item.year || "n.d."})`;
@@ -412,32 +394,16 @@ export default function EvidenceSynthesisWorkspace({
 
                         {/* Effect Size & CI */}
                         <td className="py-3 px-3 align-top font-mono text-[11px]">
-                          {isEditing ? (
-                            <div className="flex items-center gap-1">
-                              <input
-                                type="number"
-                                step="0.01"
-                                defaultValue={item.effectSize}
-                                onBlur={(e) =>
-                                  handleUpdateItem(item.id, {
-                                    effectSize: parseFloat(e.target.value) || 0,
-                                  })
-                                }
-                                className="w-16 px-1 py-0.5 rounded border border-indigo-400 text-xs"
-                              />
-                            </div>
-                          ) : (
-                            <div className="flex items-baseline gap-1">
-                              <span className="font-bold text-neutral-900 dark:text-neutral-100">
-                                {item.effectMetric}: {item.effectSize ?? "---"}
+                          <div className="flex items-baseline gap-1">
+                            <span className="font-bold text-neutral-900 dark:text-neutral-100">
+                              {item.effectMetric}: {item.effectSize ?? "---"}
+                            </span>
+                            {typeof item.ciLower === "number" && (
+                              <span className="text-[10px] text-neutral-500">
+                                [{item.ciLower}, {item.ciUpper}]
                               </span>
-                              {typeof item.ciLower === "number" && (
-                                <span className="text-[10px] text-neutral-500">
-                                  [{item.ciLower}, {item.ciUpper}]
-                                </span>
-                              )}
-                            </div>
-                          )}
+                            )}
+                          </div>
                           <div className="text-[10px] text-neutral-400 font-sans mt-0.5">
                             {item.primaryOutcome}
                           </div>

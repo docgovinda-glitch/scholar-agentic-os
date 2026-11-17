@@ -3,7 +3,6 @@ import { JOURNAL_STUDIO_MODES, type ResearchStage } from "./types";
 import ContextPanel from "./ContextPanel";
 import { ResearchProvider, useResearchWorkspace } from "./ResearchContext";
 import JournalHeaderActions from "./JournalHeaderActions";
-import { useAiAccess } from "../aiAccess/useAiAccess";
 import Tray from "../regions/Tray";
 import AiExhaustedModal from "./AiExhaustedModal";
 import { useUnsavedChangesGuard } from "../../hooks/useUnsavedChangesGuard";
@@ -20,7 +19,6 @@ import AuditExportMode from "./AuditExportMode";
 
 function ResearchWorkspaceInner({
   onClose,
-  onOpenAccountSettings,
   onOpenVault,
   onOpenAiAccess,
 }: {
@@ -44,7 +42,6 @@ function ResearchWorkspaceInner({
     setFallbackToast,
   } = useResearchWorkspace();
 
-  const { connected, settings } = useAiAccess();
 
   const [contextPanelOpen, setContextPanelOpen] = useState(() =>
     typeof window !== "undefined" ? window.innerWidth >= 1440 : false
@@ -72,10 +69,6 @@ function ResearchWorkspaceInner({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isZenMode]);
 
-  const defaultProvider = connected.find(p => p.id === settings.provider);
-  const defaultModelText = defaultProvider 
-    ? (defaultProvider.selectedModel ? `${defaultProvider.name} - ${defaultProvider.selectedModel}` : defaultProvider.name) 
-    : "Automatic";
 
   // Header figures: the same target and the same word count the Writing Studio shows.
   const targetWords = React.useMemo(() => journalTargetWords(project?.answers), [project?.answers]);

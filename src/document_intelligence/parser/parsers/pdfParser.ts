@@ -31,7 +31,7 @@ export class PDFParser implements Parser {
   };
 
   async parse(input: DocumentInput): Promise<ParserOperationResult> {
-    const { data, filename } = input;
+    const { data } = input;
 
     // Check for encrypted documents
     if (this.isEncrypted(data)) {

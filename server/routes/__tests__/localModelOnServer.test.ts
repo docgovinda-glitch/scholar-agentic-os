@@ -145,7 +145,7 @@ describe("local models are never called from a deployed server", () => {
   it("a browser-capable feature hands the prompt to the browser (426) for a local model", async () => {
     process.env.ALLOW_SERVER_LOCAL_AI = "false";
     const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-10" });
-    const res = await request(app).post(`/api/projects/${created.body.projectId}/agentic/gaps`).set(LOCAL).send({});
+    const res = await request(app).post(`/api/projects/${created.body.projectId}/agentic/peer-review`).set(LOCAL).send({});
     expect(res.status).toBe(426);
     expect(res.body.requireFrontendLLM).toBe(true);
   });

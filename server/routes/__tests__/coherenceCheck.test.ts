@@ -18,8 +18,7 @@ import { AI_HEADERS, keyringHeader, useFetchBackedAi } from "../../test/aiTestKi
 import { app } from "../../../server.ts";
 import { __resetProjectStoreForTests } from "../../../src/app/conductor/projectStore.ts";
 import { __resetProjectStoreSelectionForTests } from "../../../src/services/store/projectStore.ts";
-import { __resetSharedStoreForTests } from "../project.ts";
-import { __resetSessionPoliciesForTests } from "../../../src/app/studio/sessionPolicyStore.ts";
+import { __resetSharedStoreForTests } from "../project/core/projectHelpers.ts";
 import { __resetRateLimitStore } from "../../src/middleware/rateLimit.ts";
 import { __setEnabledOutputTypesForTests } from "../outputTypeAccess.ts";
 import { generateMasterKeyBase64, encrypt, generateCEK, wrapKey } from "../../../src/services/crypto/crypto.ts";
@@ -38,7 +37,6 @@ beforeEach(() => {
   __resetSharedStoreForTests();         // nulls server/routes/project.ts storeInstance
   __resetProjectStoreSelectionForTests(); // nulls src/services/store/projectStore.ts cache
   __resetProjectStoreForTests();        // clears the in-memory Map
-  __resetSessionPoliciesForTests();
   __resetRateLimitStore();
   __setEnabledOutputTypesForTests(["OT-10"]);
   process.env.MASTER_KEY = generateMasterKeyBase64();

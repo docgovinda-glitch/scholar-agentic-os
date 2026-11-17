@@ -30,7 +30,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CLOUD_PROVIDERS, getCloudProvider, providerAccessFacts, type CloudProviderSpec } from "../../config/providerCatalog";
+import { CLOUD_PROVIDERS, getCloudProvider, type CloudProviderSpec } from "../../config/providerCatalog";
 import { LOCAL_RUNNERS, getLocalRunner, type LocalRunnerSpec } from "../../config/localRunnerCatalog";
 import {
   DEFAULT_AI_SETTINGS,

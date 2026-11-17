@@ -186,13 +186,6 @@ export function formatAsVancouver(items: LiteratureItem[]): string {
     .join("\n\n");
 }
 
-/**
- * Normalizes title string for exact and fuzzy matching.
- */
-function normalizeTitleKey(title?: string): string {
-  if (!title) return "";
-  return title.toLowerCase().replace(/[\W_]+/g, " ").trim();
-}
 
 
 

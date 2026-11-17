@@ -1,7 +1,7 @@
 import express, { type Response } from "express";
 import { z } from "zod";
 import { getProjectStore } from "../../src/services/store/projectStore.ts";
-import { currentUserId, asyncRoute } from "./project.ts";
+import { currentUserId, asyncRoute } from "./project/core/projectHelpers.ts";
 import { requireAuth } from "../src/middleware/auth.ts";
 import { getSupabaseRestConfig, SupabaseTable } from "../src/supabaseRest.ts";
 

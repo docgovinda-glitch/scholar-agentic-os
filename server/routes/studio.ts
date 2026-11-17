@@ -4,10 +4,8 @@
  * Spec: docs/03-workflow/32-LANGUAGE-AND-VOICE-ARCHITECTURE.md,
  *       docs/04-architecture/48-API-ARCHITECTURE.md.
  *
- * This is the first server route built on the new architecture (Warden ->
- * Gateway -> Studio) rather than the legacy direct-provider-call pattern in
- * server/routes/ai.ts. See src/app/studio/sessionPolicyStore.ts for the
- * scope note on session-policy persistence.
+ * Refinement runs through the request's Completer (the one AI engine); the
+ * Warden (src/platform/warden) records what left the device.
  */
 
 import express from "express";
@@ -18,7 +16,7 @@ import { INTERVENTION_LEVELS, MIN_VOICE_PROFILE_WORDS } from "../../src/domain/l
 import { ALL_L1_PROFILES } from "../../src/domain/language/l1Patterns.ts";
 import { buildVoiceProfile } from "../../src/domain/language/voiceProfile.ts";
 import type { InterventionLevel, VoiceProfile } from "../../src/domain/language/types.ts";
-import { requireAuth, type AuthenticatedUser } from "../src/middleware/auth.ts";
+import { requireAuth } from "../src/middleware/auth.ts";
 
 function isValidLevel(level: unknown): level is InterventionLevel {
   return typeof level === "string" && (INTERVENTION_LEVELS as string[]).includes(level);
@@ -90,7 +88,7 @@ export function registerStudioRoutes(app: express.Express, studioLimit: express.
       });
     }
 
-    const { sessionId, passageId, text, level, discipline, l1, voiceProfile, provider, model, scopeId } = req.body ?? {};
+    const { sessionId, passageId, text, level, discipline, l1, voiceProfile } = req.body ?? {};
 
     if (typeof sessionId !== "string" || sessionId.length === 0) {
       return res.status(400).json({ error: "Missing required field: sessionId" });

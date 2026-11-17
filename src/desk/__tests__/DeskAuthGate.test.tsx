@@ -52,7 +52,6 @@ vi.mock("../../services/supabaseAuthService", () => ({
 
 const { RequireAuth, PublicOnly, RequireRecovery } = await import("../DeskAuthGate");
 const {
-  LandingRoute,
   SignInRoute,
   SignUpRoute,
   ForgotRoute,
@@ -87,12 +86,24 @@ function BackForwardControls() {
  * trivial Protected placeholder — this file exercises the auth boundary and
  * screens, not the workspace behind it.
  */
+/** Stand-in start page: the two entry buttons the auth flows begin from. */
+function StartPage() {
+  const navigate = useNavigate();
+  return (
+    <div>
+      <h1>Research at the speed of thought</h1>
+      <button type="button" onClick={() => navigate("/signup")}>Get Started</button>
+      <button type="button" onClick={() => navigate("/signin")}>Sign in</button>
+    </div>
+  );
+}
+
 function TestApp() {
   return (
     <>
       <BackForwardControls />
       <Routes>
-        <Route path="/" element={<PublicOnly><LandingRoute /></PublicOnly>} />
+        <Route path="/" element={<PublicOnly><StartPage /></PublicOnly>} />
         <Route path="/signin" element={<PublicOnly><SignInRoute /></PublicOnly>} />
         <Route path="/signup" element={<PublicOnly><SignUpRoute /></PublicOnly>} />
         <Route path="/signup/check-email" element={<PublicOnly><RegisteredRoute /></PublicOnly>} />

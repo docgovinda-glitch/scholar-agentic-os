@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import type { SlideDeck, PresentationStudioStep } from '../../features/slides';
 import {
   Step01Understand,
@@ -82,11 +82,10 @@ export default function PresentationWorkspace({
   }, [signedIn]);
   const [showLivePlayer, setShowLivePlayer] = useState(false);
   const [playerStartIndex, setPlayerStartIndex] = useState(0);
-  const [autosaveStatus, setAutosaveStatus] = useState<'saved' | 'saving' | 'idle' | 'error'>('saved');
+  const [autosaveStatus, setAutosaveStatus] = useState<'saved' | 'saving' | 'idle' | 'error' | 'signed-out'>('saved');
   const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
   const [projectVersion, setProjectVersion] = useState<number>(1);
-  useUnsavedChangesGuard(autosaveStatus === 'saving');
-  const [isHydrated, setIsHydrated] = useState(false);
+  useUnsavedChangesGuard(autosaveStatus === 'saving' || autosaveStatus === 'error');
   const [isAskScholarOpen, setIsAskScholarOpen] = useState(false);
   const [isQaSimulatorOpen, setIsQaSimulatorOpen] = useState(false);
   const [savedQaQuestions, setSavedQaQuestions] = useState<AudienceQaQuestion[]>([]);
@@ -200,8 +199,6 @@ export default function PresentationWorkspace({
         }
       } catch (err) {
         console.warn('[PresentationWorkspace] Hydration fallback:', err);
-      } finally {
-        if (mounted) setIsHydrated(true);
       }
     }
 
@@ -219,6 +216,12 @@ export default function PresentationWorkspace({
         clearTimeout(autosaveTimerRef.current);
       }
 
+      // A signed-out visitor's deck lives only in this tab: say so instead of calling the server.
+      if (!signedIn) {
+        setAutosaveStatus('signed-out');
+        return;
+      }
+
       setAutosaveStatus('saving');
 
       autosaveTimerRef.current = setTimeout(async () => {
@@ -228,19 +231,6 @@ export default function PresentationWorkspace({
           };
 
           const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-          try {
-            if (typeof window !== 'undefined' && window.localStorage) {
-              const authKey = Object.keys(localStorage).find(
-                (k) => k.startsWith('sb-') && k.endsWith('-auth-token')
-              );
-              if (authKey) {
-                const parsed = JSON.parse(localStorage.getItem(authKey) || '{}');
-                if (parsed?.access_token) {
-                  headers['Authorization'] = `Bearer ${parsed.access_token}`;
-                }
-              }
-            }
-          } catch {}
 
           const legacyPayload = {
             id: deckToSave.id,
@@ -273,7 +263,7 @@ export default function PresentationWorkspace({
             .catch(() => {});
 
           // 2. Also update /api/presentations/:id for unified access
-          const res = await window.fetch(`/api/presentations/${encodeURIComponent(deckToSave.id)}`, {
+          const res = await authedFetch(`/api/presentations/${encodeURIComponent(deckToSave.id)}`, {
             method: 'PUT',
             headers,
             body: JSON.stringify(legacyPayload),
@@ -285,15 +275,14 @@ export default function PresentationWorkspace({
               new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
             );
           } else {
-            setAutosaveStatus(projectId === 'demo-presentation' ? 'saved' : 'error');
+            setAutosaveStatus('error');
           }
         } catch {
-          // Fallback for offline tests
-          setAutosaveStatus('saved');
+          setAutosaveStatus('error');
         }
       }, 500);
     },
-    [projectId]
+    [projectId, signedIn]
   );
 
   const handleUpdateDeck = (updatedDeck: SlideDeck) => {

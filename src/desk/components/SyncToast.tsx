@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { syncManager, SyncStatus } from '../../services/offline/syncManager';
 import { CloudOff, CloudUpload, CheckCircle2, AlertCircle } from 'lucide-react';
 

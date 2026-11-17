@@ -1,13 +1,10 @@
 /**
- * Interim in-memory project store.
+ * The project record type and the in-memory project store.
  *
- * Same honest scope note as src/app/studio/sessionPolicyStore.ts: this is
- * an explicitly-labelled stand-in for what `services/store` should provide
- * once it exists (docs/01-product/13-MODULE-SPECIFICATIONS.md §8.3 —
- * "the largest near-term gap"). It does not survive a process restart and
- * does not scale past one process. server/routes/project.ts is the only
- * caller; nothing in domain/ or app/conductor's pure logic depends on this
- * file existing.
+ * The in-memory store is one of the backends `src/services/store/projectStore.ts`
+ * resolves (tests, and an unconfigured development run); production persists
+ * through Supabase and refuses to start without durable storage. The REST and
+ * Postgres stores share `ProjectRecord` and `generateProjectId` from here.
  */
 
 import { initialProjectGateState } from "../../domain/project/gates";

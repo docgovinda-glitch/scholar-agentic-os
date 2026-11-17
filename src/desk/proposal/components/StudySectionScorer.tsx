@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 export type StudySectionCriterion = "Significance" | "Investigator(s)" | "Innovation" | "Approach" | "Environment";
 

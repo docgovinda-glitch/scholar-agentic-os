@@ -196,20 +196,3 @@ describe("Coursework stream-section", () => {
     expect(streamed).toBe(full);
   });
 });
-
-describe("/api/drafting/section", () => {
-  it("an empty AI answer is a 502, not a template draft", async () => {
-    vi.mocked(callOpenRouterText).mockResolvedValue("");
-    const res = await request(app).post("/api/drafting/section").send({ sectionTitle: "Introduction", assignmentQuestion: "Discuss group work." });
-    expect(res.status).toBe(502);
-    expect(res.body.draft).toBeUndefined();
-    expect(res.body.isFallback).toBeUndefined();
-  });
-
-  it("without the user's AI, the 426 hand-off is the only response", async () => {
-    handOffToBrowser();
-    const res = await request(app).post("/api/drafting/section").send({ sectionTitle: "Introduction" });
-    expect(res.status).toBe(426);
-    expect(res.body.requireFrontendLLM).toBe(true);
-  });
-});

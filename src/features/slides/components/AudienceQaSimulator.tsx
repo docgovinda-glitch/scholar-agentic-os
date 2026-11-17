@@ -2,13 +2,9 @@ import React, { useState } from 'react';
 import {
   Sparkles,
   HelpCircle,
-  AlertTriangle,
   ChevronDown,
   ChevronUp,
   X,
-  Play,
-  RotateCcw,
-  CheckCircle2,
   Clock,
   ShieldCheck,
 } from 'lucide-react';

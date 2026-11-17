@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { LiveRouting, QuickStart, providerLabel } from "./AiAccessExtras";
-import { getCloudProvider, providerAccessFacts, CLOUD_PROVIDERS, type CloudProviderSpec } from "../../config/providerCatalog";
-import { getLocalRunner, LOCAL_RUNNERS, type LocalRunnerSpec } from "../../config/localRunnerCatalog";
+import { getCloudProvider, providerAccessFacts, CLOUD_PROVIDERS } from "../../config/providerCatalog";
+import { getLocalRunner, LOCAL_RUNNERS } from "../../config/localRunnerCatalog";
 import {
   detectHardwareProfile,
   loadHardwareProfile,
@@ -12,7 +12,7 @@ import {
 import ProviderDetail, { Chip } from "./ProviderDetail";
 import LocalRunnerDetail from "./LocalRunnerDetail";
 import ManualHardwareForm from "./ManualHardwareForm";
-import { useAiAccess, type ProviderView } from "./useAiAccess";
+import { useAiAccess } from "./useAiAccess";
 import OnboardingProgress from "../setup/OnboardingProgress";
 import {
 } from "./aiAccessApi";

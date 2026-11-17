@@ -50,13 +50,6 @@ interface PrimaryDataEntry {
   datasetName?: string;
 }
 
-interface VaultSourceEntry {
-  id: string;
-  title?: string;
-  name?: string;
-  year?: number | string;
-  publicationYear?: number | string;
-}
 
 export default function AuditExportMode() {
   const { project, projectId, setProject } = useResearchWorkspace();
@@ -105,16 +98,6 @@ export default function AuditExportMode() {
   }, [answers]);
 
   // Vault sources in Mode 2
-  const vaultSources: VaultSourceEntry[] = useMemo(() => {
-    const raw = answers["approved_vault_sources"] || answers["vault_sources"];
-    if (!raw) return [];
-    try {
-      const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  }, [answers]);
 
   // ── 1. Word Count Compliance ──
   // The author's own target from Blueprint (or the journal profile); none is assumed.

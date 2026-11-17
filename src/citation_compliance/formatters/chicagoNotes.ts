@@ -28,7 +28,7 @@
  *   matching every hand-picked example in the manual.
  */
 
-import type { CitationStyle, InTextOptions, NoteOptions } from "../formattingEngine";
+import type { CitationStyle, InTextOptions, NoteOptions } from "../styleTypes";
 import type { CanonicalReference, ReferenceAuthor } from "../model/reference";
 
 const SHORT_TITLE_MAX_WORDS = 5;

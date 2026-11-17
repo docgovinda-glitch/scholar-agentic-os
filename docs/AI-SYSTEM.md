@@ -49,7 +49,7 @@ Router behaviour (`src/platform/router/`): per-candidate circuit breaker (closed
 - **User-supplied addresses.** `normalizeBaseUrl` (`src/platform/router/baseUrl.ts`) cleans what people paste (a full `/chat/completions` endpoint is cut back to its base, host lower-cased, slashes trimmed) and refuses http, credentials in the address, query strings and fragments, with a plain reason; AI Access shows "Your key will be sent only to <host>" before connecting. The server still screens every non-catalog address (`aiEndpointGuard`: https, public addresses only, connection pinned to the checked address, no redirects), including the model-list proxy `POST /api/ai-access/models`, which now lists through the guarded client (it used to fetch the typed address directly). Model lists larger than 4 MB are refused.
 - **`POST /api/ai/verify`** (key in `x-ai-api-key`, never the body; 10 per minute per user) is what AI Access calls on connect: it lists the live models, sends a one-line test request through the same adapters Ask Scholar uses (trying the next best live model if one fails), and returns `{ ok, tested, options[], needsModel }`. A rejected key, an account with no credit and a provider with no model list each get their own message. If the server cannot be reached AI Access falls back to the browser's list-only check and says so.
 
-`aiRouteDecorator` (in `routerBridge.ts`, mounted in `server.ts` on `/api/ai`, `/api/drafting`, `/api/projects/:id/{agent,agentic,assignment,thesis,proposal,presentation}` and `/api/presentations`) attaches an `aiRoute` summary (who answered, fallback/retry/limit notices, usage) to JSON responses; streaming callers forward the events live.
+`aiRouteDecorator` (in `routerBridge.ts`, mounted in `server.ts` on `/api/ai`, `/api/projects/:id/{agent,agentic,assignment,thesis,proposal,presentation}` and `/api/presentations`) attaches an `aiRoute` summary (who answered, fallback/retry/limit notices, usage) to JSON responses; streaming callers forward the events live.
 
 ### 2.1 The unified endpoint
 
@@ -87,8 +87,8 @@ Model names are never listed in code: they come live from the provider (`GET /ap
 
 ## 7. Search and research
 
-- `POST /api/ai/search` (web search, `server/src/research/webSearchEngine.ts`), `POST /api/ai/deep-research` (`deepResearchEngine.ts`) and `POST /api/ai/agent` (Ask Scholar: grounded answer with retrieval, citation validation and lock) use `scholarBrain` through the router chain.
-- Scholarly retrieval: `server/src/research/scholarlyRetrievalPipeline.ts`, `server/src/discovery/` (`liveSearch.ts`, `discovery.ts`, `blueprintScout.ts`), and the client-side `src/services/liveSearchService.ts`. Coursework source discovery runs in the browser through `src/desk/assignment/services/realScholarlyDiscoveryService.ts` (OpenAlex, Crossref, Semantic Scholar, DOAJ, DataCite, arXiv with `Promise.allSettled` and timeouts).
+- `POST /api/ai/search` (web search, `server/src/research/webSearchEngine.ts`) and `POST /api/ai/agent` (Ask Scholar: chat, grounded answer with retrieval, citation validation and lock, and deep research through `deepResearchEngine.ts`, chosen by `mode`) use `scholarBrain` through the router chain.
+- Scholarly retrieval: `server/src/research/scholarlyRetrievalPipeline.ts`, `server/src/retrieval/retrievalService.ts`, `server/src/discovery/` (`discovery.ts`, `blueprintScout.ts`), and the client-side `src/services/liveSearchService.ts`. Coursework source discovery runs in the browser through `src/desk/assignment/services/realScholarlyDiscoveryService.ts` (OpenAlex, Crossref, Semantic Scholar, DOAJ, DataCite, arXiv with `Promise.allSettled` and timeouts).
 - Optional keys: `TAVILY_API_KEY`, `SERPER_API_KEY`, `BRAVE_SEARCH_API_KEY`, `OPENALEX_API_KEY`, `OPENALEX_MAILTO`. The `search-proxy` Edge Function restricts Tavily to basic and advanced search.
 
 ## 8. Multi-agent mesh and LangGraph

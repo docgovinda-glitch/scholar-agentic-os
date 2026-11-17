@@ -11,7 +11,7 @@ import { SlideLayoutSwitcher, AddBlockMenu } from './StudioBlockTools';
 import { addBlock, contentContext, BLOCK_SPECS, type BlockKind, type BlockFill } from '../gamma/blocks';
 import { authedJsonFetch } from '../../../desk/api';
 import { imageFileToDataUrl } from '../gamma/imageFile';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Copy, GripVertical, ImagePlus, ImageOff, Minus, Plus, Redo2, Sparkles, Trash2, Undo2, Wand2 } from 'lucide-react';
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -20,7 +20,6 @@ import type { CardContent, GammaLayout, SlideCard, SlideDeck } from '../types/sl
 import InSlidePromptCopilot from './InSlidePromptCopilot';
 import { GammaSlide } from '../gamma/GammaCard';
 import {
-  GAMMA_LAYOUTS,
   createBlankCard,
   editSlideContent,
   getCardContent,

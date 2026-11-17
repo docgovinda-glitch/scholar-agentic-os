@@ -7,7 +7,7 @@
  */
 
 import { Router, Request, Response } from "express";
-import { asyncRoute, loadOwnedProject, getSharedStore } from "../project.ts";
+import { asyncRoute, loadOwnedProject, getSharedStore } from "./core/projectHelpers.ts";
 import { getAgent, listAgents } from "../../../src/app/mesh/registry.ts";
 import { runAgent } from "../../../src/app/mesh/executor.ts";
 import { issue, revoke } from "../../../src/services/capabilities/capabilities.ts";

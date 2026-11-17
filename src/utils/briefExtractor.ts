@@ -4,7 +4,6 @@
  * circular reference strippers, and deep equality guards.
  */
 
-import type { SectionBudgetItem, WritingStyleConfig } from "../desk/assignment/types";
 
 /**
  * Safely strips circular references, DOM Nodes, Window, File, Blob,

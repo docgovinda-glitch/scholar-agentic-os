@@ -3,13 +3,10 @@ import { showAppToast } from '../../../components/ui/FeedbackSystem';
 import {
   Palette,
   Sparkles,
-  Download,
   Upload,
   Trash2,
   Check,
   Copy,
-  Sliders,
-  Layers,
   FileCode,
   CheckCircle2,
   AlertTriangle,
@@ -18,7 +15,6 @@ import {
   Wand2,
   RefreshCw,
   ArrowRight,
-  ExternalLink,
 } from 'lucide-react';
 import type { SlideDeck } from '../types/slides';
 import {
@@ -28,14 +24,12 @@ import {
   type CustomTheme,
   calculateContrastRatio,
   isWcagAA,
-  resolveSlideTheme,
 } from '../types/themes';
 import { applyDeckTheme } from '../services/deckProgressionService';
 import {
   getStoredCustomThemes,
   saveCustomThemeToStorage,
   generateThemeFromPrompt,
-  compileSlideTheme,
 } from '../services/themeExtractorService';
 import { createBlankSheetDeck } from '../services/blankSheetService';
 import { recreateDeckFromFile, type RecreatedDeckResult } from '../services/deckRecreatorService';

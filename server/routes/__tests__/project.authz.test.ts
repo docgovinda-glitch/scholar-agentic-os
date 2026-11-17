@@ -144,7 +144,6 @@ describe("project API — authentication", () => {
     ["get", "/api/projects/proj-anything/claims"],
     ["post", "/api/projects/proj-anything/gates/G0/signoff"],
     ["post", "/api/projects/proj-anything/export"],
-    ["post", "/api/drafting/section"],
     ["get", "/api/presentations"],
     ["post", "/api/presentations"],
   ];
@@ -258,22 +257,6 @@ describe("project API — ownership", () => {
       .post(`/api/projects/${aliceProject}/submissions`)
       .set(asBob())
       .send({ journalName: "Bob's Journal", submittedAt: "2026-01-01", status: "draft" });
-
-    expect(res.status).toBe(404);
-  });
-
-  it("refuses to draft a section on another user's project", async () => {
-    const aliceProject = await createProjectAs(asAlice());
-
-    const res = await request(app)
-      .post("/api/drafting/section")
-      .set(asBob())
-      .send({
-        projectId: aliceProject,
-        sectionTitle: "Introduction",
-        sectionDescription: "Overview",
-        keyThemes: ["Background"],
-      });
 
     expect(res.status).toBe(404);
   });

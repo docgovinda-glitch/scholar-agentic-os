@@ -8,10 +8,9 @@ What Scholar Core does today, who uses it, and which parts are built. Behaviour 
 | :--- | :--- | :--- |
 | Visitor | No session | Landing page, sign-in and sign-up, and `/presentation` (works signed out) |
 | Signed-in user | Supabase session verified by `requireAuth` | Own projects, Vault, AI Access, settings |
-| Premium subscriber | Active row in `user_entitlements` with a plan (`premium_plans`) | Platform-managed AI resources within plan credits and quotas |
 | Admin | Row in `admin_users` or the `MAIN_ADMIN_EMAIL` account | `/admin/*` panel and `/api/admin/ai/*`, limited by scope |
 
-Admin scopes (`server/src/middleware/requireAdmin.ts`): `manage_providers`, `manage_premium`, `manage_budget`, `manage_opportunities`, `manage_users`, `manage_admins`.
+Admin scopes (`server/src/middleware/requireAdmin.ts`): `manage_opportunities`, `manage_users`, `manage_admins`.
 
 Profiles carry username, full name, phone, affiliation, user type and education level (`public.profiles`).
 
@@ -57,7 +56,7 @@ Workspace ids match the catalog: Research Proposal is `OT-15` and the Thesis wor
 
 **Citation engine** (`src/citation_compliance/`): formatters for APA 7, IEEE, MLA 9, Chicago (author-date and notes), Harvard and Vancouver registered at startup in `server.ts`; `scholarBrain` additionally accepts the `oscola` style key. BibTeX and RIS importers.
 
-**Ask Scholar** (`/projects`): research chat backed by `POST /api/ai/agent` with web search and deep research endpoints (`/api/ai/search`, `/api/ai/deep-research`).
+**Ask Scholar** (`/projects`): research chat backed by `POST /api/ai/agent` (chat, grounded search and deep research are modes of that one endpoint; `/api/ai/search` is the plain web search).
 
 **AI Access** (`/ai-access`): Overview, Providers, Subscription and Preferences sections. See [`AI-SYSTEM.md`](AI-SYSTEM.md).
 
@@ -67,8 +66,8 @@ Workspace ids match the catalog: Research Proposal is `OT-15` and the Thesis wor
 
 - Everything a user can hand in or rely on must be real: references, DOIs, figures and reviewer comments are never invented. Generators use only material from the user's input or retrieved sources.
 - One AI brain (`scholarBrain`); no per-workspace prompt engines or subject lookup tables.
-- The user's own AI key is never stored by request handlers or written to logs; Premium keys never leave the server.
+- The user's own AI key is never stored by request handlers or written to logs.
 
 ## 5. Not built
 
-Items under consideration are listed in [`../PRODUCT_BACKLOG.md`](../PRODUCT_BACKLOG.md) (shared deck links, real plagiarism checking). Output types without a dedicated workspace open the generic shell.
+Items under consideration are listed in [`records/PRODUCT_BACKLOG.md`](records/PRODUCT_BACKLOG.md) (shared deck links, real plagiarism checking). Output types without a dedicated workspace open the generic shell.

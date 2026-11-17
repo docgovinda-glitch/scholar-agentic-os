@@ -3,7 +3,6 @@ import ScholarCoreLogo from "../../components/ScholarCoreLogo";
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import GlobalSearchModal from "./GlobalSearchModal";
-import UserAccountMenu from "../components/UserAccountMenu";
 import { useActiveAi } from "../ai/useActiveAi";
 
 /**

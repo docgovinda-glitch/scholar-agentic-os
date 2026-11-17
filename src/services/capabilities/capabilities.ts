@@ -26,7 +26,7 @@
  *   - Enforced at the call boundary: this module makes verify() cheap and
  *     side-effect-free specifically so callers have no excuse to skip it.
  *
- * Scope, stated honestly: like sessionPolicyStore.ts, this is in-memory and
+ * Scope, stated honestly: this is in-memory and
  * does not survive a restart or scale past one process — tokens are
  * short-lived by nature (issued per agent run), so that is a smaller gap
  * than services/store's was, but it is still a gap, not a design choice

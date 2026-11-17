@@ -18,7 +18,6 @@ import { useAiSetupStatus } from "./setup/useAiSetupStatus";
 import { useVaultSetupStatus } from "./setup/useVaultSetupStatus";
 import { useDeskSession } from "./useDeskSession";
 import { normalizeOutputTypeId } from "../app/atlas/legacyIds";
-import { useDeviceClass } from "../hooks/useDeviceClass";
 import type { SectionId } from "./aiAccess/AiAccessPage";
 import GlobalLoader from "./components/GlobalLoader";
 import SyncToast from "./components/SyncToast";
@@ -35,16 +34,11 @@ const ProposalWorkspace = lazy(() => import("./proposal/ProposalWorkspace"));
 const PresentationWorkspace = lazy(() => import("./presentation/PresentationWorkspace"));
 const ProjectListScreen = lazy(() => import("./ProjectListScreen"));
 const VaultSetupScreen = lazy(() => import("./setup/VaultSetupScreen"));
-const VaultScreen = lazy(() => import("./vault/VaultScreen"));
 
 import type { AssignmentPhaseId } from "./assignment/types";
 import { isAssignmentStageId,normalizeAssignmentPhase } from "./assignment/types";
 
-const SECTION_IDS: readonly SectionId[] = ["overview", "providers", "subscription", "preferences"];
 
-function isSectionId(value: string | undefined): value is SectionId {
-  return SECTION_IDS.includes(value as SectionId);
-}
 
 function normalizeSectionId(sec?: string): SectionId {
   if (!sec) return "overview";
@@ -146,7 +140,6 @@ function OnboardingGate() {
 function ProjectsIndexRoute() {
   const navigate = useNavigate();
   const session = useDeskSession();
-  const device = useDeviceClass();
   const outletCtx = useOutletContext<OnboardingContext | null>();
   const justFinishedOnboarding = outletCtx?.justFinishedOnboarding ?? false;
   const clearJustFinishedOnboarding = outletCtx?.clearJustFinishedOnboarding ?? (() => {});
@@ -173,7 +166,6 @@ function ProjectsIndexRoute() {
 function ProjectRoute() {
   const navigate = useNavigate();
   const location = useLocation();
-  const device = useDeviceClass();
   const { projectId: urlProjectId, view } = useParams<{ projectId: string; view?: string }>();
   const [outputTypeId, setOutputTypeId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -412,7 +404,6 @@ function SettingsRoute() {
 /** Knowledge Vault route: global cross-project literature repository. */
 function VaultRoute() {
   const navigate = useNavigate();
-  const location = useLocation();
   const session = useDeskSession();
   const isLocalhost = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
   if (session.status !== "signed-in" && !isLocalhost) return null;

@@ -38,11 +38,11 @@ Process start order in `server.ts`: helmet and CSP, request-header redaction, Su
 
 | Area | Choice (from `package.json`) |
 | :--- | :--- |
-| Client | React 19, react-router-dom 7, Vite 6, Tailwind CSS v4 (`@tailwindcss/vite`), TipTap 3, motion, lucide-react, @dnd-kit |
+| Client | React 19, react-router-dom 7, Vite 6, Tailwind CSS v4 (`@tailwindcss/vite`), TipTap 3, lucide-react, @dnd-kit |
 | Server | Express 4 (`express-async-errors`), helmet 8, multer 2, run with `tsx` in development and bundled by esbuild to `dist/server.cjs` (`--packages=external`) |
 | Language | TypeScript ~5.8, strict; path alias `@/*` resolves to the repository root |
 | Validation | zod 4 |
-| AI libraries | `@google/genai`, LangChain core / OpenAI and LangGraph (`server/services/briefScannerGraph.ts`) |
+| AI libraries | LangGraph with LangChain core (`server/services/briefScannerGraph.ts`); providers are called through the app's own router adapters (`src/platform/router`), not vendor SDKs |
 | Documents | `pdf-parse`, `mammoth`, `docx`, `pdfmake`, `pptxgenjs`, `jszip` |
 | Data | `@supabase/supabase-js` (client), Supabase Data API over HTTPS from the server, optional `pg` direct connection |
 | Tests | Vitest 4 + Testing Library (unit and route tests), Playwright + axe (end to end) |
@@ -51,7 +51,7 @@ Process start order in `server.ts`: helmet and CSP, request-header redaction, Su
 
 ### 3.1 Route modules (`server/routes/`)
 
-Registered in `server.ts` in this order: health, admin, auth, `/api/ai/run` and `/api/ai/models`, AI routes, studio, projects, drafting, AI access, search, vault, presentations. Full endpoint list: [`API.md`](API.md).
+Registered in `server.ts` in this order: health, admin, auth, `/api/ai/run` and `/api/ai/models`, AI routes, studio, projects, AI access, search, vault, presentations. Full endpoint list: [`API.md`](API.md).
 
 | Module | Mount |
 | :--- | :--- |
@@ -59,17 +59,16 @@ Registered in `server.ts` in this order: health, admin, auth, `/api/ai/run` and 
 | `admin.ts` | `/api/admin/ai/*` (`requireAuth` then `requireAdmin`, scope checks) |
 | `auth.ts` | `/api/auth/verify-signup`, `/login`, `/check-availability` |
 | `aiRun.ts` | `POST /api/ai/run`, `GET /api/ai/models` |
-| `ai.ts` | `/api/ai/*`: status, search, deep research, agent, threads |
+| `ai.ts` | `/api/ai/*`: status, search, agent (chat, grounded search, deep research), threads |
 | `studio.ts` | `/api/studio/*` (voice profile, refine, consent, restrict, egress audit) |
 | `project.ts` | `/api/projects/*` and `/api/atlas/output-types`, `/api/user/saved-authors`; mounts the sub-routers in `server/routes/project/` |
-| `drafting.ts` | `POST /api/drafting/section` |
 | `aiAccess.ts` | `/api/ai-access/*` |
 | `search.ts` | `/api/search/*` and the alias `/api/discovery/*` |
 | `vault.ts` | `/api/vault/*` and `POST /api/lookup-doi` |
 | `presentations.ts` | `/api/presentations/*` |
 | `supabaseProxy.ts` | `/api/supabase/*` (HTTP) and WebSocket upgrade |
 
-Project sub-routers (`server/routes/project/`): `agentic/` (journal pipeline, split into blueprint, citation support, drafting, evidence, journal profile, references, review routers), `assignment/` (extract, understand, sources, drafting, submission, agent routes), `thesis.ts`, `proposal.ts`, `presentation.ts` (+ `presentationCards.ts`), `claims.ts`, `evidence.ts`, `files.ts`, `activity.ts`, `parse.ts`, `mesh.ts`, `journal_compliance.ts`, `submissions.ts`, and `core/` (manuscript, gate, export handlers).
+Project sub-routers (`server/routes/project/`): `agentic/` (journal pipeline, split into blueprint, citation support, drafting, the author's own data, journal profile, references, review routers), `assignment/` (extract, understand, sources, drafting, submission, agent routes), `thesis.ts`, `proposal.ts`, `presentation.ts` (+ `presentationCards.ts`), `claims.ts`, `evidence.ts`, `files.ts`, `activity.ts`, `parse.ts`, `mesh.ts`, `journal_compliance.ts`, `submissions.ts`, and `core/` (manuscript, gate, export handlers).
 
 ### 3.2 Middleware (`server/src/middleware/`)
 
@@ -93,7 +92,7 @@ Ownership is enforced in application code: the server holds the service-role key
 
 ### 3.4 AI layer
 
-`server/src/services/scholarBrain.ts` is the only AI brain. Routing, credentials and providers are documented in [`AI-SYSTEM.md`](AI-SYSTEM.md); entry layers in [`AI-CALL-MAP.md`](AI-CALL-MAP.md). Supporting modules: `server/src/aiEngine/` (routers, credits, quotas, entitlements, credential vault, provider health), `server/src/ai/` (client AI config, endpoint guard, router bridge), `server/src/research/` (web search, deep research, citation validator, scholarly retrieval), `server/src/discovery/` (live search, blueprint scout), `server/src/services/semanticRagEngine.ts`.
+`server/src/services/scholarBrain.ts` is the only AI brain. Routing, credentials and providers are documented in [`AI-SYSTEM.md`](AI-SYSTEM.md); entry layers in [`AI-CALL-MAP.md`](AI-CALL-MAP.md). Prompt text lives in `server/src/services/prompts/` (`courseworkPrompts`, `journalPrompts`, `thesisPrompts`, `proposalPrompts`, `presentationPrompts`), reached only through `scholarBrain`; no route file holds prompt text and no module but `scholarBrain` takes a completion from the router bridge (both enforced by `src/__tests__/singleBrainGuardian.test.ts`). Supporting modules: `server/src/aiEngine/` (a user's saved keys in `userKeyVault`, admin roster and user administration, audit log, the opportunity agent), `server/src/ai/` (router bridge, browser hand-off, account AI settings, live model lists, endpoint guard), `server/src/research/` (web search, deep research, citation validator, scholarly retrieval), `server/src/discovery/` (live search, blueprint scout), `server/src/services/semanticRagEngine.ts`.
 
 ### 3.5 Shared code
 
@@ -130,8 +129,8 @@ The server imports from `src/` (citation formatters, `document_intelligence`, me
 | `src/features/` | `slides` (Presentation Studio and Gamma card engine), `coursework` (style engine, legacy coursework components), `drafting`, `sources`, `understand` |
 | `src/platform/` | `router/` (the one AI engine: adapters, failover, key rotation, circuit breaker, model listing and curation, SSE bridge), `completion.ts` (the `Completer` app modules use), `warden/` (egress policy, used by the mesh agents) |
 | `src/services/` | Auth, Supabase client, vault, store, offline queue, crypto, capabilities, AI settings and diagnostics |
-| `src/citation_compliance/` | Formatters, validation, CSL engine, BibTeX/RIS importers |
-| `src/config/` | `providerCatalog.ts`, `modelCatalog.ts`, `localRunnerCatalog.ts` |
+| `src/citation_compliance/` | The one citation engine: formatters, validation, CSL engine, BibTeX/RIS importers (the Vault's Add Source dialog reads pasted records through them) |
+| `src/config/` | `providerCatalog.ts`, `localRunnerCatalog.ts`, `keySlots.ts`, `askScholarConfig.ts`, `accountSchema.ts` |
 | `src/shared/` | Cross-cutting helpers (project state schema, LLM JSON parser, guardrails, style weights) |
 
 ### 4.3 State
@@ -148,11 +147,11 @@ Coursework state lives in `AssignmentContext` and is saved as keyed answers thro
 - **Authorization**: `requireAuth` on every project, vault, AI-access, search, presentation, drafting and studio route; project ownership checked per request; admin routes require an admin roster entry and the relevant scope.
 - **CSP** (production, `server.ts`): `connect-src` allows self, the Supabase origin (https and wss), direct-call provider origins from the provider catalog, `localhost`/`127.0.0.1` for local runners, the scholarly APIs (OpenAlex, Crossref, DataCite, EuropePMC, DOAJ, Semantic Scholar, arXiv), World Bank and OECD, Cloudflare challenges, Google Fonts and Google accounts. `script-src` is self, Turnstile, Google accounts and one hashed inline theme script (`INLINE_THEME_SCRIPT_CSP_HASH`, checked by `npm run verify:csp-hash`). `frame-src` is self, Turnstile and Google accounts.
 - **Supabase proxy**: only `/auth/v1`, `/rest/v1`, `/storage/v1`, `/functions/v1` and `/realtime/v1` are forwarded; fails closed when no upstream is configured.
-- **Credentials**: a user's key is sent per request in the `x-ai-keyring` header and held in memory for that request only; handlers never log it (`x-ai-api-key` is redacted in `server.ts`) and request bodies may not carry credentials (`rejectClientCredentials`). Keys a user chooses to save for device sync (`user_provider_keys`, via `/api/ai-access/keys`) and the platform's own provider keys (`platform_provider_credentials`) are envelope-encrypted: a per-credential key wrapped under `MASTER_KEY` (`server/src/aiEngine/credentialVault.ts`, `userKeyVault.ts`). Only the owner's own request can read back saved user keys.
+- **Credentials**: a user's key is sent per request in the `x-ai-keyring` header and held in memory for that request only; handlers never log it (`x-ai-api-key` is redacted in `server.ts`) and request bodies may not carry credentials (`rejectClientCredentials`). Keys a user chooses to save for device sync (`user_provider_keys`, via `/api/ai-access/keys`) are envelope-encrypted: a per-credential key wrapped under `MASTER_KEY` (`server/src/aiEngine/userKeyVault.ts`). There are no platform-held provider keys. Only the owner's own request can read back saved user keys.
 - **Outbound requests**: user-named AI base URLs must be https and public (`server/src/ai/aiEndpointGuard.ts`); the generic provider proxy applies an equivalent check; page fetches use `ssrfGuard`.
 - **Uploads**: in-memory, ceiling 10 MB, heavy parsers (PDF, Office) tracked by `uploadGuard`.
 - **Database**: all tables have RLS enabled; server-owned tables carry no policies and are reachable only with the service-role key.
-- Deeper security history: `AUDIT.md`, `ROTATION_RUNBOOK.md`, `HOTFIX*_DEPLOY.md` (dated records).
+- Deeper security history: `ROTATION_RUNBOOK.md` and the dated records in `docs/records/` (`AUDIT.md`, `HOTFIX*_DEPLOY.md`).
 
 ## 6. ML style engine (`ml-style-engine/`)
 

@@ -57,7 +57,6 @@ export async function askSelectedSources(
   for (const item of selectedItems) {
     const keyPoints = item.metadata?.keyPoints || item.metadata?.notes?.keyPoints || [];
     const quote = item.metadata?.notes?.keyQuote || item.metadata?.keyQuote;
-    const whySaved = item.metadata?.notes?.whySaved || item.metadata?.whySaved;
 
     const matchedQuotes: string[] = [];
     if (quote) matchedQuotes.push(quote);

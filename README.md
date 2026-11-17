@@ -35,10 +35,10 @@ Other surfaces: Ask Scholar chat on `/projects`, Knowledge Vault (`/vault`), AI 
 
 ## AI access
 
-Users choose where AI runs in `/ai-access` (sections: Overview, Providers, Subscription, Preferences). A request is served from four tiers: the user's local runner, free-tier keys, bring-your-own keys, or platform-managed Premium resources.
+Users choose where AI runs in `/ai-access` (sections: Overview, Providers, Premium, Preferences). There are two tiers: the user's local runner and bring-your-own keys. Premium is shown as "Coming soon" and has no code.
 
 - 37 cloud providers are catalogued in `src/config/providerCatalog.ts`; 9 local runners (Ollama, LM Studio, Jan, LocalAI, llama.cpp, KoboldCpp, vLLM, text-generation-webui, OmniRoute) in `src/config/localRunnerCatalog.ts`.
-- A user's key travels with a request only as transient `x-ai-*` headers (or the `x-ai-keyring` header for `/api/ai/run`); request handlers hold it in memory and never log or store it, and request bodies may not carry credentials. Users can optionally save keys to their account to sync devices (`public.user_provider_keys`, envelope-encrypted under `MASTER_KEY`). Premium (platform) credentials live in a separate server-side vault and never leave the server.
+- A user's key travels with a request only as transient `x-ai-*` headers (or the `x-ai-keyring` header for `/api/ai/run`); request handlers hold it in memory and never log or store it, and request bodies may not carry credentials. Users can optionally save keys to their account to sync devices (`public.user_provider_keys`, envelope-encrypted under `MASTER_KEY`).
 - A local model on the user's machine can only be reached from the browser; a deployed server cannot reach it.
 - See [`docs/AI-SYSTEM.md`](docs/AI-SYSTEM.md).
 
@@ -90,4 +90,4 @@ npm run dev               # Express + Vite middleware on http://localhost:3000
 | [`docs/presentation-studio.md`](docs/presentation-studio.md) | Slides engine |
 | [`SETUP.md`](SETUP.md), [`RUNBOOK.md`](RUNBOOK.md), [`SYSTEM_MAP.md`](SYSTEM_MAP.md) | Setup, operations, file map |
 
-Incident, audit and hotfix records (`AUDIT.md`, `HOTFIX*_DEPLOY.md`, `COMPROMISE_CHECKS.md`, `MERGE_PLAN.md`, `POST_DEPLOY_80.md`, `PROD_CHECKS.md`, `PRODUCT_AUDIT.md`, `ROTATION_RUNBOOK.md`, `USER_NOTICE.md`, `STATUS.md`, `docs/COMPLETION_ROADMAP.md`) are dated records and are not kept in sync with the code. `CHANGELOG.md` lists user-visible changes.
+Incident, audit, hotfix and status records are dated and live in [`docs/records/`](docs/records/); they are not kept in sync with the code. [`ROTATION_RUNBOOK.md`](ROTATION_RUNBOOK.md) is the key-rotation procedure.

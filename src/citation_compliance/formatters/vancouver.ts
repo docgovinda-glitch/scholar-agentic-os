@@ -3,7 +3,7 @@
  */
 
 import { bareDoi, endSentence, familyBareInitials, journalOf, publisherOf, sortedAuthors } from "./bibParts";
-import type { CitationStyle, InTextOptions } from "../formattingEngine";
+import type { CitationStyle, InTextOptions } from "../styleTypes";
 import type { CanonicalReference } from "../model/reference";
 
 export class VancouverFormatter implements CitationStyle {

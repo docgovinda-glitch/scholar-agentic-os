@@ -18,21 +18,21 @@ A navigational map of the repository: where things live and where to start when 
 | `.claude/`, `.agents/`, `.husky/` | Agent definitions and skills (single-brain guardian), an IDE assistant rule file, the pre-commit hook (`npm run lint`) |
 | `Dockerfile`, `render.yaml` | Container build and Render service |
 | `vite.config.ts`, `vitest.config.ts`, `tsconfig.json`, `tsconfig.test.json`, `playwright.config.ts` | Tooling |
-| `README.md`, `CLAUDE.md`, `SETUP.md`, `RUNBOOK.md`, `SYSTEM_MAP.md`, `CHANGELOG.md`, `docs/` | Documentation; the other root `.md` files are dated records ([`docs/README.md`](docs/README.md)) |
+| `README.md`, `CLAUDE.md`, `SETUP.md`, `RUNBOOK.md`, `SYSTEM_MAP.md`, `CHANGELOG.md`, `docs/` | Documentation; dated records live in `docs/records/` ([`docs/README.md`](docs/README.md)) |
 
 ## 2. Server
 
 | Path | Contents |
 | :--- | :--- |
 | `server/routes/index.ts` | Re-exports every `register*Routes` |
-| `server/routes/{health,auth,admin,ai,aiRun,aiAccess,studio,project,drafting,search,vault,presentations,supabaseProxy}.ts` | Route modules ([`docs/API.md`](docs/API.md)) |
+| `server/routes/{health,auth,admin,ai,aiRun,aiAccess,studio,project,search,vault,presentations,supabaseProxy}.ts` | Route modules ([`docs/API.md`](docs/API.md)) |
 | `server/routes/project/` | Per-workflow routers: `agentic/` (journal), `assignment/` (coursework), `thesis.ts`, `proposal.ts`, `presentation.ts`, `presentationCards.ts`, `claims.ts`, `evidence.ts`, `files.ts`, `activity.ts`, `parse.ts`, `mesh.ts`, `journal_compliance.ts`, `submissions.ts`, `core/` (manuscript, gates, export, shared helpers) |
-| `server/src/aiEngine/` | `omniRouter`, `userRouter`, `adminRouter`, `credentialVault`, `userKeyVault`, `creditEngine`, `creditPolicy`, `quotaEngine`, `entitlements`, `providerHealth`, `auditLog`, `adminUsers`, `userAdmin`, `opportunityAgent` |
-| `server/src/ai/` | `routerBridge` (request chain), `clientAiConfig`, `aiEndpointGuard`, `aiRouteErrors`, `premium`, `premiumPort` |
-| `server/src/services/` | `scholarBrain.ts` (the only AI brain), `semanticRagEngine.ts` |
+| `server/src/aiEngine/` | `userKeyVault` (a user's saved keys), `rewrapKeys`, `adminUsers`, `userAdmin`, `auditLog`, `opportunityAgent` |
+| `server/src/ai/` | `routerBridge` (request chain), `browserHandoff`, `accountAi`, `liveModels`, `serverLocalAccess`, `aiEndpointGuard`, `aiRouteErrors` |
+| `server/src/services/` | `scholarBrain.ts` (the only AI brain), `sectionDrafter.ts`, `semanticRagEngine.ts`, `prompts/` (all workspace prompt text) |
 | `server/src/research/`, `server/src/discovery/` | Web search, deep research, citation validation, scholarly retrieval, live search, blueprint scout |
 | `server/src/middleware/` | `auth`, `requireAdmin`, `rateLimit`, `captchaVerify`, `rejectClientCredentials`, `uploadGuard`, `errorHandler`, `asyncHandler` |
-| `server/src/utils/` | `citationLockScrubber`, `scholarlyVoiceGuard`, `sectionBudget`, `sectionScaffold`, `wordBudgetAllocator` |
+| `server/src/utils/` | `citationLock`, `citationLockScrubber`, `scholarlyVoiceGuard`, `sectionBudget`, `sectionContract`, `sectionScaffold`, `sectionStream`, `wordBudgetAllocator` |
 | `server/src/supabaseRest.ts`, `syncRelational.ts`, `concurrency/projectLock.ts` | Data API client, relational mirroring, per-project lock |
 
 ## 3. Client and shared code (`src/`)
@@ -44,12 +44,12 @@ A navigational map of the repository: where things live and where to start when 
 | `app/` | Engines: `atlas` (output-type catalog), `conductor` (project store and gates), `mesh`, `citation`, `manuscript`, `review`, `coherence`, `rubric`, `studio`, `journal`, `anonymization`, `coverLetter`, `export` |
 | `domain/` | Pure models and zod schemas |
 | `features/` | `slides` (Gamma engine, Presentation Studio steps), `coursework` (style engine, legacy components), `drafting`, `sources`, `understand` |
-| `platform/` | `gateway/`, `router/`, `warden/` |
+| `platform/` | `router/` (the one AI engine), `completion.ts`, `warden/` |
 | `services/` | Supabase client and auth, vault, project store clients (`store/`), crypto, offline queue, capabilities, AI settings, hardware and local-runner probes |
 | `citation_compliance/` | Formatters (APA 7, IEEE, MLA 9, Chicago, Chicago notes, Harvard, Vancouver), validation, CSL engine, BibTeX and RIS importers |
 | `document_intelligence/` | Parsers registered at server start (`registerDefaultParsers`) |
 | `config/` | Provider, model and local-runner catalogs; account schema |
-| `shared/`, `utils/`, `hooks/`, `components/`, `layouts/`, `types/` | Cross-cutting helpers (brief parsing is in `utils/briefQuestions.ts`, `briefSourceQueries.ts`, `briefExtractor.ts`), hooks, shared UI, layouts, generated DB types |
+| `shared/`, `utils/`, `hooks/`, `components/`, `types/` | Cross-cutting helpers (brief parsing is in `utils/briefQuestions.ts`, `briefSourceQueries.ts`, `briefExtractor.ts`), hooks, shared UI |
 | `index.css` | Design tokens and base styles |
 | `__tests__/` | Repository-level tests: `singleBrainGuardian`, `render.costGuard`, `authIntegration`, and others |
 
@@ -73,8 +73,8 @@ A navigational map of the repository: where things live and where to start when 
 | Task | Start here |
 | :--- | :--- |
 | New or changed HTTP endpoint | `server/routes/` module, then [`docs/API.md`](docs/API.md) |
-| New AI capability | A method on `scholarBrain` (read `.claude/skills/single-brain-guardian/SKILL.md` first) |
-| Provider or model change | `src/config/providerCatalog.ts`, `modelCatalog.ts`; adapters in `src/platform/gateway/adapters.ts` |
+| New AI capability | A method on `scholarBrain`, prompt text in `server/src/services/prompts/` (read `.claude/skills/single-brain-guardian/SKILL.md` first) |
+| Provider change | `src/config/providerCatalog.ts`; adapters in `src/platform/router/adapters.ts` (models are listed live, never named in code) |
 | Coursework stage | `src/desk/assignment/stages/` and `server/routes/project/assignment/` |
 | Journal stage | `src/desk/workspace/types.ts` (stage list) and `server/routes/project/agentic/` |
 | Slide layout or theme | `src/features/slides/gamma/geometry.ts`, `theme.ts` ([`docs/presentation-studio.md`](docs/presentation-studio.md)) |

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { authedJsonFetch } from "../api";
 import { currentUserId } from "../../services/userVault";
 import { listVaultItems, searchVaultItems, isVaultUnlocked } from "../../services/vaultContents";

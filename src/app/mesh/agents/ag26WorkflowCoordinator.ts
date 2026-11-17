@@ -13,7 +13,7 @@
  * language. It does NOT call a model, so "proposes next actions" here
  * means "names the next outstanding gate and why it isn't ready," not a
  * generated suggestion — and it does not "schedule runs" or "detect
- * stalls" (both would need services/queue integration and a notion of
+ * stalls" (both would need a job queue and a notion of
  * elapsed time this agent doesn't have). Those are real future extensions
  * to this same agent, not a different one.
  *

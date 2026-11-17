@@ -5,7 +5,7 @@
  */
 
 import { bareDoi, initialsFamily, joinNames, journalOf, pageRange, publisherOf, quotedTitle, sortedAuthors } from "./bibParts";
-import type { CitationStyle, InTextOptions } from "../formattingEngine";
+import type { CitationStyle, InTextOptions } from "../styleTypes";
 import type { CanonicalReference } from "../model/reference";
 
 // ============================================================================
@@ -54,18 +54,5 @@ export class IEEEFormatter implements CitationStyle {
   }
   formatReferenceList(references: CanonicalReference[]): string {
     return references.map((ref, i) => `[${i + 1}] ${this.formatBibliography(ref)}`).join("\n");
-  }
-  // ============================================================================
-  // Private Helpers
-  // ============================================================================
-
-  private formatAuthors(authors: Array<{ firstName: string; lastName: string }> | undefined): string {
-    if (!authors || authors.length === 0) return "";
-
-    if (authors.length === 1) {
-      return `${authors[0].firstName} ${authors[0].lastName}`;
-    }
-
-    return `${authors[0].firstName} ${authors[0].lastName} et al.`;
   }
 }

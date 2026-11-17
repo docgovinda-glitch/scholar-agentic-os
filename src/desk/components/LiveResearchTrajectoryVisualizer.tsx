@@ -9,9 +9,7 @@ import {
   Filter,
   BarChart3,
   ShieldCheck,
-  FileText,
   Square,
-  Sparkles,
 } from "lucide-react";
 import type { ResearchStageTelemetry } from "../api/types";
 import ScholarCoreLogo from "../../components/ScholarCoreLogo";

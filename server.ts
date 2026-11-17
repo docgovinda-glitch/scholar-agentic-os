@@ -2,18 +2,15 @@ import express from "express";
 import helmet from "helmet";
 import path from "path";
 import fs from "fs";
-import { fileURLToPath } from "url";
-import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 
 import "express-async-errors";
 import { rateLimit } from "./server/src/middleware/rateLimit.ts";
 import { errorHandler } from "./server/src/middleware/errorHandler.ts";
 import { getMaxUploadMb } from "./server/src/middleware/uploadGuard.ts";
-import { registerDefaultParsers, detectHeadings } from "./src/document_intelligence/index.ts";
+import { registerDefaultParsers } from "./src/document_intelligence/index.ts";
 import { registerBuiltinAgents } from "./src/app/mesh/agents/index.ts";
-import type { CanonicalReference, ReferenceAuthor, ReferenceKind } from "./src/citation_compliance/model/reference.ts";
-import { CitationStyleRegistry, CitationFormatterFactory } from "./src/citation_compliance/formattingEngine.ts";
+import { CitationStyleRegistry } from "./src/citation_compliance/formattingEngine.ts";
 import { APA7Formatter } from "./src/citation_compliance/formatters/apa7.ts";
 import { IEEEFormatter } from "./src/citation_compliance/formatters/ieee.ts";
 import { MLA9Formatter } from "./src/citation_compliance/formatters/mla9.ts";
@@ -21,14 +18,8 @@ import { ChicagoFormatter } from "./src/citation_compliance/formatters/chicago.t
 import { ChicagoNotesFormatter } from "./src/citation_compliance/formatters/chicagoNotes.ts";
 import { HarvardFormatter } from "./src/citation_compliance/formatters/harvard.ts";
 import { VancouverFormatter } from "./src/citation_compliance/formatters/vancouver.ts";
-import { importBibTex } from "./src/citation_compliance/importers/bibtexImporter.ts";
-import { importRis } from "./src/citation_compliance/importers/risImporter.ts";
 import {
-  getCloudProvider,
-  chatUrl,
-  buildAuthHeaders,
   DIRECT_BROWSER_CALL_ORIGINS,
-  type CloudProviderSpec,
 } from "./src/config/providerCatalog.ts";
 import http from "node:http";
 import { LOCAL_RUNNERS } from "./src/config/localRunnerCatalog.ts";
@@ -37,7 +28,7 @@ import { aiRouteDecorator } from "./server/src/ai/routerBridge.ts";
 import { legacyAgentPath } from "./server/src/middleware/legacyAgentPath.ts";
 import { onProjectSaved } from "./src/services/store/projectStore.ts";
 import { mirrorAssignmentProject } from "./server/src/assignmentRelational.ts";
-import { registerHealthRoutes, registerAdminRoutes, registerAuthRoutes, registerAIRoutes, registerStudioRoutes, registerProjectRoutes, registerDraftingRoutes, registerAiAccessRoutes, registerSearchRoutes, registerVaultRoutes, registerPresentationRoutes, registerSupabaseProxy, registerSupabaseWsProxy } from "./server/routes/index.ts";
+import { registerHealthRoutes, registerAdminRoutes, registerAuthRoutes, registerAIRoutes, registerStudioRoutes, registerProjectRoutes, registerAiAccessRoutes, registerSearchRoutes, registerVaultRoutes, registerPresentationRoutes, registerSupabaseProxy, registerSupabaseWsProxy } from "./server/routes/index.ts";
 
 if (!process.env.VITEST && process.env.NODE_ENV !== "test") {
   dotenv.config();
@@ -47,14 +38,6 @@ if (!process.env.VITEST && process.env.NODE_ENV !== "test") {
 const PORT = Number(process.env.PORT) || 3000;
 
 // Resolve server directory across both dev ESM (`tsx server.ts`) and production CJS (`dist/server.cjs`).
-function resolveServerDirname(): string {
-  if (typeof import.meta !== "undefined" && import.meta.url) {
-    return path.dirname(fileURLToPath(import.meta.url));
-  }
-  // @ts-ignore - __dirname is provided by Node's CJS runtime in the bundled dist/server.cjs
-  return __dirname;
-}
-const serverDirname = resolveServerDirname();
 
 const app = express();
 app.set("trust proxy", 1);
@@ -237,13 +220,12 @@ app.use(["/api/ai/run", "/api/ai/models"], aiAbuseLimit);
 registerAiRunRoutes(app);
 // Every other AI call site runs through the same router (server/src/ai/routerBridge.ts);
 // their JSON responses carry an `aiRoute` summary of which model answered and why.
-app.use(["/api/ai", "/api/drafting", "/api/projects/:id/agentic", "/api/projects/:id/assignment", "/api/projects/:id/thesis", "/api/projects/:id/proposal", "/api/projects/:id/presentation", "/api/projects/:id/manuscript", "/api/projects/:id/journal-requirements", "/api/projects/:id/cover-letter", "/api/projects/:id/anonymization", "/api/studio/refine", "/api/presentations"], aiRouteDecorator);
+app.use(["/api/ai", "/api/projects/:id/agentic", "/api/projects/:id/assignment", "/api/projects/:id/thesis", "/api/projects/:id/proposal", "/api/projects/:id/presentation", "/api/projects/:id/manuscript", "/api/projects/:id/journal-requirements", "/api/projects/:id/cover-letter", "/api/projects/:id/anonymization", "/api/studio/refine", "/api/presentations"], aiRouteDecorator);
 registerAIRoutes(app, aiAbuseLimit, citationStyleRegistry);
 registerStudioRoutes(app, studioLimit);
 // Coursework (OT-01) saves are mirrored into normalized per-stage tables.
 onProjectSaved(mirrorAssignmentProject);
 registerProjectRoutes(app, projectLimit);
-registerDraftingRoutes(app);
 registerAiAccessRoutes(app);
 registerSearchRoutes(app);
 registerVaultRoutes(app);

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Maximize2, NotebookText, Timer, X } from 'lucide-react';
 import type { SlideDeck } from '../types/slides';
 import { CANVAS_H, CANVAS_W } from './geometry';

@@ -1,4 +1,3 @@
-import crypto from "crypto";
 import { canonicalizeAssignmentUpdate } from "../../src/domain/assignment/answerKeys.ts";
 import express from "express";
 import { requestCompleter } from "../src/ai/browserHandoff.ts";
@@ -48,59 +47,18 @@ import {
   isValidDocument,
   isValidJournalRequirementsInput,
   recomputeG1,
-  recomputeG2 as _recomputeG2,
+  recomputeG2,
   recomputeG3,
-  recomputeG4 as _recomputeG4,
-  recomputeG6 as _recomputeG6,
-  projectView as _projectView,
-  saveClaimGraphChange as _saveClaimGraphChange,
-  currentUserId as _currentUserId,
-  loadOwnedProject as _loadOwnedProject,
-  asyncRoute as _asyncRoute,
-  getSharedStore as _getSharedStore,
-  __resetSharedStoreForTests as ___resetSharedStoreForTests,
+  recomputeG4,
+  recomputeG6,
+  projectView,
+  saveClaimGraphChange,
+  currentUserId,
+  loadOwnedProject,
+  asyncRoute,
+  getSharedStore,
 } from "./project/core/projectHelpers.ts";
 import { registerManuscriptAndGateRoutes } from "./project/core/manuscriptAndGateRoutes.ts";
-import type { ProjectRecord, ProjectStore } from "../../src/services/store/types.ts";
-import type { CanonicalDocument } from "../../src/domain/document/model.ts";
-import type { ClaimEvidenceGraph } from "../../src/domain/claim/types.ts";
-
-export function recomputeG2(record: ProjectRecord) {
-  return _recomputeG2(record);
-}
-export function recomputeG4(record: ProjectRecord, document: CanonicalDocument | undefined) {
-  return _recomputeG4(record, document);
-}
-export function recomputeG6(record: ProjectRecord, document: CanonicalDocument) {
-  return _recomputeG6(record, document);
-}
-export function projectView(record: ProjectRecord | undefined) {
-  return _projectView(record);
-}
-export function saveClaimGraphChange(store: ProjectStore, record: ProjectRecord, claimGraph: ClaimEvidenceGraph) {
-  return _saveClaimGraphChange(store, record, claimGraph);
-}
-export function currentUserId(req: express.Request): string {
-  return _currentUserId(req);
-}
-export async function loadOwnedProject(
-  store: { get(id: string): Promise<ProjectRecord | undefined> },
-  req: express.Request,
-  res: express.Response
-): Promise<ProjectRecord | null> {
-  return _loadOwnedProject(store, req, res);
-}
-export function asyncRoute(
-  handler: (req: express.Request, res: express.Response) => Promise<unknown>
-): express.RequestHandler {
-  return (req, res, next) => _asyncRoute(handler)(req, res, next);
-}
-export function getSharedStore() {
-  return _getSharedStore();
-}
-export function __resetSharedStoreForTests(): void {
-  return ___resetSharedStoreForTests();
-}
 
 export function registerProjectRoutes(app: express.Express, projectLimit: express.RequestHandler): void {
   const store = getSharedStore();

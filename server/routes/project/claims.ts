@@ -6,21 +6,19 @@ import {
   projectView, 
   saveClaimGraphChange, 
   recomputeG4 
-} from "../project.ts";
+} from "./core/projectHelpers.ts";
 import { 
   addClaim, 
   bindEvidence, 
-  removeSource, 
   unsupportedClaims, 
   findConflicts, 
-  claimsDependingOnSource, 
   markClaimUnsupported, 
   ClaimGraphError 
 } from "../../../src/domain/claim/graph.ts";
 import { ClaimSchema, ClaimEvidenceBindingSchema } from "../../../src/domain/schemas/projectSchemas.ts";
 import type { Claim, ClaimEvidenceBinding } from "../../../src/domain/claim/types.ts";
 import { GateTransitionError } from "../../../src/app/conductor/conductor.ts";
-import { syncClaimToRelational, syncBindingToRelational, deleteSourceFromRelational } from "../../src/syncRelational.ts";
+import { syncClaimToRelational, syncBindingToRelational } from "../../src/syncRelational.ts";
 
 function isValidClaim(value: unknown): value is Claim {
   return ClaimSchema.safeParse(value).success;

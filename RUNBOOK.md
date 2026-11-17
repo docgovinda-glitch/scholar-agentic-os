@@ -53,7 +53,7 @@ The code is stateless on Render, so rolling back is just redeploying an earlier 
 1. Render dashboard → service → **Events / Deploys** → pick the last good deploy → **Rollback**. Alternatively, revert the bad PR with a new PR, which is better because `main` then matches production.
 2. Confirm with `/api/health` that `commit` equals the old SHA, then run the smoke suite.
 
-Database changes do not roll back with the code. Every migration applied in production is listed in `STATUS.md` §1 along with its rollback note.
+Database changes do not roll back with the code. Every migration applied in production is listed in `docs/records/STATUS.md` §1 along with its rollback note.
 
 ## 4. Database changes
 
@@ -90,7 +90,7 @@ The server also caps `/api/auth/login` at 5 per 5 minutes per IP (`server/src/mi
 To change a limit:
 1. Send `PATCH /v1/projects/{ref}/config/auth` with the field.
 2. Read it back with `GET` on the same endpoint.
-3. Note the change in `STATUS.md`.
+3. Note the change in `docs/records/STATUS.md`.
 
 ## 7. When something breaks
 
@@ -104,8 +104,8 @@ To change a limit:
 
 ## 8. Where things are recorded
 
-- `STATUS.md`: task checklist, production change ledger with rollbacks, PR ledger.
-- `PRODUCT_AUDIT.md`: product findings (P0/P1) and their fix PRs.
+- `docs/records/STATUS.md`: task checklist, production change ledger with rollbacks, PR ledger.
+- `docs/records/PRODUCT_AUDIT.md`: product findings (P0/P1) and their fix PRs.
 - `ROTATION_RUNBOOK.md`: credential rotation, including the agent's own credentials (§7).
 - `CHANGELOG.md`: user-visible changes.
 

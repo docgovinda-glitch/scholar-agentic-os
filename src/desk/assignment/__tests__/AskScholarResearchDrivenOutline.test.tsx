@@ -5,7 +5,6 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { planBriefInquiries } from "../../../domain/assignment/briefInquiryPlan";
 import {
   generateDynamicAssignmentStructure,
-  generateAdaptiveDefaultOutline,
 } from "../services/outlineService";
 import { DynamicStructurePlanner } from "../components/DynamicStructurePlanner";
 
