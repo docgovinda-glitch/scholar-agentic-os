@@ -1,9 +1,9 @@
 /**
- * CAPTCHA service for Cloudflare Turnstile integration.
- * Provides abuse protection on signup form.
+ * CAPTCHA configuration for Cloudflare Turnstile.
  *
- * Turnstile is configured in Cloudflare dashboard and returns verification
- * tokens that the server validates via CAPTCHA_SECRET_KEY.
+ * The widget itself lives in src/desk/auth/CaptchaWidget.tsx. Turnstile tokens
+ * are single-use, so the widget owns their lifecycle (reset after a failed
+ * attempt, cleared on expiry). The server-side check is done by Supabase Auth.
  */
 
 export interface CaptchaConfig {
@@ -26,46 +26,7 @@ export function getCaptchaConfig(): CaptchaConfig {
 }
 
 /**
- * Request a CAPTCHA token from Turnstile.
- * Must be called in response to user interaction (form submission).
- * Returns the verification token to send to the server.
- */
-export async function getCaptchaToken(): Promise<string | null> {
-  if (!window.turnstile) {
-    console.error("Turnstile CAPTCHA not loaded");
-    return null;
-  }
-
-  try {
-    const token = await window.turnstile.getResponse();
-    if (token) return token;
-    return null;
-  } catch (error) {
-    console.error("Error getting CAPTCHA token:", error);
-    return null;
-  }
-}
-
-/**
- * Reset the CAPTCHA widget (called when user wants to retry after error).
- */
-export function resetCaptcha(): void {
-  if (window.turnstile) {
-    window.turnstile.reset();
-  }
-}
-
-/**
- * Remove/reset the CAPTCHA widget (called after successful submission).
- */
-export function clearCaptcha(): void {
-  if (window.turnstile) {
-    window.turnstile.remove();
-  }
-}
-
-/**
- * Type augmentation for Cloudflare Turnstile API.
+ * Type augmentation for the Cloudflare Turnstile API (loaded by CaptchaWidget).
  */
 declare global {
   interface Window {

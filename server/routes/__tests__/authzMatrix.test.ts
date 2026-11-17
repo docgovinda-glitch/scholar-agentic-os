@@ -101,7 +101,6 @@ const PUBLIC_API_ALLOWLIST = new Set<string>([
   "GET /api/ai/status",
   "GET /api/atlas/output-types",
   "GET /api/atlas/output-types/:id",
-  "POST /api/auth/verify-signup",
   "POST /api/auth/login",
   "POST /api/auth/check-availability",
 ]);

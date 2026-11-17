@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { loadGoogleGsiScript, signInWithGoogleIdToken, signInWithGoogle } from "../../services/supabaseAuthService";
+import {
+  GOOGLE_CLIENT_ID,
+  loadGoogleGsiScript,
+  signInWithGoogleIdToken,
+  signInWithGoogle,
+} from "../../services/supabaseAuthService";
 import { GoogleSignInButton } from "./AuthLayout";
-
-const GOOGLE_CLIENT_ID =
-  (typeof import.meta !== "undefined" && (import.meta?.env?.VITE_GOOGLE_CLIENT_ID as string | undefined)) ||
-  (typeof process !== "undefined" && (process?.env?.VITE_GOOGLE_CLIENT_ID as string | undefined)) ||
-  "321279128437-m3pm3b0qk9kli39mv2em8t5fq2io841p.apps.googleusercontent.com";
 
 interface GoogleIdentityButtonProps {
   onSuccess?: () => void;
@@ -51,6 +51,7 @@ export default function GoogleIdentityButton({ onSuccess, onError, disabled }: G
 
   useEffect(() => {
     let cancelled = false;
+    let iframeCheckTimer: ReturnType<typeof setTimeout> | undefined;
 
     loadGoogleGsiScript()
       .then(() => {
@@ -117,7 +118,7 @@ export default function GoogleIdentityButton({ onSuccess, onError, disabled }: G
         // Verification check: If Google fails to render the iframe inside containerRef
         // (common when Authorized JavaScript origins is missing in Google Cloud Console or cookies blocked),
         // fallback smoothly to our standard GoogleSignInButton after 1.5s so the user is never stuck.
-        setTimeout(() => {
+        iframeCheckTimer = setTimeout(() => {
           if (!cancelled && containerRef.current) {
             const hasIframe = containerRef.current.querySelector("iframe");
             if (!hasIframe) {
@@ -133,6 +134,7 @@ export default function GoogleIdentityButton({ onSuccess, onError, disabled }: G
 
     return () => {
       cancelled = true;
+      if (iframeCheckTimer !== undefined) clearTimeout(iframeCheckTimer);
     };
   }, []);
 

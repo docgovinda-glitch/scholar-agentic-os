@@ -1,4 +1,4 @@
-import { useCallback, useState, type FormEvent } from "react";
+import { useCallback, useRef, useState, type FormEvent } from "react";
 import { Navigate, useNavigate, useLocation, type Location } from "react-router-dom";
 import {
   sendPasswordResetEmail,
@@ -13,7 +13,7 @@ import {
 } from "../../services/supabaseAuthService";
 import { useDeskSession } from "../useDeskSession";
 import { SessionBoundaryFallback } from "../DeskAuthGate";
-import CaptchaWidget from "./CaptchaWidget";
+import CaptchaWidget, { type CaptchaWidgetHandle } from "./CaptchaWidget";
 import {
   AuthError,
   AuthForm,
@@ -167,12 +167,12 @@ export function SignInScreen({
   onForgot: () => void;
   embedded?: boolean;
 }) {
-  const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captchaRef = useRef<CaptchaWidgetHandle>(null);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -180,10 +180,13 @@ export function SignInScreen({
     setError(null);
     try {
       const result = await signIn({ username: username.trim(), password, captchaToken: captchaToken || undefined });
-      if (result.success) return; // useDeskSession flips to "signed-in"; PublicOnly (DeskAuthGate.tsx) notices and navigates away.
+      if (result.success) return; // useDeskSession flips to "signed-in"; PublicOnly (DeskAuthGate.tsx) notices and follows ?redirect=.
 
+      // The token was spent on this attempt, so a retry needs a fresh challenge.
+      captchaRef.current?.reset();
       setError(result.error ?? "Could not sign you in.");
     } catch (e) {
+      captchaRef.current?.reset();
       setError((e as Error).message);
     } finally {
       setBusy(false);
@@ -217,7 +220,7 @@ export function SignInScreen({
             <AuthLink onClick={onForgot}>Forgot your password?</AuthLink>
           </div>
         </div>
-        <CaptchaWidget onTokenReady={setCaptchaToken} />
+        <CaptchaWidget ref={captchaRef} onTokenReady={setCaptchaToken} />
         {error && <AuthError>{error}</AuthError>}
         <SubmitButton busy={busy} busyLabel="Signing in…" disabled={!username.trim() || !password}>
           Sign in
@@ -228,7 +231,7 @@ export function SignInScreen({
         <AuthDivider />
       </div>
       <div className="mt-3.5">
-        <GoogleIdentityButton onSuccess={() => navigate("/desk")} onError={(msg) => setError(msg)} />
+        <GoogleIdentityButton onError={(msg) => setError(msg)} />
       </div>
       <div className="mt-5 pt-4 border-t border-neutral-200/80 dark:border-white/10 text-center">
         <p className="text-xs text-neutral-500 dark:text-neutral-400">
@@ -263,11 +266,11 @@ export function SignUpScreen({
   onBack: () => void;
   embedded?: boolean;
 }) {
-  const navigate = useNavigate();
   const [fields, setFields] = useState<SignUpFields>(EMPTY_SIGN_UP);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captchaRef = useRef<CaptchaWidgetHandle>(null);
   const [usernameAvailability, setUsernameAvailability] = useState<Availability>(null);
   const [emailAvailability, setEmailAvailability] = useState<Availability>(null);
   const [phoneAvailability, setPhoneAvailability] = useState<Availability>(null);
@@ -332,10 +335,16 @@ export function SignUpScreen({
     setBusy(true);
     setError(null);
     try {
+      // A field the blur check already verified for its current text is not
+      // re-queried. Only the ones never checked (or edited since) are sent.
       const [usernameOk, emailOk, phoneOk] = await Promise.all([
-        checkUsernameAvailable(username),
-        checkEmailAvailable(email),
-        phoneE164 ? checkPhoneAvailable(phoneE164) : Promise.resolve(true),
+        usernameStatus?.status === "available" ? true : checkUsernameAvailable(username),
+        emailStatus?.status === "available" ? true : checkEmailAvailable(email),
+        !phoneE164
+          ? Promise.resolve(true)
+          : phoneStatus?.status === "available"
+            ? true
+            : checkPhoneAvailable(phoneE164),
       ]);
       if (!usernameOk) {
         setUsernameAvailability({ checkedValue: username, status: "taken" });
@@ -360,11 +369,14 @@ export function SignUpScreen({
         captchaToken: captchaToken || undefined,
       });
       if (!result.success) {
+        // The token was spent on this attempt; a retry needs a fresh challenge.
+        captchaRef.current?.reset();
         setError(result.error ?? "Registration failed.");
         return;
       }
       onDone(email);
     } catch (e) {
+      captchaRef.current?.reset();
       setError((e as Error).message);
     } finally {
       setBusy(false);
@@ -457,7 +469,7 @@ export function SignUpScreen({
           />
         </div>
 
-        <CaptchaWidget onTokenReady={setCaptchaToken} />
+        <CaptchaWidget ref={captchaRef} onTokenReady={setCaptchaToken} />
         {error && <AuthError>{error}</AuthError>}
         <SubmitButton busy={busy} busyLabel="Creating account…" disabled={problem !== null}>
           Create account
@@ -468,7 +480,7 @@ export function SignUpScreen({
         <AuthDivider />
       </div>
       <div className="mt-2.5">
-        <GoogleIdentityButton onSuccess={() => navigate("/desk")} onError={(msg) => setError(msg)} />
+        <GoogleIdentityButton onError={(msg) => setError(msg)} />
       </div>
 
       <div className="mt-3.5 pt-3 border-t border-neutral-200/80 dark:border-white/10 text-center">
@@ -493,6 +505,7 @@ export function ForgotScreen({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captchaRef = useRef<CaptchaWidgetHandle>(null);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -501,8 +514,12 @@ export function ForgotScreen({
     try {
       const result = await sendPasswordResetEmail(email.trim(), captchaToken || undefined);
       if (result.success) setSent(true);
-      else setError(result.error ?? "Could not send the reset email.");
+      else {
+        captchaRef.current?.reset();
+        setError(result.error ?? "Could not send the reset email.");
+      }
     } catch (e) {
+      captchaRef.current?.reset();
       setError((e as Error).message);
     } finally {
       setBusy(false);
@@ -517,7 +534,7 @@ export function ForgotScreen({
           If an account exists for {email.trim()}, a reset link is on its way. The link opens Scholar and lets you set
           a new password.
         </AuthNotice>
-        <div className="mt-6 pt-4 border-t border-slate-200/80 dark:border-neutral-800 text-center">
+        <div className="mt-6 pt-4 border-t border-neutral-200/80 dark:border-white/10 text-center">
           <AuthLink onClick={onBack}>Back to sign in</AuthLink>
         </div>
       </AuthShell>
@@ -529,13 +546,13 @@ export function ForgotScreen({
       <AuthHeading title="Reset your password" subtitle="We will email you a link to set a new one." />
       <AuthForm onSubmit={handleSubmit}>
         <Field id="reset-email" label="Email" type="email" value={email} onChange={setEmail} autoComplete="email" autoFocus />
-        <CaptchaWidget onTokenReady={setCaptchaToken} />
+        <CaptchaWidget ref={captchaRef} onTokenReady={setCaptchaToken} />
         {error && <AuthError>{error}</AuthError>}
         <SubmitButton busy={busy} busyLabel="Sending…" disabled={!email.trim()}>
           Send reset link
         </SubmitButton>
       </AuthForm>
-      <div className="mt-6 pt-4 border-t border-slate-200/80 dark:border-neutral-800 text-center">
+      <div className="mt-6 pt-4 border-t border-neutral-200/80 dark:border-white/10 text-center">
         <AuthLink onClick={onBack}>Back to sign in</AuthLink>
       </div>
     </AuthShell>
@@ -628,12 +645,7 @@ export function RegisteredScreen({
         )}
       </AuthNotice>
       <div className="mt-6 flex flex-col items-start gap-3">
-        <button
-          onClick={onResend}
-          className="text-sm text-[color:var(--accent)] transition-colors duration-[var(--motion-fast)] hover:text-[color:var(--accent-hover)] cursor-pointer"
-        >
-          Didn't receive the email? Resend it
-        </button>
+        <AuthLink onClick={onResend}>Didn't receive the email? Resend it</AuthLink>
         <AuthLink onClick={onBack}>Back to sign in</AuthLink>
       </div>
     </AuthShell>
@@ -656,12 +668,9 @@ function EmailVerificationSuccessScreen({ email, onContinue }: { email?: string 
         )}
       </AuthNotice>
       <div className="mt-6">
-        <button
-          onClick={onContinue}
-          className="w-full rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-4 py-2.5 text-sm font-medium text-[color:var(--text-inverse)] transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--accent-hover)] cursor-pointer"
-        >
+        <SubmitButton busy={false} disabled={false} busyLabel="" onClick={onContinue}>
           Continue to Scholar Core
-        </button>
+        </SubmitButton>
       </div>
     </AuthShell>
   );
@@ -758,7 +767,7 @@ function OnboardingScreen({ onDone }: { onDone: () => void }) {
       <AuthForm onSubmit={handleSubmit}>
         <SelectField
           id="user_type"
-          label="Role"
+          label="User Type"
           value={userType}
           onChange={setUserType}
           options={USER_TYPES}
@@ -766,7 +775,7 @@ function OnboardingScreen({ onDone }: { onDone: () => void }) {
         />
         <SelectField
           id="education_level"
-          label="Highest education level"
+          label="Level of Education"
           value={educationLevel}
           onChange={setEducationLevel}
           options={EDUCATION_LEVELS}
@@ -774,7 +783,7 @@ function OnboardingScreen({ onDone }: { onDone: () => void }) {
         />
         <Field
           id="affiliation"
-          label="Institution or Company"
+          label="Institution"
           value={affiliation}
           onChange={setAffiliation}
           hint="Optional. Where do you study or work?"
