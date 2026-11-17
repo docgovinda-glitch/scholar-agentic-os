@@ -55,7 +55,6 @@ filesRouter.post(
     const supabase = createClient(config.supabaseUrl, config.serviceRoleKey);
     
     // Generate a unique storage path for the file
-    const fileExt = file.originalname.split('.').pop() || '';
     const safeName = file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_');
     const storagePath = `${projectId}/${Date.now()}_${safeName}`;
     

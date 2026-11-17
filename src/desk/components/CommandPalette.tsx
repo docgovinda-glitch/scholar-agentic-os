@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   Search,
-  BookOpen,
   FileText,
-  Sparkles,
   Database,
   Sliders,
   MessageSquare,
@@ -14,7 +12,6 @@ import {
   Globe,
   Compass,
   X,
-  Clock,
 } from "lucide-react";
 import type { ProjectView } from "../types";
 import { getProjectDisplayName, matchesProjectSearch, getFormatLabel, deduplicateProjectList } from "../projectNaming";

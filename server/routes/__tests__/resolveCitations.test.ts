@@ -17,7 +17,7 @@ vi.mock("../../src/middleware/auth.ts", () => ({
 import request from "supertest";
 import { app } from "../../../server.ts";
 import { __resetProjectStoreForTests } from "../../../src/app/conductor/projectStore.ts";
-import { getSharedStore } from "../project.ts";
+import { getSharedStore } from "../project/core/projectHelpers.ts";
 import { sourceToReference } from "../../../src/app/citation/resolveCitations.ts";
 import { __resetRateLimitStore } from "../../src/middleware/rateLimit.ts";
 import { __setEnabledOutputTypesForTests } from "../outputTypeAccess.ts";

@@ -17,9 +17,8 @@
  *    Tavily's open-ended-cost Research endpoint. Calling Tavily directly
  *    from here instead would bypass that boundary — so this module never
  *    holds or sends a Tavily key itself.
- *  - Synthesis uses the same raw Gemini generateContent call
- *    server/routes/parse.ts already makes for OCR, against the existing
- *    GEMINI_API_KEY — no new provider credential.
+ *  - Synthesis goes through scholarBrain's routed completion (the one AI
+ *    engine, on the admin's own AI Access connections) — no provider key here.
  *
  * The synthesis prompt is deliberately restrictive about what counts as a
  * usable finding (Section 17's safety rule): official sources only, honest
@@ -28,7 +27,7 @@
 
 import { getSupabaseRestConfig, SupabaseTable } from "../supabaseRest";
 import type express from "express";
-import { routedCompletion } from "../ai/routerBridge.ts";
+import { routedCompletion } from "../services/scholarBrain.ts";
 import { LocalModelUnreachableError, NoClientAiProviderError } from "../ai/aiRouteErrors.ts";
 
 interface RawOpportunity {

@@ -9,7 +9,6 @@ import {
   removePendingMutation,
   saveCachedProject,
   listCachedProjects,
-  type OfflineMutation,
 } from "./indexedDbStorage";
 
 export type SyncStatus = "online" | "offline" | "syncing" | "synced" | "error";

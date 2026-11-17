@@ -18,7 +18,6 @@ import Header from "./regions/Header";
 import Rail from "./regions/Rail";
 import Primary from "./regions/Primary";
 import Aside from "./regions/Aside";
-import IntakePanel from "./intake/IntakePanel";
 import ResearchDefinitionPanel from "./journal/ResearchDefinitionPanel";
 import GatesPanel from "./gates/GatesPanel";
 import ClaimsPanel from "./claims/ClaimsPanel";

@@ -1,9 +1,9 @@
 import express, { Request, Response } from "express";
 import { requireAuth } from "../src/middleware/auth.ts";
-import { readVerifiedBrowserResult, signLlmChallenge, computePromptHash } from "../src/services/scholarBrain.ts";
+import { readVerifiedBrowserResult, signLlmChallenge, computePromptHash, routedCompletion } from "../src/services/scholarBrain.ts";
 import { requestKeyring } from "../src/ai/routerBridge.ts";
 import { InvalidLlmChallengeError, LocalModelUnreachableError, NoClientAiProviderError, sendAiFailure } from "../src/ai/aiRouteErrors.ts";
-import { aiAvailability, answeredByLabel, routedCompletion } from "../src/ai/routerBridge.ts";
+import { aiAvailability, answeredByLabel } from "../src/ai/routerBridge.ts";
 import type { ResearchLlm } from "../src/research/deepResearchEngine.ts";
 import { executeWebSearch, formatSearchResultsForPrompt, type SearchResultItem } from "../src/research/webSearchEngine.ts";
 import { executeDeepResearch, DeepResearchBrowserHandOffError } from "../src/research/deepResearchEngine.ts";
@@ -320,116 +320,6 @@ export function registerAIRoutes(
       res.json({ ok: true, ...webResults, evidence: scholarEvidence });
     } catch (err) {
       res.status(500).json({ error: `Web search failed: ${err instanceof Error ? err.message : String(err)}` });
-    }
-  });
-
-  /**
-   * POST /api/ai/deep-research
-   * Dedicated Deep Research pipeline with full document, image, and 426 browser-LLM hand-off support.
-   */
-  router.post("/deep-research", requireAuth, async (req: Request, res: Response) => {
-    try {
-      const {
-        topic,
-        files = [],
-        images = [],
-        vaultSources = [],
-        citationStyle = "apa",
-        approvedSubQuestions,
-        preRetrievedSources,
-      } = req.body || {};
-      if (!topic || typeof topic !== "string") {
-        return res.status(400).json({ error: "Missing required topic string" });
-      }
-      const hasBrowserResult = req.body?.llmResult !== undefined && req.body?.llmResult !== null;
-      const where = await aiAvailability(req, "reasoning").catch(() => "server" as const);
-      if (where === "none" && !hasBrowserResult) {
-        return sendAiFailure(res, new NoClientAiProviderError(), "Deep research");
-      }
-
-      const makeChallengeToken = (sysPrompt: string, uPrompt: string): string => challengeTokenFor(req, "/api/ai/deep-research", sysPrompt, uPrompt);
-
-      const [evidence] = await Promise.all([
-        scholarBrain.retrieveEvidence({ query: topic, maxResults: 15, vaultSources }).catch(() => []),
-      ]);
-
-      const normalizedImages = normalizeAttachedImages(images);
-
-      const normalizedPreRetrieved = normalizePreRetrievedSources(preRetrievedSources);
-      let result;
-      try {
-        result = await executeDeepResearch(
-          topic,
-          researchLlm(req),
-          undefined,
-          files,
-          normalizedImages,
-          Array.isArray(vaultSources) ? vaultSources : [],
-          String(citationStyle || "apa"),
-          {
-            approvedSubQuestions: Array.isArray(approvedSubQuestions) ? approvedSubQuestions : undefined,
-            preRetrievedSources: normalizedPreRetrieved,
-            forceBrowserHandOff: !hasBrowserResult && where === "browser",
-            verifyAndReadBrowserResult: hasBrowserResult
-              ? (sys, usr) => readVerifiedBrowserResult(req, sys, usr)
-              : undefined,
-          }
-        );
-      } catch (deepErr) {
-        if (deepErr instanceof DeepResearchBrowserHandOffError) {
-          return res.status(426).json({
-            requireFrontendLLM: true,
-            challengeToken: makeChallengeToken(deepErr.systemPrompt, deepErr.userPrompt),
-            systemPrompt: deepErr.systemPrompt,
-            userPrompt: deepErr.userPrompt,
-            taskType: "reasoning",
-            mode: "deep-research",
-            citations: deepErr.allCitations,
-            plan: deepErr.plan,
-            researchPlan: deepErr.researchPlan,
-            stages: deepErr.stages,
-            evidence: deepErr.evidence,
-            citationStyle: String(citationStyle || "apa"),
-          });
-        }
-        throw deepErr;
-      }
-
-      const verifiedSources: VerifiedSourceItem[] = evidence
-        .filter((e) => e.authors && e.authors.length > 0 && e.year)
-        .map((e) => ({
-          id: e.id,
-          authors: e.authors,
-          year: String(e.year),
-          title: e.title,
-          doi: e.doi,
-          url: e.url,
-          journal: e.venue,
-        }));
-
-      const hasCiteTokens = /\[CITE:[^\]]+\]/i.test(result.synthesizedReport);
-      const scrubbed = hasCiteTokens
-        ? scholarBrain.scrubAndFormatCitations(
-            result.synthesizedReport,
-            verifiedSources,
-            "apa7",
-            "en-GB"
-          )
-        : null;
-
-      const finalReport = scrubbed && scrubbed.citedSources.length > 0 ? scrubbed.formattedText : result.synthesizedReport;
-
-      res.json({
-        ok: true,
-        ...result,
-        synthesizedReport: finalReport,
-        text: finalReport,
-        wordCount: countExactWords(finalReport),
-        verifiedSourcesCount: Math.max(scrubbed?.citedSources.length ?? 0, (result.allCitations || []).length),
-        evidence,
-      });
-    } catch (err) {
-      sendAiFailure(res, err, "Deep research");
     }
   });
 

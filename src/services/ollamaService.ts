@@ -295,7 +295,6 @@ export async function diagnoseOllamaConnection(customEndpoint?: string): Promise
   let models: OllamaModelInfo[] = [];
   let latencyMs = 0;
   let isApiReachable = false;
-  let lastThrownError: any = null;
 
   const startTime = Date.now();
 
@@ -322,8 +321,8 @@ export async function diagnoseOllamaConnection(customEndpoint?: string): Promise
         latencyMs = Date.now() - epStart;
         break;
       }
-    } catch (err: any) {
-      lastThrownError = err;
+    } catch {
+      // Try the next candidate endpoint.
     }
   }
 
@@ -337,7 +336,7 @@ export async function diagnoseOllamaConnection(customEndpoint?: string): Promise
         id: "models",
         label: "Installed models",
         status: models.length > 0 ? "pass" : "warning",
-        detail: models.length > 0 ? `${models.length} model(s) detected` : "No models found. Run `ollama pull qwen2.5-coder`",
+        detail: models.length > 0 ? `${models.length} model(s) detected` : "No models found. Pull one with `ollama pull <model>`",
       },
     ];
 

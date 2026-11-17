@@ -91,7 +91,6 @@ export async function checkItemRetraction(item: VaultItem): Promise<RetractionCh
 
     // Check Crossmark update-to relations
     const updateTo = (message["update-to"] || []) as CrossmarkUpdate[];
-    const relation = message["relation"] || {};
     const updates = (Array.isArray(message["updates"]) ? message["updates"] : []) as CrossmarkUpdate[];
 
     // Check if the work itself is a retraction notice

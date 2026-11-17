@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight, Maximize2 } from 'lucide-react';
 import SlideMotifGraphic from './SlideMotifGraphic';
-import SlideCreativeSketchIllustration from './SlideCreativeSketchIllustration';
-import type { SlideTheme, VisualMotif } from '../types/themes';
+import type { VisualMotif } from '../types/themes';
 import type { BestDesignCategory, DesignLayoutArchetype } from '../data/bestSlideDesigns100';
 
 export interface MultiSlideDeckPreviewProps {

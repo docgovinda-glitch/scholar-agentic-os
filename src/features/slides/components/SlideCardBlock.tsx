@@ -1,4 +1,3 @@
-import React from 'react';
 import type { SlideBlock, SlideViewMode } from '../types/slides';
 import type { SlideTheme } from '../types/themes';
 import SlideCreativeSketchIllustration from './SlideCreativeSketchIllustration';

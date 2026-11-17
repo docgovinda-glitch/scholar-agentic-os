@@ -39,7 +39,6 @@ interface LegacyUserRecord {
   encryptedApiKeys?: Record<string, string>;
 }
 
-const IV_LENGTH = 16;
 
 /** Decrypts a value produced by server.ts's old encryptServerKey (AES-256-CBC), so it can be re-stored (unencrypted, per the open question noted in supabaseAuthService.ts) in the new api_credentials table. Only runs if ENCRYPTION_KEY is provided — otherwise those keys are skipped with a warning, not guessed at. */
 function decryptLegacyKey(value: string, encryptionKey: string): string | null {

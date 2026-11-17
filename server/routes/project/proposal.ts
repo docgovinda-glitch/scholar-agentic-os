@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { asyncRoute, loadOwnedProject, getSharedStore } from "../project.ts";
+import { asyncRoute, loadOwnedProject, getSharedStore } from "./core/projectHelpers.ts";
 import {
   sanitizeScholarlyText,
   normalizeUnicodeNFC,
@@ -80,25 +80,7 @@ router.post(
 
     {
       try {
-        const systemPrompt = `You are an NIH/NSF Study Section Scientific Review Officer and Primary Reviewer.
-Evaluate the grant proposal and return a strictly formatted JSON object matching this schema:
-{
-  "overallImpactScore": "string: the overall impact score you assign on the NIH 1-9 scale (1 = exceptional), with one line on why. Do not state a percentile.",
-  "recommendationForFunding": "string: your recommendation in one short phrase",
-  "studySectionMembers": [
-    { "role": "string", "verdict": "string" }
-  ],
-  "criteria": [
-    {
-      "criterion": "Significance" | "Investigator(s)" | "Innovation" | "Approach" | "Environment",
-      "score": number (1.0 to 9.0 scale, where 1.0 is exceptional),
-      "verdict": "string",
-      "critique": "string",
-      "recommendation": "string"
-    }
-  ]
-}
-Return ONLY valid JSON. Zero markdown backticks, zero conversational preambles.`;
+        const systemPrompt = scholarBrain.proposalPrompts.studySectionSystemPrompt();
 
         const userPrompt = `Evaluate this grant proposal:
 Agency: ${agency || "not specified"}${mechanism ? ` (${mechanism})` : ""}
@@ -184,22 +166,7 @@ router.post(
 
     {
       try {
-        const systemPrompt = `You are an expert NIH/NSF grant consultant. Audit the submitted Specific Aims text and output a JSON array of check items:
-{
-  "checks": [
-    {
-      "name": "string (e.g. Overarching Hypothesis Stated)",
-      "status": "passed" | "warn" | "fail",
-      "detail": "string (scholarly justification)"
-    }
-  ]
-}
-Evaluate specifically:
-1. Overarching Hypothesis Stated
-2. Aim Structural Independence
-3. Quantifiable Deliverables & Benchmarks
-4. Specific Aims Page Length Budget
-Output ONLY valid JSON.`;
+        const systemPrompt = scholarBrain.proposalPrompts.aimsAuditSystemPrompt();
 
         const brainRes = await scholarBrain.complete({
           req,
@@ -308,17 +275,7 @@ router.post(
       .map((e) => `${e.citationToken}: ${e.title} (${Array.isArray(e.authors) ? e.authors.slice(0, 2).join(", ") : e.authors}, ${e.year || "n.d."})`)
       .join("\n");
 
-    const systemPrompt = `You are an elite academic grant writer specializing in ${agency} (${mechanism}) applications.
-Draft the "${sectionTitle}" section adhering strictly to high-rigour scholarly conventions.
-${hypothesis ? `Central hypothesis (the section must be consistent with it): ${hypothesis}\n` : ""}${aims.length ? `Specific aims:\n${aims.map((a, i) => `Aim ${i + 1}. ${a}`).join("\n")}\n` : ""}Target word count: approximately ${targetWords} words.
-Scholarly dialect: ${dialect}.
-
-CITATION RULES:
-1. Ground empirical assertions and prior literature using ONLY the provided evidence tokens:
-${evidenceLedger || "No external sources available."}
-2. Insert citations using strictly the token format [CITE:id] (e.g. [CITE:src_1] or [CITE:src_vault_1]).
-3. NEVER invent or hallucinate uncited author names or publication years.
-4. Maintain an objective, assertive, and grant-competitive scholarly tone.`;
+    const systemPrompt = scholarBrain.proposalPrompts.sectionDraftSystemPrompt({ agency, mechanism, sectionTitle, hypothesisLine: hypothesis ? `Central hypothesis (the section must be consistent with it): ${hypothesis}\n` : "", aims: aims.length ? `Specific aims:\n${aims.map((a, i) => `Aim ${i + 1}. ${a}`).join("\n")}\n` : "", targetWords, dialect, evidenceLedger: evidenceLedger || "No external sources available." });
 
     try {
       const brainRes = await scholarBrain.complete({

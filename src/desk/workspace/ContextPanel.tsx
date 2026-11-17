@@ -1,6 +1,5 @@
-import React, { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { ResearchStage } from "./types";
-import { STAGE_MAP } from "./types";
 import { useOptionalResearchWorkspace } from "./ResearchContext";
 import { sendCopilotMessage } from "../api";
 import ScholarCoreLogo from "../../components/ScholarCoreLogo";
@@ -220,7 +219,6 @@ export default function ContextPanel({
   onToggle,
   agent: propAgent,
   projectId: propProjectId,
-  stageName: propStageName,
   onSendMessage,
 }: ContextPanelProps) {
   const researchWorkspace = useOptionalResearchWorkspace();
@@ -237,7 +235,6 @@ export default function ContextPanel({
           iconPath: AI_ICON,
           quickActions: [],
         });
-  const stageDef = typeof effectiveStage === "string" ? STAGE_MAP.get(effectiveStage as ResearchStage) : null;
 
   const [history, setHistory] = useState<Array<{ role: "user" | "assistant"; content: string }>>([]);
   const [inputValue, setInputValue] = useState("");

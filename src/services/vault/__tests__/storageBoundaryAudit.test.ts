@@ -4,11 +4,6 @@ import {
   vaultItemToSource,
   type Source,
 } from "../sourceTypes";
-import {
-  validateLibraryIndex,
-  createEmptyLibraryIndex,
-  serializeLibraryIndex,
-} from "../../cloud/cloudLibraryIndex";
 import { extractLightweightUrlMetadata } from "../../../../server/utils/ssrfGuard";
 
 describe("Storage Boundary & Zero-Document-Persistence Audit", () => {
@@ -94,59 +89,6 @@ describe("Storage Boundary & Zero-Document-Persistence Audit", () => {
     expect(payload.metadata.oauthToken).toBeUndefined();
     expect(payload.metadata.refreshToken).toBeUndefined();
     expect(payload.metadata.clientSecret).toBeUndefined();
-  });
-
-  it("guarantees source-library.json index never contains document contents or credentials", () => {
-    const dirtyIndex: any = {
-      schemaVersion: 1,
-      appName: "Source Library",
-      updatedAt: new Date().toISOString(),
-      libraryStorageProvider: "google_drive",
-      sources: [
-        {
-          id: "src-1",
-          sourceId: "src-1",
-          identity: { fileId: "123", fileName: "test.pdf" },
-          metadata: { title: "Test Article", authors: [] },
-          citation: "Test Article.",
-          projects: [],
-          tags: [],
-          notes: {},
-          integrity: { status: "checked" },
-          integrityStatus: "clean",
-          createdAt: new Date().toISOString(),
-          // Accidental/malicious payloads across all 9 prohibited types:
-          pdfBuffer: "JVBERi0xLjQKJcOkw7zDtsOfC...",
-          docxBuffer: "PK\x03\x04 simulated docx...",
-          xlsxBuffer: "PK\x03\x04 simulated xlsx...",
-          imagePayload: "data:image/png;base64,iVBORw0KGgo...",
-          fullExtractedText: "Massive 20MB document dump...",
-          ocrOutput: "Full OCR page dump with coordinate boxes...",
-          transcriptionOutput: "Full audio transcription text dump...",
-          webpageBody: "<html><body>Entire scraped article body...</body></html>",
-          accessToken: "ya29.leak",
-          refreshToken: "1//leak",
-          clientSecret: "client-secret-leak",
-        },
-      ],
-      projects: [],
-    };
-
-    const validation = validateLibraryIndex(dirtyIndex);
-    expect(validation.valid).toBe(true);
-
-    const json = serializeLibraryIndex(validation.sanitizedIndex!);
-    expect(json).not.toContain("JVBERi0xLjQK");
-    expect(json).not.toContain("simulated docx");
-    expect(json).not.toContain("simulated xlsx");
-    expect(json).not.toContain("iVBORw0KGgo");
-    expect(json).not.toContain("Massive 20MB document dump");
-    expect(json).not.toContain("Full OCR page dump");
-    expect(json).not.toContain("Full audio transcription text dump");
-    expect(json).not.toContain("Entire scraped article body");
-    expect(json).not.toContain("ya29.leak");
-    expect(json).not.toContain("1//leak");
-    expect(json).not.toContain("client-secret-leak");
   });
 
   it("guarantees web URL metadata extractor processes HTML transiently without retaining full body", () => {

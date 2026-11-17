@@ -5,7 +5,6 @@ import type { CanonicalDocument, Block } from "../../../../src/desk/types.ts";
 import { safeParseAnswerField } from "../../../../src/shared/projectStateSchema.ts";
 import { createUploadInstance } from "../../../src/middleware/uploadGuard.ts";
 import type {
-  RefereeRole,
   AcademicCritiqueItem,
   RebuttalMatrixItem,
   CitationReconciliationReport,

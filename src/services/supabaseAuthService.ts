@@ -751,7 +751,7 @@ export function loadGoogleGsiScript(): Promise<void> {
 export async function signInWithGoogleIdToken(idToken: string): Promise<ServiceResult> {
   const supabase = getSupabaseClient();
   localStorage.setItem(GOOGLE_OAUTH_PENDING_KEY, "1");
-  const { data, error } = await supabase.auth.signInWithIdToken({
+  const { error } = await supabase.auth.signInWithIdToken({
     provider: "google",
     token: idToken,
   });
@@ -767,7 +767,7 @@ async function fallbackToOAuth(
   redirectPath: string
 ): Promise<ServiceResult> {
   localStorage.setItem(GOOGLE_OAUTH_PENDING_KEY, "1");
-  const { data, error } = await supabase.auth.signInWithOAuth({
+  const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
       redirectTo: `${window.location.origin}${redirectPath}`,

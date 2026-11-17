@@ -1,10 +1,8 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
-import type { ProjectView } from "../types";
+import { useState, useEffect, useMemo } from "react";
 import type {
   RefereeRole,
   RefereeCritique,
   RebuttalMatrixItem,
-  ManuscriptPatch,
 } from "./types";
 import { useResearchWorkspace } from "./ResearchContext";
 import {

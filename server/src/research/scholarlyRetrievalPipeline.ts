@@ -18,7 +18,7 @@ import {
   evaluateBurstiness,
 } from "../utils/scholarlyVoiceGuard.ts";
 import { CitationFormatterFactory } from "../../../src/citation_compliance/formattingEngine.ts";
-import type { CanonicalReference, ReferenceAuthor } from "../../../src/citation_compliance/model/reference.ts";
+import type { CanonicalReference } from "../../../src/citation_compliance/model/reference.ts";
 
 export interface DeliverableHandoff {
   targetFormatId: "OT-01" | "OT-10" | "OT-15" | "OT-07" | "OT-22";

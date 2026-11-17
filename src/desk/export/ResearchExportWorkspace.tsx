@@ -1,19 +1,15 @@
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import {
   FileCode,
   Download,
   Copy,
   ExternalLink,
-  BookOpen,
   Check,
-  ChevronRight,
   Folder,
   FileText,
   Table,
-  Layers,
   ArrowLeft,
   X,
-  Sparkles,
 } from "lucide-react";
 import {
   type ResearchProjectExportData,

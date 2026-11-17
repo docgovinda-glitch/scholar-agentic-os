@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Plus, Compass, Paperclip, X, MessageSquare } from 'lucide-react';
 
 export type PromptMode = 'auto' | 'chat' | 'deep_research';

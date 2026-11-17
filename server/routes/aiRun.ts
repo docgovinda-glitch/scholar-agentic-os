@@ -129,7 +129,6 @@ export function registerAiRunRoutes(app: express.Express, deps: AiRunDeps = {}):
   const aiFetch = createAiFetch();
   const adapters = deps.adapters ?? serverAdapters();
   const breaker = deps.breaker ?? new CircuitBreaker(new MemoryBreakerStore());
-  const listModels = deps.listModels ?? listLiveModels;
 
   app.post("/api/ai/run", requireAuth, async (req, res) => {
     const userId = (req as express.Request & { user?: { id: string } }).user?.id;

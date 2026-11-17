@@ -1,4 +1,4 @@
-import React, { useState, useMemo, Fragment } from "react";
+import { useState, Fragment } from "react";
 import type { OutputTypeSummary } from "../types";
 import { FORMAT_TILES, getFormatTileTheme } from "./constants";
 
@@ -57,10 +57,6 @@ export function ChooseOutputType({
 }) {
   const [selected, setSelected] = useState("");
 
-  const selectedSummary = useMemo(() => {
-    if (!types || !selected) return null;
-    return types.find((t) => t.id === selected) ?? null;
-  }, [types, selected]);
 
   return (
     <div className="max-w-6xl mx-auto py-6 animate-fade-in font-sans">

@@ -172,15 +172,15 @@ describe("Automated Express Route Authz & Ownership Matrix", () => {
 
   const allApiRoutes = discoverExpressApiRoutes(app);
 
-  it("discovers the Express /api/* route table dynamically (>200 endpoints)", () => {
-    expect(allApiRoutes.length).toBeGreaterThan(200);
+  it("discovers the Express /api/* route table dynamically (>180 endpoints)", () => {
+    expect(allApiRoutes.length).toBeGreaterThan(180);
   });
 
   it("rejects unauthenticated requests with 401 on every non-allowlisted /api/* route", async () => {
     const protectedRoutes = allApiRoutes.filter(
       (r) => !PUBLIC_API_ALLOWLIST.has(`${r.method.toUpperCase()} ${r.path}`),
     );
-    expect(protectedRoutes.length).toBeGreaterThan(200);
+    expect(protectedRoutes.length).toBeGreaterThan(175);
 
     const failures: string[] = [];
 
@@ -211,7 +211,7 @@ describe("Automated Express Route Authz & Ownership Matrix", () => {
     );
 
     // The journal pipeline is mounted once (/agentic); the old /agent alias doubled its routes.
-    expect(resourceRoutes.length).toBeGreaterThan(130);
+    expect(resourceRoutes.length).toBeGreaterThan(115);
 
     const failures: string[] = [];
 

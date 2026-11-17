@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { ChevronDown, FileText, Loader2, Sparkles, Trash2, Upload } from 'lucide-react';
 import type { SlideDeck } from '../types/slides';
 import { composeDeckFromOutline } from '../gamma/composer';

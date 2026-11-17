@@ -10,19 +10,17 @@
  */
 
 import { useState, useEffect, useMemo } from "react";
-import type { VaultItem, CitationStatus, RetractionStatus } from "../../services/vaultContents";
+import type { VaultItem } from "../../services/vaultContents";
 import {
   listVaultItems,
   addVaultItem,
   deleteVaultItem,
   lockVault,
-  updateVaultItemDetails,
   linkVaultItemToProject,
   unlinkVaultItemFromProject,
 } from "../../services/vaultContents";
-import type { Source, SourceType } from "../../services/vault/sourceTypes";
+import type { Source } from "../../services/vault/sourceTypes";
 import { vaultItemToSource } from "../../services/vault/sourceTypes";
-import { formatVaultCitation } from "../../services/vault/citationService";
 import {
   getConnectedCloudDrives,
   type CloudDriveAccount,
@@ -57,8 +55,6 @@ export default function SourceLibraryScreen({
   onLock,
   onResetVault,
   onOpenProject,
-  onSwitchToProjects,
-  projectCount,
 }: SourceLibraryScreenProps) {
   const [items, setItems] = useState<VaultItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,7 +68,6 @@ export default function SourceLibraryScreen({
   const [selectedProjectFilter, setSelectedProjectFilter] = useState<string>("all");
   const [expandedKeyPointsIds, setExpandedKeyPointsIds] = useState<Set<string>>(new Set());
   const [projectMenuSourceId, setProjectMenuSourceId] = useState<string | null>(null);
-  const [customProjectInput, setCustomProjectInput] = useState("");
   const [copiedKeyPointsId, setCopiedKeyPointsId] = useState<string | null>(null);
 
   // Multi-source Selection & Literature Matrix
@@ -840,7 +835,11 @@ export default function SourceLibraryScreen({
             )}
 
             {/* ================= SOURCES LIST ================= */}
-            {filteredSources.length === 0 ? (
+            {loading && items.length === 0 ? (
+              <div role="status" className="p-12 text-center text-xs text-[color:var(--text-muted)] my-4">
+                Loading your sources…
+              </div>
+            ) : filteredSources.length === 0 ? (
               /* Empty State */
               <div className="p-12 text-center rounded-[var(--radius-xl)] border border-dashed border-[color:var(--border-default)] bg-[color:var(--surface-raised)] flex flex-col items-center justify-center gap-3 my-4">
                 <span className="text-4xl">📚</span>
@@ -854,8 +853,6 @@ export default function SourceLibraryScreen({
                     ? "Try adjusting your search terms, project filter, or clearing tags."
                     : "Nothing in your Vault yet. Save sources from Google Drive, OneDrive, websites, or DOI to organize and cite them when you write."}
                 </p>
-                {/* For backward-compatibility with tests expecting "Nothing in your Vault yet." */}
-                <p className="sr-only">Nothing in your Vault yet.</p>
 
                 <button
                   type="button"

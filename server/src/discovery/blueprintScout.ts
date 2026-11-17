@@ -6,37 +6,18 @@
 import type { RawSourceInput } from "../../../src/citation_compliance/cslEngine.ts";
 import { fetchOpenAlexSourceDetails, searchCrossref, searchOpenAlex, type ProviderOptions } from "../../../src/shared/retrieval/providers.ts";
 import {
-  abstractFromInvertedIndex,
-  decodeEntities,
   rankVenues,
-  stripJats,
   type ScoutPaper,
   type VenueMatch,
   type VenueWork,
 } from "../../../src/domain/journal/blueprintFunnel.ts";
 
 type Fetch = typeof fetch;
-type Json = Record<string, unknown>;
 
-const UA = "ScholarCore/2.0 (https://scholar.gkshah.com.np; mailto:support@scholar-core.org)";
 export const RECENT_YEARS = 5;
 export const fromYear = (now = new Date()) => now.getUTCFullYear() - RECENT_YEARS;
 
-async function getJson(f: Fetch, url: string): Promise<Json> {
-  const res = await f(url, { headers: { Accept: "application/json", "User-Agent": UA }, signal: AbortSignal.timeout(15_000) });
-  if (!res.ok) throw new Error(`${new URL(url).host} ${res.status}`);
-  return (await res.json()) as Json;
-}
 
-const cleanDoi = (d: unknown) => (typeof d === "string" && d ? d.replace(/^https?:\/\/(dx\.)?doi\.org\//i, "") : undefined);
-const firstString = (v: unknown) => {
-  const s = Array.isArray(v) ? (typeof v[0] === "string" ? v[0] : undefined) : typeof v === "string" ? v : undefined;
-  return s === undefined ? undefined : decodeEntities(s);
-};
-const crossrefYear = (item: Json) => {
-  const parts = ((item.published ?? item["published-print"] ?? item["published-online"] ?? item.created) as { "date-parts"?: number[][] } | undefined)?.["date-parts"];
-  return parts?.[0]?.[0];
-};
 
 function toScoutPaper(r: RawSourceInput, i: number, source: ScoutPaper["source"]): ScoutPaper {
   return {

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { UploadCloud, Check, Sparkles, Image as ImageIcon, RefreshCw, AlertCircle } from 'lucide-react';
+import { UploadCloud, Check, Sparkles, RefreshCw } from 'lucide-react';
 import type { SlideDeck } from '../types/slides';
 import type { CustomTheme, SlideThemeId } from '../types/themes';
 import {

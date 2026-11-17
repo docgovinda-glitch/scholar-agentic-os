@@ -1,5 +1,5 @@
 import express from "express";
-import { asyncRoute, loadOwnedProject, getSharedStore } from "../project.ts";
+import { asyncRoute, loadOwnedProject, getSharedStore } from "./core/projectHelpers.ts";
 import { buildReport, compileRubricFromOutputType } from "../../../src/app/rubric/rubric.ts";
 import { catalog } from "../../../src/app/atlas/atlas.ts";
 

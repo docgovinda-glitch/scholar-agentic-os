@@ -7,14 +7,10 @@ import {
   ZoomOut,
   Maximize2,
   Download,
-  Share2,
   BookmarkPlus,
   Check,
   ArrowRight,
-  ArrowLeft,
-  ArrowUpRight,
   Layers,
-  Filter,
   ExternalLink,
   BookOpen,
   HelpCircle,
@@ -24,10 +20,7 @@ import {
 } from "lucide-react";
 import {
   type CitationGraphNode,
-  type CitationGraphEdge,
   type CitationGraphState,
-  type CitationGraphCluster,
-  type ResearchGap,
   buildInitialCitationGraph,
   performSnowballExpansion,
   layoutForceDirectedGraph,
@@ -46,7 +39,6 @@ export interface LiteratureDiscoveryWorkspaceProps {
 }
 
 export default function LiteratureDiscoveryWorkspace({
-  projectId,
   seedPapers = [],
   initialQuery = "",
   onOpenEvidenceSynthesis,
@@ -583,7 +575,6 @@ export default function LiteratureDiscoveryWorkspace({
               {/* Nodes */}
               {filteredNodes.map((node) => {
                 const isSelected = selectedNode?.id === node.id;
-                const isSaved = savedNodeIds.has(node.id) || node.isSavedToCollection;
                 const isSynthesisSelected = selectedPaperIdsForSynthesis.has(node.id);
 
                 // Radius based on citationCount (between 14 and 32)

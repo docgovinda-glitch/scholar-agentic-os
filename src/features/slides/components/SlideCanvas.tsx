@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { SlideDeck, SlideViewMode } from '../types/slides';
 import type { SlideTheme } from '../types/themes';
 import SlideCardBlock from './SlideCardBlock';
@@ -121,7 +121,6 @@ export default function SlideCanvas({
     enabled: totalSlides > 0,
   });
 
-  const fontClass = theme?.fontFamily === 'serif' ? 'font-serif' : theme?.fontFamily === 'mono' ? 'font-mono' : 'font-sans';
 
   return (
     <div

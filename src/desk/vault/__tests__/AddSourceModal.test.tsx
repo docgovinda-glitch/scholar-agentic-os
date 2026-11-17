@@ -193,7 +193,8 @@ describe("AddSourceModal — Streamlined 1-Step Intake", () => {
       const titleInput = screen.getByLabelText(/^Title/i) as HTMLInputElement;
       expect(titleInput.value).toBe("Deep Learning Survey");
       const authorsInput = screen.getByLabelText(/Authors/i) as HTMLInputElement;
-      expect(authorsInput.value).toBe("LeCun, Yann");
+      // One name per author in reading order: the field is comma-separated, so "LeCun, Yann" would save as two authors.
+      expect(authorsInput.value).toBe("Yann LeCun");
       const yearInput = screen.getByLabelText(/Publication Year/i) as HTMLInputElement;
       expect(yearInput.value).toBe("2024");
     });

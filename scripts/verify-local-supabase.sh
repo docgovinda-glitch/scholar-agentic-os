@@ -6,7 +6,7 @@
 # and 20261028010000_purge to production:
 #   1. Applies base schemas + all 28 historical migrations on local Supabase using
 #      documented non-destructive bootstrap workarounds for the 5 ordering issues
-#      catalogued in AUDIT.md §2.1.
+#      catalogued in docs/records/AUDIT.md §2.1.
 #   2. Applies 20261028000000_hotfix2_db_storage_rpc_lockdown.sql and
 #      20261028010000_purge_plaintext_credentials.sql, then verifies:
 #        - anon is denied on project_research_gaps, project_titles,
@@ -15,10 +15,10 @@
 #        - a real user can sign in by email, username, and phone via Express
 #          POST /api/auth/login; upload & download a project file via signed URL;
 #          upload an ID document to their own folder; and update their full_name.
-#   3. Executes EVERY SQL SELECT block in COMPROMISE_CHECKS.md and PROD_CHECKS.md
+#   3. Executes EVERY SQL SELECT block in docs/records/COMPROMISE_CHECKS.md and PROD_CHECKS.md
 #      against live local Supabase PostgreSQL (ON_ERROR_STOP=1).
 #   4. Executes a full pg_dump + pg_restore round-trip against the local DB using
-#      the exact flags from HOTFIX2_DEPLOY.md §2.2-2.3.
+#      the exact flags from docs/records/HOTFIX2_DEPLOY.md §2.2-2.3.
 # ==============================================================================
 set -euo pipefail
 
@@ -142,7 +142,7 @@ const fs = require("fs");
 const { execFileSync } = require("child_process");
 const dbUrl = process.argv[2];
 
-for (const file of ["COMPROMISE_CHECKS.md", "PROD_CHECKS.md"]) {
+for (const file of ["docs/records/COMPROMISE_CHECKS.md", "docs/records/PROD_CHECKS.md"]) {
   const md = fs.readFileSync(file, "utf8");
   const blocks = [...md.matchAll(/```sql\n([\s\S]*?)```/g)].map((m) => m[1].trim());
   console.log(`  Executing ${blocks.length} SQL blocks from ${file}...`);

@@ -149,12 +149,7 @@ draftingRoutes.post("/copilot-chat", async (req: express.Request<{ id: string }>
   }
 
   try {
-    const systemPrompt = `You are a helpful AI Copilot integrated into a research workspace. 
-The user is currently on the stage: "${stage}".
-Here is the context of their project for this stage:
-${JSON.stringify(scopedContext)}
-
-Answer the user's question concisely. Be highly academic and professional. Use markdown formatting.`;
+    const systemPrompt = scholarBrain.journalPrompts.copilotSystemPrompt({ stage, context: JSON.stringify(scopedContext) });
 
     // Construct the user prompt including history
     let userPrompt = "";

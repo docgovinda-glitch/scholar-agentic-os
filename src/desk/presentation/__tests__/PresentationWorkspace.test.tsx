@@ -158,7 +158,25 @@ describe("PresentationWorkspace", () => {
     expect(screen.getByText(/Provenance:/i)).toBeInTheDocument();
   });
 
+  it("a signed-out visitor's edits are not sent to the server and the badge says so", () => {
+    vi.useFakeTimers();
+    render(<PresentationWorkspace projectId="demo-presentation" initialStep="studio" />);
+    vi.mocked(global.fetch).mockClear();
+
+    const headline = screen.getByTestId("wysiwyg-slide-card").querySelector('[data-path="headline"]') as HTMLElement;
+    headline.textContent = "Grounded synthesis in practice";
+    fireEvent.blur(headline);
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+
+    expect(screen.getByTestId("autosave-status")).toHaveTextContent(/Sign in to save/);
+    expect(global.fetch).not.toHaveBeenCalledWith(expect.stringContaining("/api/presentations/"), expect.objectContaining({ method: "PUT" }));
+    vi.useRealTimers();
+  });
+
   it("triggers 500ms debounced autosave with clean indicator and zero PostgreSQL leakage", async () => {
+    sessionMock.value = { status: "signed-in", userId: "user-1", email: "user@example.com" };
     vi.useFakeTimers();
 
     render(<PresentationWorkspace projectId="proj-pres-deb" initialStep="studio" />);
@@ -172,8 +190,8 @@ describe("PresentationWorkspace", () => {
     expect(screen.queryByText(/PostgreSQL/i)).not.toBeInTheDocument();
 
     // Advance timer by 500ms
-    act(() => {
-      vi.advanceTimersByTime(500);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
     });
 
     expect(global.fetch).toHaveBeenCalledWith(

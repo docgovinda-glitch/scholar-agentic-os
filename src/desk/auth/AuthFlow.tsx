@@ -9,7 +9,6 @@ import {
   checkUsernameAvailable,
   checkEmailAvailable,
   checkPhoneAvailable,
-  signInWithGoogle,
   saveProfileFields,
 } from "../../services/supabaseAuthService";
 import { useDeskSession } from "../useDeskSession";
@@ -31,7 +30,6 @@ import {
 import GoogleIdentityButton from "./GoogleIdentityButton";
 import {
   EMPTY_SIGN_UP,
-  SIGN_UP_FIELDS,
   passwordProblem,
   signUpProblem,
   type SignUpFields,
@@ -39,7 +37,6 @@ import {
 import { EDUCATION_LEVELS, USER_TYPES, usernameProblem, emailProblem } from "../../config/accountSchema";
 import { normalizeE164, e164Problem } from "../../config/countries";
 import { getCaptchaConfig } from "../../services/captchaService";
-import ScholarCoreLanding from "../ScholarCoreLanding";
 
 /**
  * Desk's unauthenticated surface: sign in, register, recover a password.
@@ -67,16 +64,6 @@ import ScholarCoreLanding from "../ScholarCoreLanding";
 function passedEmail(location: Location): string {
   const state = location.state as { email?: string } | null;
   return state?.email ?? "";
-}
-
-export function LandingRoute() {
-  const navigate = useNavigate();
-  return (
-    <ScholarCoreLanding
-      onGetStarted={() => navigate("/signup")}
-      onSignIn={() => navigate("/signin")}
-    />
-  );
 }
 
 export function SignInRoute() {

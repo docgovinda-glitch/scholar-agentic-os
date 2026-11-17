@@ -44,7 +44,7 @@ export class DOCXParser implements Parser {
   };
 
   async parse(input: DocumentInput): Promise<ParserOperationResult> {
-    const { data, filename } = input;
+    const { data } = input;
 
     // Check for valid DOCX signature (ZIP-based)
     if (!this.isValidDOCX(data)) {
@@ -67,7 +67,6 @@ export class DOCXParser implements Parser {
       const normalizedText = (result.value || "").normalize("NFC");
 
       // Extract paragraphs with potential heading detection
-      const paragraphs = this.extractParagraphs(normalizedText);
 
       // Extract pages (DOCX doesn't have explicit pages, estimate from breaks)
       const pages = this.extractPages(normalizedText).map((p) => ({ ...p, text: p.text.normalize("NFC") }));
@@ -118,48 +117,7 @@ export class DOCXParser implements Parser {
     return header === "504b0304"; // PK..
   }
 
-  /**
-   * Extract paragraphs from text.
-   * Attempts to detect headings by analyzing structure.
-   */
-  private extractParagraphs(text: string): Array<{ text: string; type?: string }> {
-    const paragraphs: Array<{ text: string; type?: string }> = [];
-    const lines = text.split(/\r?\n/);
-    
-    for (const line of lines) {
-      if (line.trim().length === 0) continue;
-      
-      // Simple heuristic: check if line looks like a heading
-      // (shorter, no period at end, all caps, or followed by content)
-      const isHeading = this.detectHeading(line, paragraphs);
-      
-      paragraphs.push({
-        text: line,
-        type: isHeading ? "heading" : "paragraph",
-      });
-    }
-    
-    return paragraphs;
-  }
 
-  /**
-   * Simple heading detection heuristic.
-   */
-  private detectHeading(line: string, previousParagraphs: Array<{ text: string; type?: string }>): boolean {
-    // Skip if already detected as heading
-    if (line.length < 100 && !line.endsWith(".")) {
-      const trimmed = line.trim();
-      // Check for common heading patterns
-      if (trimmed === trimmed.toUpperCase() && trimmed.length > 0) {
-        return true;
-      }
-      // Check if followed by paragraph
-      if (previousParagraphs.length > 0 && previousParagraphs[previousParagraphs.length - 1]?.type === "heading") {
-        return false;
-      }
-    }
-    return false;
-  }
 
   /**
    * Extract pages from text.

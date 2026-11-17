@@ -1,5 +1,4 @@
 import { AiModelSwitcher } from "../../../desk/ai/AiModelSwitcher";
-import React from 'react';
 import { ArrowLeft, Lightbulb, MessagesSquare, PanelLeftOpen, Play } from 'lucide-react';
 import type { PresentationStudioStep } from '../types/slides';
 import { WorkspaceAutosaveBadge } from '../../../components/ui/WorkspaceAutosaveBadge';
@@ -23,7 +22,7 @@ export interface PresentationHeaderProps {
   onTitleChange: (newTitle: string) => void;
   currentStep: PresentationStudioStep;
   onStepChange: (step: PresentationStudioStep) => void;
-  autosaveStatus: 'saved' | 'saving' | 'idle' | 'error';
+  autosaveStatus: 'saved' | 'saving' | 'idle' | 'error' | 'signed-out';
   lastSavedTime?: string | null;
   projectVersion?: number;
   isAskScholarOpen: boolean;
@@ -135,13 +134,15 @@ export default function PresentationHeader({
       <div className="flex items-center justify-end gap-1.5 min-w-0">
         {!hideAutosaveBadge && (
           // The badge sets its own display (inline-flex), which overrode `hidden`
-          // and overlapped the step switcher on phones; hide via a wrapper.
-          <span className="hidden md:inline-flex shrink-0" data-testid="presentation-autosave-slot">
+          // and overlapped the step switcher on small screens; hide via a wrapper.
+          // A failed save stays visible at every width (as the status dot).
+          <span className={`${autosaveStatus === 'error' ? 'inline-flex' : 'hidden lg:inline-flex'} shrink-0`} data-testid="presentation-autosave-slot">
             <WorkspaceAutosaveBadge
               status={autosaveStatus}
               version={projectVersion}
               lastSavedTime={lastSavedTime || undefined}
               className="whitespace-nowrap shrink-0"
+              compactOnSmall="2xl"
             />
           </span>
         )}
@@ -155,7 +156,7 @@ export default function PresentationHeader({
             aria-label="Simulate Audience Q&A"
           >
             <MessagesSquare className="w-3.5 h-3.5" />
-            <span className="hidden xl:inline">Q&amp;A</span>
+            <span className="hidden 2xl:inline">Q&amp;A</span>
           </button>
         )}
         <button
@@ -168,7 +169,7 @@ export default function PresentationHeader({
           aria-label="Toggle Ask Scholar"
         >
           <Lightbulb className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
-          <span className="hidden xl:inline whitespace-nowrap">Ask Scholar</span>
+          <span className="hidden 2xl:inline whitespace-nowrap">Ask Scholar</span>
         </button>
         {currentStep === 'delivery' && onStartPresentation && (
           <button

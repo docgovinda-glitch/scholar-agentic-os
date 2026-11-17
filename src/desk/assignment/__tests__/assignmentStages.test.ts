@@ -43,60 +43,6 @@ describe("Assignment Stages & Domain Taxonomy", () => {
     expect(ASSIGNMENT_TYPE_LABELS.reflection).toBeDefined();
   });
 
-  it("allocates custom section word targets and injects guidance notes into adaptive outlines", async () => {
-    const { generateAdaptiveDefaultOutline } = await import("../services/outlineService");
-
-    const customSections = {
-      isCustomized: true,
-      intro: {
-        targetWords: 250,
-        guidelines: "Highlight clean energy transition barriers and thesis on regulatory policy.",
-      },
-      body: {
-        targetWords: 1450,
-        guidelines: "Evaluate solar vs wind infrastructure capEx in Section 1; regulatory hurdles in Section 2.",
-      },
-      conclusion: {
-        targetWords: 300,
-        guidelines: "Provide policy recommendations and final synthesis.",
-      },
-    };
-
-    const outline = generateAdaptiveDefaultOutline(
-      "essay",
-      "Critically evaluate renewable energy transitions.",
-      2000,
-      "Central regulatory thesis.",
-      customSections
-    );
-
-    expect(outline.length).toBeGreaterThanOrEqual(3);
-
-    // Intro section
-    const introSec = outline[0];
-    expect(introSec.targetWordCount).toBe(250);
-    expect(introSec.guidance).toContain("Highlight clean energy transition barriers and thesis on regulatory policy.");
-
-    // Conclusion section
-    const conclSec = outline[outline.length - 1];
-    expect(conclSec.targetWordCount).toBe(300);
-    expect(conclSec.guidance).toContain("Provide policy recommendations and final synthesis.");
-
-    // Body sections sum
-    const bodySections = outline.slice(1, outline.length - 1);
-    const bodyWordsSum = bodySections.reduce((sum, s) => sum + s.targetWordCount, 0);
-    expect(bodyWordsSum).toBe(1450);
-
-    // Total words sum
-    const totalWordsSum = outline.reduce((sum, s) => sum + s.targetWordCount, 0);
-    expect(totalWordsSum).toBe(2000);
-
-    // Body guidelines injected into body sections
-    for (const bodySec of bodySections) {
-      expect(bodySec.guidance).toContain("Evaluate solar vs wind infrastructure capEx in Section 1; regulatory hurdles in Section 2.");
-    }
-  });
-
   describe("normalizeProjectAnswers", () => {
     it("automatically generates standard 10/75/15 section allocations when sections is missing", () => {
       const answers = {

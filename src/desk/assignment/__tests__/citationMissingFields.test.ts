@@ -35,7 +35,7 @@ describe("citations with missing author, year or venue", () => {
   });
 
   it("an entry with no author leads with the title in every style, with no doubled full stops", async () => {
-    const { CitationFormatterFactory } = await import("../../../citation_compliance");
+    const { CitationFormatterFactory } = await import("../../../citation_compliance/formattingEngine");
     const ref = discoveredSourceToCanonical({ title: "Week 3 notes", authors: [], year: "n.d." } as never);
     const out = Object.fromEntries(["apa7", "harvard", "mla9", "chicago", "ieee", "vancouver"].map((st) => [st, CitationFormatterFactory.formatBibliography(st, ref)]));
     expect(out.apa7).toBe("Week 3 notes. (n.d.).");

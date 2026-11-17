@@ -14,7 +14,6 @@ vi.mock("../../src/middleware/auth.ts", () => ({
 }));
 import request from "supertest";
 import { app } from "../../../server.ts";
-import { __resetSessionPoliciesForTests } from "../../../src/app/studio/sessionPolicyStore.ts";
 import { __resetAuditLogForTests } from "../../../src/platform/warden/warden.ts";
 import { __resetRateLimitStore } from "../../src/middleware/rateLimit.ts";
 
@@ -22,7 +21,6 @@ const originalFetch = global.fetch;
 
 describe("POST /api/studio/refine", () => {
   beforeEach(() => {
-    __resetSessionPoliciesForTests();
     __resetAuditLogForTests();
     __resetRateLimitStore();
   });
@@ -140,7 +138,6 @@ describe("POST /api/studio/voice-profile", () => {
 
 describe("POST /api/studio/refine with a voiceProfile", () => {
   beforeEach(() => {
-    __resetSessionPoliciesForTests();
     __resetAuditLogForTests();
     __resetRateLimitStore();
   });

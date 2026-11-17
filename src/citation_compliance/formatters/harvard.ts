@@ -3,7 +3,7 @@
  */
 
 import { doiUrl, endSentence, familyInitialsTight, joinNames, journalOf, pageRange, publisherOf, sortedAuthors } from "./bibParts";
-import type { CitationStyle, InTextOptions } from "../formattingEngine";
+import type { CitationStyle, InTextOptions } from "../styleTypes";
 import { authorDateYear, type CanonicalReference } from "../model/reference";
 
 export class HarvardFormatter implements CitationStyle {

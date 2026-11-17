@@ -1,13 +1,13 @@
 # Data Model
 
-Tables, storage and state shapes. The authority is the SQL in `supabase/` (`schema.sql`, `schema_ai_engine.sql`, `schema_store.sql`, `schema_user_settings.sql`, and `migrations/`, applied in timestamp order). New changes go in a new timestamped migration; never edit an applied one. `src/types/database.types.ts` holds generated client types.
+Tables, storage and state shapes. The authority is the SQL in `supabase/` (`schema.sql`, `schema_ai_engine.sql`, `schema_store.sql`, `schema_user_settings.sql`, and `migrations/`, applied in timestamp order). New changes go in a new timestamped migration; never edit an applied one.
 
 ## 1. Access model
 
 - The server reaches Postgres through the Supabase Data API over HTTPS with the service-role key (`server/src/supabaseRest.ts`), or directly through `DATABASE_URL` as an optional fallback.
 - RLS is enabled on every table. Server-owned tables (for example `projects`) have **no** policies, so `anon` and `authenticated` can do nothing and only `service_role` can read or write; ownership is checked in application code (`loadOwnedProject` in `server/routes/project.ts`).
 - A few user-facing tables (`profiles`, `user_vaults`, `user_vault_items`, `user_cloud_integrations`, `api_credentials`, `project_files`, `project_activity`, `ai_providers`) also have policies; read each migration for the exact rules. Migration `20261028000000_hotfix2_db_storage_rpc_lockdown.sql` enabled RLS on three agentic tables, made all buckets private and restricted the account-lookup functions to `service_role`.
-- Database functions: `deduct_credits`, `grant_credits` (atomic credit accounting), `match_project_evidence` (pgvector similarity over `project_evidence.embedding`, 768 dimensions, HNSW index), `email_for_identifier`, `email_for_username`, `email_for_phone_e164`, `check_email_available`, `check_username_available`, `check_phone_available`, `submit_id_document`, `handle_new_user`, `handle_project_delete_cascade`, `enforce_account_status_admin_only`, `update_modified_column`.
+- Database functions: `match_project_evidence` (pgvector similarity over `project_evidence.embedding`, 768 dimensions, HNSW index), `email_for_identifier`, `email_for_username`, `email_for_phone_e164`, `check_email_available`, `check_username_available`, `check_phone_available`, `submit_id_document`, `handle_new_user`, `handle_project_delete_cascade`, `enforce_account_status_admin_only`, `update_modified_column`.
 
 ## 2. Tables by area
 
@@ -117,3 +117,12 @@ Local drafts (`draft-…` ids) live in browser storage (`scholar_ephemeral_proje
 ## 5. Local-only stores
 
 `data/.scholar_local_store.json` backs projects when no database is configured outside production (`src/services/store/projectStore.ts`); it is not used in production, where the server refuses to start without durable storage.
+
+## 6. Migration process and status
+
+- **Order.** `schema.sql`, `schema_ai_engine.sql`, `schema_store.sql`, `schema_user_settings.sql`, then every file in `migrations/` by timestamp. `scripts/db/replay-migrations.sh <db-url>` does exactly this on a local database (it refuses hosted Supabase addresses) and is what CI's end-to-end job builds its database from.
+- **Two known history quirks**, both handled by that script and left in place because applied migrations are never edited: `profiles.authentic_id` exists in production but no repository SQL creates it (`20260811000000` references it), and `20260812120000` needs a table that `20260812180000` creates, so it is applied after it.
+- **Verified on 2026-11-17:** the full history (base schemas plus all migrations, including `20261117120000`) replays without error on plain PostgreSQL 16 with pgvector and on a local Supabase (`supabase start`, PostgreSQL 17). After the replay every `public` table has row level security enabled.
+- **`20261117120000_index_project_foreign_keys.sql`** adds indexes on foreign-key columns that had none (`peer_review_critiques.project_id`, `manuscript_versions.project_id`, `project_evidence.project_id` and `.source_id`, `project_claim_binding_evidence (project_id, binding_id)`, `opportunity_reviews.opportunity_id`). It only creates indexes, is safe to run twice, and has **not been applied to production**: apply it with the Supabase CLI like any other migration.
+- **Production compared with the repo replay (2026-11-17, read-only queries):** all 46 earlier migrations are applied and none unknown; the 40 `public` tables, 385 of 386 columns, RLS state, all 31 policies and the effective `anon` / `authenticated` table privileges are identical. Differences: `20261117120000` is the only unapplied migration (its six indexes are absent in production); `profiles.is_approved` exists only in production (a legacy column the account migrations deliberately leave in place, unused by the app); production also has the legacy `is_username_approved` function (execute revoked from `anon` by `20261029020000`) and Supabase's `rls_auto_enable` event-trigger function, which enables RLS on every new `public` table. Re-check with `scripts/db/schema-diff.sh`.
+- Tables marked "schema only" above are kept: dropping them is destructive and needs the owner's decision.

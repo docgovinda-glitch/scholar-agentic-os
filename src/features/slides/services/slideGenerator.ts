@@ -281,9 +281,6 @@ function generateSlidesForTopic(
   styleInput?: string
 ): SlideCard[] {
   const cleanTopic = topic.trim() || 'Autonomous Knowledge Grounding';
-  const lower = cleanTopic.toLowerCase();
-  const effectiveStyle = styleInput || framework;
-  const styleProfile = PRESENTATION_STYLE_PROFILES[effectiveStyle] || PRESENTATION_STYLE_PROFILES['Standard-Narrative'];
 
 
   // Generate natural slide headlines for general topics

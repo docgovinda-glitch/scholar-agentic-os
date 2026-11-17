@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { AlertTriangle, ArrowRightLeft, Cpu, Gauge, KeyRound, Loader2, Square, Timer } from "lucide-react";
 import type { AiRunState } from "./aiRunState";
 

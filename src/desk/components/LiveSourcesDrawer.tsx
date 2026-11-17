@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Globe, ExternalLink, ChevronDown, ChevronUp, Calendar, User, BookmarkPlus, Check } from "lucide-react";
 import type { LiveSearchResult } from "../../services/liveSearchService";
 

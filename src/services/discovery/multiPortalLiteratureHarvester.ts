@@ -16,7 +16,7 @@
  */
 
 import type { RawSourceInput } from "../../citation_compliance/cslEngine";
-import { searchArxiv, searchCrossref, searchDataCite, searchDoaj, searchEuropePmc, searchOpenAlex, stripMarkup } from "../../shared/retrieval/providers";
+import { searchArxiv, searchCrossref, searchDataCite, searchDoaj, searchEuropePmc, searchOpenAlex } from "../../shared/retrieval/providers";
 import { type LiteratureItem } from "../../desk/workspace/agentPrompts/literaturePrompts";
 import { normalizeDoi, normalizeTitle, calculateTokenSimilarity } from "../vault/duplicateDetection";
 export { normalizeDoi, normalizeTitle, calculateTokenSimilarity };

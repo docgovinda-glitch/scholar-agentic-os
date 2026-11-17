@@ -9,7 +9,7 @@
  * Designed with elevated soft dark mode aesthetics (#171717 / #1C1C1E), strictly avoiding pure black.
  */
 
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { showAppToast } from "../../components/ui/FeedbackSystem";
 import {
   Search,
@@ -22,13 +22,8 @@ import {
   Database,
   Settings,
   ArrowRight,
-  Trash2,
   CheckCircle2,
-  Clock,
-  AlertCircle,
   X,
-  Plus,
-  RefreshCw,
   Pencil,
   Check,
   LayoutGrid,
@@ -47,7 +42,6 @@ import {
 import SourceLibraryScreen from "./SourceLibraryScreen";
 import SettingsView from "./SettingsView";
 import { getConnectedCloudDrives, type CloudDriveAccount } from "../../services/vault/cloudDriveService";
-import { loadVault } from "../../services/userVault";
 
 export interface KnowledgeVaultProps {
   userId: string;

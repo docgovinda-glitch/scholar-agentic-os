@@ -3,7 +3,7 @@
  */
 
 import { doiUrl, endSentence, familyGiven, givenFamily, joinNames, journalOf, pageRange, publisherOf, quotedTitle, sortedAuthors } from "./bibParts";
-import type { CitationStyle, InTextOptions } from "../formattingEngine";
+import type { CitationStyle, InTextOptions } from "../styleTypes";
 import { authorDateYear, type CanonicalReference } from "../model/reference";
 
 export class ChicagoFormatter implements CitationStyle {

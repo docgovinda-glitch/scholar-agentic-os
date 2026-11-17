@@ -32,7 +32,6 @@ import {
   initiateGoogleDriveAuth,
   initiateOneDriveAuth,
   connectCloudDrive,
-  cleanFileNameForTitle,
   parseCloudShareUrl,
   inferMetadataFromCloudFile,
   getDriveFileWebUrl,
@@ -41,6 +40,7 @@ import {
   type CloudDriveProvider,
 } from "../../services/vault/cloudDriveService";
 import CredentialResetNotice from "../security/CredentialResetNotice";
+import { detectReferenceFormat, parsePastedReference } from "./referenceImport";
 
 export interface AddSourceModalProps {
   userId: string;
@@ -198,7 +198,8 @@ export default function AddSourceModal({
   function detectType(val: string): IntakeType {
     const trimmed = val.trim();
     if (!trimmed) return "manual";
-    if (trimmed.startsWith("@") && (trimmed.includes("{") || trimmed.includes("="))) {
+    const referenceFormat = detectReferenceFormat(trimmed);
+    if (referenceFormat === "ris" || (referenceFormat === "bibtex" && (trimmed.includes("{") || trimmed.includes("=")))) {
       return "bibtex";
     }
     const cleanedDoi = normalizeDoi(trimmed);
@@ -222,38 +223,26 @@ export default function AddSourceModal({
     return "manual";
   }
 
-  // Parse BibTeX snippet
-  function parseBibtex(raw: string) {
-    const titleMatch = raw.match(/title\s*=\s*[\{"]([^"\}]+)[\}"]/i);
-    const authorMatch = raw.match(/author\s*=\s*[\{"]([^"\}]+)[\}"]/i);
-    const yearMatch = raw.match(/year\s*=\s*[\{"]?(\d{4})[\}"]?/i);
-    const journalMatch = raw.match(/(?:journal|booktitle|publisher)\s*=\s*[\{"]([^"\}]+)[\}"]/i);
-    const doiMatch = raw.match(/doi\s*=\s*[\{"]([^"\}]+)[\}"]/i);
-
-    const parsedTitle = titleMatch?.[1]?.trim() || "";
-    const parsedAuthors = authorMatch?.[1]?.trim() || "";
-    const parsedYear = yearMatch?.[1] || "";
-    const parsedJournal = journalMatch?.[1]?.trim() || "";
-    const parsedDoi = doiMatch?.[1]?.trim() || "";
-
-    if (parsedTitle) setTitle(parsedTitle);
-    if (parsedAuthors) setAuthorsText(parsedAuthors);
-    if (parsedYear) setYear(parsedYear);
-    if (parsedJournal) {
-      setJournal(parsedJournal);
-      setPublisher(parsedJournal);
+  // Fill the form from a pasted BibTeX or RIS record (shared citation-engine importers).
+  function applyPastedReference(raw: string) {
+    const ref = parsePastedReference(raw);
+    if (!ref || !ref.title) {
+      setError("That reference could not be read. Check it is a complete BibTeX or RIS record, or enter the details below.");
+      return;
     }
-    if (parsedDoi) setDoi(parsedDoi);
+    const container = ref.journal || ref.publisher;
+    setTitle(ref.title);
+    if (ref.authors.length > 0) setAuthorsText(ref.authors.join(", "));
+    if (ref.year) setYear(ref.year);
+    if (container) {
+      setJournal(container);
+      setPublisher(ref.publisher || container);
+    }
+    if (ref.doi) setDoi(ref.doi);
     setSourceType("paper");
-    setFetchStatus("BibTeX reference parsed");
+    setFetchStatus(ref.format === "bibtex" ? "BibTeX reference parsed" : "RIS reference parsed");
 
-    const takeaways = generateKeyPointsAndNotes({
-      title: parsedTitle,
-      authors: parsedAuthors.split(/[,;&]|\band\b/i).map((a) => a.trim()).filter(Boolean),
-      year: parsedYear,
-      journal: parsedJournal,
-    });
-    applyTakeaways(takeaways);
+    applyTakeaways(generateKeyPointsAndNotes({ title: ref.title, authors: ref.authors, year: ref.year, journal: container }));
   }
 
   // Helper to apply auto-extracted key points and notes
@@ -535,7 +524,7 @@ export default function AddSourceModal({
         );
         if (dup.isDuplicate) setDuplicateWarning(dup);
       } else if (kind === "bibtex") {
-        parseBibtex(raw);
+        applyPastedReference(raw);
       } else if (kind === "cloud_drive" || kind === "onedrive") {
         const parsed = parseCloudShareUrl(raw);
         const provider: CloudStorageProvider = kind === "cloud_drive" ? "google_drive" : "onedrive";
@@ -837,7 +826,7 @@ export default function AddSourceModal({
                       handleSmartFetch();
                     }
                   }}
-                  placeholder="Paste URL (https://...), DOI (10.1038/...), or title..."
+                  placeholder="Paste a URL, DOI, BibTeX or RIS record, or a title"
                   className="flex-1 px-3.5 py-2.5 text-xs bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:outline-hidden focus:border-[color:var(--accent)]"
                 />
                 <button

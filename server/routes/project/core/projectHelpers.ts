@@ -30,76 +30,36 @@
  * it's set. Every handler below is async and awaits the store accordingly.
  */
 
-import crypto from "crypto";
 import express from "express";
 import { catalog } from "../../../../src/app/atlas/atlas.ts";
 import {
-  computeG0ExitCriteria,
   computeG1ExitCriteria,
   computeG2ExitCriteria,
   computeG3ExitCriteria,
   computeG4ExitCriteria,
-  computeG5ExitCriteria,
   computeG6ExitCriteria,
   computeG7ExitCriteria,
   flattenSections,
   intakeCompleteness,
   updateExitCriteria,
-  signOff,
-  invalidateGate,
   summarize,
-  GATE_ORDER,
-  GateTransitionError,
 } from "../../../../src/app/conductor/conductor.ts";
 import type { GateId } from "../../../../src/app/conductor/conductor.ts";
 import { getProjectStore } from "../../../../src/services/store/projectStore.ts";
 import type { ProjectStore } from "../../../../src/services/store/types.ts";
-import { requireAuth } from "../../../src/middleware/auth.ts";
 import type { ProjectRecord } from "../../../../src/services/store/types.ts";
 import { OptimisticLockError } from "../../../../src/services/store/types.ts";
-import { exportDocument } from "../../../../src/app/export/export.ts";
-import type { ExportFormat } from "../../../../src/app/export/types.ts";
-import { buildReport, compileRubricFromOutputType, applyWaivers, waiveRule, RuleNotWaivableError } from "../../../../src/app/rubric/rubric.ts";
-import { safeParseAnswerField } from "../../../../src/shared/projectStateSchema";
+import { buildReport, compileRubricFromOutputType, applyWaivers } from "../../../../src/app/rubric/rubric.ts";
 
 import { emptyDocument } from "../../../../src/domain/document/model.ts";
 import type { Block, CanonicalDocument } from "../../../../src/domain/document/model.ts";
-import { approveEvidence, rejectEvidence } from "../../../../src/domain/evidence/stateMachine.ts";
-import { addClaim, bindEvidence, removeSource, unsupportedClaims, findConflicts, claimsDependingOnSource, markClaimUnsupported, ClaimGraphError } from "../../../../src/domain/claim/graph.ts";
-import type { Claim, ClaimEvidenceBinding, ClaimEvidenceGraph, EvidenceSpan, SupportStrength } from "../../../../src/domain/claim/types.ts";
-import { addSubmission, updateSubmission, deleteSubmission, SubmissionError } from "../../../../src/domain/submission/submissions.ts";
-import { SUBMISSION_STATUSES } from "../../../../src/domain/submission/types.ts";
+import type { ClaimEvidenceGraph, EvidenceSpan } from "../../../../src/domain/claim/types.ts";
 import type { SubmissionRecord, SubmissionStatus } from "../../../../src/domain/submission/types.ts";
-import { countWords, MIN_GUIDELINES_WORDS } from "../../../../src/domain/journal/types.ts";
-import type { JournalRequirements, JournalRequirementsProposal } from "../../../../src/domain/journal/types.ts";
-import { isOutputTypeEnabled, MAINTENANCE_MESSAGE } from "../../outputTypeAccess.ts";
-import { extractJournalRequirements } from "../../../../src/app/journal/extract.ts";
-import { allocateWordBudget } from "../../../../src/domain/manuscript/wordBudget.ts";
-import type { GeneratedSection, SectionPlan } from "../../../../src/domain/manuscript/types.ts";
-import {
-  startJob,
-  nextSection as nextPlannedSection,
-  appendSection,
-  failJob,
-  resumeJob,
-  pauseJob,
-  GenerationJobError,
-} from "../../../../src/domain/manuscript/stateMachine.ts";
+import type { JournalRequirements } from "../../../../src/domain/journal/types.ts";
+import type { SectionPlan } from "../../../../src/domain/manuscript/types.ts";
 import { priorSectionsContext, researchContextFromAnswers, type DraftSectionInput } from "../../../src/services/sectionDrafter.ts";
-import { checkCoherence } from "../../../../src/app/coherence/checkCoherence.ts";
-import type { CoherenceDimension } from "../../../../src/domain/coherence/types.ts";
-import { COHERENCE_DIMENSIONS } from "../../../../src/domain/coherence/types.ts";
-import { runPeerReview } from "../../../../src/app/review/peerReview.ts";
-import type { ReviewLens } from "../../../../src/domain/review/types.ts";
-import { REVIEW_LENSES } from "../../../../src/domain/review/types.ts";
-import { getPolicyForSession } from "../../../../src/app/studio/sessionPolicyStore.ts";
-import { generateCoverLetter } from "../../../../src/app/coverLetter/generateCoverLetter.ts";
-import { proposeAnonymization } from "../../../../src/app/anonymization/proposeAnonymization.ts";
-import { applyAnonymization, AnonymizationApplyError } from "../../../../src/app/anonymization/applyAnonymization.ts";
-import { resolveCitations, isKnownCitationStyle, knownCitationStyleIds } from "../../../../src/app/citation/resolveCitations.ts";
-import { withProjectLock } from "../../../src/concurrency/projectLock.ts";
 
-import { BlockSchema, CanonicalDocumentSchema, GateIdSchema, ClaimSchema, EvidenceSpanSchema, SubmissionStatusSchema, NewSubmissionSchema, SubmissionPatchSchema, JournalRequirementsInputSchema, ManualSourceSchema, EvidenceLocatorSchema, ClaimEvidenceBindingSchema } from "../../../../src/domain/schemas/projectSchemas.ts";
+import { BlockSchema, CanonicalDocumentSchema, GateIdSchema, EvidenceSpanSchema, SubmissionStatusSchema, NewSubmissionSchema, SubmissionPatchSchema, JournalRequirementsInputSchema } from "../../../../src/domain/schemas/projectSchemas.ts";
 
 export function isValidBlock(value: unknown): value is Block {
   return BlockSchema.safeParse(value).success;

@@ -3,11 +3,9 @@ import type {
   VisualMotif,
   LayoutArchetype,
   SlideThemeId,
-  TypographyPairing,
   ThemeCategory,
   ThemeMode,
 } from '../types/themes';
-import { calculateContrastRatio, validateWcagAA } from '../types/themes';
 
 export interface ExtractedThemeResult {
   name: string;

@@ -1,4 +1,4 @@
-import type { SlideDeck, SlideCard } from '../types/slides';
+import type { SlideDeck } from '../types/slides';
 import type { SlideTheme, CustomTheme, SlideThemeId } from '../types/themes';
 import { calculateContrastRatio, isWcagAA } from '../types/themes';
 import { extractSlidesFromAcademicText } from './semanticSlideExtractor';

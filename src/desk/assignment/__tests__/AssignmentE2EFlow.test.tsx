@@ -27,7 +27,6 @@ import {
   normalizeAssignmentPhase,
   normalizeProjectAnswers,
 } from "../types";
-import { generateAdaptiveDefaultOutline } from "../services/outlineService";
 import { evaluateRubricCompliance, auditCitations } from "../services/submissionAuditService";
 import { formatBibliographyEntry } from "../services/assignmentExportService";
 
@@ -236,34 +235,6 @@ describe("Phase 3: Drafting — Invisible Chunker, PEEL Synthesis & Section Inde
   it("assigns the Scribe persona for Phase 3 (drafting)", () => {
     const config = ASSIGNMENT_AGENT_CONFIGS["drafting"];
     expect(config.name.toLowerCase()).toContain("scribe");
-  });
-
-  it("generateAdaptiveDefaultOutline gives an introduction, body and conclusion that sum to the target", () => {
-    const outline = generateAdaptiveDefaultOutline("essay", "Evaluate renewable energy policy.", 2500);
-    expect(outline.length).toBeGreaterThanOrEqual(3);
-    const total = outline.reduce((s, o) => s + o.targetWordCount, 0);
-    expect(total).toBe(2500);
-    // Each section has required fields
-    for (const sec of outline) {
-      expect(sec.id).toBeTruthy();
-      expect(sec.title).toBeTruthy();
-      expect(sec.guidance).toBeTruthy();
-      expect(sec.targetWordCount).toBeGreaterThan(0);
-    }
-  });
-
-  it("generateAdaptiveDefaultOutline respects custom section splits precisely", () => {
-    const outline = generateAdaptiveDefaultOutline(
-      "essay",
-      "Evaluate renewable energy policy.",
-      2500,
-      "Policy urgency thesis",
-      MOCK_BRIEF.sections
-    );
-    expect(outline[0].targetWordCount).toBe(250);
-    expect(outline[outline.length - 1].targetWordCount).toBe(300);
-    const bodyWords = outline.slice(1, -1).reduce((s, o) => s + o.targetWordCount, 0);
-    expect(bodyWords).toBe(1950);
   });
 
   it("all draft sections have non-empty content before submission audit", () => {

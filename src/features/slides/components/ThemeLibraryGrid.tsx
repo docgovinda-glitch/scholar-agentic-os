@@ -1,19 +1,15 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Search, Check, Sun, Moon, Sparkles } from 'lucide-react';
 import type { SlideDeck } from '../types/slides';
 import {
   SLIDE_THEMES,
   type SlideThemeId,
-  calculateContrastRatio,
-  isWcagAA,
 } from '../types/themes';
 import {
   BEST_100_SLIDE_DESIGNS,
   type BestSlideDesign,
   type DesignLayoutArchetype,
 } from '../data/bestSlideDesigns100';
-import SlideMotifGraphic from './SlideMotifGraphic';
-import SlideCreativeSketchIllustration from './SlideCreativeSketchIllustration';
 import MultiSlideDeckPreview from './MultiSlideDeckPreview';
 import DeckPreviewModal from './DeckPreviewModal';
 import { getStoredCustomThemes } from '../services/themeExtractorService';
@@ -349,8 +345,6 @@ export default function ThemeLibraryGrid({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredThemes.map((theme) => {
             const isSelected = selectedThemeId === theme.id;
-            const ratio = calculateContrastRatio(theme.accent, theme.cardBg);
-            const passWcag = isWcagAA(ratio);
 
             return (
               <div

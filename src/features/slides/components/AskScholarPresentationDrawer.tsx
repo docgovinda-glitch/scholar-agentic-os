@@ -1,7 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { ArrowRight, ChevronRight, ChevronsRight, Sparkles, Lightbulb, Check, AlertTriangle, Send } from 'lucide-react';
-import type { SlideDeck, SlideCard } from '../types/slides';
-import ScholarCoreLogo from '../../../components/ScholarCoreLogo';
+import { useState, useRef, useEffect } from 'react';
+import { ArrowRight, ChevronRight, Sparkles, Lightbulb } from 'lucide-react';
+import type { SlideDeck } from '../types/slides';
 
 export interface AskScholarPresentationDrawerProps {
   deck: SlideDeck;

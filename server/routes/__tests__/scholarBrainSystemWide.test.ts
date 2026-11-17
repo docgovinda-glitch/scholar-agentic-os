@@ -310,10 +310,10 @@ describe("Architectural Unification Step 2: System-Wide scholarBrain Integration
       completeSpy.mockRestore();
     });
 
-    it("deep research with no AI connected asks for a provider before any retrieval", async () => {
-      const res = await request(app).post("/api/ai/deep-research").send({ topic: "Coastal erosion modelling" });
-      expect(res.status).toBe(400);
-      expect(res.body.code).toBe("ai_provider_required");
+    it("deep research with no server-side AI hands the request to the browser (426)", async () => {
+      const res = await request(app).post("/api/ai/agent").send({ prompt: "Coastal erosion modelling", mode: "deep-research" });
+      expect(res.status).toBe(426);
+      expect(res.body.requireFrontendLLM).toBe(true);
     });
 
     it("attaches 1-click deliverable handoff payload for academic format launching", async () => {

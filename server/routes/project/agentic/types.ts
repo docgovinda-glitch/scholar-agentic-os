@@ -1,5 +1,3 @@
-import type { ProjectRecord } from "../../../../src/services/store/projectStore.ts";
-import type { ScholarlyDialect } from "../../../src/utils/scholarlyVoiceGuard.ts";
 
 export type RefereeRole =
   | "Methodologist"

@@ -137,7 +137,6 @@ beforeAll(async () => {
     import("../presentation/PresentationWorkspace"),
     import("../ProjectListScreen"),
     import("../setup/VaultSetupScreen"),
-    import("../vault/VaultScreen"),
   ]);
 }, 60_000);
 

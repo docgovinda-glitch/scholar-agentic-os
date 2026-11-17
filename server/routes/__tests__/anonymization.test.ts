@@ -19,7 +19,6 @@ import request from "supertest";
 import { AI_HEADERS, useFetchBackedAi } from "../../test/aiTestKit.ts";
 import { app } from "../../../server.ts";
 import { __resetProjectStoreForTests } from "../../../src/app/conductor/projectStore.ts";
-import { __resetSessionPoliciesForTests } from "../../../src/app/studio/sessionPolicyStore.ts";
 import { __resetRateLimitStore } from "../../src/middleware/rateLimit.ts";
 import { __setEnabledOutputTypesForTests } from "../outputTypeAccess.ts";
 
@@ -31,7 +30,6 @@ const originalFetch = global.fetch;
 beforeEach(() => {
   useFetchBackedAi();
   __resetProjectStoreForTests();
-  __resetSessionPoliciesForTests();
   __resetRateLimitStore();
   __setEnabledOutputTypesForTests(["OT-10"]);
 });

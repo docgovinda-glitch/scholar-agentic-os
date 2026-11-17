@@ -1,5 +1,5 @@
 import express from "express";
-import { routedCompletion } from "../../../src/ai/routerBridge.ts";
+import { routedCompletion } from "../../../src/services/scholarBrain.ts";
 import { sendAiFailure } from "../../../src/ai/aiRouteErrors.ts";
 import { journalExtractionPrompt, tryParseProposal } from "../../../../src/app/journal/extract.ts";
 import { groundProposal } from "../../../../src/domain/journal/grounding.ts";

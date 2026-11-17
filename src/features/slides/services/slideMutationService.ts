@@ -15,7 +15,6 @@
 import type {
   SlideCard,
   SlideBlock,
-  ActionHeaderBlock,
   BulletListBlock,
   TwoColumnBlock,
   MetricCalloutBlock,

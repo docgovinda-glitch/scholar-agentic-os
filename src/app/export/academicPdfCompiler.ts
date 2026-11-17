@@ -5,7 +5,7 @@
 
 import path from "node:path";
 import type { Content, TDocumentDefinitions } from "pdfmake/interfaces";
-import type { Block, CanonicalDocument } from "../../desk/types";
+import type { CanonicalDocument } from "../../desk/types";
 import type { ExportMetadata } from "./types";
 
 let cachedPdfMake: unknown = null;
@@ -257,7 +257,7 @@ export function generateTypstSource(
   metadata: ExportMetadata,
   options: AcademicExportOptions = { template: "typst_modern" }
 ): string {
-  const { authorAffiliation = "", authorEmail = "", abstractText, keywords = [] } = options;
+  const { authorAffiliation = "", abstractText, keywords = [] } = options;
 
   const titleEscaped = escapeTypst(document.title || metadata.title || "Academic Manuscript");
   const authorEscaped = escapeTypst(metadata.author?.trim() || "");

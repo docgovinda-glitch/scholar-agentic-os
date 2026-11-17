@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
-import type { ProjectView } from "../types";
+import { useState, useEffect, useMemo, useRef } from "react";
 import type {
   UserDatasetItem,
   SmartEvidenceRow,

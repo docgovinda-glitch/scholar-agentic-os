@@ -12,7 +12,6 @@ import {
 } from "../../../src/utils/scholarlyVoiceGuard.ts";
 import { computeG7ExitCriteria } from "../../../../src/app/conductor/conductor.ts";
 import { exportDocument } from "../../../../src/app/export/export.ts";
-import { renderRefereeResponseLetterDocx } from "../../../../src/app/export/docxWriter.ts";
 import type { ExportFormat } from "../../../../src/app/export/types.ts";
 import type { AcademicTemplate } from "../../../../src/app/export/academicPdfCompiler.ts";
 import { getSupabaseRestConfig, SupabaseTable } from "../../../src/supabaseRest.ts";
@@ -36,65 +35,10 @@ reviewRoutes.post("/peer-review", async (req: express.Request<{ id: string }>, r
   const context = JSON.stringify(project.answers);
 
   try {
-    const systemPrompt = `You are a 5-Referee Adversarial Peer Review Simulator for an elite scholarly journal.
-Critique the manuscript draft provided in the research context. You must generate EXACTLY 5 distinct, rigorous critiques—one from each of the following 5 peer reviewer personas:
-1. "Methodologist" (Lens: "Methodological Rigor & Experimental Design"): Evaluate experimental controls, boundary conditions, algorithmic complexity, and procedural threats to validity.
-2. "Domain Specialist" (Lens: "Domain Alignment & Literature Grounding"): Evaluate domain framing, theoretical gaps, related literature integration, and novelty in the field.
-3. "Biostatistician" (Lens: "Quantitative Rigor & Telemetry Calibration"): Evaluate statistical power, confidence intervals, sample sizes, distribution assumptions, and variance.
-4. "Synthesizer" (Lens: "Cross-Source Synthesis & Validity Threats"): Evaluate cross-source synthesis, argument coherence, evidence-claim linkage, and resolution of contradictory evidence.
-5. "Formal Editor" (Lens: "Scholarly Voice, Orthography & Standards Compliance"): Evaluate formal tone, terminology consistency, British English orthography, and 2026 ICMJE/COPE declarations.
-
-Return ONLY valid JSON in this exact format:
-{
-  "data": [
-    {
-      "id": "crit-ref-01",
-      "referee": "Methodologist",
-      "lens": "Methodological Rigor & Experimental Design",
-      "section": "Section 2: Methodology",
-      "severity": "Major",
-      "feedback": "...",
-      "revisionDirective": "..."
-    },
-    {
-      "id": "crit-ref-02",
-      "referee": "Domain Specialist",
-      "lens": "Domain Alignment & Literature Grounding",
-      "section": "Section 1: Introduction",
-      "severity": "Moderate",
-      "feedback": "...",
-      "revisionDirective": "..."
-    },
-    {
-      "id": "crit-ref-03",
-      "referee": "Biostatistician",
-      "lens": "Quantitative Rigor & Telemetry Calibration",
-      "section": "Section 3: Empirical Results",
-      "severity": "Major",
-      "feedback": "...",
-      "revisionDirective": "..."
-    },
-    {
-      "id": "crit-ref-04",
-      "referee": "Synthesizer",
-      "lens": "Cross-Source Synthesis & Validity Threats",
-      "section": "Section 4: Discussion",
-      "severity": "Moderate",
-      "feedback": "...",
-      "revisionDirective": "..."
-    },
-    {
-      "id": "crit-ref-05",
-      "referee": "Formal Editor",
-      "lens": "Scholarly Voice, Orthography & Standards Compliance",
-      "section": "Manuscript-wide & Declarations",
-      "severity": "Minor",
-      "feedback": "...",
-      "revisionDirective": "..."
-    }
-  ]
-}`;
+    const systemPrompt = scholarBrain.journalPrompts.peerReviewSystemPrompt();
     const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`, undefined, "long-context");
+    // Falsy: the request was handed to the browser (426) or already answered.
+    if (!result) return;
 
     let critiquesData: AcademicCritiqueItem[] = [];
     if (result && Array.isArray(result.data) && result.data.length > 0) {
@@ -181,40 +125,6 @@ Return ONLY valid JSON in this exact format:
   }
 });
 
-// POST /api/projects/:id/agentic/revision
-reviewRoutes.post("/revision", async (req: express.Request<{ id: string }>, res) => {
-  const project = await getProjectSafe(req, res);
-  if (!project) return;
-  const context = JSON.stringify(project.answers);
-
-  try {
-    const systemPrompt = `You are an expert academic editor.
-Apply revisions to the manuscript based on the peer review critiques provided in the research context.
-Instead of rewriting the entire manuscript, you MUST output a JSON array of exact text replacements (patches). This saves output tokens and processing time.
-Return ONLY valid JSON in this exact format:
-{
-  "data": [
-    { "section": "Introduction", "find": "exact old sentence or paragraph to replace", "replace": "the new revised text" },
-    { "section": "Methodology", "find": "exact old sentence or paragraph to replace", "replace": "the new revised text" }
-  ]
-}`;
-    const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`, undefined, "reasoning");
-    if (!result) return;
-    res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
-    res.end();
-  } catch (err: unknown) {
-    if (res.writableEnded) return;
-    const message = err instanceof Error ? err.message : String(err);
-    if (message === "RequireFrontendLLMException") return;
-    if (!res.headersSent) {
-      res.status(500).json({ error: message });
-    } else {
-      res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
-      res.end();
-    }
-  }
-});
-
 // POST /api/projects/:id/agentic/rebuttal-matrix
 reviewRoutes.post("/rebuttal-matrix", async (req: express.Request<{ id: string }>, res) => {
   const project = await getProjectSafe(req, res);
@@ -249,26 +159,7 @@ reviewRoutes.post("/rebuttal-matrix", async (req: express.Request<{ id: string }
 
     if (!isTest) {
       try {
-        const systemPrompt = `${buildScholarlyVoiceSystemPrompt({ discipline: "Peer Review Rebuttal Synthesis" })}
-You are an expert principal investigator composing a Point-by-Point Author Rebuttal Letter and Revision Matrix responding to peer reviewers.
-For each referee critique provided, formulate an authoritative, respectful, and evidence-grounded Author Response and Manuscript Revision Action with find/replace diffs.
-Return ONLY valid JSON matching this schema:
-{
-  "matrix": [
-    {
-      "id": "string",
-      "referee": "Methodologist" | "Domain Specialist" | "Biostatistician" | "Synthesizer" | "Formal Editor",
-      "lens": "string",
-      "section": "string",
-      "critique": "string",
-      "severity": "Major" | "Moderate" | "Minor",
-      "authorResponse": "string",
-      "revisionAction": "string",
-      "diff": { "find": "string", "replace": "string" },
-      "status": "addressed"
-    }
-  ]
-}`;
+        const systemPrompt = scholarBrain.journalPrompts.rebuttalSystemPrompt(buildScholarlyVoiceSystemPrompt({ discipline: "Peer Review Rebuttal Synthesis" }));
         const text = await routedCompletion(req, {
           task: "reasoning",
           systemPrompt,
@@ -354,87 +245,6 @@ reviewRoutes.get("/rebuttal-matrix", async (req: express.Request<{ id: string }>
     if (res.writableEnded) return;
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: message });
-  }
-});
-
-// POST /api/projects/:id/agentic/citation-audit
-reviewRoutes.post("/citation-audit", async (req: express.Request<{ id: string }>, res) => {
-  const project = await getProjectSafe(req, res);
-  if (!project) return;
-  const context = JSON.stringify(project.answers);
-
-  try {
-    const systemPrompt = `You are an expert academic citation auditor.
-Audit the citations in the provided research context, ensuring claims are backed by the provided vault sources.
-Identify 5 specific claims and determine if they are verified or flagged.
-Return ONLY valid JSON in this exact format:
-{
-  "data": [
-    {
-      "id": "cit-xyz",
-      "claim": "...",
-      "source": "...",
-      "status": "verified"
-    }
-  ]
-}
-Use 'verified' or 'flagged' for the status.`;
-    const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`);
-    if (!result) return;
-    res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
-    res.end();
-  } catch (err: unknown) {
-    if (res.writableEnded) return;
-    const message = err instanceof Error ? err.message : String(err);
-    if (message === "RequireFrontendLLMException") return;
-    if (!res.headersSent) {
-      res.status(500).json({ error: message });
-    } else {
-      res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
-      res.end();
-    }
-  }
-});
-
-// POST /api/projects/:id/agentic/originality-check
-reviewRoutes.post("/originality-check", async (req: express.Request<{ id: string }>, res) => {
-  const project = await getProjectSafe(req, res);
-  if (!project) return;
-  const context = JSON.stringify(project.answers);
-
-  try {
-    const systemPrompt = `You are an expert academic originality checker.
-Check the manuscript drafts in the context for potential plagiarism, structural overlap, or cliché phrasing.
-Calculate an overall originality score (0-100) and flag up to 3 specific sections if needed.
-Return ONLY valid JSON in this exact format:
-{
-  "data": {
-    "score": 94,
-    "flags": [
-      {
-        "id": "flag-xyz",
-        "section": "Introduction",
-        "issue": "Structural overlap",
-        "snippet": "...",
-        "suggestion": "..."
-      }
-    ]
-  }
-}`;
-    const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`);
-    if (!result) return;
-    res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
-    res.end();
-  } catch (err: unknown) {
-    if (res.writableEnded) return;
-    const message = err instanceof Error ? err.message : String(err);
-    if (message === "RequireFrontendLLMException") return;
-    if (!res.headersSent) {
-      res.status(500).json({ error: message });
-    } else {
-      res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
-      res.end();
-    }
   }
 });
 
@@ -957,149 +767,4 @@ reviewRoutes.post("/export", async (req: express.Request<{ id: string }>, res) =
       generatedAt: updatedAnswers.export_timestamp,
     },
   });
-});
-
-// GET /api/projects/:id/agentic/export/rebuttal-letter
-reviewRoutes.get("/export/rebuttal-letter", async (req: express.Request<{ id: string }>, res) => {
-  const project = await getProjectSafe(req, res);
-  if (!project) return;
-
-  let rebuttalMatrix = safeParseAnswerField<Array<{ referee: string; lens?: string; section?: string; severity?: string; critique: string; authorResponse: string; revisionAction?: string }> | undefined>(
-    project.answers?.["rebuttal_matrix"],
-    undefined
-  );
-
-  if (!rebuttalMatrix || rebuttalMatrix.length === 0) {
-    return res.status(400).json({ error: "Nothing to export yet: build your rebuttal matrix from the reviewers' critiques first." });
-  }
-
-  const buffer = await renderRefereeResponseLetterDocx(
-    {
-      title: project.answers?.["working_title"] || (project as { title?: string }).title || "Academic Manuscript",
-      author: project.authors?.[0]
-        ? `${project.authors[0].firstName} ${project.authors[0].surname}`.trim()
-        : "",
-      created: new Date(),
-      modified: new Date(),
-    },
-    {
-      template: "nature",
-      rebuttalMatrix,
-    }
-  );
-
-  res.setHeader(
-    "Content-Type",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-  );
-  res.setHeader("Content-Disposition", 'attachment; filename="Referee_Response_Letter.docx"');
-  res.setHeader("Content-Length", buffer.length);
-  res.send(buffer);
-});
-
-// POST /api/projects/:id/agentic/export/rebuttal-letter
-reviewRoutes.post("/export/rebuttal-letter", async (req: express.Request<{ id: string }>, res) => {
-  const project = await getProjectSafe(req, res);
-  if (!project) return;
-
-  let rebuttalMatrix: Array<{ referee: string; lens?: string; section?: string; severity?: string; critique: string; authorResponse: string; revisionAction?: string }> | undefined =
-    req.body?.rebuttalMatrix ||
-    safeParseAnswerField<Array<{ referee: string; lens?: string; section?: string; severity?: string; critique: string; authorResponse: string; revisionAction?: string }> | undefined>(
-      project.answers?.["rebuttal_matrix"],
-      undefined
-    );
-
-  if (!rebuttalMatrix || rebuttalMatrix.length === 0) {
-    return res.status(400).json({ error: "Nothing to export yet: build your rebuttal matrix from the reviewers' critiques first." });
-  }
-
-  const buffer = await renderRefereeResponseLetterDocx(
-    {
-      title: project.answers?.["working_title"] || (project as { title?: string }).title || "Academic Manuscript",
-      author: project.authors?.[0]
-        ? `${project.authors[0].firstName} ${project.authors[0].surname}`.trim()
-        : "",
-      created: new Date(),
-      modified: new Date(),
-    },
-    {
-      template: "nature",
-      rebuttalMatrix,
-    }
-  );
-
-  res.setHeader(
-    "Content-Type",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-  );
-  res.setHeader("Content-Disposition", 'attachment; filename="Referee_Response_Letter.docx"');
-  res.setHeader("Content-Length", buffer.length);
-  res.send(buffer);
-});
-
-// PUT /api/projects/:id/agentic/critiques/:critiqueId/waive
-reviewRoutes.put("/critiques/:critiqueId/waive", async (req, res) => {
-  const project = await getProjectSafe(req, res);
-  if (!project) return;
-  const config = getSupabaseRestConfig();
-
-  try {
-    if (config) {
-      try {
-        const table = new SupabaseTable(config, "peer_review_critiques");
-        await table.request(`?id=eq.${encodeURIComponent(req.params.critiqueId)}&project_id=eq.${encodeURIComponent(project.projectId)}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ waived: true })
-        });
-      } catch (e) {
-        console.warn("Could not waive critique in Supabase:", e);
-      }
-    }
-
-    // Also update project.answers.peer_review_critique locally if present
-    if (project.answers?.peer_review_critique) {
-      const critiques = safeParseAnswerField<Record<string, unknown>[]>(project.answers.peer_review_critique, []);
-      if (Array.isArray(critiques) && critiques.length > 0) {
-        const updated = critiques.map((c) => c.id === req.params.critiqueId ? { ...c, waived: true } : c);
-        await getProjectStore().save({
-          ...project,
-          answers: { ...project.answers, peer_review_critique: JSON.stringify(updated) }
-        });
-      }
-    }
-
-    res.json({ ok: true });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
-});
-
-// GET /api/projects/:id/agentic/critiques
-reviewRoutes.get("/critiques", async (req, res) => {
-  const project = await getProjectSafe(req, res);
-  if (!project) return;
-  const config = getSupabaseRestConfig();
-
-  try {
-    let data: unknown[] = [];
-    if (config) {
-      try {
-        const table = new SupabaseTable(config, "peer_review_critiques");
-        const resData = await table.request(`?project_id=eq.${project.projectId}`);
-        if (Array.isArray(resData)) data = resData;
-      } catch (e) {
-        console.warn("Could not query Supabase peer_review_critiques:", e);
-      }
-    }
-    if (data.length === 0 && project.answers?.peer_review_critique) {
-      const parsed = safeParseAnswerField<unknown[]>(project.answers.peer_review_critique, []);
-      if (Array.isArray(parsed)) data = parsed;
-    }
-    res.json({ ok: true, data });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: message });
-  }
 });

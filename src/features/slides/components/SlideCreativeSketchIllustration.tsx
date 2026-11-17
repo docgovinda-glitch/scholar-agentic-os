@@ -1,4 +1,3 @@
-import React from 'react';
 import type { BestDesignCategory, DesignLayoutArchetype } from '../data/bestSlideDesigns100';
 
 export interface SlideCreativeSketchIllustrationProps {

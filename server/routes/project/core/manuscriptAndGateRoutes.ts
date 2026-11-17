@@ -4,7 +4,6 @@ import { scholarBrain } from "../../../src/services/scholarBrain.ts";
 import { sendAiFailure, BrowserAiRequiredError } from "../../../src/ai/aiRouteErrors.ts";
 import { catalog } from "../../../../src/app/atlas/atlas.ts";
 import {
-  computeG4ExitCriteria,
   computeG5ExitCriteria,
   updateExitCriteria,
   signOff,
@@ -19,7 +18,6 @@ import { layoutFrom } from "../../../../src/domain/journal/wordLayouts.ts";
 import type { ExportFormat } from "../../../../src/app/export/types.ts";
 import { safeParseAnswerField } from "../../../../src/shared/projectStateSchema";
 import { manuscriptToCanonicalDocument } from "../agentic";
-import { emptyDocument } from "../../../../src/domain/document/model.ts";
 import { allocateWordBudget } from "../../../../src/domain/manuscript/wordBudget.ts";
 import type { GeneratedSection } from "../../../../src/domain/manuscript/types.ts";
 import {
@@ -32,10 +30,8 @@ import {
   GenerationJobError,
 } from "../../../../src/domain/manuscript/stateMachine.ts";
 import { checkCoherence } from "../../../../src/app/coherence/checkCoherence.ts";
-import type { CoherenceDimension } from "../../../../src/domain/coherence/types.ts";
 import { COHERENCE_DIMENSIONS } from "../../../../src/domain/coherence/types.ts";
 import { runPeerReview } from "../../../../src/app/review/peerReview.ts";
-import type { ReviewLens } from "../../../../src/domain/review/types.ts";
 import { REVIEW_LENSES } from "../../../../src/domain/review/types.ts";
 import { generateCoverLetter } from "../../../../src/app/coverLetter/generateCoverLetter.ts";
 import { proposeAnonymization } from "../../../../src/app/anonymization/proposeAnonymization.ts";
@@ -50,7 +46,6 @@ import {
   recomputeG4,
   recomputeG6,
   projectView,
-  currentUserId,
   loadOwnedProject,
   asyncRoute,
 } from "./projectHelpers.ts";

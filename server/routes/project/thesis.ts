@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { asyncRoute, loadOwnedProject, getSharedStore } from "../project.ts";
+import { asyncRoute, loadOwnedProject, getSharedStore } from "./core/projectHelpers.ts";
 import {
   buildScholarlyVoiceSystemPrompt,
   sanitizeScholarlyText,
@@ -104,23 +104,7 @@ router.post(
         ? `\nRelevant Benchmarks:\n` + evidence.slice(0, 4).map((e) => `- ${e.title} (${e.authors.slice(0, 2).join(", ")}, ${e.year || "n.d."})`).join("\n")
         : "";
 
-      const systemPrompt = `${buildScholarlyVoiceSystemPrompt({ discipline: "Doctoral Viva Voce Defense" })}
-You are a senior external examiner presiding over a doctoral Viva Voce oral defense.
-Formulate rigorous, adversarial examiner questions based on the candidate's thesis and output a valid JSON object matching this schema:
-{
-  "examinerPersona": "string: the examiner's role and specialism only, never a personal name (e.g. Senior External Examiner, Quantitative Methodologies)",
-  "examinerRigorScore": "string (e.g. High (Viva Voce Standard))",
-  "questions": [
-    {
-      "id": "string",
-      "category": "string (e.g. Theoretical Framing, Methodological Rigor, Original Contribution, Limitations)",
-      "examinerQuestion": "string",
-      "assessmentFocus": "string",
-      "suggestedRebuttalStructure": ["string", "string", "string"]
-    }
-  ]
-}
-Output ONLY valid JSON. Zero markdown codeblocks, zero conversational filler.`;
+      const systemPrompt = scholarBrain.thesisPrompts.vivaSystemPrompt(buildScholarlyVoiceSystemPrompt({ discipline: "Doctoral Viva Voce Defense" }));
 
       const userPrompt = `Candidate Dissertation Context:
 Title: ${title}
@@ -233,21 +217,7 @@ router.post(
     const gating = computeChapterGating(record, chapters);
 
     try {
-      const systemPrompt = `${buildScholarlyVoiceSystemPrompt({ discipline: "Dissertation Committee Audit" })}
-You are an academic dissertation auditor. Analyze the submitted chapter progression and return a JSON object:
-{
-  "totalChapters": number,
-  "alignmentScore": number (0 to 100),
-  "coherenceStatus": "string (e.g. Strong Academic Flow)",
-  "crossChapterChecks": [
-    {
-      "check": "string",
-      "status": "passed" | "warn" | "fail",
-      "details": "string"
-    }
-  ]
-}
-Output ONLY valid JSON.`;
+      const systemPrompt = scholarBrain.thesisPrompts.chapterAuditSystemPrompt(buildScholarlyVoiceSystemPrompt({ discipline: "Dissertation Committee Audit" }));
 
       const userPrompt = `Audit these dissertation chapters:
 ${chapters.map((c) => `Ch ${c.chapterNumber}: "${c.title}" (${c.wordCount}/${c.targetWordCount} words, status: ${c.status})`).join("\n")}`;
@@ -414,19 +384,7 @@ router.post(
       .map((e) => `${e.citationToken}: ${e.title} (${Array.isArray(e.authors) ? e.authors.slice(0, 2).join(", ") : e.authors}, ${e.year || "n.d."})`)
       .join("\n");
 
-    const systemPrompt = `You are a distinguished academic doctoral supervisor and scholar.
-Draft Chapter ${chapterNumber}: "${chapterTitle}" for a ${degreeLevel} entitled "${title}".
-Theoretical Framework: ${theoreticalFramework}.
-Methodology: ${methodology}.
-${researchQuestions.length ? `Research questions (the chapter must serve these):\n${researchQuestions.map((q, i) => `RQ${i + 1}. ${q}`).join("\n")}\n` : ""}Target word count: approximately ${targetWords} words.
-Scholarly dialect: ${dialect}.
-
-CITATION RULES:
-1. Ground theoretical assertions and empirical literature using ONLY the provided evidence tokens:
-${evidenceLedger || "No external sources available."}
-2. Insert citations using strictly the token format [CITE:id] (e.g. [CITE:src_1] or [CITE:src_vault_1]).
-3. NEVER invent or hallucinate uncited author names or publication years.
-4. Maintain doctoral-level analytical rigor, nuanced synthesis, and zero clichés.`;
+    const systemPrompt = scholarBrain.thesisPrompts.chapterDraftSystemPrompt({ chapterNumber, chapterTitle, degreeLevel, title, theoreticalFramework, methodology, researchQuestions: researchQuestions.length ? `Research questions (the chapter must serve these):\n${researchQuestions.map((q, i) => `RQ${i + 1}. ${q}`).join("\n")}\n` : "", targetWords, dialect, evidenceLedger: evidenceLedger || "No external sources available." });
 
     try {
       const brainRes = await scholarBrain.complete({

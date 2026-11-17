@@ -1,6 +1,6 @@
 import express from "express";
 import { z } from "zod";
-import { routedCompletion } from "../../../src/ai/routerBridge.ts";
+import { routedCompletion } from "../../../src/services/scholarBrain.ts";
 import { sendAiFailure } from "../../../src/ai/aiRouteErrors.ts";
 import { scoutJournals, scoutPapers } from "../../../src/discovery/blueprintScout.ts";
 import {

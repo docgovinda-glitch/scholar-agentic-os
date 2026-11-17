@@ -30,7 +30,7 @@ import {
   SectionType,
 } from "docx";
 import { lineTwips } from "../../domain/journal/wordLayouts";
-import type { Block, CanonicalDocument } from "../../desk/types";
+import type { CanonicalDocument } from "../../desk/types";
 import type { ExportMetadata } from "./types";
 import type { AcademicExportOptions } from "./academicPdfCompiler";
 

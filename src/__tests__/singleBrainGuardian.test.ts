@@ -113,10 +113,38 @@ describe("Single-Brain Architecture lock", () => {
     expect(fs.readFileSync(path.join(ROOT, "server/src/services/scholarBrain.ts"), "utf8")).toMatch(/courseworkPrompts/);
   });
 
+  it("no HTTP route holds prompt text: every workspace's prompts live in server/src/services/prompts, reached through scholarBrain", () => {
+    const offenders: string[] = [];
+    for (const rel of productionFiles(["server/routes"])) {
+      const text = fs.readFileSync(path.join(ROOT, rel), "utf8");
+      if (/You are (the|a|an) /.test(text) || /Return ONLY valid JSON|Respond with ONLY JSON/.test(text)) offenders.push(rel);
+    }
+    expect(offenders).toEqual([]);
+    const brain = fs.readFileSync(path.join(ROOT, "server/src/services/scholarBrain.ts"), "utf8");
+    for (const name of ["courseworkPrompts", "journalPrompts", "thesisPrompts", "proposalPrompts", "presentationPrompts"]) {
+      expect(brain, name).toMatch(new RegExp(`\\b${name},`));
+    }
+  });
+
   it("Coursework routes reach the AI only through scholarBrain's logged wrappers, never routerBridge directly", () => {
     const offenders = productionFiles(["server/routes/project/assignment"]).filter((rel) =>
       /ai\/routerBridge/.test(fs.readFileSync(path.join(ROOT, rel), "utf8"))
     );
+    expect(offenders).toEqual([]);
+  });
+
+  it("no route or server module takes routedCompletion straight from routerBridge: every completion goes through scholarBrain", () => {
+    // routerBridge's other exports (keyring, availability, the response decorator) are plumbing, not completions.
+    const offenders: string[] = [];
+    for (const rel of [...productionFiles(["server/routes", "server/src"]), "server.ts"]) {
+      if (rel === path.join("server", "src", "ai", "routerBridge.ts")) continue;
+      const text = fs.readFileSync(path.join(ROOT, rel), "utf8");
+      const importRe = /import\s*(?:type\s*)?\{([^}]*)\}\s*from\s*["'][^"']*ai\/routerBridge(?:\.ts)?["']/g;
+      let m: RegExpExecArray | null;
+      while ((m = importRe.exec(text))) {
+        if (/\brouted(Completion|Text)\b/.test(m[1])) offenders.push(rel);
+      }
+    }
     expect(offenders).toEqual([]);
   });
 

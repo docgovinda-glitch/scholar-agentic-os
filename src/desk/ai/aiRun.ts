@@ -4,7 +4,7 @@
  * (it cannot reach the user's machine), the same chain continues here in the
  * browser, so the caller sees one uninterrupted event stream.
  */
-import { authHeaders } from "../api/client";
+import { authHeaders } from "../api/authHeaders";
 import { route } from "../../platform/router/router";
 import { CircuitBreaker, MemoryBreakerStore } from "../../platform/router/circuitBreaker";
 import { ollamaAdapter, openAiCompatibleAdapter, sseEvents } from "../../platform/router/adapters";
