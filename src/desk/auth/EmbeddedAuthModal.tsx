@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   SignInScreen,
@@ -39,6 +39,7 @@ export default function EmbeddedAuthModal({
   const [savedAccounts, setSavedAccounts] = useState<StoredAccountProfile[]>([]);
   const [switching, setSwitching] = useState(false);
   const [switchError, setSwitchError] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -47,6 +48,12 @@ export default function EmbeddedAuthModal({
       setSavedAccounts(getSavedAccounts());
     }
   }, [isOpen, initialMode]);
+
+  // Move focus into the dialog when it opens, so keyboard and screen-reader
+  // users start inside it rather than on the page behind the backdrop.
+  useEffect(() => {
+    if (isOpen) dialogRef.current?.focus();
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -100,6 +107,8 @@ export default function EmbeddedAuthModal({
     >
       <div
         className={`relative w-full ${modalWidth} max-h-[94dvh] overflow-hidden bg-white dark:bg-ink-800 border border-neutral-200/90 dark:border-white/10 rounded-2xl shadow-2xl flex flex-col transition-all duration-200`}
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={screen === "signup" ? "Create account" : "Sign in"}
@@ -241,10 +250,10 @@ export default function EmbeddedAuthModal({
           {screen === "switch" && (
             <div className="w-full">
               <div className="mb-6">
-                <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+                <h2 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-white">
                   Switch Researcher Account
                 </h2>
-                <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400">
+                <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
                   Toggle between your research profiles and institutions.
                 </p>
               </div>
@@ -257,30 +266,30 @@ export default function EmbeddedAuthModal({
 
               <div className="space-y-2 mb-6">
                 {savedAccounts.length === 0 ? (
-                  <p className="text-xs text-slate-500 dark:text-neutral-400 py-6 text-center">
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400 py-6 text-center">
                     No other saved accounts on this device.
                   </p>
                 ) : (
                   savedAccounts.map((account) => (
                     <div
                       key={account.userId}
-                      className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-200/80 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 hover:border-slate-400 dark:hover:border-neutral-600 hover:shadow-xs transition-all"
+                      className="flex items-center justify-between p-3.5 rounded-2xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-800 hover:border-neutral-400 dark:hover:border-white/25 hover:shadow-xs transition-all"
                     >
                       <div
                         className="min-w-0 flex-1 cursor-pointer"
                         onClick={() => handleSwitchAccount(account.userId)}
                       >
-                        <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                        <p className="text-sm font-bold text-neutral-900 dark:text-white truncate">
                           {account.name || account.email}
                         </p>
-                        <p className="text-xs text-slate-500 dark:text-neutral-400 truncate mt-0.5">
+                        <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate mt-0.5">
                           {account.email} {account.institution ? `• ${account.institution}` : ""}
                         </p>
                       </div>
                       <button
                         type="button"
                         onClick={() => handleRemoveAccount(account.userId)}
-                        className="ml-2 w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                        className="ml-2 w-7 h-7 rounded-lg flex items-center justify-center text-neutral-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
                         title="Remove from device"
                       >
                         ✕
@@ -294,7 +303,7 @@ export default function EmbeddedAuthModal({
                 type="button"
                 disabled={switching}
                 onClick={() => setScreen("signin")}
-                className="w-full py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-sm font-semibold text-slate-900 dark:text-white transition-colors cursor-pointer disabled:opacity-50"
+                className="w-full py-2.5 px-4 rounded-xl bg-neutral-100 hover:bg-neutral-200 dark:bg-ink-750 dark:hover:bg-ink-700 text-sm font-semibold text-neutral-900 dark:text-white transition-colors cursor-pointer disabled:opacity-50"
               >
                 + Add Another Account
               </button>

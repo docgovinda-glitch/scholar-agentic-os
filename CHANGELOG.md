@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-11-17
 
+### Login and signup audit
+- **One identifier rule.** Username, email and mobile detection and the uniform sign-in error now live in `src/domain/auth/identifier.ts`, used by both the browser service and `POST /api/auth/login`. They had been two copies of the same regular expressions.
+- **Dead signup CAPTCHA route removed.** `POST /api/auth/verify-signup` had no caller, and its server-side Turnstile check would spend the single-use token before Supabase Auth could verify it. Signup still relies on Supabase's CAPTCHA check.
+- **Google sign-in no longer redirects mid-prompt.** A fixed 3.5 s fallback sent users to the OAuth redirect while the account chooser was open. The fallback now runs only if Google reports no prompt at all. A failed Google script load can be retried instead of staying broken until reload.
+- **CAPTCHA resets after a failed attempt.** Turnstile tokens are single-use; a retry after a failed sign-in, sign-up or reset used to send the spent token. The widget now resets on failure and clears expired or errored tokens.
+- **Redirects survive sign-in.** Google sign-in navigated to a route that does not exist, dropping `?redirect=`. Redirect targets containing backslashes or control characters are refused.
+- **Signup checks each field once.** Submit re-queried availability for fields the blur check had already verified.
+- **First-login profile username** is built to match the username rule and to be unique, so it no longer fails when the email's local part is taken.
+- **Visual consistency.** Auth fields, buttons and cards share one radius, a visible focus ring replaces the removed outline, and the two onboarding labels now match sign-up. Dead `FileField` removed.
+
 ### Repository audit: one brain, less code, honest states
 - **Every AI completion goes through `scholarBrain`.** The journal blueprint, citation-support and journal-profile routes, the Ask routes and the admin opportunity agent called the router bridge directly; they now use the brain's logged wrapper, and a guardian test fails the suite if a route or server module does otherwise.
 - **Prompts in one place.** The system prompts that lived in the journal, thesis, proposal and presentation route files moved, unchanged, to `server/src/services/prompts/` (`journalPrompts`, `thesisPrompts`, `proposalPrompts`, `presentationPrompts`). No route file holds prompt text (guardian test).

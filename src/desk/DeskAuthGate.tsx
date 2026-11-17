@@ -82,6 +82,9 @@ export function SessionBoundaryFallback({ status }: { status: "loading" | "uncon
 function safeInternalRedirect(target: string | null): string | null {
   if (!target) return null;
   if (!target.startsWith("/") || target.startsWith("//")) return null;
+  // Browsers read "/\evil.example" as "//evil.example", and URL parsers strip
+  // tabs and newlines, so backslashes and control characters are refused too.
+  if (/[\u0000-\u001f\u007f\\]/.test(target)) return null;
   return target;
 }
 
@@ -102,14 +105,10 @@ export function RequireAuth() {
   if (session.status === "loading") return <SessionBoundaryFallback status="loading" />;
   if (session.status === "unconfigured") return <SessionBoundaryFallback status="unconfigured" />;
   if (session.status === "signed-out") {
-    if (
-      location.pathname === "/projects" ||
-      location.pathname === "/" ||
-      !location.pathname ||
-      location.pathname === "/signin" ||
-      location.pathname === "/signup" ||
-      location.pathname.startsWith("/projects/draft-")
-    ) {
+    // Only the guest-usable project routes are open to signed-out visitors.
+    // /signin and /signup are top-level routes outside this guard, so they
+    // never reach it.
+    if (location.pathname === "/projects" || location.pathname.startsWith("/projects/draft-")) {
       return <Outlet />;
     }
     const redirect = encodeURIComponent(location.pathname + location.search);
@@ -202,6 +201,9 @@ export function RequireOnboarding() {
       } else {
         setStatus("complete");
       }
+    }).catch(() => {
+      // Like an unsuccessful lookup above: never trap the user on a spinner.
+      if (active) setStatus("complete");
     });
 
     return () => {

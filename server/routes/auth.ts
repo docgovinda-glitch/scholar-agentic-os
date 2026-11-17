@@ -1,25 +1,15 @@
 import crypto from "node:crypto";
 import express from "express";
-import { verifyCaptchaToken } from "../src/middleware/captchaVerify.ts";
 import { getBaseIp, rateLimit } from "../src/middleware/rateLimit.ts";
 import { getSupabaseRestConfig, SupabaseTable } from "../src/supabaseRest.ts";
-
-export const UNIFORM_LOGIN_ERROR =
-  "Invalid credentials. Please check your User ID, email, or mobile number and try again.";
+import {
+  detectIdentifierType,
+  INVALID_IDENTIFIER_MESSAGE,
+  UNIFORM_LOGIN_ERROR,
+} from "../../src/domain/auth/identifier.ts";
 
 export const UPSTREAM_LOGIN_RATE_LIMIT_ERROR =
   "Too many sign-in attempts right now. Please wait a minute and try again.";
-
-export type IdentifierType = "email" | "username" | "phone" | "unknown";
-
-export function detectIdentifierType(rawIdentifier: string): IdentifierType {
-  const identifier = rawIdentifier.trim();
-  if (!identifier) return "unknown";
-  if (/^\+\d{1,3}\d{6,14}$/.test(identifier)) return "phone";
-  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier)) return "email";
-  if (/^[a-zA-Z0-9_-]{1,}$/.test(identifier)) return "username";
-  return "unknown";
-}
 
 // 5 attempts per 5 minutes per verified client IP: keeps any single attacker IP
 // at <= 5/30 (16.7%) of Supabase GoTrue's default 30 requests / 5 minutes
@@ -36,12 +26,6 @@ const authLoginLimiter = rateLimit({
 const authAvailabilityLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 30,
-  limitBy: "ip",
-});
-
-const authVerifyLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
   limitBy: "ip",
 });
 
@@ -68,35 +52,14 @@ async function callServiceRoleRpc<T>(
 }
 
 /**
- * Authentication routes for signup verification, unified login, and availability checks.
+ * Authentication routes: unified sign-in and username / email / phone availability.
+ *
+ * Signup itself is not here. The browser calls Supabase Auth directly, and
+ * Supabase verifies the CAPTCHA token at the endpoint that creates the user.
+ * A Turnstile token is single-use, so checking it on this server first would
+ * spend it before Supabase could.
  */
 export function registerAuthRoutes(app: express.Express): void {
-  /**
-   * POST /api/auth/verify-signup
-   * Verifies CAPTCHA token before allowing signup.
-   */
-  app.post("/api/auth/verify-signup", authVerifyLimiter, express.json(), async (req, res) => {
-    const { captchaToken } = (req.body ?? {}) as { captchaToken?: string };
-
-    if (!captchaToken) {
-      return res.status(400).json({
-        success: false,
-        error: "CAPTCHA token is required",
-      });
-    }
-
-    const result = await verifyCaptchaToken(captchaToken);
-
-    if (!result.success) {
-      return res.status(400).json({
-        success: false,
-        error: result.error || "CAPTCHA verification failed",
-      });
-    }
-
-    return res.json({ success: true });
-  });
-
   /**
    * POST /api/auth/login
    *
@@ -128,7 +91,7 @@ export function registerAuthRoutes(app: express.Express): void {
     if (idType === "unknown") {
       return res.status(400).json({
         success: false,
-        error: "Invalid User ID, email, or mobile number format.",
+        error: INVALID_IDENTIFIER_MESSAGE,
       });
     }
 
@@ -253,7 +216,14 @@ export function registerAuthRoutes(app: express.Express): void {
 
       let activeProfile = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
       if (!activeProfile) {
-        const defaultUsername = emailForGoTrue.split("@")[0] || "researcher";
+        // A profile is missing only for an account created before the profile
+        // trigger existed. The username must match the username rule and must
+        // not collide with an existing one, so it is built from the email's
+        // local part plus a slice of the user id (unique per account).
+        const localPart = (emailForGoTrue.split("@")[0] || "")
+          .replace(/[^a-zA-Z0-9_-]/g, "")
+          .slice(0, 24);
+        const defaultUsername = `${localPart || "researcher"}_${userId.replace(/-/g, "").slice(0, 8)}`;
         const createdRows = (await profilesTable.request("", {
           method: "POST",
           headers: {

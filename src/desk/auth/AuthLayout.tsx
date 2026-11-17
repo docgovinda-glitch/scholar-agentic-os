@@ -12,8 +12,8 @@ import ScholarCoreLogo from "../../components/ScholarCoreLogo";
  * rather than hand-maintained.
  *
  * Also imported directly by desk/account/AccountSettingsScreen.tsx: Field,
- * SelectField, FileField and PhoneField are the one definition of each
- * control shared by Create Account and Account Settings.
+ * SelectField and PhoneField are the one definition of each control shared
+ * by Create Account and Account Settings.
  */
 
 /**
@@ -76,7 +76,7 @@ export function AuthHeading({
         </div>
       </div>
       {/* h1 is the screen's own title for accessibility and page structure */}
-      <h1 className="mt-2.5 text-xl sm:text-[22px] font-bold tracking-tight text-neutral-900 dark:text-white">
+      <h1 className="mt-3 text-[22px] sm:text-[26px] font-semibold tracking-[-0.02em] leading-tight text-neutral-900 dark:text-white">
         {title}
       </h1>
       {subtitle && (
@@ -112,7 +112,7 @@ export function Field({
   onBlur?: () => void;
   autoComplete?: string;
   hint?: string;
-  /** A validation/availability problem, shown the same way PhoneField and FileField already show theirs. */
+  /** A validation/availability problem, shown the same way PhoneField already shows its own. */
   error?: string | null;
   autoFocus?: boolean;
   required?: boolean;
@@ -155,7 +155,7 @@ export function Field({
             error
               ? "border-rose-400 dark:border-rose-500/80 focus:border-rose-600"
               : "border-neutral-300 dark:border-white/15 hover:border-neutral-400 dark:hover:border-white/25 focus:border-neutral-900 dark:focus:border-white"
-          } rounded-md text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 focus:outline-hidden transition-colors duration-150 disabled:bg-neutral-50 dark:disabled:bg-ink-850 disabled:text-neutral-400 ${
+          } rounded-xl text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 focus:outline-none focus-visible:ring-4 focus-visible:ring-neutral-900/10 dark:focus-visible:ring-white/15 transition-[border-color,box-shadow] duration-150 disabled:bg-neutral-50 dark:disabled:bg-ink-850 disabled:text-neutral-400 ${
             showPasswordToggle ? "pr-20" : ""
           }`}
         />
@@ -235,7 +235,7 @@ export function SelectField({
           required={required}
           aria-describedby={hintId}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full h-11 appearance-none px-3.5 py-2 pr-9 text-sm bg-white dark:bg-ink-900 border border-neutral-300 dark:border-white/15 hover:border-neutral-400 dark:hover:border-white/25 focus:border-neutral-900 dark:focus:border-white rounded-md text-neutral-900 dark:text-neutral-100 focus:outline-hidden transition-colors duration-150 cursor-pointer"
+          className="w-full h-11 appearance-none px-3.5 py-2 pr-9 text-sm bg-white dark:bg-ink-900 border border-neutral-300 dark:border-white/15 hover:border-neutral-400 dark:hover:border-white/25 focus:border-neutral-900 dark:focus:border-white rounded-xl text-neutral-900 dark:text-neutral-100 focus:outline-none focus-visible:ring-4 focus-visible:ring-neutral-900/10 dark:focus-visible:ring-white/15 transition-[border-color,box-shadow] duration-150 cursor-pointer"
         >
           <option value="" disabled={required}>
             {placeholder}
@@ -257,76 +257,6 @@ export function SelectField({
           {hint}
         </p>
       )}
-    </div>
-  );
-}
-
-function formatBytes(bytes: number): string {
-  return `${(bytes / (1024 * 1024)).toFixed(bytes < 1024 * 1024 ? 3 : 1)} MB`;
-}
-
-/**
- * Institutional ID document upload.
- */
-export function FileField({
-  id,
-  label,
-  file,
-  onChange,
-  accept,
-  maxBytes,
-  required = true,
-  helpText,
-  error,
-}: {
-  id: string;
-  label: string;
-  file: File | null;
-  onChange: (file: File | null) => void;
-  accept: string;
-  maxBytes?: number;
-  required?: boolean;
-  helpText?: string;
-  error?: string | null;
-}) {
-  const hintId = `${id}-hint`;
-  return (
-    <div className="flex flex-col gap-1.5 text-left">
-      <label htmlFor={id} className={labelClass(required)}>
-        {label}
-      </label>
-      {!file && (
-        <input
-          id={id}
-          name={id}
-          type="file"
-          accept={accept}
-          required={required}
-          aria-describedby={hintId}
-          onChange={(e) => onChange(e.target.files?.[0] ?? null)}
-          className="w-full text-sm py-2 px-3 bg-white dark:bg-ink-900 border border-neutral-300 dark:border-white/15 rounded-md cursor-pointer"
-        />
-      )}
-      {file && (
-        <div className="flex items-center justify-between gap-3 rounded-md border border-neutral-200 dark:border-white/10 bg-neutral-50 dark:bg-ink-900/60 px-3.5 py-2.5 text-sm">
-          <span className="truncate text-neutral-900 dark:text-white font-medium">
-            {file.name} ({formatBytes(file.size)})
-          </span>
-          <button
-            type="button"
-            data-compact="true"
-            onClick={() => onChange(null)}
-            className="shrink-0 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:text-rose-700 cursor-pointer"
-          >
-            Remove
-          </button>
-        </div>
-      )}
-      <p id={hintId} className="text-[11.5px] text-neutral-500 dark:text-neutral-400">
-        {helpText}
-        {maxBytes ? ` Max size ${formatBytes(maxBytes)}.` : ""}
-      </p>
-      {error && <AuthError>{error}</AuthError>}
     </div>
   );
 }
@@ -369,7 +299,7 @@ export function PhoneField({
         {label}
       </label>
       <div
-        className={`flex items-stretch h-11 rounded-md border ${
+        className={`flex items-stretch h-11 rounded-xl border ${
           error
             ? "border-rose-400 dark:border-rose-500/80 focus-within:border-rose-600"
             : "border-neutral-300 dark:border-white/15 hover:border-neutral-400 dark:hover:border-white/25 focus-within:border-neutral-900 dark:focus-within:border-white"
@@ -474,7 +404,7 @@ export function SubmitButton({
       onClick={onClick}
       disabled={busy || disabled}
       aria-busy={busy}
-      className="mt-1.5 w-full h-11 rounded-md bg-neutral-900 hover:bg-ink-950 dark:bg-white dark:hover:bg-neutral-200 dark:text-neutral-900 text-white font-semibold px-4 text-sm shadow-xs hover:shadow-sm active:scale-[0.99] transition-all duration-150 disabled:bg-neutral-800 disabled:text-white/90 dark:disabled:bg-neutral-200 dark:disabled:text-neutral-900 disabled:!opacity-85 disabled:cursor-not-allowed disabled:shadow-none disabled:active:scale-100 cursor-pointer inline-flex items-center justify-center gap-2 group"
+      className="mt-1.5 w-full h-11 rounded-xl bg-neutral-900 hover:bg-ink-950 dark:bg-white dark:hover:bg-neutral-200 dark:text-neutral-900 text-white font-semibold px-4 text-sm shadow-xs hover:shadow-sm active:scale-[0.99] transition-all duration-150 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-neutral-900/15 dark:focus-visible:ring-white/20 disabled:bg-neutral-800 disabled:text-white/90 dark:disabled:bg-neutral-200 dark:disabled:text-neutral-900 disabled:opacity-80 disabled:cursor-not-allowed disabled:shadow-none disabled:active:scale-100 cursor-pointer inline-flex items-center justify-center gap-2 group"
     >
       {busy ? (
         <>
@@ -539,7 +469,7 @@ export function GoogleSignInButton({ onClick, busy }: { onClick: () => void; bus
       onClick={onClick}
       disabled={busy}
       aria-busy={busy}
-      className="flex w-full h-11 items-center justify-center gap-3 rounded-md border border-neutral-300 dark:border-white/15 bg-white dark:bg-ink-750 hover:bg-neutral-50 dark:hover:bg-ink-700 hover:border-neutral-400 dark:hover:border-white/25 px-4 text-sm font-semibold text-neutral-800 dark:text-neutral-100 shadow-2xs active:scale-[0.99] transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+      className="flex w-full h-11 items-center justify-center gap-3 rounded-xl border border-neutral-300 dark:border-white/15 bg-white dark:bg-ink-750 hover:bg-neutral-50 dark:hover:bg-ink-700 hover:border-neutral-400 dark:hover:border-white/25 px-4 text-sm font-semibold text-neutral-800 dark:text-neutral-100 shadow-2xs active:scale-[0.99] transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
     >
       {busy ? (
         <>

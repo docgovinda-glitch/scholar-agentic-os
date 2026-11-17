@@ -11,6 +11,11 @@
 import { getSupabaseClient, isSupabaseConfigured } from "./supabaseClient";
 import { storeProviderKey, forgetProviderKey } from "./userAiSettings";
 import { getCaptchaConfig } from "./captchaService";
+import {
+  detectIdentifierType,
+  INVALID_IDENTIFIER_MESSAGE,
+  UNIFORM_LOGIN_ERROR,
+} from "../domain/auth/identifier";
 
 export interface SignUpInput {
   username: string;
@@ -70,10 +75,11 @@ export function safeAuthErrorMessage(error: { message?: string; status?: number 
  * (Authentication -> Attack Protection); VITE_CAPTCHA_SITE_KEY on its own
  * only renders the widget.
  *
- * The /api/auth/verify-signup call is kept ahead of it as a fail-closed
- * front door: it turns an unsolved challenge into a clear message before a
- * signup attempt is made, and now refuses outright when CAPTCHA is
- * configured but no token was produced, instead of falling through.
+ * The check below is a front door, not a boundary: it turns a missing
+ * challenge into a clear message before any request is made. It refuses when
+ * CAPTCHA is configured but no token was produced. It does not verify the
+ * token itself, since that would spend the single-use token before Supabase
+ * could use it.
  */
 export async function signUp(input: SignUpInput): Promise<ServiceResult> {
   const captcha = getCaptchaConfig();
@@ -160,57 +166,26 @@ export interface SignInResult extends ServiceResult {
 }
 
 /**
- * Detect the type of login identifier the user entered.
- *
- * Returns the RPC function name to call for that identifier type.
- * Auto-detection allows users to sign in with:
- *   - Username (e.g., "john_doe")
- *   - Email (e.g., "john@example.com")
- *   - Mobile number in E.164 format (e.g., "+19800000000")
- */
-function detectIdentifierType(identifier: string): "username" | "email" | "phone" | "unknown" {
-  identifier = identifier.trim();
-
-  // E.164 phone format: starts with + followed by 1-3 digits (country code), then digits
-  // Examples: +19800000000, +977800000000, +442071838750
-  if (/^\+\d{1,3}\d{6,14}$/.test(identifier)) {
-    return "phone";
-  }
-
-  // Email: contains @ symbol and looks like valid email
-  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier)) {
-    return "email";
-  }
-
-  // Default to username (alphanumeric, underscore, dash, etc.)
-  if (/^[a-zA-Z0-9_-]{1,}$/.test(identifier)) {
-    return "username";
-  }
-
-  return "unknown";
-}
-
-/**
- * Logs in with flexible identifier support: username, email, or mobile number.
+ * Logs in with flexible identifier support: username, email, or mobile number
+ * (rules in src/domain/auth/identifier.ts).
  *
  * Delegates identifier-to-email resolution and GoTrue password authentication
  * to the rate-limited, Turnstile-guarded Express endpoint `POST /api/auth/login`
  * so the resolved email address is never exposed to unauthenticated clients.
  */
-interface QueryWithMaybeSingle<T> {
-  maybeSingle?: () => Promise<{ data: T | null; error: unknown }>;
-  single?: () => Promise<{ data: T | null; error: unknown }>;
-}
-
 export async function signIn(input: SignInInput): Promise<SignInResult> {
   const supabase = getSupabaseClient();
   const identifier = input.username.trim();
-  const type = detectIdentifierType(identifier);
 
-  if (type === "unknown") {
+  // A password sign-in supersedes any Google redirect that was started and
+  // abandoned, so that stale marker must not make this session look like a
+  // Google return later.
+  clearPendingGoogleSignIn();
+
+  if (detectIdentifierType(identifier) === "unknown") {
     return {
       success: false,
-      error: "Invalid User ID, email, or mobile number format.",
+      error: INVALID_IDENTIFIER_MESSAGE,
     };
   }
 
@@ -243,9 +218,7 @@ export async function signIn(input: SignInInput): Promise<SignInResult> {
     if (!res.ok || !data.success) {
       return {
         success: false,
-        error:
-          data.error ||
-          "Invalid credentials. Please check your User ID, email, or mobile number and try again.",
+        error: data.error || UNIFORM_LOGIN_ERROR,
       };
     }
 
@@ -360,6 +333,12 @@ export async function resendVerificationEmail(input: ResendVerificationEmailInpu
   return { success: true, emailSent: true };
 }
 
+
+/** Minimal shape of a supabase-js query that can be narrowed to one row. */
+interface QueryWithMaybeSingle<T> {
+  maybeSingle?: () => Promise<{ data: T | null; error: unknown }>;
+  single?: () => Promise<{ data: T | null; error: unknown }>;
+}
 
 export interface ProfileFields {
   username: string;
@@ -692,7 +671,8 @@ export function clearPendingGoogleSignIn(): void {
   localStorage.removeItem(GOOGLE_OAUTH_PENDING_KEY);
 }
 
-const GOOGLE_CLIENT_ID =
+/** Public OAuth client id. Shared with GoogleIdentityButton, so it is defined once. */
+export const GOOGLE_CLIENT_ID =
   (typeof import.meta !== "undefined" && (import.meta?.env?.VITE_GOOGLE_CLIENT_ID as string | undefined)) ||
   (typeof process !== "undefined" && (process?.env?.VITE_GOOGLE_CLIENT_ID as string | undefined)) ||
   "321279128437-m3pm3b0qk9kli39mv2em8t5fq2io841p.apps.googleusercontent.com";
@@ -736,7 +716,14 @@ export function loadGoogleGsiScript(): Promise<void> {
     script.async = true;
     script.defer = true;
     script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Failed to load Google Sign-In script"));
+    script.onerror = () => {
+      // Clear the cached promise so a later attempt can retry the load; a
+      // rejected promise cached here would fail every future Google sign-in
+      // until the page reloads.
+      script.remove();
+      gisScriptLoading = null;
+      reject(new Error("Failed to load Google Sign-In script"));
+    };
     document.head.appendChild(script);
   });
 
@@ -757,7 +744,7 @@ export async function signInWithGoogleIdToken(idToken: string): Promise<ServiceR
   });
   if (error) {
     localStorage.removeItem(GOOGLE_OAUTH_PENDING_KEY);
-    return { success: false, error: error.message };
+    return { success: false, error: safeAuthErrorMessage(error, "Google sign-in failed. Please try again.") };
   }
   return { success: true };
 }
@@ -800,12 +787,28 @@ export async function signInWithGoogle(redirectPath: string = ""): Promise<Servi
         const googleId = win.google.accounts.id;
         return await new Promise<ServiceResult>((resolve) => {
           let finished = false;
+          // Safety net for a prompt that never reports anything. It is armed
+          // only until Google reports a prompt moment: while the account
+          // chooser is open the user is still deciding, and a redirect fired
+          // then would abandon their choice mid-flow.
+          let safetyTimer: ReturnType<typeof setTimeout> | undefined = undefined;
+          const disarmSafety = () => {
+            if (safetyTimer !== undefined) clearTimeout(safetyTimer);
+            safetyTimer = undefined;
+          };
+          const fallBack = () => {
+            if (finished) return;
+            finished = true;
+            disarmSafety();
+            fallbackToOAuth(supabase, redirectPath).then(resolve);
+          };
 
           googleId.initialize({
             client_id: GOOGLE_CLIENT_ID,
             callback: async (response: { credential?: string }) => {
               if (response.credential && !finished) {
                 finished = true;
+                disarmSafety();
                 const result = await signInWithGoogleIdToken(response.credential);
                 resolve(result);
               }
@@ -816,24 +819,17 @@ export async function signInWithGoogle(redirectPath: string = ""): Promise<Servi
           });
 
           googleId.prompt((notification: GoogleIdPromptNotification) => {
+            disarmSafety();
             if (
-              !finished &&
-              (notification.isNotDisplayed?.() ||
-                notification.isSkippedMoment?.() ||
-                notification.isDismissedMoment?.())
+              notification.isNotDisplayed?.() ||
+              notification.isSkippedMoment?.() ||
+              notification.isDismissedMoment?.()
             ) {
-              finished = true;
-              fallbackToOAuth(supabase, redirectPath).then(resolve);
+              fallBack();
             }
           });
 
-          // Timeout safety: if prompt is ignored, fall back to OAuth after 3.5s
-          setTimeout(() => {
-            if (!finished) {
-              finished = true;
-              fallbackToOAuth(supabase, redirectPath).then(resolve);
-            }
-          }, 3500);
+          safetyTimer = setTimeout(fallBack, 3500);
         });
       }
     } catch {

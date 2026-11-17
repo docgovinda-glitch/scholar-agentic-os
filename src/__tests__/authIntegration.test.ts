@@ -48,9 +48,6 @@ vi.mock("../services/supabaseClient", () => ({
 
 vi.mock("../services/captchaService", () => ({
   getCaptchaConfig: () => ({ siteKey: "test_site_key", enabled: true }),
-  getCaptchaToken: vi.fn(),
-  resetCaptcha: vi.fn(),
-  clearCaptcha: vi.fn(),
 }));
 
 import { signUp, signIn, sendPasswordResetEmail } from "../services/supabaseAuthService";
@@ -188,7 +185,7 @@ describe("Phase 4: Integration Testing - Automated Authentication Flow", () => {
         captchaToken: "valid_captcha_token",
       });
 
-      // signUp() runs in the browser, so its own /api/auth/verify-signup check
+      // signUp() runs in the browser, so its own captcha-field check
       // is a front door, not a boundary — a bot skips this code and posts to
       // Supabase directly. The token therefore has to reach Supabase Auth,
       // which validates it server-side at the endpoint that creates the user.
@@ -466,7 +463,7 @@ describe("Phase 4: Integration Testing - Automated Authentication Flow", () => {
           }),
       });
 
-      const response = await (global.fetch as any)("/api/auth/verify-signup", {
+      const response = await (global.fetch as any)("/api/auth/login", {
         method: "POST",
         body: JSON.stringify({ captchaToken: "token" }),
       });

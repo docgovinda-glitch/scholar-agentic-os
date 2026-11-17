@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useImperativeHandle, useRef, type Ref } from "react";
 import { getCaptchaConfig } from "../../services/captchaService";
 
 const TURNSTILE_SCRIPT_ID = "cf-turnstile-script";
@@ -39,24 +39,36 @@ function loadTurnstile(): Promise<void> {
   return turnstileReady;
 }
 
+/** Imperative handle a form holds so it can reset the challenge after a failed attempt. */
+export interface CaptchaWidgetHandle {
+  reset: () => void;
+}
+
+interface CaptchaWidgetProps {
+  onTokenReady: (token: string | null) => void;
+  /** React 19 passes ref as a plain prop, so no forwardRef wrapper is needed. */
+  ref?: Ref<CaptchaWidgetHandle>;
+}
+
 /**
  * CAPTCHA widget wrapper for Cloudflare Turnstile.
  *
- * The script-loading and already-loaded paths deliberately share ONE cleanup.
- * They used to be separate: the loading branch returned its own cleanup that
- * removed the <script> tag and nothing else, which made the widget-removing
- * cleanup below it unreachable on that path — so React StrictMode's
- * mount/unmount/remount rendered a second Turnstile widget into the same
- * container on any cold load. (Removing the <script> also did not unload the
- * API it had already defined, so it never undid anything.) The `cancelled`
- * flag covers the same race for an unmount that happens while the script is
+ * A Turnstile token is single-use. After a failed submit the token it produced
+ * has already been spent, so a retry with it fails for a reason the user cannot
+ * see. Forms therefore call `reset()` on failure, which clears the held token
+ * and re-arms the challenge. The widget also clears the token when Turnstile
+ * reports it expired or errored, so a stale token is never submitted.
+ *
+ * The script-loading and already-loaded paths share ONE cleanup, so React
+ * StrictMode's mount/unmount/remount never renders a second widget into the
+ * same container. The `cancelled` flag covers an unmount while the script is
  * still in flight.
  *
  * `onTokenReady` is held in a ref rather than listed as an effect dependency:
  * callers pass an inline arrow, and depending on it would tear down and
  * re-render the challenge on every parent re-render.
  */
-export default function CaptchaWidget({ onTokenReady }: { onTokenReady: (token: string | null) => void }) {
+export default function CaptchaWidget({ onTokenReady, ref }: CaptchaWidgetProps) {
   const config = getCaptchaConfig();
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
@@ -65,6 +77,19 @@ export default function CaptchaWidget({ onTokenReady }: { onTokenReady: (token: 
   useEffect(() => {
     onTokenReadyRef.current = onTokenReady;
   }, [onTokenReady]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      reset() {
+        onTokenReadyRef.current(null);
+        if (widgetIdRef.current && window.turnstile) {
+          window.turnstile.reset(widgetIdRef.current);
+        }
+      },
+    }),
+    []
+  );
 
   useEffect(() => {
     if (!config.enabled) {
@@ -88,11 +113,9 @@ export default function CaptchaWidget({ onTokenReady }: { onTokenReady: (token: 
           sitekey: config.siteKey,
           theme: "light",
           size: "normal",
-          callback: async () => {
-            if (!window.turnstile || !widgetIdRef.current) return;
-            const token = await window.turnstile.getResponse(widgetIdRef.current);
-            onTokenReadyRef.current(token || null);
-          },
+          callback: (token: string) => onTokenReadyRef.current(token || null),
+          "expired-callback": () => onTokenReadyRef.current(null),
+          "error-callback": () => onTokenReadyRef.current(null),
         });
       })
       .catch(() => {
