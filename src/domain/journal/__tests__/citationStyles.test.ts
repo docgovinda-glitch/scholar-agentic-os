@@ -49,26 +49,26 @@ describe("formatEntry", () => {
       "Harris, C. R., Millman, K. J., & van der Walt, S. J. (2020). Array programming with NumPy. *Nature*, *585*(7825), 357–362. https://doi.org/10.1038/s41586-020-2649-2"
     );
     expect(formatEntry(numpy, "ieee")).toBe(
-      "C. R. Harris, K. J. Millman, and S. J. van der Walt, “Array programming with NumPy,” *Nature*, vol. 585, no. 7825, pp. 357–362, 2020. doi: 10.1038/s41586-020-2649-2."
+      'C. R. Harris, K. J. Millman, and S. J. van der Walt, "Array programming with NumPy," *Nature*, vol. 585, no. 7825, pp. 357–362, 2020, doi: 10.1038/s41586-020-2649-2.'
     );
     expect(formatEntry(numpy, "vancouver")).toBe(
       "Harris CR, Millman KJ, van der Walt SJ. Array programming with NumPy. Nature. 2020;585(7825):357-362. doi:10.1038/s41586-020-2649-2"
     );
     expect(formatEntry(numpy, "harvard")).toBe(
-      "Harris, C.R., Millman, K.J. and van der Walt, S.J. (2020) 'Array programming with NumPy', *Nature*, 585(7825), pp. 357–362. doi:10.1038/s41586-020-2649-2."
+      "Harris, C.R., Millman, K.J. and van der Walt, S.J. (2020) 'Array programming with NumPy', *Nature*, 585(7825), pp. 357–362. Available at: https://doi.org/10.1038/s41586-020-2649-2."
     );
     expect(formatEntry(numpy, "chicago")).toBe(
-      "Harris, Charles R., K. Jarrod Millman, and Stéfan J. van der Walt. 2020. “Array programming with NumPy.” *Nature* 585 (7825): 357–362. https://doi.org/10.1038/s41586-020-2649-2."
+      'Harris, Charles R., K. Jarrod Millman, and Stéfan J. van der Walt. 2020. "Array programming with NumPy." *Nature* 585 (7825): 357–362. https://doi.org/10.1038/s41586-020-2649-2.'
     );
     expect(formatEntry(numpy, "mla")).toBe(
-      "Harris, Charles R., et al. “Array programming with NumPy.” *Nature*, vol. 585, no. 7825, 2020, pp. 357–362, https://doi.org/10.1038/s41586-020-2649-2."
+      'Harris, Charles R., et al. "Array programming with NumPy." *Nature*, vol. 585, no. 7825, 2020, pp. 357–362, https://doi.org/10.1038/s41586-020-2649-2.'
     );
   });
 
   it("writes a book, and n.d. for a missing year, with nothing invented", () => {
     expect(formatEntry(book, "apa")).toBe("Goodfellow, I., & Bengio, Y. (2016). *Deep learning*. MIT Press.");
     expect(formatEntry(book, "chicago")).toBe("Goodfellow, Ian, and Yoshua Bengio. 2016. *Deep learning*. MIT Press.");
-    expect(formatEntry(noYear, "apa")).toBe("Shah. (n.d.). Field notes.");
+    expect(formatEntry(noYear, "apa")).toBe("Shah. (n.d.). *Field notes*.");
   });
 });
 

@@ -28,6 +28,6 @@ describe("Approved references shelf", () => {
 
   it("in-text citations use the family name from the shared formatter", () => {
     expect(formatInTextCitation(source, "apa7")).toBe("(Kuncoro, 2020)");
-    expect(formatInTextCitation(source, "ieee")).toBe("(Kuncoro 2020)"); // a card has no reference number: Harvard author-date
+    expect(formatInTextCitation(source, "ieee")).toBe("(Kuncoro, 2020)"); // a card has no reference number: Harvard author-date
   });
 });

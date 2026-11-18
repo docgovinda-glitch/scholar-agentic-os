@@ -791,7 +791,9 @@ function getYear(item: CSLItem): number {
 }
 
 /**
- * Formats an in-text citation for a single CSLItem in the target style.
+ * The in-text citation for a verified CSL item, rendered by the shared
+ * formatters (the one engine): author-date styles name the authors and year,
+ * numbered styles (IEEE, Vancouver, Chicago notes) the list number.
  */
 export function formatCSLInTextSingle(
   item: CSLItem,
@@ -799,84 +801,10 @@ export function formatCSLInTextSingle(
   displayNumber: number = 1,
   locator?: string
 ): string {
-  if (style === "ieee" || style === "chicago-notes") {
-    return locator ? `[${displayNumber}, ${locator}]` : `[${displayNumber}]`;
-  }
-  if (style === "vancouver") {
-    return locator ? `(${displayNumber}, ${locator})` : `(${displayNumber})`;
-  }
-
-  const authors = item.author;
-  const year = getYear(item);
-  const s0 = getAuthorSurname(authors[0]);
-  const s1 = authors[1] ? getAuthorSurname(authors[1]) : "";
-
-  if (style === "mla") {
-    const authorPart =
-      authors.length === 1
-        ? s0
-        : authors.length === 2
-          ? `${s0} and ${s1}`
-          : `${s0} et al.`;
-    return locator ? `(${authorPart} ${locator})` : `(${authorPart})`;
-  }
-
-  if (style === "chicago") {
-    const authorPart =
-      authors.length === 1
-        ? s0
-        : authors.length === 2
-          ? `${s0} and ${s1}`
-          : `${s0} et al.`;
-    return locator ? `(${authorPart} ${year}, ${locator})` : `(${authorPart} ${year})`;
-  }
-
-  if (style === "harvard") {
-    const authorPart =
-      authors.length === 1
-        ? s0
-        : authors.length === 2
-          ? `${s0} and ${s1}`
-          : `${s0} et al.`;
-    return locator ? `(${authorPart}, ${year}, ${locator})` : `(${authorPart}, ${year})`;
-  }
-
-  // Default: APA 7th
-  const authorPart =
-    authors.length === 1
-      ? s0
-      : authors.length === 2
-        ? `${s0} & ${s1}`
-        : `${s0} et al.`;
-  return locator ? `(${authorPart}, ${year}, ${locator})` : `(${authorPart}, ${year})`;
-}
-
-/**
- * Formats a grouped in-text citation for one or more CSLItems supporting the same claim (Section 5).
- * e.g., "(Smith & Lee, 2023; Zhang et al., 2022)" or "[1, 2]"
- */
-export function formatCSLInTextGroup(
-  items: Array<{ item: CSLItem; displayNumber: number; locator?: string }>,
-  style: SupportedCSLStyle
-): string {
-  if (items.length === 0) return "";
-  if (items.length === 1) {
-    return formatCSLInTextSingle(items[0].item, style, items[0].displayNumber, items[0].locator);
-  }
-
-  if (style === "ieee" || style === "chicago-notes") {
-    return `[${items.map((x) => x.displayNumber).join(", ")}]`;
-  }
-  if (style === "vancouver") {
-    return `(${items.map((x) => x.displayNumber).join(", ")})`;
-  }
-
-  // For author-date styles, sort grouped citations alphabetically per APA/Harvard/Chicago convention
-  const innerList = items.map((x) => {
-    const single = formatCSLInTextSingle(x.item, style, x.displayNumber, x.locator);
-    return single.replace(/^\(|\)$/g, "");
+  return CitationFormatterFactory.formatInText(style, cslItemToCanonical(item), {
+    position: displayNumber,
+    ...(locator ? { locator } : {}),
   });
-  return `(${innerList.join("; ")})`;
 }
 
 const CSL_KIND: Record<CSLItemType, ReferenceKind> = {

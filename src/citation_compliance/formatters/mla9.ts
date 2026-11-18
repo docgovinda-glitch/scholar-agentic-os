@@ -18,10 +18,6 @@ export class MLA9Formatter implements CitationStyle {
   version = "9";
 
   formatInText(reference: CanonicalReference, options?: InTextOptions): string {
-    if (!reference.authors || reference.authors.length === 0) {
-      return "( ? )";
-    }
-
     const authorPart = inTextSurnames(reference, 2);
 
     if (options && options.locator) {

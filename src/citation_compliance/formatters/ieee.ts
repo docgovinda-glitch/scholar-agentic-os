@@ -22,7 +22,7 @@ export class IEEEFormatter implements CitationStyle {
 
   formatInText(reference: CanonicalReference, options?: InTextOptions): string {
     const position = options?.position ?? 1;
-    return `[${position}]`;
+    return options?.locator ? `[${position}, ${options.locator}]` : `[${position}]`;
   }
 
   /**

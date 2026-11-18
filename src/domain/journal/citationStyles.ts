@@ -1,9 +1,13 @@
 /**
- * In-text citations and reference-list entries for the six styles journals
- * ask for most, from a ReferenceRecord. Only recorded fields are printed; a
- * missing year prints as "n.d.". Pure; no I/O.
+ * Journal and Thesis citations: [CITE:id] tokens become in-text citations and
+ * a reference list in the six styles journals ask for most. Every entry and
+ * citation is rendered by the shared citation_compliance formatters (the one
+ * engine); this module only orders, numbers, groups and disambiguates
+ * (2021a / 2021b). Only recorded fields are printed. Pure; no I/O.
  */
-import type { RefName, ReferenceRecord } from "./references";
+import type { ReferenceRecord } from "./references";
+import { CitationFormatterFactory } from "../../citation_compliance/formattingEngine";
+import type { CanonicalReference, ReferenceKind } from "../../citation_compliance/model/reference";
 
 export type StyleKey = "apa" | "harvard" | "chicago" | "mla" | "ieee" | "vancouver";
 
@@ -20,194 +24,38 @@ export function styleKey(raw: string | undefined): StyleKey {
 
 export const isNumeric = (s: StyleKey) => s === "ieee" || s === "vancouver";
 
-const initials = (given: string | undefined, sep: string, join: string) =>
-  (given ?? "")
-    .split(/[\s-]+/)
-    .filter(Boolean)
-    .map((g) => `${g.replace(/\./g, "").charAt(0).toUpperCase()}${sep}`)
-    .join(join);
+const FORMATTER_ID: Record<StyleKey, string> = { apa: "apa7", harvard: "harvard", chicago: "chicago", mla: "mla9", ieee: "ieee", vancouver: "vancouver" };
+const KIND: Record<ReferenceRecord["kind"], ReferenceKind> = { article: "JournalArticle", book: "Book", chapter: "BookChapter", dataset: "Dataset", other: "Website" };
 
-const yearText = (r: ReferenceRecord) => (r.year ? String(r.year) : "n.d.");
-const end = (s: string) => (/[.?!]$/.test(s) ? s : `${s}.`);
-const pagesDash = (p: string | undefined) => p?.replace(/\s*-+\s*/g, "–");
-/** *Title*. with the full stop outside the italics (none after ? or !). */
-const italicTitle = (t: string) => `*${t.replace(/\.$/, "")}*${/[?!]$/.test(t) ? "" : "."}`;
-
-function listNames(names: string[], and: string, serialComma: boolean): string {
-  if (names.length <= 1) return names[0] ?? "";
-  if (names.length === 2) return `${names[0]} ${and} ${names[1]}`;
-  return `${names.slice(0, -1).join(", ")}${serialComma ? "," : ""} ${and} ${names[names.length - 1]}`;
+/** A recorded reference as the shared formatters' reference: only recorded fields, nothing filled in. */
+export function recordToCanonical(r: ReferenceRecord, suffix = ""): CanonicalReference {
+  const isArticle = r.kind === "article" && !!r.container;
+  return {
+    kind: r.kind === "article" && !r.container ? "Website" : KIND[r.kind],
+    title: r.title.trim() || "Untitled",
+    authors: r.authors.map((n, order) => ({ firstName: n.given ?? "", lastName: n.family, order })),
+    source: r.container ?? (r.kind === "dataset" ? "" : (r.publisher ?? "")),
+    ...(isArticle ? { journal: r.container } : {}),
+    ...(r.publisher ? { publisher: r.publisher } : {}),
+    ...(r.volume ? { volume: r.volume } : {}),
+    ...(r.issue ? { issue: r.issue } : {}),
+    ...(r.pages ? { pages: r.pages } : {}),
+    ...(r.doi ? { doi: r.doi } : {}),
+    ...(r.url ? { url: r.url } : {}),
+    year: r.year ? String(r.year) : "n.d.",
+    ...(r.year ? { publicationDate: String(r.year) } : {}),
+    ...(suffix ? { yearSuffix: suffix } : {}),
+  };
 }
 
-/** Surname(s) for an author-date citation: one, two, or "et al.". */
-function citeAuthors(a: RefName[], and: string, etAlFrom: number): string {
-  if (a.length === 0) return "";
-  if (a.length >= etAlFrom) return `${a[0].family} et al.`;
-  return listNames(a.map((n) => n.family), and, false);
-}
-
-/** The author part of a reference-list entry, per style. */
-function listAuthors(a: RefName[], style: StyleKey): string {
-  if (a.length === 0) return "";
-  switch (style) {
-    case "apa": {
-      const f = (n: RefName) => (n.given ? `${n.family}, ${initials(n.given, ".", " ")}` : n.family);
-      if (a.length > 20) return `${a.slice(0, 19).map(f).join(", ")}, . . . ${f(a[a.length - 1])}`;
-      return a.length === 1 ? f(a[0]) : `${a.slice(0, -1).map(f).join(", ")}, & ${f(a[a.length - 1])}`;
-    }
-    case "harvard": {
-      const f = (n: RefName) => (n.given ? `${n.family}, ${initials(n.given, ".", "")}` : n.family);
-      return listNames(a.map(f), "and", false);
-    }
-    case "chicago": {
-      const first = a[0].given ? `${a[0].family}, ${a[0].given}` : a[0].family;
-      const rest = a.slice(1).map((n) => (n.given ? `${n.given} ${n.family}` : n.family));
-      if (a.length > 10) return `${[first, ...rest.slice(0, 6)].join(", ")}, et al.`;
-      if (a.length === 2) return `${first}, and ${rest[0]}`;
-      return listNames([first, ...rest], "and", true);
-    }
-    case "mla": {
-      const first = a[0].given ? `${a[0].family}, ${a[0].given}` : a[0].family;
-      if (a.length >= 3) return `${first}, et al.`;
-      if (a.length === 2) return `${first}, and ${a[1].given ? `${a[1].given} ${a[1].family}` : a[1].family}`;
-      return first;
-    }
-    case "ieee": {
-      const f = (n: RefName) => (n.given ? `${initials(n.given, ".", " ")} ${n.family}` : n.family);
-      if (a.length > 6) return `${f(a[0])} et al.`;
-      return listNames(a.map(f), "and", a.length > 2);
-    }
-    case "vancouver": {
-      const f = (n: RefName) => (n.given ? `${n.family} ${initials(n.given, "", "")}` : n.family);
-      return a.length > 6 ? `${a.slice(0, 6).map(f).join(", ")}, et al` : a.map(f).join(", ");
-    }
-  }
-}
-
-const doiOrUrl = (r: ReferenceRecord, style: StyleKey): string => {
-  if (r.doi) {
-    if (style === "ieee") return `doi: ${r.doi}.`;
-    if (style === "vancouver") return `doi:${r.doi}`;
-    return `https://doi.org/${r.doi}`;
-  }
-  return r.url ?? "";
-};
-
-/** One reference-list entry (Markdown: *italic* for titles of containers). */
+/** One reference-list entry (Markdown: *italic*), from the shared formatters (the one citation engine). */
 export function formatEntry(r: ReferenceRecord, style: StyleKey, suffix = ""): string {
-  const authors = listAuthors(r.authors, style);
-  const title = r.title.trim() || "Untitled";
-  const y = yearText(r) + suffix;
-  const pages = pagesDash(r.pages);
-  const link = doiOrUrl(r, style);
-  const dataset = r.kind === "dataset" ? " [Data set]" : "";
-  const parts: string[] = [];
-  const isArticle = r.kind === "article" && r.container;
-
-  switch (style) {
-    case "apa": {
-      parts.push(authors ? `${end(authors)} (${y}).` : `${end(title)} (${y}).`);
-      if (authors) parts.push(r.kind === "book" ? italicTitle(title) : end(`${title}${dataset}`));
-      if (isArticle) {
-        let src = `*${r.container}*`;
-        if (r.volume) src += `, *${r.volume}*`;
-        if (r.issue) src += `(${r.issue})`;
-        if (pages) src += `, ${pages}`;
-        parts.push(`${src}.`);
-      } else if (r.container) parts.push(`${r.container}.`);
-      else if (r.publisher && r.kind !== "dataset") parts.push(end(r.publisher));
-      if (link) parts.push(link);
-      return parts.join(" ");
-    }
-    case "harvard": {
-      parts.push(`${authors || title} (${y})`);
-      if (authors) parts[0] += r.kind === "book" ? ` *${title}*.` : ` '${title}'${dataset}${isArticle ? "," : "."}`;
-      else parts[0] += ".";
-      if (isArticle) {
-        let src = `*${r.container}*`;
-        if (r.volume) src += `, ${r.volume}`;
-        if (r.issue) src += `(${r.issue})`;
-        if (pages) src += `, pp. ${pages}`;
-        parts.push(`${src}.`);
-      } else if (r.publisher) parts.push(end(r.publisher));
-      if (r.doi) parts.push(`doi:${r.doi}.`);
-      else if (r.url) parts.push(`Available at: ${r.url}.`);
-      return parts.join(" ");
-    }
-    case "chicago": {
-      parts.push(authors ? `${end(authors)} ${y}.` : `${y}.`);
-      parts.push(r.kind === "book" ? italicTitle(title) : `“${end(title)}”${r.kind === "dataset" ? " Dataset." : ""}`);
-      if (isArticle) {
-        let src = `*${r.container}*`;
-        if (r.volume) src += ` ${r.volume}`;
-        if (r.issue) src += ` (${r.issue})`;
-        if (pages) src += `: ${pages}`;
-        parts.push(`${src}.`);
-      } else if (r.publisher) parts.push(end(r.publisher));
-      if (link) parts.push(end(link));
-      return parts.join(" ");
-    }
-    case "mla": {
-      if (authors) parts.push(end(authors));
-      parts.push(r.kind === "book" ? italicTitle(title) : `“${end(title)}”`);
-      const src: string[] = [];
-      if (r.container) src.push(`*${r.container}*`);
-      if (r.volume) src.push(`vol. ${r.volume}`);
-      if (r.issue) src.push(`no. ${r.issue}`);
-      if (!r.container && r.publisher) src.push(r.publisher);
-      if (r.year) src.push(String(r.year));
-      if (pages) src.push(`pp. ${pages}`);
-      if (link) src.push(link);
-      if (src.length) parts.push(`${src.join(", ")}.`);
-      return parts.join(" ");
-    }
-    case "ieee": {
-      const head = authors ? `${authors}, ` : "";
-      if (r.kind === "book") {
-        const pub = [r.publisher, r.year ? String(r.year) : ""].filter(Boolean).join(", ");
-        return `${head}*${title}*${pub ? `. ${pub}` : ""}.${link ? ` ${link}` : ""}`;
-      }
-      const src: string[] = [`${head}“${title.replace(/[.]$/, "")},”`];
-      if (r.container) src.push(`*${r.container}*,`);
-      const tail = [r.volume ? `vol. ${r.volume}` : "", r.issue ? `no. ${r.issue}` : "", pages ? `pp. ${pages}` : "", r.year ? String(r.year) : ""].filter(Boolean);
-      src.push(`${tail.join(", ")}${tail.length ? "," : ""}`);
-      const s = src.join(" ").replace(/,$/, ".");
-      return `${s.replace(/,”$/, ".”")}${link ? ` ${link}` : ""}`.replace(/\s+/g, " ").trim();
-    }
-    case "vancouver": {
-      if (authors) parts.push(`${authors}.`);
-      parts.push(`${title.replace(/[.]$/, "")}${r.kind === "dataset" ? " [dataset]" : ""}.`);
-      if (isArticle) {
-        let src = `${r.container}. ${r.year ?? ""}`;
-        if (r.volume) src += `;${r.volume}`;
-        if (r.issue) src += `(${r.issue})`;
-        if (r.pages) src += `:${r.pages}`;
-        parts.push(`${src.trim()}.`);
-      } else {
-        const pub = [r.publisher, r.year ? String(r.year) : ""].filter(Boolean).join("; ");
-        if (pub) parts.push(`${pub}.`);
-      }
-      if (link) parts.push(link);
-      return parts.join(" ");
-    }
-  }
+  return CitationFormatterFactory.formatBibliography(FORMATTER_ID[style], recordToCanonical(r, suffix));
 }
 
-/** The label inside an author-date citation, e.g. "Smith & Lee, 2021". */
+/** The label inside an author-date citation, e.g. "Smith & Lee, 2021" (the shared formatter's citation without its brackets). */
 function authorDate(r: ReferenceRecord, style: StyleKey, suffix: string): string {
-  const y = yearText(r) + suffix;
-  const short = r.title.trim().split(/\s+/).slice(0, 4).join(" ");
-  switch (style) {
-    case "apa":
-      return `${citeAuthors(r.authors, "&", 3) || `“${short}”`}, ${y}`;
-    case "harvard":
-      return `${citeAuthors(r.authors, "and", 4) || `‘${short}’`}, ${y}`;
-    case "chicago":
-      return `${citeAuthors(r.authors, "and", 3) || `“${short}”`} ${y}`;
-    default:
-      // MLA: author only (page numbers are the author's to add).
-      return citeAuthors(r.authors, "and", 3) || `“${short}”`;
-  }
+  return CitationFormatterFactory.formatInText(FORMATTER_ID[style], recordToCanonical(r, suffix)).replace(/^\(|\)$/g, "");
 }
 
 export interface RenderedManuscript {

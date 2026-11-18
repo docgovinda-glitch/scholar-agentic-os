@@ -13,7 +13,7 @@ export class VancouverFormatter implements CitationStyle {
 
   formatInText(reference: CanonicalReference, options?: InTextOptions): string {
     const position = options?.position ?? 1;
-    return "[" + position + "]";
+    return options?.locator ? `[${position}, ${options.locator}]` : `[${position}]`;
   }
 
   /**
@@ -27,7 +27,8 @@ export class VancouverFormatter implements CitationStyle {
     const doi = bareDoi(reference);
     const parts: string[] = [];
     if (authors) parts.push(authors);
-    parts.push(endSentence(reference.title));
+    // Citing Medicine: a database or data set carries its medium in brackets.
+    parts.push(endSentence(reference.kind === "Dataset" ? `${reference.title.replace(/\.$/, "")} [dataset]` : reference.title));
     if (reference.kind === "Book") {
       const pub = publisherOf(reference);
       const tail = [pub, year].filter(Boolean).join("; ");

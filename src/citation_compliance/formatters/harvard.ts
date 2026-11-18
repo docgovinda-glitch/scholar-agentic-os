@@ -12,16 +12,13 @@ export class HarvardFormatter implements CitationStyle {
   version = "latest";
 
   formatInText(reference: CanonicalReference, options?: InTextOptions): string {
-    if (!reference.authors || reference.authors.length === 0) {
-      return "(????)";
-    }
-
     const author = inTextSurnames(reference, 3);
     const year = authorDateYear(reference);
     if (options && options.locator) {
-      return "(" + author + " " + year + " " + options.locator + ")";
+      return `(${author}, ${year}, ${options.locator})`;
     }
-    return "(" + author + " " + year + ")";
+    // Cite Them Right: "(Smith, 2019)", "(Smith, 2019, p. 4)".
+    return `(${author}, ${year})`;
   }
 
   /**

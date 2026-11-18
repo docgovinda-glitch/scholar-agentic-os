@@ -123,7 +123,7 @@ describe("CSL-JSON Golden-File Citation Engine (Section 6)", () => {
     expect(formatCSLInTextSingle(csl, "chicago-notes", 1)).toBe("[1]");
     expect(formatCSLInTextSingle(csl, "harvard", 1)).toBe("(Turing, 1950)");
     expect(formatCSLInTextSingle(csl, "ieee", 1)).toBe("[1]");
-    expect(formatCSLInTextSingle(csl, "vancouver", 1)).toBe("(1)");
+    expect(formatCSLInTextSingle(csl, "vancouver", 1)).toBe("[1]");
 
     // Bibliography golden output
     expect(formatCSLBibliographyEntry(csl, "apa", 1).markdownText).toBe(
@@ -160,7 +160,7 @@ describe("CSL-JSON Golden-File Citation Engine (Section 6)", () => {
     expect(formatCSLInTextSingle(csl, "chicago", 2)).toBe("(Kahneman and Tversky 1979)");
     expect(formatCSLInTextSingle(csl, "harvard", 2)).toBe("(Kahneman and Tversky, 1979)");
     expect(formatCSLInTextSingle(csl, "ieee", 2)).toBe("[2]");
-    expect(formatCSLInTextSingle(csl, "vancouver", 2)).toBe("(2)");
+    expect(formatCSLInTextSingle(csl, "vancouver", 2)).toBe("[2]");
 
     expect(formatCSLBibliographyEntry(csl, "apa", 2).markdownText).toBe(
       "Kahneman, D., & Tversky, A. (1979). Prospect Theory: An Analysis of Decision under Risk. *Econometrica*, *47*(2), 263\u2013291. https://doi.org/10.2307/1914185"
@@ -190,8 +190,8 @@ describe("CSL-JSON Golden-File Citation Engine (Section 6)", () => {
 
     expect(formatCSLInTextSingle(csl, "apa", 3)).toBe("(Jinek et al., 2012)");
     expect(formatCSLInTextSingle(csl, "mla", 3)).toBe("(Jinek et al.)");
-    expect(formatCSLInTextSingle(csl, "chicago", 3)).toBe("(Jinek et al. 2012)");
-    expect(formatCSLInTextSingle(csl, "harvard", 3)).toBe("(Jinek et al., 2012)");
+    expect(formatCSLInTextSingle(csl, "chicago", 3)).toBe("(Jinek, Doudna, and Charpentier 2012)");
+    expect(formatCSLInTextSingle(csl, "harvard", 3)).toBe("(Jinek, Doudna and Charpentier, 2012)");
 
     expect(formatCSLBibliographyEntry(csl, "apa", 3).markdownText).toBe(
       "Jinek, M., Doudna, J. A., & Charpentier, E. (2012). A Programmable Dual-RNA-Guided DNA Endonuclease in Adaptive Bacterial Immunity. *Science*, *337*(6096), 816\u2013821. https://doi.org/10.1126/science.1225829"

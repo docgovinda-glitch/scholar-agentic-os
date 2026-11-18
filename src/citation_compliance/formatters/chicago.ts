@@ -12,10 +12,6 @@ export class ChicagoFormatter implements CitationStyle {
   version = "17";
 
   formatInText(reference: CanonicalReference, options?: InTextOptions): string {
-    if (!reference.authors || reference.authors.length === 0) {
-      return "(????)";
-    }
-
     const author = inTextSurnames(reference, 3, ", and");
     const year = authorDateYear(reference);
     if (options && options.locator) {

@@ -4,7 +4,7 @@
  * Formats citations and references according to APA 7th edition style.
  */
 
-import { pageRange } from "./bibParts";
+import { inTextSurnames, pageRange } from "./bibParts";
 import type { CitationStyle, InTextOptions } from "../styleTypes";
 import { authorDateYear, type CanonicalReference, type ReferenceAuthor } from "../model/reference";
 
@@ -23,25 +23,9 @@ export class APA7Formatter implements CitationStyle {
   version = "7";
 
   formatInText(reference: CanonicalReference, options?: InTextOptions): string {
-    const author = this.inTextAuthors(reference.authors);
+    const author = inTextSurnames(reference, 2, "&");
 
-    if (options?.position !== undefined && options.locator) {
-      return `${author}, ${options.position}`;
-    }
-
-    return `(${author}, ${authorDateYear(reference)})`;
-  }
-
-  /**
-   * APA 7 in-text names: surnames only (8.17): one author "Kubin", two
-   * "Kubin & von Sikorski", three or more "Kubin et al.".
-   */
-  private inTextAuthors(authors: CanonicalReference["authors"]): string {
-    const names = (authors ?? []).map((a) => a.lastName).filter(Boolean);
-    if (names.length === 0) return "";
-    if (names.length === 1) return names[0];
-    if (names.length === 2) return `${names[0]} & ${names[1]}`;
-    return `${names[0]} et al.`;
+    return `(${author}, ${authorDateYear(reference)}${options?.locator ? `, ${options.locator}` : ""})`;
   }
 
   /**
@@ -56,7 +40,9 @@ export class APA7Formatter implements CitationStyle {
     const endSentence = (t: string) => (/[.?!]$/.test(t) ? t : `${t}.`);
     const parts: string[] = [];
     // APA 7 (6.22): titles of works that stand alone are italic; articles, chapters and papers in a container are not.
-    const title = APA_STANDALONE.has(reference.kind) ? endSentence(`*${reference.title}*`) : endSentence(reference.title);
+    const title = APA_STANDALONE.has(reference.kind)
+      ? endSentence(`*${reference.title.replace(/\.$/, "")}*${reference.kind === "Dataset" ? " [Data set]" : ""}`) // APA 7 (10.9)
+      : endSentence(reference.title);
     // APA 7 (9.12): with no author, the title moves to the author position.
     if (authors) parts.push(endSentence(authors), year, title);
     else parts.push(title, year);

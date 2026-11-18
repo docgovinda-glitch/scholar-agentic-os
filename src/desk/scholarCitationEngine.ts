@@ -275,8 +275,10 @@ export function citationItemToCSL(item: WebsiteCitationItem, index = 0): CSLItem
   return res.ok ? res.item : null;
 }
 
+const NUMBERED_STYLES = new Set<SupportedCSLStyle>(["ieee", "vancouver", "chicago-notes"]);
+
 /**
- * Formats an in-text citation marker using the CSL-JSON Engine according to the selected style.
+ * The in-text citation in the selected style, from the shared formatters (the one citation engine).
  * Returns empty string if the item lacks verifiable author or publication year.
  */
 export function formatAskScholarInText(
@@ -325,12 +327,8 @@ export function formatAskScholarBibliographyEntry(
   const formatted = formatCSLBibliographyEntry(csl, style, index + 1);
   const yearStr = String(csl.issued["date-parts"][0][0]);
 
-  let marker: string | undefined = undefined;
-  if (style === "ieee" || style === "chicago-notes") {
-    marker = `[${index + 1}]`;
-  } else if (style === "vancouver") {
-    marker = `(${index + 1})`;
-  }
+  // Numbered styles: the list marker is the in-text marker, from the one engine.
+  const marker = NUMBERED_STYLES.has(style) ? formatCSLInTextSingle(csl, style, index + 1) : undefined;
 
   const doi = csl.DOI;
   const directUrl = doi ? (doi.startsWith("http") ? doi : `https://doi.org/${doi}`) : csl.URL;
@@ -404,12 +402,8 @@ export function formatAskScholarBibliography(
         : `https://doi.org/${doi}`
       : pair.csl.URL;
 
-    let marker: string | undefined = undefined;
-    if (style === "ieee" || style === "chicago-notes") {
-      marker = `[${displayIdx + 1}]`;
-    } else if (style === "vancouver") {
-      marker = `(${displayIdx + 1})`;
-    }
+    // Numbered styles: the list marker is the in-text marker, from the one engine.
+    const marker = NUMBERED_STYLES.has(style) ? formatCSLInTextSingle(pair.csl, style, displayIdx + 1) : undefined;
 
     return {
       originalIndex: pair.origIdx + 1,

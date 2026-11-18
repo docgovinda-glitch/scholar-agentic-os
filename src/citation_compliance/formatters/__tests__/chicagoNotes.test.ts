@@ -40,12 +40,12 @@ describe("ChicagoNotesFormatter: identity", () => {
 
 describe("ChicagoNotesFormatter: in-text marker", () => {
   it("is the plain footnote number, not a parenthetical", () => {
-    expect(formatter.formatInText(book, { position: 1 })).toBe("1");
-    expect(formatter.formatInText(book, { position: 7 })).toBe("7");
+    expect(formatter.formatInText(book, { position: 1 })).toBe("[1]");
+    expect(formatter.formatInText(book, { position: 7 })).toBe("[7]");
   });
 
   it("defaults to 1 when no position is given", () => {
-    expect(formatter.formatInText(book)).toBe("1");
+    expect(formatter.formatInText(book)).toBe("[1]");
   });
 });
 

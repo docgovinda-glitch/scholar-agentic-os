@@ -143,8 +143,8 @@ describe("app/citation: resolveCitations", () => {
       "chicago-notes-bibliography"
     );
     const intro = result.document.blocks.find((b) => b.id === "introduction")!;
-    expect(intro.text).toContain("Zebra's finding 1."); // cited first -> footnote 1
-    expect(intro.text).toContain("Also Apple's finding 2."); // cited second -> footnote 2
+    expect(intro.text).toContain("Zebra's finding [1]."); // cited first -> footnote 1
+    expect(intro.text).toContain("Also Apple's finding [2]."); // cited second -> footnote 2
     const refs = result.document.blocks.find((b) => b.id === "references")!;
     expect(refs.text.indexOf("Apple")).toBeLessThan(refs.text.indexOf("Zebra")); // bibliography stays alphabetical
     expect(refs.text).not.toMatch(/^\d+\.\s/); // no numeric prefix — only vancouver/ieee bibliographies are numbered

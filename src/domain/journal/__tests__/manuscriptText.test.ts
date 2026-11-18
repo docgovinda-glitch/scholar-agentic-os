@@ -53,7 +53,7 @@ describe("citedReferences", () => {
 
   it("formats entries in the project's citation style and lists unknown ids", () => {
     const apa = citedReferences("A [CITE:s1] and [CITE:ghost].", evidence);
-    expect(apa.entries[0].reference).toMatch(/^Smith, J\. \(2024\)\. Decoding\./);
+    expect(apa.entries[0].reference).toMatch(/^Smith, J\. \(2024\)\. \*Decoding\*\./);
     expect(apa.unknownTokens).toEqual(["[CITE:ghost]"]);
     const ieee = citedReferences("A [CITE:s1].", evidence, { citationStyle: "IEEE" });
     expect(ieee.entries[0].reference).not.toBe(apa.entries[0].reference);

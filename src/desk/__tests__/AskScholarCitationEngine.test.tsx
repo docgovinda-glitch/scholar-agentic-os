@@ -126,8 +126,8 @@ describe("Ask Scholar Citation Engine & Referencing System", () => {
     it("formats Vancouver in-text citations with numeric markers", () => {
       const inText1 = formatAskScholarInText(sampleCitations[0], 0, "vancouver");
       const inText2 = formatAskScholarInText(sampleCitations[1], 1, "vancouver");
-      expect(inText1).toBe("(1)");
-      expect(inText2).toBe("(2)");
+      expect(inText1).toBe("[1]");
+      expect(inText2).toBe("[2]");
     });
   });
 
@@ -157,8 +157,8 @@ describe("Ask Scholar Citation Engine & Referencing System", () => {
       expect(bibIeee[1].formattedText).toContain("He");
 
       const bibVan = formatAskScholarBibliography(sampleCitations, "vancouver");
-      expect(bibVan[0].marker).toBe("(1)");
-      expect(bibVan[1].marker).toBe("(2)");
+      expect(bibVan[0].marker).toBe("[1]");
+      expect(bibVan[1].marker).toBe("[2]");
       expect(bibVan[0].formattedText).toContain("Vaswani");
     });
 

@@ -41,7 +41,8 @@ export class ChicagoNotesFormatter implements CitationStyle {
 
   /** The in-text marker is the footnote/endnote number, not a parenthetical — the note's content comes from formatNote/formatShortNote. */
   formatInText(_reference: CanonicalReference, options?: InTextOptions): string {
-    return String(options?.position ?? 1);
+    // In stored text the note marker is shown in brackets ("[1]"); a bare digit would read as part of the sentence.
+    return `[${options?.position ?? 1}]`;
   }
 
   /** The full note — first citation of this source. CMOS 17 §14.19 (journal article), §14.30 (book). */
