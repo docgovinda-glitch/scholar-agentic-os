@@ -1,36 +1,24 @@
 import { WORD_LIMIT_MAX } from "../../../../src/domain/assignment/wordLimit.ts";
-import { DEFAULT_CITATION_STYLE } from "../../../../src/domain/assignment/answerKeys.ts";
 import { errorText } from "../../../../src/shared/errorText.ts";
-import { parseBody, AnalyzeBody, OutlineBody } from "./schemas.ts";
+import { parseBody, OutlineBody, OutlineSectionBody, ThesisRefineBody } from "./schemas.ts";
 import { routedCompletion } from "../../../src/services/scholarBrain.ts";
 import { sendAiFailure,UnusableAiResponseError } from "../../../src/ai/aiRouteErrors.ts";
-import { structureFromAi } from "../../../../src/domain/assignment/aiAssignmentOutline.ts";
+import { briefQuestionsForOutline, replaceSectionFromAi, structureFromAi } from "../../../../src/domain/assignment/aiAssignmentOutline.ts";
 import { scopeBrief } from "../../../../src/domain/assignment/briefScoping.ts";
-import type { AcademicLevel, AssignmentDraftingSection, AssignmentStructure, AssignmentType } from "../../../../src/desk/assignment/types.ts";
+import type { AssignmentDraftingSection, AssignmentStructure } from "../../../../src/desk/assignment/types.ts";
 import type { ProjectRecord } from "../../../../src/services/store/types.ts";
 import express from "express";
+import { z } from "zod";
 import { parseDocument } from "../../../../src/document_intelligence/index.ts";
 import {
 normalizeUnicodeNFC
 } from "../../../src/utils/scholarlyVoiceGuard.ts";
 import { scholarBrain } from "../../../src/services/scholarBrain.ts";
 import {
-auditDocumentLineByLine,COMMAND_VERB_MAP,
-type DocumentRequirement
-} from "../../../services/briefScannerGraph.ts";
-import type {
-AssignmentAnalysis,
-CommandVerbDetail
-} from "../../../../src/desk/assignment/types.ts";
-import {
 cleanAnswerString,
 extractStandardizedInstructions
 } from "../../../../src/desk/assignment/types.ts";
-import { generateDynamicAssignmentStructure } from "../../../../src/desk/assignment/services/dynamicStructure.ts";
-import { extractBriefInquiriesAndConcepts } from "../../../../src/desk/assignment/services/briefSemantics.ts";
-import { assignmentStructureToOutlineTree } from "../../../../src/desk/assignment/services/outlineTree.ts";
 import { sanitizeBrief } from "../../../../src/features/understand/services/briefSanitizer.ts";
-import { classifyScopeBoundaries } from "../../../../src/features/understand/services/scopeClassifier.ts";
 import {
 isClassroomLogisticsLine,
 isTutorialOrShortQABrief,
@@ -38,10 +26,9 @@ extractSubstantiveBriefQuestions,
 stripSlideArtifacts,
 stripCourseCodes,
 } from "../../../../src/utils/briefExtractor.ts";
-import { buildBriefSummary,extractPrescribedReferences } from "../../../../src/utils/briefQuestions.ts";
 import {
 upload,
-abortOnClose,getProjectSafe,safeParseObject,saveChangedAnswers,deriveSemanticAcademicTitle,
+abortOnClose,getProjectSafe,safeParseObject,saveChangedAnswers,deriveHeuristicTitle,
 autoUpdateProjectTitleIfUntitled
 } from "./helpers.ts";
 
@@ -184,7 +171,8 @@ router.post(
     }
     await saveChangedAnswers(project);
 
-    const derivedTitle = await deriveSemanticAcademicTitle(cleanedText, req);
+    // The title is read from the brief's own wording here; no AI call while uploading.
+    const derivedTitle = deriveHeuristicTitle(cleanedText);
     const updatedTitle = await autoUpdateProjectTitleIfUntitled(project, derivedTitle);
 
     return res.json({
@@ -205,298 +193,6 @@ router.post(
     return res.status(500).json({ error: errorText(err) || "Failed to extract text from brief" });
   }
 });
-
-// 1. POST /api/projects/:id/assignment/analyze & /deconstruct
-const handleDeconstruct = async (req: express.Request<{ id: string }>, res: express.Response) => {
-  if (!parseBody(AnalyzeBody, req, res)) return;
-  const project = await getProjectSafe(req, res);
-  if (!project) return;
-
-  const question =
-    cleanAnswerString(req.body?.instructions) ||
-    cleanAnswerString(req.body?.question) ||
-    extractStandardizedInstructions(project.answers);
-  const assignmentType =
-    req.body?.assignmentType ||
-    project.answers["assignment_type"] ||
-    "essay";
-  const academicLevel =
-    req.body?.academicLevel ||
-    project.answers["academic_level"] ||
-    "undergraduate";
-  const briefText =
-    cleanAnswerString(req.body?.briefText) ||
-    cleanAnswerString(project.answers["assignment_brief"]) ||
-    question;
-  const isTutorial = isTutorialOrShortQABrief(briefText) || isTutorialOrShortQABrief(question);
-  const targetWordCount = Number(
-    req.body?.targetWordCount ||
-    project.answers["word_limit"] ||
-    (isTutorial ? 400 : 2000)
-  );
-  const citationStyle =
-    cleanAnswerString(req.body?.citationStyle) ||
-    cleanAnswerString(project.answers["citation_style"]) ||
-    DEFAULT_CITATION_STYLE;
-  const rubricText =
-    cleanAnswerString(req.body?.rubricText) ||
-    cleanAnswerString(project.answers["marking_rubric"]) ||
-    "";
-  const rawSections = req.body?.sections || project.answers["sections"];
-  type SavedBreakdown = { intro?: { targetWords?: number }; body?: { targetWords?: number }; conclusion?: { targetWords?: number }; isCustomized?: boolean };
-  const parsedSections = safeParseObject<SavedBreakdown>(rawSections);
-
-  try {
-    const combinedContent = [question, briefText, rubricText].filter(Boolean).join("\n\n").trim();
-    const ledger: DocumentRequirement[] = await auditDocumentLineByLine(combinedContent);
-
-    // 1. Command Verbs & Examiner Demands (mapped from category === 'prompt')
-    const promptItems = ledger.filter((item) => item.category === "prompt" && !isClassroomLogisticsLine(item.verbatimText));
-    const commandVerbs: CommandVerbDetail[] = [];
-    const verbSeen = new Set<string>();
-
-    for (const item of promptItems) {
-      const lower = item.verbatimText.toLowerCase();
-      let matched = false;
-      for (const [verbKey, verbVal] of Object.entries(COMMAND_VERB_MAP)) {
-        if (new RegExp(`\\b${verbKey}\\b`, "i").test(lower) && !verbSeen.has(verbKey)) {
-          verbSeen.add(verbKey);
-          matched = true;
-          commandVerbs.push({
-            verb: verbKey.charAt(0).toUpperCase() + verbKey.slice(1),
-            meaning: verbVal.meaning,
-            academicExpectation: `${verbVal.expectation} (${item.lineRange})`,
-          });
-        }
-      }
-      if (!matched && !verbSeen.has(item.lineRange)) {
-        verbSeen.add(item.lineRange);
-        commandVerbs.push({
-          verb: "Task Directive",
-          meaning: "Directly answer the specified task requirement from the brief.",
-          academicExpectation: `${item.verbatimText} (${item.lineRange})`,
-        });
-      }
-    }
-
-    if (commandVerbs.length === 0) {
-      commandVerbs.push(
-        {
-          verb: "Critically evaluate",
-          meaning: "Weigh competing theoretical arguments and empirical evidence to judge their validity.",
-          academicExpectation: "You must not merely describe; synthesize counterarguments and substantiate a justified academic conclusion.",
-        },
-        {
-          verb: "Analyse",
-          meaning: "Break down complex issues into component parts to examine relationships and causes.",
-          academicExpectation: "Explain 'how' and 'why' with methodological rigor, avoiding superficial summary.",
-        }
-      );
-    }
-
-    // 2. Key Conceptual Scope & Boundaries (Green: What to Focus On vs Orange: What to Avoid)
-    const rawQuestions = promptItems.map((p) => p.verbatimText);
-    const scope = classifyScopeBoundaries(combinedContent, rawQuestions);
-    const included: string[] = [...scope.included];
-    const excluded: string[] = [...scope.excluded];
-
-    // 3. Rubric Rules & Grade Bands (mapped from category === 'rubric_band' and category === 'penalty')
-    const rubricItems = ledger.filter((item) => item.category === "rubric_band");
-    const penaltyItems = ledger.filter((item) => item.category === "penalty");
-    const markingCriteriaInsights: string[] = [];
-
-    const substantiveRubricItems = rubricItems.filter((r) => {
-      const text = r.verbatimText.trim();
-      if (text.length < 15) return false;
-      if (/^\(?\d+%\s*[-–]\s*\d+%\)?$/i.test(text)) return false;
-      if (/^part\s+\d+/i.test(text)) return false;
-      if (/^criteria\s*&\s*weight/i.test(text)) return false;
-      return true;
-    });
-
-    // Only what the brief states: when it gives no marking criteria, none
-    // are invented (generic UK grade bands used to be shown as if they were).
-    if (substantiveRubricItems.length > 0) {
-      markingCriteriaInsights.push(...substantiveRubricItems.map((r) => `${r.lineRange} ${r.verbatimText}`).slice(0, 6));
-    }
-
-    if (penaltyItems.length > 0) {
-      markingCriteriaInsights.push(
-        ...penaltyItems.map((p) => `🚨 Detected Assessment Penalty: ${p.lineRange} ${p.verbatimText}`)
-      );
-    }
-
-    // 4. Formatting & Word Budget (mapped from category === 'formatting')
-    const targetWords = Number(targetWordCount) || (isTutorial ? 400 : 2000);
-    const introWords = parsedSections?.intro?.targetWords ?? Math.round(targetWords * 0.10);
-    const conclWords = parsedSections?.conclusion?.targetWords ?? Math.round(targetWords * 0.15);
-    const bodyWords = parsedSections?.body?.targetWords ?? Math.max(0, targetWords - introWords - conclWords);
-
-    const formattingRules = ledger
-      .filter((item) => item.category === "formatting")
-      .map((item) => `${item.lineRange} ${item.verbatimText}`);
-
-    const customSectionNote = parsedSections?.isCustomized ? " Section allocations customized by student." : "";
-    const wordCountImplications = `Target: ${targetWords.toLocaleString()} words (Intro: ~${introWords}w, Body: ~${bodyWords}w, Conclusion: ~${conclWords}w). Standard ±10% penalty threshold applies.${customSectionNote}${
-      formattingRules.length > 0 ? ` Detected Rules: ${formattingRules.join(" | ")}` : ""
-    }`;
-
-    const citationGuidance = `Format all in-text citations and reference list strictly according to ${citationStyle.toUpperCase()} conventions.${
-      formattingRules.some((r) => new RegExp(citationStyle, "i").test(r)) ? " Confirmed in assignment brief." : ""
-    }`;
-
-    // 5. Concepts, Expected Response Type, Evidence Requirements, Summary
-    const isExamOrQuestionnaire = /examination|questionnaire|question\s*1|part\s*1|marks\b/i.test(combinedContent);
-
-    // Concepts come from the brief's own wording, never from a subject lookup.
-    const keyConcepts = extractBriefInquiriesAndConcepts(question, briefText).keyConcepts.slice(0, 6);
-
-    const expectedResponseType = isExamOrQuestionnaire
-      ? "Rigorous, structured technical answers solving all examination questions systematically with theoretical frameworks, mathematical rigor, and standard Harvard referencing."
-      : assignmentType === "case_study"
-      ? "Strategic case analysis diagnosing root causes, evaluating alternatives, and proposing an implementation roadmap."
-      : assignmentType === "report" || assignmentType === "business_assignment"
-      ? "Structured professional report with numbered subheadings, empirical findings, and actionable SMART recommendations."
-      : assignmentType === "reflection"
-      ? "Critical reflective analysis connecting experiential practice with pedagogical and disciplinary theory (e.g. Gibbs' cycle)."
-      : assignmentType === "lab_report"
-      ? "Scientific laboratory report following IMRaD structure with empirical hypothesis testing and error analysis."
-      : "Dialectical academic essay advancing a central argumentative thesis substantiated by peer-reviewed evidence.";
-
-    const prescribed = extractPrescribedReferences(combinedContent).map((r) => r.label);
-    const evidenceRequirements =
-      prescribed.length > 0
-        ? `Authoritative peer-reviewed literature. The brief names: ${prescribed.slice(0, 6).join(", ")}.`
-        : academicLevel === "postgraduate"
-        ? "High-impact peer-reviewed journal articles, foundational theoretical monographs, and authoritative empirical datasets."
-        : "Authoritative academic sources, scholarly peer-reviewed journals, and verified institutional benchmark data.";
-
-    const academicLevelNotes = academicLevel === "postgraduate"
-      ? "Calibrated for Postgraduate / Masters study: demands high theoretical synthesis, methodological reflexivity, nuanced hedging, and original critical insight."
-      : "Calibrated for Undergraduate study: emphasizes conceptual clarity, structured logical flow, accurate evidence deployment, and clear thesis progression.";
-
-    const penaltyNote = penaltyItems.length > 0 ? ` Note: ${penaltyItems.length} specific penalty clause(s) identified.` : "";
-
-    const summary = buildBriefSummary({
-      briefText: combinedContent,
-      assignmentType: String(assignmentType),
-      level: String(academicLevel),
-      citationStyle: String(citationStyle),
-      targetWords,
-    }) + penaltyNote;
-
-    const finalAnalysis: AssignmentAnalysis = {
-      commandVerbs,
-      summary,
-      keyConcepts,
-      scopeBoundaries: {
-        included: included.slice(0, 8),
-        excluded: excluded.slice(0, 8),
-      },
-      expectedResponseType,
-      evidenceRequirements,
-      markingCriteriaInsights,
-      wordCountImplications,
-      citationGuidance,
-      academicLevelNotes,
-      approvedByUser: false,
-      briefLedger: ledger,
-    };
-
-    // 6. Persist the ledger in the project JSONB answers under assignment_analysis and brief_ledger
-    const derivedTitle = await deriveSemanticAcademicTitle(question || briefText, req);
-    const updatedTitle = await autoUpdateProjectTitleIfUntitled(project, derivedTitle);
-
-    project.answers = {
-      ...project.answers,
-      instructions: String(question),
-      assignment_question: String(question),
-      assignment_brief_text: String(briefText),
-      research_topic: String(question),
-      assignment_brief: String(question),
-      academicLevel: String(academicLevel),
-      academic_level: String(academicLevel),
-      assignmentType: String(assignmentType),
-      assignment_type: String(assignmentType),
-      targetWordCount: String(targetWords),
-      target_word_count: String(targetWords),
-      word_count: String(targetWords),
-      word_limit: String(targetWords),
-      citationStyle: String(citationStyle),
-      citation_style: String(citationStyle),
-      marking_rubric: String(rubricText),
-      assignment_analysis: JSON.stringify(finalAnalysis),
-      brief_ledger: JSON.stringify(ledger),
-      ...(parsedSections ? { sections: parsedSections } : {}),
-      ...(updatedTitle ? { title: updatedTitle, assignment_title: updatedTitle } : {}),
-    };
-
-    // The outline is written by the student's AI from the whole brief. When
-    // no AI answers, the offline starter outline is used and marked as such,
-    // so the workspace can say it is not from the brief.
-    const criteriaLines = substantiveRubricItems.map((r) => r.verbatimText);
-    const discipline =
-      (typeof project.answers["assignment_discipline"] === "string" && project.answers["assignment_discipline"]) ||
-      scopeBrief(`${question} ${briefText}`).discipline;
-    let structure = undefined as ReturnType<typeof structureFromAi>;
-    let outlineNote: string | undefined;
-    try {
-      const aiText = await routedCompletion(req, { signal: abortOnClose(req),
-        task: "drafting",
-        systemPrompt: scholarBrain.courseworkPrompts.assignmentOutlinePrompt(),
-        userPrompt: scholarBrain.courseworkPrompts.assignmentOutlineUserPrompt({
-          brief: briefText,
-          question,
-          assignmentType: String(assignmentType),
-          academicLevel: String(academicLevel),
-          discipline: discipline || undefined,
-          citationStyle,
-          targetWords,
-          criteria: criteriaLines,
-        }),
-      });
-      structure = structureFromAi(aiText ?? "", targetWords, { briefText });
-      if (!structure) outlineNote = "Your AI's answer had no usable outline, so a starter outline is shown.";
-    } catch (llmErr) {
-      // The student left or cancelled: save nothing in their place.
-      if (abortOnClose(req).aborted) return;
-      console.warn("AI outline call failed:", llmErr instanceof Error ? llmErr.message : llmErr);
-      outlineNote = "No AI answered, so a starter outline is shown. Connect an AI and rebuild it from your brief.";
-    }
-    if (!structure) {
-      structure = {
-        ...generateDynamicAssignmentStructure({ question, assignmentType: assignmentType as AssignmentType, academicLevel: academicLevel as AcademicLevel, targetWordCount: targetWords, citationStyle, briefText }),
-        source: "starter",
-      };
-    }
-
-    project.answers.assignment_structure = JSON.stringify(structure);
-    project.answers.target_frameworks = JSON.stringify(structure.targetFrameworks || []);
-    if (project.answers.assignment_internal_sections) {
-      delete project.answers.assignment_internal_sections;
-    }
-
-    await saveChangedAnswers(project);
-
-    res.json({
-      ...finalAnalysis,
-      briefLedger: ledger,
-      updatedTitle: updatedTitle || project.answers?.["title"],
-      structure,
-      outlineSource: structure.source,
-      outlineNote,
-      targetFrameworks: structure.targetFrameworks || [],
-      sections: assignmentStructureToOutlineTree(structure).sections,
-    });
-  } catch (err: unknown) {
-    console.error("Assignment deconstruction error:", err);
-    if (!res.headersSent) {
-      res.status(500).json({ error: errorText(err) || "Failed to deconstruct assignment brief" });
-    }
-  }
-};
-
-router.post("/analyze", handleDeconstruct);
 
 /**
  * POST /api/projects/:id/assignment/outline  { instruction? }
@@ -541,6 +237,7 @@ export async function writeOutlineForProject(
       citationStyle: cleanAnswerString(a["citation_style"]) || undefined,
       targetWords,
       criteria,
+      questions: briefQuestionsForOutline(briefText),
       instruction: opts.instruction,
       plan: opts.plan,
       current: current?.headings?.length ? current : null,
@@ -573,6 +270,86 @@ router.post("/outline", async (req: express.Request<{ id: string }>, res: expres
     res.json({ structure });
   } catch (err) {
     sendAiFailure(res, err, "Outline");
+  }
+});
+
+
+/**
+ * POST /api/projects/:id/assignment/outline/section  { headingId, instruction? }
+ * The student's AI rewrites one section of the outline; the section keeps its
+ * word budget (so the total does not move) and text already written under
+ * sub-sections that survive. Saves and returns the new outline.
+ */
+router.post("/outline/section", async (req: express.Request<{ id: string }>, res: express.Response) => {
+  const project = await getProjectSafe(req, res);
+  if (!project) return;
+  const body = parseBody(OutlineSectionBody, req, res);
+  if (!body) return;
+  const a = project.answers;
+  const structure = safeParseObject<AssignmentStructure>(a["assignment_structure"]);
+  const target = structure?.headings?.find((h) => h.id === body.headingId);
+  if (!structure || !target) {
+    return res.status(404).json({ error: "That section is not in your outline any more. Reload and try again.", code: "missing_section" });
+  }
+  const brief = cleanAnswerString(a["assignment_brief"]) || extractStandardizedInstructions(a);
+  try {
+    const aiText = await routedCompletion(req, {
+      signal: abortOnClose(req),
+      task: "drafting",
+      systemPrompt: scholarBrain.courseworkPrompts.outlineSectionPrompt(),
+      userPrompt: scholarBrain.courseworkPrompts.outlineSectionUserPrompt({
+        brief,
+        thesis: cleanAnswerString(a["assignment_thesis"]) || undefined,
+        outline: structure.headings.map((h) => ({ title: h.title, words: h.targetWordCount, isTarget: h.id === target.id })),
+        target: { title: target.title, purpose: target.purpose, words: target.targetWordCount, units: target.subheadings.map((s) => ({ title: s.title, words: s.targetWordCount })) },
+        instruction: body.instruction,
+      }),
+    });
+    const previous = (safeParseObject(a["assignment_internal_sections"]) as AssignmentDraftingSection[] | null) ?? [];
+    const next = replaceSectionFromAi(structure, target.id, aiText ?? "", Array.isArray(previous) ? previous : []);
+    if (!next) throw new UnusableAiResponseError("outline section");
+    project.answers.assignment_structure = JSON.stringify({ ...next, isConfirmed: false });
+    delete project.answers.assignment_internal_sections;
+    await saveChangedAnswers(project);
+    res.json({ structure: { ...next, isConfirmed: false } });
+  } catch (err) {
+    sendAiFailure(res, err, "Outline section");
+  }
+});
+
+const RefinedThesis = z.object({ thesis: z.string().trim().min(5).max(1200), note: z.string().trim().max(400).optional() });
+
+/**
+ * POST /api/projects/:id/assignment/thesis/refine  { thesis, instruction? }
+ * The student's AI sharpens the thesis they wrote, keeping their position.
+ * Saves nothing: the student accepts or ignores the suggestion.
+ */
+router.post("/thesis/refine", async (req: express.Request<{ id: string }>, res: express.Response) => {
+  const project = await getProjectSafe(req, res);
+  if (!project) return;
+  const body = parseBody(ThesisRefineBody, req, res);
+  if (!body) return;
+  const a = project.answers;
+  const brief = cleanAnswerString(a["assignment_brief"]) || extractStandardizedInstructions(a);
+  try {
+    const aiText = await routedCompletion(req, {
+      signal: abortOnClose(req),
+      task: "reasoning",
+      systemPrompt: scholarBrain.courseworkPrompts.thesisRefinePrompt(),
+      userPrompt: scholarBrain.courseworkPrompts.thesisRefineUserPrompt({ brief, thesis: body.thesis, instruction: body.instruction, level: String(a["academic_level"] || "") }),
+    });
+    const match = /\{[\s\S]*\}/.exec(aiText ?? "");
+    let parsed: z.infer<typeof RefinedThesis> | undefined;
+    try {
+      const r = RefinedThesis.safeParse(match ? JSON.parse(match[0]) : null);
+      parsed = r.success ? r.data : undefined;
+    } catch {
+      parsed = undefined;
+    }
+    if (!parsed) throw new UnusableAiResponseError("thesis");
+    res.json({ thesis: parsed.thesis, note: parsed.note ?? "" });
+  } catch (err) {
+    sendAiFailure(res, err, "Thesis");
   }
 });
 

@@ -20,7 +20,7 @@ import * as presentationPrompts from "./prompts/presentationPrompts.ts";
 import { draftSection, priorSectionsContext, researchContextFromAnswers } from "./sectionDrafter.ts";
 import { searchEuropePmc } from "../../../src/shared/retrieval/providers.ts";
 import { buildAskGeneralPrompt, buildAskSearchPrompt } from "../../../src/shared/askPrompts.ts";
-import { NoAiConnectedError, routedCompletion as rawRoutedCompletion, routedText, RouterHandoffError, toRouterTask } from "../ai/routerBridge.ts";
+import { aiAvailability as rawAiAvailability, NoAiConnectedError, routedCompletion as rawRoutedCompletion, routedText, RouterHandoffError, toRouterTask } from "../ai/routerBridge.ts";
 import { BrowserAiRequiredError, LocalModelUnreachableError, NoClientAiProviderError } from "../ai/aiRouteErrors.ts";
 import {
   createChallengeTokenForRequest,
@@ -281,6 +281,11 @@ async function runGatewayCall<T>(kind: string, taskType: string | undefined, fn:
     console.warn(`[scholarBrain] ${kind} failed task=${taskType ?? "reasoning"} ms=${Date.now() - started} error=${name}`);
     throw err;
   }
+}
+
+/** Where this request's AI would run ("server", "browser" or "none"), without calling it: lets a route say so before it starts long work. */
+export function aiAvailability(...args: Parameters<typeof rawAiAvailability>): ReturnType<typeof rawAiAvailability> {
+  return rawAiAvailability(...args);
 }
 
 /** The router call routes use (Coursework agent steps, the Journal studio): timed and logged like the other gateway calls, NFC-normalised, errors rethrown unchanged. */

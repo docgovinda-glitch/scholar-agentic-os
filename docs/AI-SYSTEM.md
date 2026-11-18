@@ -91,10 +91,9 @@ Model names are never listed in code: they come live from the provider (`GET /ap
 - Scholarly retrieval: `server/src/research/scholarlyRetrievalPipeline.ts`, `server/src/retrieval/retrievalService.ts`, `server/src/discovery/` (`discovery.ts`, `blueprintScout.ts`), and the client-side `src/services/liveSearchService.ts`. Coursework source discovery runs in the browser through `src/desk/assignment/services/realScholarlyDiscoveryService.ts` (OpenAlex, Crossref, Semantic Scholar, DOAJ, DataCite, arXiv with `Promise.allSettled` and timeouts).
 - Optional keys: `TAVILY_API_KEY`, `SERPER_API_KEY`, `BRAVE_SEARCH_API_KEY`, `OPENALEX_API_KEY`, `OPENALEX_MAILTO`. The `search-proxy` Edge Function restricts Tavily to basic and advanced search.
 
-## 8. Multi-agent mesh and LangGraph
+## 8. Multi-agent mesh
 
 - `src/app/mesh/` is the agent registry and executor (`registry.ts`, `executor.ts`); four agents are registered by `registerBuiltinAgents()`: `ag14CitationManager`, `ag18ReadabilityAnalyst`, `ag25PrivacyGuard`, `ag26WorkflowCoordinator`. `GET /api/projects/:id/mesh/agents` lists them and `POST .../mesh/run` runs one.
-- `server/services/briefScannerGraph.ts` is a LangGraph workflow for brief scanning.
 - Journal peer review simulates referee lenses (`src/app/review/peerReview.ts`, `server/routes/project/agentic/reviewRoutes.ts`).
 
 ## 9. Offline scaffold

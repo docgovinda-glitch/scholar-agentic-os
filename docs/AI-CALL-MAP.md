@@ -24,7 +24,6 @@ A user's own key reaches the server only on AI routes (`routeUsesClientAi` in `s
 | `server/routes/project/agentic/*`, `server/routes/project/assignment/*`, `thesis.ts`, `proposal.ts`, `presentation.ts` | scholarBrain wrappers and `scholarBrain.*`, `routedCompletion` (Coursework prompt text: `scholarBrain.courseworkPrompts`, `server/src/services/prompts/courseworkPrompts.ts`; manuscript section drafting for the Journal studio and the desk generation job: `scholarBrain.draftSection`, prompts in `server/src/services/prompts/journalPrompts.ts`) |
 | `server/routes/project/core/manuscriptAndGateRoutes.ts`, `server/routes/project.ts`, `server/routes/studio.ts` | `requestCompleter` (`browserHandoff.ts`) |
 | `server/src/research/deepResearchEngine.ts`, `server/src/aiEngine/opportunityAgent.ts` | `routedCompletion` / router bridge |
-| `server/services/briefScannerGraph.ts` | LangGraph workflow |
 
 ## 3. Browser call sites
 

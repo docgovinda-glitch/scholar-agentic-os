@@ -53,9 +53,9 @@ describe("Server Ingress Protection — BYOK Credential Rejection", () => {
     expect(res.status).toBe(404);
   });
 
-  it("rejects POST /api/projects/:id/assignment/analyze with 400 when an apiKey is submitted", async () => {
+  it("rejects POST /api/projects/:id/assignment/build with 400 when an apiKey is submitted", async () => {
     const res = await request(app)
-      .post("/api/projects/test-proj-id/assignment/analyze")
+      .post("/api/projects/test-proj-id/assignment/build")
       .send({
         question: "Analyze modern macroeconomic policies",
         apiKey: "sk-user-byok-secret-123",

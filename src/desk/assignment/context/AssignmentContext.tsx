@@ -1,7 +1,6 @@
 import { clampWordLimit, WORD_LIMIT_DEFAULT } from "../../../domain/assignment/wordLimit";
 import { DEFAULT_CITATION_STYLE } from "../../../domain/assignment/answerKeys";
 import { tonePresetOf } from "../types";
-import { generateDynamicAssignmentStructure } from "../services/dynamicStructure";
 import { countProseWords } from "../../../shared/proseBlocks";
 import { canonicalizeAssignmentUpdate,normalizeAssignmentAnswers } from "../../../domain/assignment/answerKeys";
 import { selectApprovedSources } from "../../../domain/assignment/approvedSources";
@@ -53,6 +52,7 @@ import { stripCircularReferences } from "../../../utils/briefExtractor";
 import type { CourseworkExecutionMode } from "../../../features/coursework/types/orchestrator";
 import { safeParseAnswerField } from "../../../shared/projectStateSchema";
 import { useCourseworkAgent,type CourseworkAgent } from "./useCourseworkAgent";
+import { useBriefBuild, type BriefBuild } from "./useBriefBuild";
 import { buildAssignmentProjectState,computePhaseStatuses } from "./assignmentState";
 import { readInternalSections,readRubricCriteria,readStructure,readSectionBudgets,readApprovedSourceIds,readWritingStyle } from "./answerReaders";
 
@@ -147,6 +147,10 @@ export interface AssignmentContextValue {
   rewriteOutline: (instruction?: string) => Promise<{ ok: true; structure: AssignmentStructure } | { ok: false; error: string }>;
   /** Puts back an earlier outline (undo). */
   restoreOutline: (previous: AssignmentStructure) => Promise<void>;
+  /** The student's AI rewrites one section of the outline (its budget stays). */
+  regenerateOutlineSection: (headingId: string, instruction?: string) => Promise<{ ok: true; structure: AssignmentStructure } | { ok: false; error: string }>;
+  /** The student's AI sharpens a thesis; nothing is saved until the student accepts it. */
+  refineThesis: (thesis: string, instruction?: string) => Promise<{ ok: true; thesis: string; note: string } | { ok: false; error: string }>;
   /** The coursework agent: each stage's AI step, its status and results. */
   agent: CourseworkAgent;
   setGeneratingSection: (sectionId: string, isGenerating: boolean) => void;
@@ -167,6 +171,9 @@ export interface AssignmentContextValue {
   citationAuditResult: CitationAuditResult | null;
   flowAuditResult: FlowAuditResult | null;
 
+
+  /** The one Build of the brief (read it, plan it, write the outline). */
+  build: BriefBuild;
 
   // Save Answers Helper
   saveAnswers: (updates: Record<string, unknown>) => Promise<void>;
@@ -860,21 +867,9 @@ export function AssignmentProvider({
       return generated;
     }
 
-    // No outline yet: build it from the brief (one section per question), never
-    // from a generic theme template.
-    const generated = structureToInternalSections(
-      generateDynamicAssignmentStructure({ question, briefText, assignmentType, academicLevel, targetWordCount })
-    );
-
-    saveAnswers({
-      assignment_internal_sections: generated,
-    });
-
-    if (generated.length > 0) {
-      setActiveSectionId((prev) => prev || generated[0].id);
-    }
-    return generated;
-  }, [structure, targetWordCount, question, briefText, assignmentType, academicLevel, saveAnswers]);
+    // No outline yet: nothing is made up. Drafting asks for the outline first.
+    return [];
+  }, [structure, saveAnswers]);
 
   /**
    * The sections as last written, not as of the last render: a draft that
@@ -924,20 +919,28 @@ export function AssignmentProvider({
   );
 
   /**
-   * Rebuild the drafting sections from the brief (one per question, marks-weighted
-   * budgets), keeping the text of every section that is still there.
+   * Rebuild the drafting sections from the saved outline (the AI's, or the
+   * student's own), keeping the text of every section that is still there.
+   * With no outline there are no sections: none are made up from a template.
    */
   const tuneOutlineWithQuestion = useCallback(async (): Promise<AssignmentDraftingSection[]> => {
     const existing = new Map(latestSections().map((sec) => [sec.id, sec]));
-    const rebuilt = structureToInternalSections(
-      generateDynamicAssignmentStructure({ question, briefText, assignmentType, academicLevel, targetWordCount })
-    ).map((sec) => {
+    const rebuilt = structureToInternalSections(structure).map((sec) => {
       const prev = existing.get(sec.id);
       return prev?.draftContent ? { ...sec, draftContent: prev.draftContent, status: prev.status } : sec;
     });
     await saveAnswers({ assignment_internal_sections: rebuilt });
     return rebuilt;
-  }, [question, briefText, assignmentType, academicLevel, targetWordCount, latestSections, saveAnswers]);
+  }, [structure, latestSections, saveAnswers]);
+
+  // Quiet reload after the server saved something: no loading screen.
+  const reloadQuietly = useCallback(async () => {
+    const loadedFresh = await getProject(activeProjectId);
+    const fresh = { ...loadedFresh, answers: purgeLegacyTemplateText(loadedFresh.answers) } as typeof loadedFresh;
+    projectRef.current = fresh;
+    setProject(fresh);
+    return (fresh.answers ?? {}) as Record<string, unknown>;
+  }, [activeProjectId]);
 
   const rewriteOutline = useCallback(
     async (instruction?: string): Promise<{ ok: true; structure: AssignmentStructure } | { ok: false; error: string }> => {
@@ -962,6 +965,41 @@ export function AssignmentProvider({
     [activeProjectId, latestSections, saveAnswers, setStructure, targetWordCount]
   );
 
+  const regenerateOutlineSection = useCallback(
+    async (headingId: string, instruction?: string): Promise<{ ok: true; structure: AssignmentStructure } | { ok: false; error: string }> => {
+      try {
+        // Text written since the last save must reach the server first, so the rewrite keeps it.
+        const current = latestSections();
+        await saveAnswers({ assignment_internal_sections: current });
+        await saveChainRef.current;
+        const res = await authedJsonFetch(`/api/projects/${activeProjectId}/assignment/outline/section`, "POST", instruction ? { headingId, instruction } : { headingId }, { skipLlmFallback: true });
+        const body = await res.json().catch(() => null);
+        if (!res.ok || !body?.structure?.headings?.length) {
+          return { ok: false, error: body?.error || `The section could not be rewritten (${res.status}).` };
+        }
+        await reloadQuietly();
+        return { ok: true, structure: body.structure as AssignmentStructure };
+      } catch (e) {
+        return { ok: false, error: e instanceof Error ? e.message : "The section could not be rewritten." };
+      }
+    },
+    [activeProjectId, latestSections, saveAnswers, reloadQuietly]
+  );
+
+  const refineThesis = useCallback(
+    async (thesis: string, instruction?: string): Promise<{ ok: true; thesis: string; note: string } | { ok: false; error: string }> => {
+      try {
+        const res = await authedJsonFetch(`/api/projects/${activeProjectId}/assignment/thesis/refine`, "POST", instruction ? { thesis, instruction } : { thesis }, { skipLlmFallback: true });
+        const body = await res.json().catch(() => null);
+        if (!res.ok || typeof body?.thesis !== "string") return { ok: false, error: body?.error || `The thesis could not be refined (${res.status}).` };
+        return { ok: true, thesis: body.thesis, note: typeof body.note === "string" ? body.note : "" };
+      } catch (e) {
+        return { ok: false, error: e instanceof Error ? e.message : "The thesis could not be refined." };
+      }
+    },
+    [activeProjectId]
+  );
+
   const restoreOutline = useCallback(
     async (previous: AssignmentStructure) => {
       await setStructure(previous);
@@ -969,6 +1007,16 @@ export function AssignmentProvider({
     },
     [saveAnswers, setStructure, targetWordCount]
   );
+
+
+  const build = useBriefBuild({
+    projectId: activeProjectId,
+    answers,
+    flushSaves: async () => {
+      await saveChainRef.current;
+    },
+    reload: reloadQuietly,
+  });
 
   const agent = useCourseworkAgent({
     projectId: activeProjectId,
@@ -982,13 +1030,7 @@ export function AssignmentProvider({
     flushSaves: async () => {
       await saveChainRef.current;
     },
-    reload: async () => {
-      const loadedFresh = await getProject(activeProjectId);
-      const fresh = { ...loadedFresh, answers: purgeLegacyTemplateText(loadedFresh.answers) } as typeof loadedFresh;
-      projectRef.current = fresh;
-      setProject(fresh);
-      return (fresh.answers ?? {}) as Record<string, unknown>;
-    },
+    reload: reloadQuietly,
     saveAnswers,
   });
 
@@ -1257,7 +1299,10 @@ export function AssignmentProvider({
         saveStatus,
         rewriteOutline,
         restoreOutline,
+        regenerateOutlineSection,
+        refineThesis,
         agent,
+        build,
         setGeneratingSection,
         generatingSectionIds,
         initializeDraftingPlan,

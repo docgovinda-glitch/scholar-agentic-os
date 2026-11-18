@@ -42,7 +42,7 @@ Process start order in `server.ts`: helmet and CSP, request-header redaction, Su
 | Server | Express 4 (`express-async-errors`), helmet 8, multer 2, run with `tsx` in development and bundled by esbuild to `dist/server.cjs` (`--packages=external`) |
 | Language | TypeScript ~5.8, strict; path alias `@/*` resolves to the repository root |
 | Validation | zod 4 |
-| AI libraries | LangGraph with LangChain core (`server/services/briefScannerGraph.ts`); providers are called through the app's own router adapters (`src/platform/router`), not vendor SDKs |
+| AI libraries | None: providers are called through the app's own router adapters (`src/platform/router`), not vendor SDKs |
 | Documents | `pdf-parse`, `mammoth`, `docx`, `pdfmake`, `pptxgenjs`, `jszip` |
 | Data | `@supabase/supabase-js` (client), Supabase Data API over HTTPS from the server, optional `pg` direct connection |
 | Tests | Vitest 4 + Testing Library (unit and route tests), Playwright + axe (end to end) |

@@ -5,8 +5,7 @@ AcademicLevel,
 AssignmentType,DiscoveredSource,UploadedSourceDocument,
 AssignmentBriefRubricCriterion,SectionBudgetItem,WritingStyleConfig,AssignmentStructure
 } from "../types";
-import { cleanAnswerString,AssignmentDraftingSection,structureToSectionBudgets } from "../types";
-import { generateDynamicAssignmentStructure } from "../services/dynamicStructure";
+import { AssignmentDraftingSection,cleanAnswerString,emptyAssignmentStructure,structureToSectionBudgets } from "../types";
 import { safeParseAnswerField } from "../../../shared/projectStateSchema";
 import { hasLeakedTemplateHeadings } from "../../../domain/assignment/legacyPurge";
 
@@ -66,7 +65,7 @@ export function readRubricCriteria({ answers }: {
   return [];
 }
 
-export function readStructure({ academicLevel, answers, assignmentType, briefText, question, targetWordCount }: {
+export function readStructure({ answers, briefText, question, targetWordCount }: {
   academicLevel: AcademicLevel;
   answers: Record<string, string>;
   assignmentType: AssignmentType;
@@ -82,13 +81,8 @@ export function readStructure({ academicLevel, answers, assignmentType, briefTex
       if (!hasLeakedTemplateHeadings(titles, `${question} ${briefText}`)) return parsed;
     }
   }
-  return generateDynamicAssignmentStructure({
-    question: cleanAnswerString(question),
-    assignmentType,
-    academicLevel,
-    targetWordCount: targetWordCount > 0 ? targetWordCount : 2000,
-    briefText: cleanAnswerString(briefText),
-  });
+  // No outline yet: none is made up here (the AI writes it in Build).
+  return emptyAssignmentStructure(targetWordCount);
 }
 
 export function readSectionBudgets({ rawBudgets, structure, targetWordCount }: {

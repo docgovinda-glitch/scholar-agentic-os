@@ -61,16 +61,22 @@ export const CopilotChatBody = z.object({
   challengeToken: optText(4_000),
 }).passthrough();
 
-export const AnalyzeBody = z.object({
-  instructions: optText(60_000),
-  question: optText(60_000),
-  briefText: optText(60_000),
-  assignmentType: optText(80),
-  academicLevel: optText(60),
-  targetWordCount: wordCount.optional(),
-  llmResult: optText(200_000),
-  challengeToken: optText(4_000),
+/** POST /build: run the build again even when the brief has not changed. */
+export const BuildBody = z.object({
+  force: z.boolean().optional(),
 }).passthrough();
+
+/** POST /thesis/refine: the student's thesis to sharpen, and an optional request. */
+export const ThesisRefineBody = z.object({
+  thesis: z.string().trim().min(5).max(1200),
+  instruction: optText(400),
+});
+
+/** POST /outline/section: rewrite one heading of the outline. */
+export const OutlineSectionBody = z.object({
+  headingId: z.string().trim().min(1).max(200),
+  instruction: optText(600),
+});
 
 export const OutlineBody = z.object({
   instruction: optText(600),

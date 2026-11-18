@@ -1,8 +1,7 @@
 /**
  * The coursework outline is written by the student's AI from the brief, and
- * revised on request without losing written text. With no AI, the starter
- * outline is used and marked as such; the analysis never invents marking
- * criteria the brief does not state.
+ * revised on request without losing written text; one section can be
+ * rewritten on its own, and a thesis refined, without anything being invented.
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
@@ -97,14 +96,64 @@ describe("coursework outline by the student's AI", () => {
     expect(res.status).toBeGreaterThanOrEqual(400);
     expect((await getProjectStore().get(id))!.answers.assignment_structure).toBeUndefined();
   });
+});
 
-  it("analysis marks a starter outline when no AI answers, and invents no marking criteria", async () => {
-    routedCompletion.mockRejectedValue(new Error("No AI providers are configured"));
+describe("one outline section, and the thesis, by the student's AI", () => {
+  async function withOutline() {
+    routedCompletion.mockResolvedValueOnce(AI);
     const id = await project();
-    const res = await request(app).post(`/api/projects/${id}/assignment/analyze`).send({ briefText: BRIEF, question: BRIEF, targetWordCount: 2500, assignmentType: "report" });
+    await request(app).post(`/api/projects/${id}/assignment/outline`).send({});
+    routedCompletion.mockReset();
+    return id;
+  }
+
+  it("rewrites one section in place, keeping its budget and every other section", async () => {
+    const id = await withOutline();
+    const before = JSON.parse(String((await getProjectStore().get(id))!.answers.assignment_structure));
+    const target = before.headings[1];
+    routedCompletion.mockResolvedValue(
+      JSON.stringify({ section: { title: "How shoppers engage online", purpose: "Evaluate engagement.", subsections: [{ title: "What drives replies", words: 1000 }, { title: "What drives sharing", words: 600 }, { title: "Limits", words: 400 }] } })
+    );
+    const res = await request(app).post(`/api/projects/${id}/assignment/outline/section`).send({ headingId: target.id });
     expect(res.status).toBe(200);
-    expect(res.body.outlineSource).toBe("starter");
-    expect(res.body.outlineNote).toMatch(/starter outline/);
-    expect(JSON.stringify(res.body)).not.toMatch(/First Class \(70%\+\)|Upper Second \(60–69%\)/);
+    const after = res.body.structure;
+    expect(after.headings.map((h: { title: string }) => h.title)).toEqual([before.headings[0].title, "How shoppers engage online", before.headings[2].title]);
+    expect(after.headings[1].id).toBe(target.id);
+    expect(after.headings[1].targetWordCount).toBe(target.targetWordCount);
+    expect(after.headings[1].subheadings.map((s: { targetWordCount: number }) => s.targetWordCount).reduce((a: number, b: number) => a + b, 0)).toBe(target.targetWordCount);
+    expect(after.headings[0]).toEqual(before.headings[0]);
+    // The prompt marks which section to rewrite and gives its fixed budget.
+    expect(routedCompletion.mock.calls[0][1].userPrompt).toMatch(/rewrite this one/);
+    expect(routedCompletion.mock.calls[0][1].userPrompt).toMatch(new RegExp(`${target.targetWordCount} words in total`));
+    const saved = JSON.parse(String((await getProjectStore().get(id))!.answers.assignment_structure));
+    expect(saved.headings[1].title).toBe("How shoppers engage online");
+  });
+
+  it("changes nothing when the AI's section cannot be read", async () => {
+    const id = await withOutline();
+    const before = (await getProjectStore().get(id))!.answers.assignment_structure;
+    routedCompletion.mockResolvedValue("I cannot help with that.");
+    const target = JSON.parse(String(before)).headings[0].id;
+    const res = await request(app).post(`/api/projects/${id}/assignment/outline/section`).send({ headingId: target });
+    expect(res.status).toBe(503);
+    expect((await getProjectStore().get(id))!.answers.assignment_structure).toEqual(before);
+  });
+
+  it("refines a thesis and saves nothing until the student accepts", async () => {
+    const id = await project({ assignment_thesis: "Social media helps retailers." });
+    routedCompletion.mockResolvedValue(JSON.stringify({ thesis: "For UK fashion retailers, social media builds engagement mainly through customer service replies.", note: "Narrowed the scope." }));
+    const res = await request(app).post(`/api/projects/${id}/assignment/thesis/refine`).send({ thesis: "Social media helps retailers." });
+    expect(res.status).toBe(200);
+    expect(res.body.thesis).toMatch(/customer service replies/);
+    expect(res.body.note).toBe("Narrowed the scope.");
+    expect((await getProjectStore().get(id))!.answers.assignment_thesis).toBe("Social media helps retailers.");
+    expect(routedCompletion.mock.calls[0][1].userPrompt).toMatch(/Social media helps retailers/);
+  });
+
+  it("rejects an empty thesis", async () => {
+    const id = await project();
+    const res = await request(app).post(`/api/projects/${id}/assignment/thesis/refine`).send({ thesis: "" });
+    expect(res.status).toBe(400);
+    expect(routedCompletion).not.toHaveBeenCalled();
   });
 });

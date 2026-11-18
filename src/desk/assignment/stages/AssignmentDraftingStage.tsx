@@ -22,6 +22,7 @@ import { buildEvidencePack,serializeEvidencePackForPrompt } from "../services/ev
 import { buildContextContinuity,updateContextContinuityAfterSection } from "../services/contextContinuityService";
 import type { ContextContinuityState } from "../services/evidencePackService";
 import type { AssignmentDraftingSection } from "../types";
+import { hasOutline } from "../types";
 import {
 ArrowRight,
 ArrowLeft,
@@ -112,7 +113,6 @@ export function AssignmentDraftingStage({
     },
     [saveAnswers]
   );
-  const [isTuning, setIsTuning] = useState(false);
   const [showPresentation, setShowPresentation] = useState(false);
   const [presentationDeck, setPresentationDeck] = useState<SlideDeck | null>(null);
   // Beside the editor on wide screens; on phones it would push the writing
@@ -150,14 +150,6 @@ export function AssignmentDraftingStage({
     }
   }, [internalSections, question, project?.answers, tuneOutlineWithQuestion]);
 
-  const handleTuneOutline = useCallback(async () => {
-    setIsTuning(true);
-    try {
-      await tuneOutlineWithQuestion();
-    } finally {
-      setIsTuning(false);
-    }
-  }, [tuneOutlineWithQuestion]);
 
   // Active section entity
   const activeSection = useMemo(() => {
@@ -426,6 +418,31 @@ export function AssignmentDraftingStage({
     );
   }
 
+  // No outline yet: sections come from the outline the AI wrote (or the
+  // student's own), never from a template.
+  if (!isLoading && project && internalSections.length === 0 && !hasOutline(structure)) {
+    return (
+      <div className="max-w-3xl mx-auto p-4 sm:p-6 lg:p-8 text-[color:var(--text-primary)]">
+        <section
+          data-testid="drafting-needs-outline"
+          className="rounded-2xl p-6 sm:p-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-xs space-y-3 text-center"
+        >
+          <h1 className="text-lg sm:text-xl font-semibold tracking-tight">Plan your outline first</h1>
+          <p className="text-sm text-[color:var(--text-muted)] max-w-md mx-auto">
+            Drafting writes one section at a time from your approved outline. Build it with your AI, or write your own, in Understand.
+          </p>
+          <button
+            type="button"
+            onClick={() => setPhase("understand")}
+            className="mt-2 px-4 py-2 rounded-xl text-xs font-semibold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 cursor-pointer"
+          >
+            Go to Understand
+          </button>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-[1600px] mx-auto p-3 sm:p-5 space-y-4 text-[color:var(--text-primary)]">
       {/* Compact header: progress and actions in one row, so the page is mostly writing space */}
@@ -608,10 +625,8 @@ export function AssignmentDraftingStage({
             activeSectionId={activeSection?.id || null}
             onSelectSection={(id) => setActiveSectionId(id)}
             onGenerateNext={handleGenerateNext}
-            onTuneToQuestion={handleTuneOutline}
             onUpdateSectionTitle={updateSectionTitle}
             assignmentTopic={question}
-            isTuning={isTuning}
             isGenerating={Boolean(activeStreamingSectionId)}
             generatingSectionId={activeStreamingSectionId}
           />

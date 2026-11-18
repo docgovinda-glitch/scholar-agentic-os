@@ -253,6 +253,19 @@ describe("Assignment Phase 3: Drafting Engine Components & Flow", () => {
           assignment_type: "critical_essay",
           approved_source_ids: ["src-1", "src-2", "src-3", "src-4", "src-5"],
           assignment_current_phase: "drafting",
+          // The approved outline the sections come from (none are made up without one).
+          assignment_structure: JSON.stringify({
+            version: 1,
+            isConfirmed: true,
+            targetWordCount: 2000,
+            totalAllocated: 2000,
+            source: "ai",
+            headings: [
+              { id: "h1", number: 1, title: "Introduction", targetWordCount: 300, subheadings: [{ id: "u1", headingId: "h1", numberStr: "1.1", title: "Introduction", targetWordCount: 300 }] },
+              { id: "h2", number: 2, title: "Governance by algorithm", targetWordCount: 1400, subheadings: [{ id: "u2", headingId: "h2", numberStr: "2.1", title: "Accountability gaps", targetWordCount: 700 }, { id: "u3", headingId: "h2", numberStr: "2.2", title: "Remedies", targetWordCount: 700 }] },
+              { id: "h3", number: 3, title: "Conclusion", targetWordCount: 300, subheadings: [{ id: "u4", headingId: "h3", numberStr: "3.1", title: "Conclusion", targetWordCount: 300 }] },
+            ],
+          }),
         },
         gates: [],
       });
@@ -272,7 +285,7 @@ describe("Assignment Phase 3: Drafting Engine Components & Flow", () => {
         </AssignmentProvider>
       );
 
-      // Wait for sections to initialize from decomposition formula
+      // Wait for sections to initialize from the approved outline
       await waitFor(() => {
         expect(screen.getByText(/Section Outline/i)).toBeInTheDocument();
       });
@@ -287,6 +300,18 @@ describe("Assignment Phase 3: Drafting Engine Components & Flow", () => {
       expect(
         screen.getByText(/Complete all sections.*to unlock submission audit/i)
       ).toBeInTheDocument();
+    });
+
+    it("asks for the outline first when there is none, instead of making sections up", async () => {
+      const base = await getProject.getMockImplementation()?.("proj-draft-1");
+      getProject.mockResolvedValue({ ...base, answers: { ...base.answers, assignment_structure: undefined } });
+      render(
+        <AssignmentProvider projectId="proj-draft-1" initialStage="drafting" onStageChangeCallback={vi.fn()}>
+          <AssignmentDraftingStage onProceed={vi.fn()} />
+        </AssignmentProvider>
+      );
+      expect(await screen.findByTestId("drafting-needs-outline")).toBeInTheDocument();
+      expect(screen.queryByText(/Section Outline/i)).toBeNull();
     });
 
     it("unlocks Phase 3 exit gate when all sections are completed and within ±10% margin", async () => {

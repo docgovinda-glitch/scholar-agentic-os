@@ -99,7 +99,7 @@ Requests to the old `/api/projects/:id/agent/*` address (browser tabs from befor
 
 Every body is validated with zod (`schemas.ts`); a bad body is a 400 `{ code: "invalid_body", fields }`.
 
-- Extract: `/parse-brief` (multipart), `/analyze`, `/outline`.
+- Extract: `/parse-brief` (multipart; reads the file, no AI call), `/build` (`{ force? }`; SSE `{ step, status, message }`, then `{ done, cached? }` or `{ error, step, recoverable }`; 409 `build_running`; 400 `ai_provider_required` / `ai_local_model_unreachable` before streaming), `/outline` (`{ instruction? }`), `/outline/section` (`{ headingId, instruction? }`; one section rewritten, budget kept), `/thesis/refine` (`{ thesis, instruction? }` → `{ thesis, note }`; saves nothing).
 - Drafting: `/stream-section` (SSE opened before the model call, `: keep-alive` every 5 s; events `{ chunk }` (model tokens as they arrive), `{ replace }` (text to show instead, e.g. after a model switch), `{ fullText }` (final, citations formatted), `{ fallback }`, `{ error, recoverable: true }`, then `[DONE]`; 426 hand-off only before the stream opens; accepts `allocatedWords` and `continueFrom` (resume a stopped draft). Closing the connection stops the model).
 - Submission: `/export-pdf`, `/copilot-chat` (the student's AI answers or a 503 `{ code: "ai_unavailable" }` with `Retry-After`; never canned advice).
 - When no AI provider can answer, AI routes reply **503** `{ code: "ai_unavailable" }` with `Retry-After: 10` (`sendAiFailure`), never 502, so provider outages are not mistaken for gateway failures.

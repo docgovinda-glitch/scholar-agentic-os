@@ -1,16 +1,8 @@
-import { DEFAULT_CITATION_STYLE } from "../../../../src/domain/assignment/answerKeys.ts";
-import { routedCompletion } from "../../../src/services/scholarBrain.ts";
 import type { ProjectRecord } from "../../../../src/services/store/types.ts";
 import express from "express";
 import { createUploadInstance } from "../../../src/middleware/uploadGuard.ts";
 import { getProjectStore } from "../../../../src/services/store/projectStore.ts";
-import { scholarBrain } from "../../../src/services/scholarBrain.ts";
-import {
-cleanAnswerString
-} from "../../../../src/desk/assignment/types.ts";
-import type { AcademicLevel, AssignmentType } from "../../../../src/desk/assignment/types.ts";
-import { generateDynamicAssignmentStructure } from "../../../../src/desk/assignment/services/dynamicStructure.ts";
-import { isClassroomLogisticsLine, isTutorialOrShortQABrief } from "../../../../src/utils/briefExtractor.ts";
+import { isClassroomLogisticsLine } from "../../../../src/utils/briefExtractor.ts";
 import { hasLeakedTemplateHeadings } from "../../../../src/domain/assignment/legacyPurge.ts";
 
 type HeadingLike = { title?: string; subheadings?: Array<{ title?: string }> };
@@ -37,20 +29,9 @@ export function healCorruptedProjectStructure(project: { answers?: Record<string
     try {
       const parsed = typeof rawStructure === "string" ? JSON.parse(rawStructure) : rawStructure;
       if (parsed?.headings && isCorruptedOutlineHeadings(parsed.headings, topic)) {
-        const briefText = cleanAnswerString(project.answers["assignment_brief"]) || topic;
-        const targetWords = Number(
-          project.answers["word_limit"] ||
-          (isTutorialOrShortQABrief(briefText) ? 400 : 2000)
-        );
-        const repaired = generateDynamicAssignmentStructure({
-          question: project.answers["assignment_brief"] || topic,
-          assignmentType: (project.answers["assignment_type"] || "essay") as AssignmentType,
-          academicLevel: (project.answers["academic_level"] || "undergraduate") as AcademicLevel,
-          targetWordCount: targetWords,
-          citationStyle: project.answers["citation_style"] || DEFAULT_CITATION_STYLE,
-          briefText,
-        });
-        project.answers["assignment_structure"] = JSON.stringify(repaired);
+        // An outline made of old template text is removed, not replaced with
+        // another template: the student builds it again from their brief.
+        delete project.answers["assignment_structure"];
         if (project.answers["assignment_internal_sections"]) {
           delete project.answers["assignment_internal_sections"];
         }
@@ -180,50 +161,6 @@ export function deriveHeuristicTitle(rawText: string): string {
   return "Academic Assignment";
 }
 
-/**
- * Intelligent Semantic Auto-Naming:
- * Generates a concise academic research title (3 to 7 words).
- * Tries LLM if configured; otherwise gracefully falls back to deterministic heuristic.
- */
-export async function deriveSemanticAcademicTitle(
-  briefText: string,
-  req?: express.Request
-): Promise<string> {
-  const heuristic = deriveHeuristicTitle(briefText);
-  if (!briefText || briefText.trim().length < 15) {
-    return heuristic;
-  }
-
-  try {
-    if (req && process.env.NODE_ENV !== "test" && !process.env.VITEST) {
-      const prompt = scholarBrain.courseworkPrompts.academicTitlePrompt({ briefText });
-      const text = await routedCompletion(req, {
-        signal: abortOnClose(req),
-        task: "fast",
-        systemPrompt: scholarBrain.courseworkPrompts.ROLES.titleRegistrar,
-        userPrompt: prompt,
-        maxOutputTokens: 64,
-      });
-
-      if (text) {
-        const candidate = text
-          .trim()
-          .replace(/^["'“”‘’]+|["'“”‘’]+$/g, "")
-          .replace(/^(?:title|topic)[:\s\-–]+/i, "")
-          .replace(/[.?!;:]+$/, "")
-          .trim();
-        const wordCount = candidate.split(/\s+/).length;
-        if (wordCount >= 2 && wordCount <= 10 && candidate.length >= 5 && candidate.length <= 75) {
-          return capitalizeTitleWords(candidate);
-        }
-      }
-    }
-  } catch {
-    // Fall back to heuristic
-  }
-
-  return heuristic;
-}
 
 /**
  * Automatically updates project title in answers & record if currently untitled.

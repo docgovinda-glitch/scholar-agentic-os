@@ -4,15 +4,12 @@ import { tonePresetOf } from "../types";
 import { ExtractAgentPanel } from "../components/AgentPanels";
 import React,{ useState,useRef,useEffect,useMemo } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
-import { authedJsonFetch,authedFetch } from "../../api";
+import { authedFetch } from "../../api";
 import {
 type AcademicLevel,
 type AssignmentType,
-type AssignmentAnalysis,type SectionBudgetItem,cleanAnswerString,
-structureToInternalSections,
-structureToSectionBudgets
+cleanAnswerString,
 } from "../types";
-import { deriveHeuristicTitle } from "../../projectNaming";
 import {
 Upload,
 ChevronDown,
@@ -20,8 +17,6 @@ Sparkles,AlertCircle,
 FileText,
 X
 } from "lucide-react";
-import type { SectionBreakdown } from "../../../components/forms/TargetWordCountInput";
-import { generateDynamicAssignmentStructure } from "../services/dynamicStructure";
 import { stripCircularReferences } from "../../../utils/briefExtractor";
 import { validateBriefFile,BRIEF_MAX_UPLOAD_MB } from "../../../services/documentParser";
 import BriefScopePanel from "../components/BriefScopePanel";
@@ -30,7 +25,7 @@ import {
 ACADEMIC_LEVEL_OPTIONS,
 ASSIGNMENT_TYPE_OPTIONS,
 STAGE_CITATION_STYLES as CITATION_STYLES,
-WRITING_TONE_OPTIONS,AGENTIC_THINKING_STAGES,AI_OUTLINE_TIMEOUT_MS
+WRITING_TONE_OPTIONS,AGENTIC_THINKING_STAGES
 } from "../types";
 
 export const ASSIGNMENT_TYPE_TONE_MAP: Record<string, string> = {
@@ -104,12 +99,10 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
     assignmentBriefText,
     writingStyle,
     writingTone,
-    setStructure,
     saveAnswers,
-    setAnalysis,
     ensurePersisted,
     isLoading,
-    agent,
+    build,
   } = useAssignmentWorkspace();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -211,7 +204,9 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
     }
   };
   const [isGeneratingStructure, setIsGeneratingStructure] = useState<boolean>(false);
-  const [structureError, setStructureError] = useState<string | null>(null);
+  const [saveError, setStructureError] = useState<string | null>(null);
+  // What went wrong: saving the brief, or the build itself (its own message).
+  const structureError = saveError || (build.state.status === "error" ? build.state.error || "Your brief could not be read. Try again." : null);
   const [uploadingBrief, setUploadingBrief] = useState<boolean>(false);
   const [showCourseDetails, setShowCourseDetails] = useState<boolean>(false);
 
@@ -281,35 +276,6 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
     !localType && "an assignment type",
   ].filter((x): x is string => Boolean(x));
 
-  const computeWordBudgetFromSections = (
-    total: number,
-    sectionItems: SectionBudgetItem[]
-  ): { intro: number; body: number; conclusion: number } => {
-    const introItem = sectionItems.find(
-      (s) => s.id === "intro" || s.title.toLowerCase().includes("intro")
-    );
-    const conclusionItem = sectionItems.find(
-      (s) => s.id === "conclusion" || s.title.toLowerCase().includes("concl")
-    );
-    const introWords = introItem ? introItem.targetWordCount : Math.round(total * 0.1);
-    const conclusionWords = conclusionItem ? conclusionItem.targetWordCount : Math.round(total * 0.1);
-    const bodyWords = Math.max(0, total - introWords - conclusionWords);
-    return { intro: introWords, body: bodyWords, conclusion: conclusionWords };
-  };
-
-  const computeSectionBreakdown = (
-    total: number,
-    sectionItems: SectionBudgetItem[]
-  ): SectionBreakdown => {
-    const budget = computeWordBudgetFromSections(total, sectionItems);
-    return {
-      isCustomized: true,
-      intro: { targetWords: budget.intro, guidelines: "" },
-      body: { targetWords: budget.body, guidelines: "" },
-      conclusion: { targetWords: budget.conclusion, guidelines: "" },
-    };
-  };
-
   const parseRubricCriteria = (text: string) => {
     if (!text || !text.trim()) return [];
     const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
@@ -344,144 +310,31 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
   const buildStructure = async () => {
     setIsGeneratingStructure(true);
     setStructureError(null);
-
-    let proposedStructure = generateDynamicAssignmentStructure({
-      question: localQuestion,
-      assignmentType: localType,
-      academicLevel: localLevel,
-      targetWordCount: localWordCount,
-      writingTone: localTone,
-      citationStyle: localCitation,
-      briefText: localBrief,
-    });
-
-    let serverAnalysis: AssignmentAnalysis | null = null;
-
     try {
-      const targetProjectId = await ensurePersisted();
-      // Past the wait, the request is cancelled (the server then stops its AI
-      // call), not left running in the background.
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), AI_OUTLINE_TIMEOUT_MS);
-      const response = await authedJsonFetch(
-        `/api/projects/${targetProjectId}/assignment/analyze`,
-        "POST",
-        {
-          question: localQuestion,
-          assignmentType: localType,
-          academicLevel: localLevel,
-          targetWordCount: localWordCount,
-          citationStyle: localCitation,
-          writingTone: localTone,
-          writing_tone: localTone,
-          briefText: localBrief,
-        },
-        { signal: controller.signal }
-      ).finally(() => clearTimeout(timer));
+      await ensurePersisted();
+      // The brief and its settings, under their canonical names (answerKeys.ts).
+      const updates: Record<string, unknown> = {
+        assignment_brief: localQuestion,
+        academic_level: localLevel,
+        assignment_type: localType,
+        word_limit: localWordCount,
+        citation_style: localCitation,
+        writing_tone: localTone,
+      };
+      const parsedCriteria = parseRubricCriteria(markingRubricText);
+      if (parsedCriteria.length > 0) updates.rubric_criteria = parsedCriteria;
+      await saveAnswers(stripCircularReferences(updates));
 
-      if (response && response.ok) {
-        const data = await response.json();
-        const incomingAnalysis: AssignmentAnalysis = data.analysis || data;
-        if (data.structure && data.structure.headings?.length > 0) {
-          proposedStructure = data.structure;
-        }
-        if (incomingAnalysis && (incomingAnalysis.commandVerbs || incomingAnalysis.briefLedger || incomingAnalysis.summary)) {
-          serverAnalysis = incomingAnalysis;
-        }
-      }
-    } catch (err: unknown) {
-      console.warn("Using resilient client question-specific structure decomposition:", err);
+      // One server build: the AI reads the brief, then plans it and writes the
+      // outline. Understand opens as soon as the brief has been read; the plan
+      // and outline arrive there while the student looks at what was found.
+      // A failure is shown from the build's own state (structureError).
+      await build.run({ onExtracted: () => onProceed?.() });
+    } catch (err) {
+      setStructureError(err instanceof Error ? err.message : "Your brief could not be saved. Try again.");
     } finally {
       setIsGeneratingStructure(false);
     }
-
-    setStructure(proposedStructure);
-    if (serverAnalysis) {
-      setAnalysis(serverAnalysis);
-    }
-
-    const internalSecs = structureToInternalSections(proposedStructure);
-    const budgets = structureToSectionBudgets(proposedStructure);
-    const budget = computeWordBudgetFromSections(localWordCount, budgets);
-    const legacyBreakdown = computeSectionBreakdown(localWordCount, budgets);
-
-    const updates: Record<string, unknown> = {
-      rawPrompt: localQuestion,
-      raw_prompt: localQuestion,
-      instructions: localQuestion,
-      research_topic: localQuestion,
-      assignment_question: localQuestion,
-      assignment_prompt: localQuestion,
-      assignment_brief: localQuestion,
-      academic_level: localLevel,
-      academicLevel: localLevel,
-      assignment_type: localType,
-      assignmentType: localType,
-      word_count: localWordCount,
-      word_limit: localWordCount,
-      targetWordCount: localWordCount,
-      target_word_count: localWordCount,
-      citation_style: localCitation,
-      citationStyle: localCitation,
-      writing_tone: localTone,
-      writingTone: localTone,
-      assignment_structure: proposedStructure,
-      structure: proposedStructure,
-      sectionBudgets: budgets,
-      section_budgets: budgets,
-      assignment_internal_sections: internalSecs,
-      assignment_outline: internalSecs,
-      sections: legacyBreakdown,
-      wordBudget: budget,
-      word_budget: budget,
-    };
-
-    const parsedCriteria = parseRubricCriteria(markingRubricText);
-    if (parsedCriteria.length > 0) {
-      updates.rubricCriteria = parsedCriteria;
-      updates.rubric_criteria = parsedCriteria;
-    }
-
-    if (serverAnalysis) {
-      updates["assignment_analysis"] = serverAnalysis;
-    }
-
-    const currentTitle =
-      project?.answers?.["title"] ||
-      project?.title ||
-      "";
-    const isDefaultOrUntitled =
-      !currentTitle ||
-      currentTitle.toLowerCase().includes("untitled") ||
-      currentTitle.toLowerCase() === "academic assignment" ||
-      currentTitle.toLowerCase() === "synthesized research project";
-
-    if (isDefaultOrUntitled && localQuestion.trim().length >= 10) {
-      const derived = deriveHeuristicTitle(localQuestion.trim());
-      if (derived && derived !== "Academic Assignment") {
-        updates.title = derived;
-        updates.assignment_title = derived;
-      }
-    }
-
-    const safeUpdates = stripCircularReferences(updates);
-    await saveAnswers(safeUpdates);
-
-    // Have the student's AI read the brief and plan the assignment so Phase 2
-    // opens with its full breakdown. A failure here must not block the student.
-    try {
-      if (agent?.runExtract && agent?.runUnderstand) {
-        setIsGeneratingStructure(true);
-        if (await agent.runExtract()) await agent.runUnderstand();
-      }
-    } catch (agentErr) {
-      console.warn("Brief reading by AI did not complete:", agentErr);
-    } finally {
-      setIsGeneratingStructure(false);
-    }
-
-    // Smoothly advance to Part 2: Understand
-    onProceed?.();
   };
 
   const processUploadedFile = async (file: File) => {
@@ -559,87 +412,8 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
         console.warn("Could not save the extracted brief yet:", persistErr);
       }
 
-      // Building the outline is a second step: if it fails, the extracted brief stays.
-      try {
-      let dynamicStruct = generateDynamicAssignmentStructure({
-        question: cleanPrompt,
-        assignmentType: localType,
-        writingTone: localTone,
-      });
-
-      let serverAnalysis: AssignmentAnalysis | null = null;
-      if (data.analysis) {
-        serverAnalysis = data.analysis;
-      }
-
-      try {
-        const analyzeRes = await authedJsonFetch(
-          `/api/projects/${targetProjectId}/assignment/analyze`,
-          "POST",
-          {
-            question: cleanPrompt,
-            assignmentType: localType,
-            academicLevel: nextLevel,
-            targetWordCount: newWordCount,
-            citationStyle: nextCitation,
-            writing_tone: localTone,
-            briefText: cleanPrompt,
-          }
-        );
-        if (analyzeRes && analyzeRes.ok) {
-          const analyzeData = await analyzeRes.json();
-          const incomingAnalysis: AssignmentAnalysis = analyzeData.analysis || analyzeData;
-          if (analyzeData.structure && analyzeData.structure.headings?.length > 0) {
-            dynamicStruct = analyzeData.structure;
-          }
-          if (incomingAnalysis && (incomingAnalysis.commandVerbs || incomingAnalysis.briefLedger || incomingAnalysis.summary)) {
-            serverAnalysis = incomingAnalysis;
-          }
-        }
-      } catch (analyzeErr) {
-        console.warn("Brief parse analyze fallback:", analyzeErr);
-      }
-
-      setStructure(dynamicStruct);
-      if (serverAnalysis) {
-        setAnalysis(serverAnalysis);
-      }
-
-      const budgets = structureToSectionBudgets(dynamicStruct);
-      const internalSecs = structureToInternalSections(dynamicStruct);
-      const budget = computeWordBudgetFromSections(newWordCount, budgets);
-      const legacyBreakdown = computeSectionBreakdown(newWordCount, budgets);
-
-      const updates: Record<string, unknown> = {
-        instructions: cleanPrompt,
-        assignment_prompt: cleanPrompt,
-        assignment_question: cleanPrompt,
-        assignment_brief_text: cleanPrompt,
-        assignment_brief: cleanPrompt,
-        assignment_brief_file: file.name,
-        word_limit: newWordCount,
-        assignment_structure: dynamicStruct,
-        section_budgets: budgets,
-        assignment_internal_sections: internalSecs,
-        sections: legacyBreakdown,
-        wordBudget: budget,
-        word_budget: budget,
-        academic_level: nextLevel,
-        citation_style: nextCitation,
-        writing_tone: localTone,
-      };
-
-      if (serverAnalysis) {
-        updates["assignment_analysis"] = serverAnalysis;
-      }
-
-      const safeUpdates = stripCircularReferences(updates);
-      await saveAnswers(safeUpdates);
-      } catch (outlineErr) {
-        console.warn("Outline build after brief upload did not finish:", outlineErr);
-        setParseNotice("Your brief was read. Click Save & Build to create the outline.");
-      }
-
+      // The brief is read and the outline written when the student presses
+      // Save & Build (one server build); uploading only reads the file.
       // Save answers without auto-advancing so user can review extracted brief parameters
     } catch (err: unknown) {
       console.warn("Brief parsing error caught safely:", err);
@@ -1208,7 +982,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
             {isGeneratingStructure ? (
               <>
                 <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                <span>{AGENTIC_THINKING_STAGES[0]}</span>
+                <span>{(build.state.steps.extract.status === "running" && build.state.steps.extract.message) || AGENTIC_THINKING_STAGES[0]}</span>
               </>
             ) : (
               <>

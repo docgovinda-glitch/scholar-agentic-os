@@ -625,11 +625,6 @@ export const WRITING_TONE_OPTIONS: { id: string; label: string }[] = [
 
 export const AGENTIC_THINKING_STAGES = ["Your AI is reading the brief and writing the outline…"];
 
-/**
- * How long the browser waits for the AI to write an outline before showing the
- * starter outline. Local and free-tier models often need more than a minute.
- */
-export const AI_OUTLINE_TIMEOUT_MS = 120_000;
 
 export const COMMON_COMMAND_VERBS: Record<string, { definition: string; keyAction: string }> = {
   "critically discuss": {
@@ -832,6 +827,12 @@ export interface AssignmentSubheading {
   boundSourceIds?: string[];
   draftContent?: string;
   draftStatus?: "not_started" | "drafting" | "reviewed" | "completed";
+  /** Heading level in the table of contents: 2 (default) or 3 (inside the H2 named by parentTitle). */
+  level?: 2 | 3;
+  /** For a level-3 unit: the title of the H2 it sits under. */
+  parentTitle?: string;
+  /** Titles of the sections this one builds on (from the AI's plan). */
+  dependsOn?: string[];
 
   // Research Blueprint fields (Ask Scholar grounded)
   purpose?: string;
@@ -852,6 +853,8 @@ export interface AssignmentMainHeading {
   notes?: string;
   targetWordCount: number; // Sum of subheadings
   subheadings: AssignmentSubheading[];
+  /** Titles of the sections this one builds on (from the AI's plan). */
+  dependsOn?: string[];
 
   // Research Blueprint fields (Ask Scholar grounded)
   purpose?: string;
@@ -899,6 +902,13 @@ export interface ResearchBlueprintOverview {
   };
 }
 
+/** A working thesis the AI proposed for the brief. */
+export interface AiThesisOption {
+  statement: string;
+  /** A few words on the angle this thesis takes. */
+  angle?: string;
+}
+
 export interface AssignmentStructure {
   version: number;
   isConfirmed: boolean;
@@ -912,6 +922,10 @@ export interface AssignmentStructure {
   targetFrameworks?: string[];
   /** "ai": written by the student's AI from the brief; "starter": the offline rule-based outline. */
   source?: "ai" | "starter";
+  /** Working theses the AI proposed for this brief (suggestions; the student's choice is `assignment_thesis`). */
+  thesisOptions?: AiThesisOption[];
+  /** What code changed or noticed when fitting the AI's word budgets (totals, missing questions, marks). */
+  budgetNotes?: string[];
 
   // Research Blueprint Architecture & Question Mapping
   researchBlueprintOverview?: ResearchBlueprintOverview;
@@ -976,6 +990,20 @@ export function structureToSectionBudgets(structure?: AssignmentStructure | null
 export const MAX_DRAFTING_SECTIONS = 8;
 /** Below this a sub-part is not drafted on its own. */
 export const MIN_DRAFTING_SECTION_WORDS = 250;
+
+/**
+ * No outline yet. The workspace never shows a template outline in place of
+ * the AI's: until the AI writes one (or the student asks for a starter
+ * outline, or writes their own), there are no headings.
+ */
+export function emptyAssignmentStructure(targetWordCount: number): AssignmentStructure {
+  return { version: 1, isConfirmed: false, targetWordCount: targetWordCount > 0 ? targetWordCount : 0, totalAllocated: 0, headings: [] };
+}
+
+/** True when the outline has at least one heading. */
+export function hasOutline(structure?: AssignmentStructure | null): boolean {
+  return Boolean(structure?.headings && structure.headings.length > 0);
+}
 
 export function structureToInternalSections(structure?: AssignmentStructure | null): AssignmentDraftingSection[] {
   if (!structure?.headings || structure.headings.length === 0) return [];
