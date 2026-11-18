@@ -34,24 +34,20 @@ vi.mock("../../api", () => ({
   saveJournalRequirements: vi.fn(),
 }));
 
-vi.mock("../../../services/discovery/multiPortalLiteratureHarvester", () => ({
-  harvestFromOpenAlex: vi.fn().mockResolvedValue([
+// Scholarly search goes through the shared live-search route; the browser never calls an index.
+vi.mock("../../../services/liveSearchService", () => ({
+  executeLiveSearch: vi.fn().mockResolvedValue([
     {
       id: "openalex_w123",
       title: "Real-Time Syndrome Decoding in Surface Codes",
       authors: ["Smith, J.", "Kovacs, L."],
       year: 2024,
       doi: "10.1038/s41586-024-0001",
-      abstract: "Demonstrated sub-50ns FPGA syndrome processing.",
-      portal: "openalex",
+      snippet: "Demonstrated sub-50ns FPGA syndrome processing.",
+      url: "https://doi.org/10.1038/s41586-024-0001",
+      source: "openalex",
     },
   ]),
-  harvestFromCrossref: vi.fn().mockResolvedValue([]),
-  harvestFromArxiv: vi.fn().mockResolvedValue([]),
-}));
-
-vi.mock("../../../services/liveSearchService", () => ({
-  executeLiveSearch: vi.fn().mockResolvedValue([]),
   getLiveSearchGroundingEnabled: vi.fn().mockReturnValue(false),
   setLiveSearchGroundingEnabled: vi.fn(),
   onLiveSearchGroundingChange: vi.fn().mockReturnValue(() => {}),

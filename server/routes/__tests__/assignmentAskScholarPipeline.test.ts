@@ -18,7 +18,7 @@ vi.mock("../../utils/llm.ts", () => ({
 }));
 
 vi.mock("../../src/discovery/discovery.ts", () => ({
-  discoverMultiPortalSources: vi.fn().mockResolvedValue([
+  discoverScholarlySources: vi.fn().mockResolvedValue([
     {
       title: "Attention Is All You Need",
       authors: ["Ashish Vaswani", "Noam Shazeer"],

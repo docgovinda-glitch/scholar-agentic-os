@@ -17,14 +17,8 @@
 import { getSupabaseRestConfig } from "../supabaseRest";
 import type { AuthorityTier, DiscoveredSource, SourceType } from "../../../src/domain/evidence/types";
 import type { RawSourceInput } from "../../../src/citation_compliance/cslEngine";
-import {
-  searchCrossref,
-  searchDataCite,
-  searchDoaj,
-  searchOpenAlex,
-  searchSemanticScholar,
-  type ProviderResult,
-} from "../../../src/shared/retrieval/providers";
+import { searchOpenAlex, type ProviderResult } from "../../../src/shared/retrieval/providers";
+import { retrieveSources } from "../retrieval/retrievalService";
 
 interface ArxivResult {
   id: string;
@@ -146,64 +140,40 @@ export async function discoverOpenAlexSources(query: string, maxResults = 10): P
   return items.map((r) => rawToDraft(r, "openalex", r.sourceType === "peer-reviewed article" ? "A" : "B"));
 }
 
-export async function discoverCrossrefSources(query: string, maxResults = 25): Promise<DiscoveredSourceDraft[]> {
-  const items = unwrapProvider(await searchCrossref(query, maxResults, 1, polite()));
-  return items.map((r) => rawToDraft(r, "crossref", "A"));
-}
+const VIA: Partial<Record<string, DiscoveredSource["discoveredVia"]>> = {
+  openalex: "openalex",
+  crossref: "crossref",
+  semantic_scholar: "semantic_scholar",
+  europe_pmc: "europepmc",
+  doaj: "doaj",
+  datacite: "datacite",
+  arxiv: "arxiv",
+};
 
-export async function discoverSemanticScholarSources(query: string, maxResults = 20): Promise<DiscoveredSourceDraft[]> {
-  const items = unwrapProvider(await searchSemanticScholar(query, Math.min(maxResults, 50), polite()));
-  return items.map((r) => rawToDraft(r, "semantic_scholar", "A"));
-}
-
-export async function discoverDoajSources(query: string, maxResults = 25): Promise<DiscoveredSourceDraft[]> {
-  const items = unwrapProvider(await searchDoaj(query, maxResults));
-  return items.map((r) => rawToDraft(r, "doaj", "A"));
-}
-
-export async function discoverDataCiteSources(query: string, maxResults = 25): Promise<DiscoveredSourceDraft[]> {
-  const items = unwrapProvider(await searchDataCite(query, maxResults));
-  return items.map((r) => rawToDraft(r, "datacite", "B"));
-}
-
-export async function discoverMultiPortalSources(query: string, maxResults = 50): Promise<DiscoveredSourceDraft[]> {
-  const perPortalLimit = Math.max(15, Math.ceil(maxResults / 3));
-
-  const portalPromises = [
-    discoverOpenAlexSources(query, perPortalLimit).catch(() => [] as DiscoveredSourceDraft[]),
-    discoverCrossrefSources(query, perPortalLimit).catch(() => [] as DiscoveredSourceDraft[]),
-    discoverDoajSources(query, Math.min(20, perPortalLimit)).catch(() => [] as DiscoveredSourceDraft[]),
-    discoverDataCiteSources(query, Math.min(20, perPortalLimit)).catch(() => [] as DiscoveredSourceDraft[]),
-    discoverArxivSources(query, Math.min(20, perPortalLimit)).catch(() => [] as DiscoveredSourceDraft[]),
-    discoverSemanticScholarSources(query, Math.min(20, perPortalLimit)).catch(() => [] as DiscoveredSourceDraft[]),
-  ];
-
-  const results = await Promise.allSettled(portalPromises);
-  const candidates: DiscoveredSourceDraft[] = [];
-
-  for (const r of results) {
-    if (r.status === "fulfilled" && Array.isArray(r.value)) {
-      candidates.push(...r.value);
-    }
-  }
-
-  // Deduplicate by DOI and normalized title
-  const seenDois = new Set<string>();
-  const seenTitles = new Set<string>();
-  const deduplicated: DiscoveredSourceDraft[] = [];
-
-  for (const item of candidates) {
-    const cleanDoi = item.doi ? item.doi.toLowerCase().trim() : null;
-    const normTitle = (item.title || "").toLowerCase().replace(/[\W_]+/g, " ").trim();
-
-    if (cleanDoi && seenDois.has(cleanDoi)) continue;
-    if (normTitle && seenTitles.has(normTitle)) continue;
-
-    if (cleanDoi) seenDois.add(cleanDoi);
-    if (normTitle) seenTitles.add(normTitle);
-
-    deduplicated.push(item);
-  }
-
-  return deduplicated.slice(0, maxResults);
+/**
+ * Scholarly sources for a question, through the shared retrieval pipeline
+ * (`retrieveSources`: the shared providers, relevance gate, one record per
+ * work). Authority "A" only for what an index reports as peer reviewed;
+ * records without a title are dropped, never named "Untitled".
+ */
+export async function discoverScholarlySources(query: string, maxResults = 50): Promise<DiscoveredSourceDraft[]> {
+  const { results } = await retrieveSources({ query, mode: "scholarly", limit: Math.max(1, Math.min(120, maxResults)) });
+  return results
+    .filter((r) => r.title)
+    .map((r) => {
+      const authors = Array.isArray(r.authors) ? (r.authors as unknown[]).filter((a): a is string => typeof a === "string") : [];
+      const year = typeof r.year === "number" ? r.year : Number(r.year) || undefined;
+      const peer = r.sourceType === "peer-reviewed article" || r.sourceType === "conference paper";
+      return {
+        title: r.title as string,
+        authors,
+        url: r.url || (r.doi ? `https://doi.org/${r.doi}` : undefined),
+        ...(r.doi ? { doi: r.doi } : {}),
+        ...(r.venue ? { venue: r.venue } : {}),
+        ...(year ? { year } : {}),
+        discoveredVia: VIA[r.provider] ?? "multi_portal",
+        sourceType: "scholarly" as const,
+        authorityTier: peer ? ("A" as const) : ("B" as const),
+      };
+    });
 }

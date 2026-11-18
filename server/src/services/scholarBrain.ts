@@ -18,7 +18,6 @@ import * as thesisPrompts from "./prompts/thesisPrompts.ts";
 import * as proposalPrompts from "./prompts/proposalPrompts.ts";
 import * as presentationPrompts from "./prompts/presentationPrompts.ts";
 import { draftSection, priorSectionsContext, researchContextFromAnswers } from "./sectionDrafter.ts";
-import { searchEuropePmc } from "../../../src/shared/retrieval/providers.ts";
 import { buildAskGeneralPrompt, buildAskSearchPrompt } from "../../../src/shared/askPrompts.ts";
 import { aiAvailability as rawAiAvailability, NoAiConnectedError, routedCompletion as rawRoutedCompletion, routedText, RouterHandoffError, toRouterTask } from "../ai/routerBridge.ts";
 import { BrowserAiRequiredError, LocalModelUnreachableError, NoClientAiProviderError } from "../ai/aiRouteErrors.ts";
@@ -62,10 +61,7 @@ import {
 } from "../utils/citationLockScrubber.ts";
 import { CitationStyleRegistry } from "../../../src/citation_compliance/formattingEngine.ts";
 import type { CanonicalReference, ReferenceAuthor } from "../../../src/citation_compliance/model/reference.ts";
-import {
-  discoverMultiPortalSources,
-  type DiscoveredSourceDraft,
-} from "../discovery/discovery.ts";
+import { discoverScholarlySources } from "../discovery/discovery.ts";
 import {
   allocateWordsByMarks,
   parseQuestionMarks,
@@ -171,24 +167,6 @@ export interface UnifiedCitationScrubResult extends ScrubResult {
 }
 
 /**
- * Fetches biomedical and life sciences evidence from Europe PMC / PubMed.
- */
-async function discoverEuropePmcSources(query: string, maxResults = 10): Promise<DiscoveredSourceDraft[]> {
-  const { items } = await searchEuropePmc(query, Math.min(maxResults, 25), { timeoutMs: 5000 });
-  return items.map((item) => ({
-    title: item.title as string,
-    authors: Array.isArray(item.authors) ? (item.authors as unknown[]).filter((a): a is string => typeof a === "string") : [],
-    year: typeof item.year === "number" ? item.year : Number(item.year) || undefined,
-    doi: item.doi,
-    url: item.url || undefined,
-    venue: item.venue,
-    discoveredVia: "europepmc" as const,
-    sourceType: "scholarly" as const,
-    authorityTier: "A" as const,
-  }));
-}
-
-/**
  * Maps raw author strings to ReferenceAuthor array.
  */
 function parseAuthorsForCitation(authors: string[] | string): ReferenceAuthor[] {
@@ -225,7 +203,7 @@ function parseAuthorsForCitation(authors: string[] | string): ReferenceAuthor[] 
  */
 const LIVE_DISCOVERY_TTL_MS = 20 * 60 * 1000;
 const LIVE_DISCOVERY_MAX_ENTRIES = 200;
-type LiveDraft = Awaited<ReturnType<typeof discoverMultiPortalSources>>[number];
+type LiveDraft = Awaited<ReturnType<typeof discoverScholarlySources>>[number];
 const liveDiscoveryCache = new Map<string, { at: number; results: Promise<LiveDraft[]> }>();
 
 export function __clearLiveDiscoveryCacheForTests(): void {
@@ -238,10 +216,8 @@ function cachedLiveDiscovery(query: string, maxResults: number): Promise<LiveDra
   const hit = liveDiscoveryCache.get(key);
   if (hit && now - hit.at < LIVE_DISCOVERY_TTL_MS) return hit.results;
 
-  const results = Promise.all([
-    discoverMultiPortalSources(query, maxResults),
-    discoverEuropePmcSources(query, Math.min(10, Math.ceil(maxResults / 3))),
-  ]).then(([multi, epmc]) => [...multi, ...epmc] as LiveDraft[]);
+  // The shared pipeline (Europe PMC included for health, STEM and general questions).
+  const results = discoverScholarlySources(query, maxResults);
   // A failed lookup is not cached, so the next request retries it.
   results.catch(() => liveDiscoveryCache.delete(key));
 
