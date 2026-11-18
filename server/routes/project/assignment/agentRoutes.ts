@@ -101,6 +101,9 @@ export async function understandStep(
       citationStyle: String(a["citation_style"] || ""),
       words: Number(a["word_limit"]) || undefined,
     }),
+    // The plan, outline and thesis options are a few thousand tokens; an explicit cap keeps the provider
+    // from reserving the 32k default, which fails on low-credit accounts before any text is written.
+    maxOutputTokens: 8_000,
   });
   const understanding = parseUnderstanding(text ?? "");
   if (!understanding) throw new UnusableAiResponseError("assignment analysis");

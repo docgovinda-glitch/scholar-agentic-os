@@ -243,6 +243,7 @@ export async function writeOutlineForProject(
       current: current?.headings?.length ? current : null,
       written: Array.isArray(previous) ? previous.filter((p) => (p.draftContent ?? "").trim()).map((p) => p.id) : [],
     }),
+    maxOutputTokens: 8_000, // an outline is a few thousand tokens; see the understand step
   });
   const structure = structureFromAi(aiText ?? "", targetWords, { instruction: opts.instruction, previous: Array.isArray(previous) ? previous : [], briefText });
   if (!structure) throw new UnusableAiResponseError("outline");
@@ -304,6 +305,7 @@ router.post("/outline/section", async (req: express.Request<{ id: string }>, res
         target: { title: target.title, purpose: target.purpose, words: target.targetWordCount, units: target.subheadings.map((s) => ({ title: s.title, words: s.targetWordCount })) },
         instruction: body.instruction,
       }),
+      maxOutputTokens: 4_000, // one section, with its units
     });
     const previous = (safeParseObject(a["assignment_internal_sections"]) as AssignmentDraftingSection[] | null) ?? [];
     const next = replaceSectionFromAi(structure, target.id, aiText ?? "", Array.isArray(previous) ? previous : []);
@@ -337,6 +339,7 @@ router.post("/thesis/refine", async (req: express.Request<{ id: string }>, res: 
       task: "reasoning",
       systemPrompt: scholarBrain.courseworkPrompts.thesisRefinePrompt(),
       userPrompt: scholarBrain.courseworkPrompts.thesisRefineUserPrompt({ brief, thesis: body.thesis, instruction: body.instruction, level: String(a["academic_level"] || "") }),
+      maxOutputTokens: 2_000, // one sentence-level thesis and a short note
     });
     const match = /\{[\s\S]*\}/.exec(aiText ?? "");
     let parsed: z.infer<typeof RefinedThesis> | undefined;

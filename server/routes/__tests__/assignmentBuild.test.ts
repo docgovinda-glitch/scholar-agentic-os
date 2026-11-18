@@ -115,6 +115,10 @@ describe("POST /assignment/build", () => {
     expect(JSON.parse(String(a.assignment_build))).toMatchObject({ state: "done" });
     // The outline prompt carries the brief's questions and marks as guidance.
     expect(routedCompletion.mock.calls[2][1].userPrompt).toMatch(/Q2: .*\(60 marks\)/);
+    // The plan and the outline set their own output limit, so the provider never reserves the 32k default
+    // (which fails on a low-credit account before any text is written).
+    expect(routedCompletion.mock.calls[1][1].maxOutputTokens).toBe(8000);
+    expect(routedCompletion.mock.calls[2][1].maxOutputTokens).toBe(8000);
   });
 
   it("does not call the AI again for an unchanged brief, unless forced", async () => {
