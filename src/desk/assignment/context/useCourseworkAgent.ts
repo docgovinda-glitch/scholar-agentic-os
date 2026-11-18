@@ -122,10 +122,8 @@ export function useCourseworkAgent(d: Deps): CourseworkAgent {
         const existing = safeParseAnswerField<DiscoveredSource[]>(a0["assignment_sources"], []) ?? [];
         const queries = u?.searchQueries?.length ? u.searchQueries.slice(0, 3) : [dd.question];
         let found: DiscoveredSource[] = [];
-        for (const q of queries) {
-          set("sources", { status: "running", message: `Searching: “${q}”…` });
-          found = found.concat(await discoverRealScholarlySourcesFromServer(q, dd.citationStyle, 15).catch(() => []));
-        }
+        set("sources", { status: "running", message: `Searching: ${queries.map((q) => `“${q}”`).join(", ")}…` });
+        found = await discoverRealScholarlySourcesFromServer(dd.projectId, { queries, limit: 30 }).catch(() => []);
         const merged = mergeDiscovered(Array.isArray(existing) ? existing : [], found, 20);
         if (merged.length === 0) throw new Error("The search found no sources. Try again later, or add your own sources.");
         set("sources", { status: "running", message: `Reading ${Math.min(20, merged.length)} abstracts with your AI…` });

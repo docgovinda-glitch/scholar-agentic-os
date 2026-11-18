@@ -172,6 +172,8 @@ export interface SourceAnalysis {
   mainPoint: string;
   evidence: Array<{ claim: string; quote: string }>;
   sections: string[];
+  /** One sentence on what this source does for this assignment and thesis. */
+  fit?: string;
 }
 
 const sourceSchema = z.object({
@@ -181,6 +183,7 @@ const sourceSchema = z.object({
       relevance: z.enum(["high", "medium", "low"]).catch("low"),
       credibility: str(200).catch(""),
       mainPoint: str(500).catch(""),
+      fit: str(300).catch("").optional(),
       evidence: list(z.object({ claim: str(400), quote: str(800) }), 3),
       sections: list(str(120), 6),
     }),
@@ -205,6 +208,7 @@ export function parseSourceAnalysis(text: string, sources: SourceForAnalysis[], 
       relevance: a.relevance,
       credibility: a.credibility,
       mainPoint: a.mainPoint,
+      ...(a.fit ? { fit: a.fit } : {}),
       evidence: a.evidence.filter((e) => quotedIn(e.quote, src.abstract ?? "")).slice(0, 2),
       sections: a.sections.filter((id) => known.has(id)),
     });

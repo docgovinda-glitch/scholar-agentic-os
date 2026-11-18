@@ -356,6 +356,8 @@ export interface DiscoveredSource {
   publicationStatus?: string;       // e.g. "published", "preprint", "in_press"
 
   // Academic quality, depth, and research metadata
+  /** Other links to the same work (another provider's record, a preprint), kept when duplicates were merged. */
+  alternateLinks?: string[];
   abstract?: string;
   citationCount?: number;
   methodology?: ResearchMethodology | string;

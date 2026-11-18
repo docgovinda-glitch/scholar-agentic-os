@@ -7,8 +7,8 @@ const src = (id: string, title: string, extra: Partial<DiscoveredSource> = {}) =
 
 describe("agent sources", () => {
   it("adds new search results after the student's own, without duplicates by DOI or title", () => {
-    const mine = [src("u1", "My upload", { isUserUploaded: true }), src("s1", "Social media in retail", { doi: "10.1/x" })];
-    const found = [src("f1", "Social Media in Retail!"), src("f2", "Other", { doi: "10.1/X" }), src("f3", "New study")];
+    const mine = [src("u1", "My upload", { isUserUploaded: true }), src("s1", "Social media in retail", { doi: "10.1234/x" })];
+    const found = [src("f1", "Social Media in Retail!"), src("f2", "Other", { doi: "10.1234/X" }), src("f3", "New study")];
     expect(mergeDiscovered(mine, found).map((s) => s.id)).toEqual(["u1", "s1", "f3"]);
   });
 
@@ -31,5 +31,22 @@ describe("agent sources", () => {
     const bound = bindToSections(structure, sections, analyses);
     expect(bound.structure.headings[0].subheadings[0].boundSourceIds).toEqual(["a"]);
     expect(bound.sections[0]).toMatchObject({ boundSourceIds: ["u1", "a"], draftContent: "My text." });
+  });
+});
+
+describe("which sources the AI reads first, and what it adds", () => {
+  const s = (id: string, extra: Partial<DiscoveredSource> = {}): DiscoveredSource =>
+    ({ id, title: `Paper ${id} about loyalty schemes and retention`, authors: [], year: "2020", type: "journal", citation: "", mainFinding: "", suggestedUse: "", status: "kept", ...extra }) as DiscoveredSource;
+  it("reads unread sources first, the brief's own references first among them, then by measured relevance", () => {
+    const list = [s("read", { aiRelevance: "high", relevanceScore: 99 }), s("low", { relevanceScore: 20 }), s("high", { relevanceScore: 80 }), s("named", { prescribedInBrief: true, relevanceScore: 10 })];
+    expect(forAnalysis(list, 3).map((x) => x.id)).toEqual(["named", "high", "low"]);
+  });
+  it("keeps the AI's fit line as the reason shown for the source", () => {
+    const [out] = applyAnalyses([s("a")], [{ id: "a", relevance: "medium", credibility: "c", mainPoint: "m", evidence: [], sections: [], fit: "Gives context for the retention argument." }], {});
+    expect(out.whyThisSource).toBe("Gives context for the retention argument.");
+  });
+  it("treats the same work with and without a DOI as one when merging search results", () => {
+    const merged = mergeDiscovered([s("x", { title: "Loyalty schemes and retention in UK supermarkets", authors: ["Smith, J."], year: "2019" })], [s("y", { title: "Loyalty Schemes and Retention in UK Supermarkets", doi: "10.1234/abc", authors: ["J. Smith"], year: "2019" })]);
+    expect(merged.map((x) => x.id)).toEqual(["x"]);
   });
 });

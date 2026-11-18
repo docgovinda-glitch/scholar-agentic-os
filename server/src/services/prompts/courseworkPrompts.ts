@@ -256,16 +256,17 @@ export function understandUserPrompt(e: Extraction, brief: string, extra?: { lev
 export function sourcesPrompt(): string {
   return [
     "You assess real search results for a student's coursework. You see each source's title, authors, year, venue and abstract only, not the full text; say nothing beyond what these show.",
-    "For each source: relevance to this assignment (high, medium or low); credibility in one short phrase based on the venue, peer review and citations shown; its main point from the abstract; up to 2 pieces of evidence, each a claim with an exact quote from the abstract; and which outline sections (by id) it supports.",
+    "For each source: relevance to this assignment and its working thesis (high, medium or low: high only when it bears directly on a question the brief sets or on the thesis; a source that only shares a keyword is low); credibility in one short phrase based on the venue, peer review and citations shown; its main point from the abstract; fit: one sentence on what it does for this assignment (supports, challenges or gives context to which point); up to 2 pieces of evidence, each a claim with an exact quote from the abstract; and which outline sections (by id) it supports, only where it bears on that section's purpose.",
     "If a source has no abstract, give no evidence and judge relevance from the title only.",
-    'Respond with ONLY JSON: {"sources": [{"id": "...", "relevance": "high|medium|low", "credibility": "...", "mainPoint": "...", "evidence": [{"claim": "...", "quote": "<exact words from the abstract>"}], "sections": ["<section id>"]}]}',
+    'Respond with ONLY JSON: {"sources": [{"id": "...", "relevance": "high|medium|low", "credibility": "...", "mainPoint": "...", "fit": "...", "evidence": [{"claim": "...", "quote": "<exact words from the abstract>"}], "sections": ["<section id>"]}]}',
   ].join("\n");
 }
 
-export function sourcesUserPrompt(task: string, sections: Array<{ id: string; title: string }>, sources: SourceForAnalysis[]): string {
+export function sourcesUserPrompt(task: string, sections: Array<{ id: string; title: string; purpose?: string }>, sources: SourceForAnalysis[], thesis?: string): string {
   return [
     `Assignment: ${clip(task, 800)}`,
-    `Outline sections:\n${sections.slice(0, 30).map((s) => `- ${s.id}: ${clip(s.title, 140)}`).join("\n") || "(none yet)"}`,
+    thesis ? `Working thesis: ${clip(thesis, 600)}` : "",
+    `Outline sections:\n${sections.slice(0, 30).map((s) => `- ${s.id}: ${clip(s.title, 140)}${s.purpose ? ` (purpose: ${clip(s.purpose, 160)})` : ""}`).join("\n") || "(none yet)"}`,
     `Sources:\n${sources
       .slice(0, 20)
       .map(
@@ -273,7 +274,7 @@ export function sourcesUserPrompt(task: string, sections: Array<{ id: string; ti
           `[${s.id}] ${clip(s.title, 300)} — ${clip((s.authors ?? []).slice(0, 4).join(", "), 160)} (${s.year || "n.d."}). ${clip(s.venue, 160)}${s.peerReviewed ? ", peer-reviewed" : ""}${typeof s.citationCount === "number" ? `, cited ${s.citationCount} times` : ""}\nAbstract: ${clip(s.abstract, 1500) || "(none)"}`
       )
       .join("\n\n")}`,
-  ].join("\n\n");
+  ].filter(Boolean).join("\n\n");
 }
 
 export function reviewPrompt(): string {

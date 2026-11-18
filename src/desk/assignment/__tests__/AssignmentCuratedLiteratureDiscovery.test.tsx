@@ -24,16 +24,19 @@ class UnauthenticatedError extends Error {
 // Live literature search is a network call; these UI tests stand in for it
 // with fixture sources, so the grid/filter/approve behaviour is still tested.
 // (The app itself no longer substitutes catalog entries when search fails.)
+const FIXTURE_QUESTION_FOR_MOCK =
+  "Critically evaluate algorithmic governance, procedural due process, and predictive accountability in administrative public decision-making.";
 vi.mock("../services/realScholarlyDiscoveryService", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../services/realScholarlyDiscoveryService")>();
   const fixtures = await import("./fixtures/sourceFixtures");
   return {
     ...actual,
-    discoverRealScholarlySourcesFromServer: vi.fn(async (question: string, style = "apa7") =>
-      fixtures.fixtureSources(question, style)
+    discoverRealScholarlySourcesFromServer: vi.fn(async (_projectId: string, req: { queries?: string[]; topic?: string }) =>
+      fixtures.fixtureSources((req.queries ?? [req.topic ?? ""]).join(" "), "apa7")
     ),
-    fetchMoreRealSources: vi.fn(async (existing: Parameters<typeof fixtures.fixtureMoreSources>[0], question: string, n = 10) =>
-      fixtures.fixtureMoreSources(existing, question, n)
+    discoverSourcesForAssignment: vi.fn(async () => fixtures.fixtureSources(FIXTURE_QUESTION_FOR_MOCK, "apa7")),
+    fetchMoreRealSources: vi.fn(async (_projectId: string, existing: Parameters<typeof fixtures.fixtureMoreSources>[0], n = 10) =>
+      fixtures.fixtureMoreSources(existing, FIXTURE_QUESTION_FOR_MOCK, n)
     ),
   };
 });

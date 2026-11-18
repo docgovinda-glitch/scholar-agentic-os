@@ -5,6 +5,7 @@ import draftingRoutes from "./assignment/draftingRoutes.ts";
 import submissionRoutes from "./assignment/submissionRoutes.ts";
 import agentRoutes from "./assignment/agentRoutes.ts";
 import buildRoutes from "./assignment/buildRoutes.ts";
+import sourceRoutes from "./assignment/sourceRoutes.ts";
 
 export {
   isCorruptedOutlineHeadings,
@@ -21,5 +22,6 @@ router.use(draftingRoutes);
 router.use(submissionRoutes);
 router.use(agentRoutes);
 router.use(buildRoutes);
+router.use(sourceRoutes);
 
 export default router;

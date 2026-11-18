@@ -35,6 +35,7 @@ import {
   type ProviderResult,
 } from "../../../src/shared/retrieval/providers.ts";
 import { executeWebSearch, type SearchResultItem } from "../research/webSearchEngine.ts";
+import { dedupeWorks } from "../../../src/shared/retrieval/identity.ts";
 
 export type RetrievalMode = "all" | "scholarly" | "web" | "deep_research";
 
@@ -78,9 +79,6 @@ const DISCIPLINES: ReadonlySet<string> = new Set([
   "stem", "management_business", "social_sciences", "humanities", "health", "law", "education", "general", "auto",
 ]);
 
-function normalizeTitle(title: string): string {
-  return title.toLowerCase().replace(/[\W_]+/g, " ").trim();
-}
 
 function providerOptions(signal?: AbortSignal): ProviderOptions {
   return {
@@ -209,20 +207,9 @@ export async function retrieveSources(request: RetrievalRequest): Promise<Retrie
   note("web", webItems.length);
   const web = webItems.map((w) => toWebSource(w, w.score));
 
-  const seenDoi = new Set<string>();
-  const seenTitle = new Set<string>();
-  const seenUrl = new Set<string>();
-  const dedupe = (list: RetrievedSource[]): RetrievedSource[] =>
-    list.filter((item) => {
-      const doi = item.doi?.toLowerCase().trim();
-      const title = normalizeTitle(item.title ?? "");
-      const url = (item.url ?? "").toLowerCase().replace(/\/+$/, "");
-      if ((doi && seenDoi.has(doi)) || (title && seenTitle.has(title)) || (url && seenUrl.has(url))) return false;
-      if (doi) seenDoi.add(doi);
-      if (title) seenTitle.add(title);
-      if (url) seenUrl.add(url);
-      return true;
-    });
+  // One record per work across providers (shared identity rules); within a
+  // group the most complete record is kept, the others' links alongside.
+  const dedupe = (list: RetrievedSource[]): RetrievedSource[] => dedupeWorks(list);
 
   const rankedScholarly = dedupe([...scholarly].sort((a, b) => b.relevance - a.relevance));
   const rankedWeb = dedupe([...web].sort((a, b) => b.relevance - a.relevance));

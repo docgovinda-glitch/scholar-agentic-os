@@ -188,11 +188,15 @@ router.post("/agent/sources", async (req: Req, res: express.Response) => {
 
   const extraction = safeParseObject(a["assignment_extraction"]) as Extraction | null;
   const understanding = safeParseObject(a["assignment_understanding"]) as Understanding | null;
-  const structure = safeParseObject(a["assignment_structure"]) as { headings?: Array<{ subheadings?: Array<{ id: string; numberStr?: string; title: string }> }> } | null;
-  const sections = (structure?.headings ?? []).flatMap((h) => h.subheadings ?? []).map((s) => ({ id: s.id, title: `${s.numberStr ?? ""} ${s.title}`.trim() }));
+  const structure = safeParseObject(a["assignment_structure"]) as { headings?: Array<{ purpose?: string; subheadings?: Array<{ id: string; numberStr?: string; title: string; purpose?: string }> }> } | null;
+  // Each unit with its purpose (the section's when the unit has none), so mapping follows the plan.
+  const sections = (structure?.headings ?? []).flatMap((h) =>
+    (h.subheadings ?? []).map((s) => ({ id: s.id, title: `${s.numberStr ?? ""} ${s.title}`.trim(), purpose: s.purpose || h.purpose }))
+  );
+  const thesis = cleanAnswerString(a["assignment_thesis"]) || undefined;
   const task = understanding?.produce || extraction?.task || briefOf(a).slice(0, 600);
   try {
-    const text = await routedCompletion(req, { signal: abortOnClose(req), task: "reasoning", systemPrompt: scholarBrain.courseworkPrompts.sourcesPrompt(), userPrompt: scholarBrain.courseworkPrompts.sourcesUserPrompt(task, sections, sources) });
+    const text = await routedCompletion(req, { signal: abortOnClose(req), task: "reasoning", systemPrompt: scholarBrain.courseworkPrompts.sourcesPrompt(), userPrompt: scholarBrain.courseworkPrompts.sourcesUserPrompt(task, sections, sources, thesis) });
     const analyses = parseSourceAnalysis(text ?? "", sources, sections.map((s) => s.id));
     if (!analyses) return sendAiFailure(res, new UnusableAiResponseError("source analysis"), "Sources");
     const prev = (safeParseObject(a["assignment_source_analysis"]) as Record<string, unknown> | null) ?? {};

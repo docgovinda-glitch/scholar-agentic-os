@@ -63,7 +63,7 @@ Registered in `server.ts` in this order: health, admin, auth, `/api/ai/run` and 
 | `studio.ts` | `/api/studio/*` (voice profile, refine, consent, restrict, egress audit) |
 | `project.ts` | `/api/projects/*` and `/api/atlas/output-types`, `/api/user/saved-authors`; mounts the sub-routers in `server/routes/project/` |
 | `aiAccess.ts` | `/api/ai-access/*` |
-| `search.ts` | `/api/search/*` and the alias `/api/discovery/*` |
+| `search.ts` | `/api/search/*` |
 | `vault.ts` | `/api/vault/*` and `POST /api/lookup-doi` |
 | `presentations.ts` | `/api/presentations/*` |
 | `supabaseProxy.ts` | `/api/supabase/*` (HTTP) and WebSocket upgrade |

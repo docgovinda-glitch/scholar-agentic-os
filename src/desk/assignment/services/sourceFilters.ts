@@ -162,9 +162,33 @@ export function filterAndSortSources(
     if (sortBy === "title") {
       return a.title.localeCompare(b.title);
     }
-    // "relevance": preserve engine's question-led, recency-first ranking
-    return (b.relevanceScore || 0) - (a.relevanceScore || 0);
+    // "relevance": the AI's reading first (high, medium, not yet read, low),
+    // then the measured relevance.
+    const ai = (s: DiscoveredSource) => (s.aiRelevance === "high" ? 0 : s.aiRelevance === "medium" ? 1 : s.aiRelevance === "low" ? 3 : 2);
+    return ai(a) - ai(b) || (b.relevanceScore || 0) - (a.relevanceScore || 0);
   });
 
   return list;
+}
+
+/**
+ * Search results the citation engine cannot cite as they stand (no author,
+ * year or title: `metadata_incomplete`) are shown apart, under "Needs
+ * checking", not in the main list. Sources the student approved, added, or
+ * that the brief names always stay in the main list.
+ */
+export function splitNeedsChecking(
+  list: DiscoveredSource[],
+  approvedSourceIds: string[]
+): { main: DiscoveredSource[]; needsChecking: DiscoveredSource[] } {
+  const main: DiscoveredSource[] = [];
+  const needsChecking: DiscoveredSource[] = [];
+  for (const s of list) {
+    const set =
+      s.verificationStatus === "metadata_incomplete" && !s.prescribedInBrief && !isSourceApproved(s, approvedSourceIds) && (s.sourceOrigin ?? "system_found") === "system_found"
+        ? needsChecking
+        : main;
+    set.push(s);
+  }
+  return { main, needsChecking };
 }

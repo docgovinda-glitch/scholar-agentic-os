@@ -2,6 +2,7 @@
  * Pure helpers for the submission export: which sources belong in the reference
  * list, and how inline Markdown in drafted prose becomes real formatting.
  */
+import { workKeys } from "../../../shared/retrieval/identity";
 import type { DiscoveredSource } from "../types";
 import { parsePersonName } from "./referenceListGenerator";
 import { cleanEscapes } from "../../../shared/inlineMarkdown";
@@ -9,15 +10,15 @@ import { parseProseBlocks } from "../../../shared/proseBlocks";
 
 export { cleanEscapes, inlineMarkdownRuns, type StyledRun } from "../../../shared/inlineMarkdown";
 
-const norm = (t: string) => (t || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 
 /** One source per DOI, else per first-author family + year + title. */
 export function dedupeSources(sources: DiscoveredSource[]): DiscoveredSource[] {
+  // One entry per work, by the shared identity rules (DOI, arXiv id, title,
+  // short title + first author + year); the first listed record is kept.
   const seen = new Set<string>();
   const out: DiscoveredSource[] = [];
   for (const s of sources) {
-    const fam = parsePersonName(String(s.authors?.[0] ?? "")).family;
-    const keys = [s.doi ? `doi:${s.doi.toLowerCase().replace(/^https?:\/\/(dx\.)?doi\.org\//, "")}` : "", `fyt:${norm(fam)}|${s.year}|${norm(s.title)}`].filter(Boolean);
+    const keys = workKeys(s);
     if (keys.some((k) => seen.has(k))) continue;
     keys.forEach((k) => seen.add(k));
     out.push(s);

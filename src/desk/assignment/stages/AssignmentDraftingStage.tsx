@@ -223,9 +223,11 @@ export function AssignmentDraftingStage({
       // Serialize evidence pack for prompt injection
       const evidencePackPrompt = serializeEvidencePackForPrompt(evidencePack);
 
-      const mappedIds = approvedSources
-        .filter((s) => s.mappedSubheadingIds?.includes(sec.id))
-        .map((s) => s.id);
+      // Sources mapped to this section (by the student, or by the AI's reading).
+      const mappedTo = (src: (typeof approvedSources)[number]) => [...(src.mappedSubheadingIds ?? []), ...(src.aiSections ?? [])];
+      const mappedIds = approvedSources.filter((s) => mappedTo(s).includes(sec.id)).map((s) => s.id);
+      // A section with none mapped gets the approved sources not mapped to another section.
+      const unmappedIds = approvedSources.filter((s) => mappedTo(s).length === 0).map((s) => s.id);
 
       const planSection: InternalSectionPlan = {
         ...sec,
@@ -236,6 +238,8 @@ export function AssignmentDraftingStage({
             ? sec.boundSourceIds
             : mappedIds.length > 0
             ? mappedIds
+            : unmappedIds.length > 0
+            ? unmappedIds
             : approvedSources.map((s) => s.id),
       };
 

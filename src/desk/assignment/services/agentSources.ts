@@ -6,10 +6,7 @@
  */
 import type { SourceAnalysis, SourceForAnalysis } from "../../../domain/assignment/assignmentAgent";
 import type { AssignmentDraftingSection, AssignmentStructure, DiscoveredSource } from "../types";
-
-/** A source is the same work if its DOI or its title (ignoring case and punctuation) matches. */
-const keys = (s: { doi?: string; title?: string }) =>
-  [s.doi ? `doi:${s.doi.toLowerCase()}` : "", `t:${(s.title ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()}`].filter((k) => k && k !== "t:");
+import { sourceIdentityKeys as keys } from "./sourceMerge";
 
 /** New results added after what the student already has, without duplicates. */
 export function mergeDiscovered(existing: DiscoveredSource[], found: DiscoveredSource[], max = 20): DiscoveredSource[] {
@@ -25,10 +22,21 @@ export function mergeDiscovered(existing: DiscoveredSource[], found: DiscoveredS
   return [...existing, ...added];
 }
 
-/** What the AI is shown for each source: bibliographic details and abstract only. */
+/**
+ * What the AI is shown: bibliographic details and abstract only, for the
+ * sources most worth reading first: not yet read by the AI, then the ones the
+ * brief names, then by measured relevance.
+ */
 export function forAnalysis(sources: DiscoveredSource[], max = 20): SourceForAnalysis[] {
+  const rank = (s: DiscoveredSource) => [s.aiRelevance ? 1 : 0, s.prescribedInBrief ? 0 : 1, -(s.relevanceScore ?? 0)];
+  const byRank = (a: DiscoveredSource, b: DiscoveredSource) => {
+    const [x, y] = [rank(a), rank(b)];
+    for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return x[i] - y[i];
+    return 0;
+  };
   return sources
     .filter((s) => s.status !== "removed" && !s.isExcluded)
+    .sort(byRank)
     .slice(0, max)
     .map((s) => ({
       id: s.id,
@@ -54,6 +62,7 @@ export function applyAnalyses(sources: DiscoveredSource[], analyses: SourceAnaly
       aiCredibility: a.credibility,
       aiSections: a.sections,
       mainFinding: a.mainPoint || s.mainFinding,
+      ...(a.fit ? { whyThisSource: a.fit } : {}),
       suggestedUse: a.sections.length ? `Supports ${a.sections.map((id) => sectionTitles[id] || id).join("; ")}` : s.suggestedUse,
       extractedEvidences: a.evidence.length
         ? a.evidence.map((e, i) => ({ id: `${s.id}-ev${i + 1}`, excerpt: e.quote, claim: e.claim, sourceLocation: "Abstract" }))

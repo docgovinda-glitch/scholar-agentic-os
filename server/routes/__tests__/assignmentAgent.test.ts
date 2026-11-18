@@ -114,6 +114,19 @@ describe("coursework agent", () => {
     expect(JSON.parse(String((await saved()).assignment_source_analysis)).W1.relevance).toBe("high");
   });
 
+  it("Sources reads each source against the thesis and each section's purpose, and keeps the AI's 'fit' line", async () => {
+    await project({
+      assignment_thesis: "Interactive content, not discounts, drives engagement.",
+      assignment_structure: JSON.stringify({ headings: [{ purpose: "Explain engagement.", subheadings: [{ id: "ai-2-1", numberStr: "2.1", title: "Engagement" }] }] }),
+    });
+    routedCompletion.mockResolvedValue(JSON.stringify({ sources: [{ id: "W1", relevance: "high", credibility: "Peer-reviewed", mainPoint: "m", fit: "Supports the thesis on interactive content.", evidence: [], sections: ["ai-2-1"] }] }));
+    const res = await post("sources", { sources: [{ id: "W1", title: "Social media in retail", abstract: "We show interactive posts increase engagement.", year: "2023" }] });
+    expect(res.body.analyses[0].fit).toBe("Supports the thesis on interactive content.");
+    const prompt = routedCompletion.mock.calls[0][1].userPrompt as string;
+    expect(prompt).toContain("Working thesis: Interactive content, not discounts, drives engagement.");
+    expect(prompt).toContain("ai-2-1: 2.1 Engagement (purpose: Explain engagement.)");
+  });
+
   it("Review needs a draft, and keeps only findings that quote it", async () => {
     await project();
     expect((await post("review")).status).toBe(400);

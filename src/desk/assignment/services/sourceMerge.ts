@@ -8,6 +8,7 @@
  * student decides.
  */
 import type { DiscoveredSource } from "../types";
+import { workKeys } from "../../../shared/retrieval/identity";
 
 /** True when the student acted on the source or it came from them or the brief. */
 export function isStudentOwnedSource(source: DiscoveredSource, approvedIds: ReadonlySet<string>): boolean {
@@ -26,12 +27,10 @@ export function isStudentOwnedSource(source: DiscoveredSource, approvedIds: Read
   );
 }
 
-/** One key per work: the DOI when there is one, else the normalised title. */
-export function sourceIdentity(source: Pick<DiscoveredSource, "doi" | "title">): string {
-  const doi = (source.doi || "").trim().toLowerCase().replace(/^https?:\/\/(dx\.)?doi\.org\//, "");
-  if (doi) return `doi:${doi}`;
-  // Preserve hyphens in compound terms (COVID-19, Machine-Learning, etc.)
-  return `title:${(source.title || "").toLowerCase().replace(/[^\p{L}\p{N}\s-]/gu, " ").replace(/\s+/g, " ").trim()}`;
+/** The keys that name a source's work (shared identity rules: DOI, arXiv id, title, short title + first author + year). */
+export function sourceIdentityKeys(source: Pick<DiscoveredSource, "doi" | "title" | "url" | "authors" | "year">): string[] {
+  const keys = workKeys(source);
+  return keys.length ? keys : [`title:${(source.title || "").toLowerCase().trim()}`];
 }
 
 /**
@@ -48,13 +47,15 @@ export function mergeSearchResults(
   const approved = new Set(approvedIds);
   const kept = mode === "replace" ? existing.filter((s) => isStudentOwnedSource(s, approved)) : [...existing];
   const ids = new Set(kept.map((s) => s.id));
-  const keys = new Set(kept.map(sourceIdentity));
+  const keys = new Set(kept.flatMap(sourceIdentityKeys));
   const added: DiscoveredSource[] = [];
   for (const s of found) {
-    const key = sourceIdentity(s);
-    if (ids.has(s.id) || keys.has(key)) continue;
+    const sKeys = sourceIdentityKeys(s);
+    const duplicate = ids.has(s.id) || sKeys.some((k) => keys.has(k));
+    // A skipped duplicate's keys (its DOI, say) still name the listed work.
+    sKeys.forEach((k) => keys.add(k));
+    if (duplicate) continue;
     ids.add(s.id);
-    keys.add(key);
     added.push(s);
   }
   return { sources: [...kept, ...added], added };
