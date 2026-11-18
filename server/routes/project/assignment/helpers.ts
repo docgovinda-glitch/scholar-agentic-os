@@ -198,6 +198,7 @@ export async function deriveSemanticAcademicTitle(
     if (req && process.env.NODE_ENV !== "test" && !process.env.VITEST) {
       const prompt = scholarBrain.courseworkPrompts.academicTitlePrompt({ briefText });
       const text = await routedCompletion(req, {
+        signal: abortOnClose(req),
         task: "fast",
         systemPrompt: scholarBrain.courseworkPrompts.ROLES.titleRegistrar,
         userPrompt: prompt,
@@ -251,7 +252,7 @@ export async function autoUpdateProjectTitleIfUntitled(
     if (typeof project.title === "string") {
       project.title = derivedTitle;
     }
-    await getProjectStore().save(project);
+    await saveChangedAnswers(project);
     return derivedTitle;
   }
 
@@ -259,6 +260,65 @@ export async function autoUpdateProjectTitleIfUntitled(
 }
 
 export const upload = createUploadInstance({ enforceHeavyParseLimit: true });
+
+const requestSignals = new WeakMap<object, AbortSignal>();
+
+/**
+ * Aborted when the client goes away before the response is sent (the student
+ * left, or the browser gave up waiting), so the AI call stops instead of
+ * running on, spending the student's credit, for nobody.
+ */
+export function abortOnClose(req: express.Request<unknown>): AbortSignal {
+  const known = requestSignals.get(req);
+  if (known) return known;
+  const ctl = new AbortController();
+  const res = req.res;
+  res?.on("close", () => {
+    if (!res.writableEnded) ctl.abort();
+  });
+  requestSignals.set(req, ctl.signal);
+  return ctl.signal;
+}
+
+/** Answers as they were when each project was loaded by getProjectSafe. */
+const answersAtLoad = new WeakMap<object, Record<string, unknown>>();
+
+const sameValue = (a: unknown, b: unknown) => a === b || JSON.stringify(a) === JSON.stringify(b);
+
+/** The keys this request changed since it loaded the project; removed keys are null. */
+export function changedAnswers(before: Record<string, unknown>, after: Record<string, unknown>): Record<string, unknown> {
+  const patch: Record<string, unknown> = {};
+  for (const k of Object.keys(after)) {
+    if (after[k] === undefined) {
+      if (k in before && before[k] !== undefined) patch[k] = null;
+    } else if (!sameValue(before[k], after[k])) {
+      patch[k] = after[k];
+    }
+  }
+  for (const k of Object.keys(before)) {
+    if (!(k in after) && before[k] !== undefined) patch[k] = null;
+  }
+  return patch;
+}
+
+/**
+ * Saves only the answer keys this request changed, merged atomically into the
+ * stored record. A route waits on the AI for a long time; saving the whole
+ * record it loaded would overwrite whatever the student saved meanwhile.
+ * The in-memory project then reflects the merged, stored answers.
+ */
+export async function saveChangedAnswers(project: ProjectRecord): Promise<void> {
+  const after = (project.answers ?? {}) as Record<string, unknown>;
+  const before = answersAtLoad.get(project) ?? {};
+  const patch = changedAnswers(before, after);
+  if (Object.keys(patch).length === 0) return;
+  const stored = await getProjectStore().patchAnswers(project.projectId, patch);
+  if (stored) {
+    project.answers = { ...stored.answers };
+    project.version = stored.version;
+  }
+  answersAtLoad.set(project, { ...(project.answers as Record<string, unknown>) });
+}
 
 export async function getProjectSafe(req: express.Request<unknown>, res: express.Response) {
   const projectId = (req.params as Record<string, string>).id;
@@ -272,8 +332,9 @@ export async function getProjectSafe(req: express.Request<unknown>, res: express
     res.status(404).json({ error: "Project not found" });
     return null;
   }
+  answersAtLoad.set(project, { ...(project.answers as Record<string, unknown>) });
   if (healCorruptedProjectStructure(project)) {
-    await getProjectStore().save(project);
+    await saveChangedAnswers(project);
   }
   return project;
 }

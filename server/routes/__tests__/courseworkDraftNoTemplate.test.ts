@@ -51,6 +51,21 @@ async function createProject(): Promise<string> {
   return project.projectId;
 }
 
+type StreamOpts = { onToken?: (t: string) => void; onReset?: () => void; signal?: AbortSignal };
+
+/** The model answering `text`, token by token, as the router streams it. */
+const streams = (text: string) => async (..._args: unknown[]) => {
+  const stream = (_args[6] ?? {}) as StreamOpts;
+  for (const token of text.split(/(\s+)/).filter(Boolean)) stream.onToken?.(token);
+  return text;
+};
+
+const eventsOf = (body: string) =>
+  body
+    .split("\n\n")
+    .filter((l) => l.startsWith("data: {"))
+    .map((l) => JSON.parse(l.slice(6)) as { chunk?: string; replace?: string; fullText?: string; error?: string });
+
 /** What callOpenRouterText does when there is no AI: send the 426 hand-off and throw. */
 function handOffToBrowser() {
   vi.mocked(callOpenRouterText).mockImplementation(async (_req: any, res: any) => {
@@ -149,22 +164,64 @@ describe("Coursework stream-section", () => {
       .post(`/api/projects/${id}/assignment/stream-section`)
       .send({ sectionTitle: "Introduction", allocatedWords: 50, boundSources: [{ id: "s1", title: "Group decisions", authors: ["Janis, I."], year: 1982 }] });
     expect(res.text).not.toMatch(/Unverified Claim/i);
-    expect(res.text).not.toContain("[ev-unknown]");
+    // Text shown in place (replace) and the final text carry no raw or unmatched token.
+    const shown = eventsOf(res.text).flatMap((e) => [e.replace, e.fullText]).filter((x): x is string => typeof x === "string");
+    expect(shown.length).toBeGreaterThan(0);
+    for (const t of shown) expect(t).not.toContain("[ev-unknown]");
   });
 
-  it("lands a short draft inside its ±5% budget (rewrite, then continuation) counting words like the app", async () => {
+  it("lands a short draft inside its ±5% budget with one visible continuation, counting words like the app", async () => {
     const id = await createProject();
     const sentence = (topic: string, n: number) => `${Array.from({ length: n - 1 }, (_, i) => `${topic}${i}`).join(" ")} end.`;
     vi.mocked(callOpenRouterText)
-      .mockResolvedValueOnce(sentence("first", 20)) // first draft: 20 words
-      .mockResolvedValueOnce(sentence("second", 30)) // rewrite: 30 words, still short
-      .mockResolvedValueOnce(sentence("third", 20)); // continuation: new text
+      .mockImplementationOnce(streams(sentence("first", 20))) // first draft: 20 words
+      .mockImplementationOnce(streams(sentence("second", 30))); // continuation: new text
     const res = await request(app).post(`/api/projects/${id}/assignment/stream-section`).send({ sectionTitle: "Body", allocatedWords: 50 });
-    const full = res.text.split("\n\n").filter((l) => l.startsWith("data: {")).map((l) => JSON.parse(l.slice(6))).find((e) => typeof e.fullText === "string")?.fullText as string;
+    const events = eventsOf(res.text);
+    const full = events.find((e) => typeof e.fullText === "string")?.fullText as string;
     const n = countProseWords(full);
     expect(n).toBeGreaterThanOrEqual(47);
     expect(n).toBeLessThanOrEqual(53);
-    expect(full).toMatch(/second0[\s\S]*\n\nthird0/);
+    expect(full).toMatch(/first0[\s\S]*\n\nsecond0/);
+    // The continuation was streamed after the first draft, not swapped in silently.
+    const order = events.map((e) => (e.chunk?.startsWith("first0") ? "first" : e.chunk?.startsWith("second0") ? "second" : e.replace !== undefined ? "replace" : e.fullText ? "final" : "")).filter(Boolean);
+    expect(order).toEqual(["first", "replace", "second", "final"]);
+    expect(vi.mocked(callOpenRouterText)).toHaveBeenCalledTimes(2);
+  });
+
+  it("resumes a stopped draft from where it ended instead of starting again", async () => {
+    const id = await createProject();
+    const partial = "Groups shape decisions through shared norms. Members anchor on early proposals.";
+    vi.mocked(callOpenRouterText).mockImplementationOnce(streams("However, structured dissent widens the options."));
+    const res = await request(app).post(`/api/projects/${id}/assignment/stream-section`).send({ sectionTitle: "Body", allocatedWords: 40, continueFrom: partial });
+    const prompt = String(vi.mocked(callOpenRouterText).mock.calls[0][3]);
+    expect(prompt).toContain("SECTION SO FAR");
+    expect(prompt).toContain(partial);
+    const events = eventsOf(res.text);
+    expect(events[0].replace).toBe(`${partial}\n\n`);
+    expect(events.find((e) => e.fullText)?.fullText).toBe(`${partial}\n\nHowever, structured dissent widens the options.`);
+  });
+
+  it("offers the model only sources it can cite and never invents author, title or year", async () => {
+    const id = await createProject();
+    vi.mocked(callOpenRouterText).mockResolvedValue("Teams decide together [s1]. Others disagree [s2].");
+    const res = await request(app)
+      .post(`/api/projects/${id}/assignment/stream-section`)
+      .send({
+        sectionTitle: "Body",
+        allocatedWords: 50,
+        boundSources: [
+          { id: "s1", title: "Group decisions", authors: ["Janis, I."], year: 1982 },
+          { id: "s2", title: "No authors listed", authors: [], year: 2001 },
+          { id: "s3", title: "No year given", authors: ["Somebody, A."] },
+          { id: "s4", authors: ["Untitled, B."], year: 2015 },
+        ],
+      });
+    const prompt = String(vi.mocked(callOpenRouterText).mock.calls[0][3]);
+    expect(prompt).not.toMatch(/Author\(s\): Author\b|Scholarly Resource|No authors listed|No year given|n\.d\./);
+    const full = eventsOf(res.text).find((e) => e.fullText)?.fullText ?? "";
+    expect(full).toContain("Janis");
+    expect(full).not.toMatch(/\(Author|Scholarly Resource|\[s2\]/);
   });
 
   it("trims an overrun created by expanding citation tokens", async () => {
@@ -183,7 +240,8 @@ describe("Coursework stream-section", () => {
     const id = await createProject();
     const p1 = "Groups shape decisions through shared norms. Members anchor on early proposals. This narrows debate quickly.";
     const p2 = "However, structured dissent widens the options. Teams that assign a critic consider more evidence. The result is a better choice.";
-    vi.mocked(callOpenRouterText).mockResolvedValue(`${p1}\n\n${p2}`);
+    // The draft is short of the 50-word minimum; the continuation adds nothing.
+    vi.mocked(callOpenRouterText).mockImplementationOnce(streams(`${p1}\n\n${p2}`)).mockImplementationOnce(streams(""));
     const res = await request(app).post(`/api/projects/${id}/assignment/stream-section`).send({ sectionTitle: "Introduction", allocatedWords: 40 });
     const events = res.text
       .split("\n\n")
@@ -194,5 +252,45 @@ describe("Coursework stream-section", () => {
     expect(full).toContain("\n\n");
     expect(full.split("\n\n")).toHaveLength(2);
     expect(streamed).toBe(full);
+  });
+
+  it("streams the first tokens before the model finishes, and stops the model when the student closes the stream", async () => {
+    const id = await createProject();
+    let aborted = false;
+    let firstTokenSent!: () => void;
+    const firstToken = new Promise<void>((r) => (firstTokenSent = r));
+    vi.mocked(callOpenRouterText).mockImplementation(async (...args: unknown[]) => {
+      const stream = (args[6] ?? {}) as StreamOpts;
+      stream.onToken?.("Groups ");
+      firstTokenSent();
+      // The model keeps going until it is stopped.
+      await new Promise<void>((resolve) => stream.signal?.addEventListener("abort", () => resolve(), { once: true }));
+      aborted = Boolean(stream.signal?.aborted);
+      throw new Error("aborted");
+    });
+    const server = app.listen(0);
+    try {
+      const port = (server.address() as { port: number }).port;
+      const ctl = new AbortController();
+      const res = await fetch(`http://127.0.0.1:${port}/api/projects/${id}/assignment/stream-section`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sectionTitle: "Introduction", allocatedWords: 100 }),
+        signal: ctl.signal,
+      });
+      const reader = res.body!.getReader();
+      let seen = "";
+      while (!seen.includes('"chunk":"Groups "')) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        seen += new TextDecoder().decode(value);
+      }
+      expect(seen).toContain('"chunk":"Groups "');
+      await firstToken;
+      ctl.abort();
+      await vi.waitFor(() => expect(aborted).toBe(true), { timeout: 2000 });
+    } finally {
+      server.close();
+    }
   });
 });

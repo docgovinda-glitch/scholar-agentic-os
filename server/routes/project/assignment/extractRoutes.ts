@@ -13,7 +13,6 @@ import { parseDocument } from "../../../../src/document_intelligence/index.ts";
 import {
 normalizeUnicodeNFC
 } from "../../../src/utils/scholarlyVoiceGuard.ts";
-import { getProjectStore } from "../../../../src/services/store/projectStore.ts";
 import { scholarBrain } from "../../../src/services/scholarBrain.ts";
 import {
 auditDocumentLineByLine,COMMAND_VERB_MAP,
@@ -42,7 +41,7 @@ stripCourseCodes,
 import { buildBriefSummary,extractPrescribedReferences } from "../../../../src/utils/briefQuestions.ts";
 import {
 upload,
-getProjectSafe,safeParseObject,deriveSemanticAcademicTitle,
+abortOnClose,getProjectSafe,safeParseObject,saveChangedAnswers,deriveSemanticAcademicTitle,
 autoUpdateProjectTitleIfUntitled
 } from "./helpers.ts";
 
@@ -183,7 +182,7 @@ router.post(
     if (detectedCitation) {
       project.answers["citation_style"] = detectedCitation;
     }
-    await getProjectStore().save(project);
+    await saveChangedAnswers(project);
 
     const derivedTitle = await deriveSemanticAcademicTitle(cleanedText, req);
     const updatedTitle = await autoUpdateProjectTitleIfUntitled(project, derivedTitle);
@@ -442,7 +441,7 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
     let structure = undefined as ReturnType<typeof structureFromAi>;
     let outlineNote: string | undefined;
     try {
-      const aiText = await routedCompletion(req, {
+      const aiText = await routedCompletion(req, { signal: abortOnClose(req),
         task: "drafting",
         systemPrompt: scholarBrain.courseworkPrompts.assignmentOutlinePrompt(),
         userPrompt: scholarBrain.courseworkPrompts.assignmentOutlineUserPrompt({
@@ -459,6 +458,8 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
       structure = structureFromAi(aiText ?? "", targetWords, { briefText });
       if (!structure) outlineNote = "Your AI's answer had no usable outline, so a starter outline is shown.";
     } catch (llmErr) {
+      // The student left or cancelled: save nothing in their place.
+      if (abortOnClose(req).aborted) return;
       console.warn("AI outline call failed:", llmErr instanceof Error ? llmErr.message : llmErr);
       outlineNote = "No AI answered, so a starter outline is shown. Connect an AI and rebuild it from your brief.";
     }
@@ -475,7 +476,7 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
       delete project.answers.assignment_internal_sections;
     }
 
-    await getProjectStore().save(project);
+    await saveChangedAnswers(project);
 
     res.json({
       ...finalAnalysis,
@@ -528,7 +529,7 @@ export async function writeOutlineForProject(
   const discipline =
     (typeof a["assignment_discipline"] === "string" && a["assignment_discipline"]) || scopeBrief(`${question} ${briefText}`).discipline;
 
-  const aiText = await routedCompletion(req, {
+  const aiText = await routedCompletion(req, { signal: abortOnClose(req),
     task: "drafting",
     systemPrompt: scholarBrain.courseworkPrompts.assignmentOutlinePrompt(),
     userPrompt: scholarBrain.courseworkPrompts.assignmentOutlineUserPrompt({
@@ -552,7 +553,7 @@ export async function writeOutlineForProject(
   project.answers.assignment_structure = JSON.stringify(structure);
   if (structure.targetWordCount !== targetWords) project.answers.word_limit = String(structure.targetWordCount);
   delete project.answers.assignment_internal_sections;
-  await getProjectStore().save(project);
+  await saveChangedAnswers(project);
   return structure;
 }
 

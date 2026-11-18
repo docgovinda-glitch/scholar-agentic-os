@@ -17,7 +17,7 @@ import { emptyPeerReviewHistory } from "../../domain/review/types";
 import { generateProjectId } from "../../app/conductor/projectStore";
 import { SUPABASE_ROOT_CA } from "./supabaseRootCa";
 import { OptimisticLockError } from "./types";
-import type { ProjectRecord, ProjectStore } from "./types";
+import type { AnswersPatch, ProjectRecord, ProjectStore } from "./types";
 
 export interface PgQueryable {
   query(text: string, params?: unknown[]): Promise<{ rows: Record<string, unknown>[] }>;
@@ -144,6 +144,23 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
          FROM public.projects p
          WHERE p.project_id = $1`,
         [projectId]
+      );
+      const row = result.rows[0];
+      return row ? rowToRecord(row) : undefined;
+    },
+
+    async patchAnswers(projectId: string, patch: AnswersPatch): Promise<ProjectRecord | undefined> {
+      // Same merge as the patch_project_answers SQL function, in one statement.
+      const result = await db.query(
+        `update public.projects
+            set answers = (coalesce(answers, '{}'::jsonb)
+                  || coalesce((select jsonb_object_agg(e.key, e.value) from jsonb_each($2::jsonb) e where e.value <> 'null'::jsonb), '{}'::jsonb))
+                  - coalesce((select array_agg(e.key) from jsonb_each($2::jsonb) e where e.value = 'null'::jsonb), '{}'::text[]),
+                version = coalesce(version, 1) + 1,
+                updated_at = now()
+          where project_id = $1
+          returning *`,
+        [projectId, JSON.stringify(patch)]
       );
       const row = result.rows[0];
       return row ? rowToRecord(row) : undefined;

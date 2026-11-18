@@ -272,6 +272,14 @@ export function AssignmentProvider({
   // The workspace has one flow: Extract → Understand → Sources → Drafting → Submission.
   const executionMode: CourseworkExecutionMode = "detailed";
 
+  // The stage comes from the URL, so it changes on every phase move. The loader
+  // reads it through refs: moving between phases must not refetch the project
+  // (that showed the loading skeleton and unmounted the stage each time).
+  const initialStageRef = useRef(initialStage);
+  initialStageRef.current = initialStage;
+  const onStageChangeRef = useRef(onStageChangeCallback);
+  onStageChangeRef.current = onStageChangeCallback;
+
   // Load project data with phase auto-migration
   const load = useCallback(async () => {
     if (justPersistedIdRef.current && justPersistedIdRef.current === activeProjectId && projectRef.current?.projectId === activeProjectId) {
@@ -294,12 +302,12 @@ export function AssignmentProvider({
       setRubric(rub);
       setOutputType(await getOutputTypeSpec(proj.outputTypeId).catch(() => null));
 
-      if (initialStage === null) {
+      if (initialStageRef.current === null) {
         const persisted =
           proj.answers?.["assignment_current_phase"];
         const targetPhase: AssignmentPhaseId = normalizeAssignmentPhase(persisted);
         setActiveStage(targetPhase);
-        onStageChangeCallback(targetPhase, { replace: true });
+        onStageChangeRef.current(targetPhase, { replace: true });
       }
     } catch (e) {
       setError(
@@ -310,7 +318,7 @@ export function AssignmentProvider({
     } finally {
       setIsLoading(false);
     }
-  }, [activeProjectId, onStageChangeCallback, initialStage]);
+  }, [activeProjectId]);
 
   useEffect(() => {
     load();

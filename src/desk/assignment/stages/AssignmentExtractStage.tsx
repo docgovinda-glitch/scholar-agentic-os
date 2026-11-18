@@ -328,8 +328,20 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
     });
   };
 
+  // One build at a time: state updates land a render late, so a quick second
+  // click (or a click while the brief is still uploading) is stopped here.
+  const buildRunningRef = useRef(false);
   const handleGenerateStructure = async () => {
-    if (!canGenerate || isGeneratingStructure) return;
+    if (!canGenerate || isGeneratingStructure || uploadingBrief || buildRunningRef.current) return;
+    buildRunningRef.current = true;
+    try {
+      await buildStructure();
+    } finally {
+      buildRunningRef.current = false;
+    }
+  };
+
+  const buildStructure = async () => {
     setIsGeneratingStructure(true);
     setStructureError(null);
 
@@ -347,27 +359,25 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
 
     try {
       const targetProjectId = await ensurePersisted();
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Structure generation timeout")), AI_OUTLINE_TIMEOUT_MS)
-      );
-
-      const response = await Promise.race([
-        authedJsonFetch(
-          `/api/projects/${targetProjectId}/assignment/analyze`,
-          "POST",
-          {
-            question: localQuestion,
-            assignmentType: localType,
-            academicLevel: localLevel,
-            targetWordCount: localWordCount,
-            citationStyle: localCitation,
-            writingTone: localTone,
-            writing_tone: localTone,
-            briefText: localBrief,
-          }
-        ),
-        timeoutPromise,
-      ]);
+      // Past the wait, the request is cancelled (the server then stops its AI
+      // call), not left running in the background.
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), AI_OUTLINE_TIMEOUT_MS);
+      const response = await authedJsonFetch(
+        `/api/projects/${targetProjectId}/assignment/analyze`,
+        "POST",
+        {
+          question: localQuestion,
+          assignmentType: localType,
+          academicLevel: localLevel,
+          targetWordCount: localWordCount,
+          citationStyle: localCitation,
+          writingTone: localTone,
+          writing_tone: localTone,
+          briefText: localBrief,
+        },
+        { signal: controller.signal }
+      ).finally(() => clearTimeout(timer));
 
       if (response && response.ok) {
         const data = await response.json();
@@ -1190,7 +1200,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
           <button
             type="button"
             id="save_and_build_outline_btn"
-            disabled={!canGenerate || isGeneratingStructure}
+            disabled={!canGenerate || isGeneratingStructure || uploadingBrief}
             onClick={handleGenerateStructure}
             aria-label="Save & Build Outline (Save & Build / Generate Structure / Analyze Assignment Brief)"
             className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 active:scale-[0.99] font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-xs flex items-center justify-center gap-2 cursor-pointer"
@@ -1211,7 +1221,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
           {/* Companion proceed button for backward-compatibility with tests expecting Proceed to Sources */}
           <button
             type="button"
-            disabled={!canGenerate || isGeneratingStructure}
+            disabled={!canGenerate || isGeneratingStructure || uploadingBrief}
             onClick={handleGenerateStructure}
             aria-label="Proceed to Sources (Confirm Structure & Proceed to Sources / Approve Outline & Proceed)"
             className="sr-only"

@@ -41,6 +41,8 @@ export const StreamSectionBody = z.object({
   sectionCount: z.coerce.number().int().min(0).max(200).optional(),
   outlineTitles: z.array(text(500)).max(60).optional(),
   previousTail: optText(2_000),
+  /** Resume: text a stopped draft had reached; the model continues from it. */
+  continueFrom: optText(60_000),
   writingStyle: z.union([z.string().max(100), z.object({ preset: optText(60), customSampleText: optText(8_000) }).passthrough()]).optional(),
   // Browser hand-off fields (verified by the challenge token, not here).
   llmResult: optText(200_000),

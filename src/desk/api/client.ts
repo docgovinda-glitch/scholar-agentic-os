@@ -188,12 +188,14 @@ export async function authedJsonFetch(
   input: string,
   method: string,
   body: unknown,
-  options?: { skipLlmFallback?: boolean }
+  options?: { skipLlmFallback?: boolean; signal?: AbortSignal }
 ): Promise<Response> {
+  const signal = options?.signal;
   let res = await authedFetch(input, {
     method,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    signal,
   });
 
   if (res.status === 426 && !options?.skipLlmFallback) {
@@ -209,6 +211,7 @@ export async function authedJsonFetch(
           challengeToken: data.challengeToken,
           canonicalSources: data.canonicalSources,
         }),
+        signal,
       });
     } else {
       res = new Response(JSON.stringify(data), { status: 426, headers: res.headers });

@@ -1,16 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { chunkPreservingWhitespace, openSseStream, paragraphRange, SSE_HEADERS, SSE_HEARTBEAT_MS } from "../sectionStream";
+import { openSseStream, paragraphRange, SSE_HEADERS, SSE_HEARTBEAT_MS } from "../sectionStream";
 import { trimToSentenceWithinWords } from "../sectionBudget";
-
-describe("chunkPreservingWhitespace", () => {
-  it("joins back to the exact text, blank lines included", () => {
-    const text = "One two three four five six.\n\nSeven eight nine ten.\n\nEleven.";
-    const chunks = chunkPreservingWhitespace(text, 5);
-    expect(chunks.join("")).toBe(text);
-    expect(chunks.length).toBeGreaterThan(1);
-    expect(chunks.some((c) => c.includes("\n\n"))).toBe(true);
-  });
-});
 
 describe("openSseStream", () => {
   it("sets the SSE headers and flushes before any model output", () => {

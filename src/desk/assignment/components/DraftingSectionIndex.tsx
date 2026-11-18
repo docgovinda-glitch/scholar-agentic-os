@@ -17,7 +17,6 @@ export interface DraftingSectionIndexProps {
   activeSectionId: string | null;
   onSelectSection: (sectionId: string) => void;
   onGenerateNext?: () => void;
-  onGenerateAll?: () => void;
   onTuneToQuestion?: () => void;
   onUpdateSectionTitle?: (sectionId: string, newTitle: string) => void;
   assignmentTopic?: string;

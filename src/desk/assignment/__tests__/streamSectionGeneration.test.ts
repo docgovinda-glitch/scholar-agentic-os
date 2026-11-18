@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const authedJsonFetch = vi.fn();
 vi.mock("../../api/client", () => ({ authedJsonFetch: (...args: unknown[]) => authedJsonFetch(...args) }));
 
-import { streamSectionGeneration, type InternalSectionPlan } from "../services/invisibleChunkerService";
+import { partialTextOf, SectionDraftStoppedError, streamSectionGeneration, type InternalSectionPlan } from "../services/invisibleChunkerService";
 
 const section = { id: "s1", title: "Introduction", targetWordCount: 300 } as unknown as InternalSectionPlan;
 
@@ -16,12 +16,24 @@ function sse(lines: string[]): Response {
   return new Response(lines.map((l) => `data: ${l}\n\n`).join(""), { status: 200, headers: { "Content-Type": "text/event-stream" } });
 }
 
-function run() {
+function run(extra: { signal?: AbortSignal; continueFrom?: string } = {}) {
   const onChunk = vi.fn();
   const onComplete = vi.fn();
   const onError = vi.fn();
-  const promise = streamSectionGeneration({ projectId: "p1", section, assignmentTopic: "Group work", onChunk, onComplete, onError });
+  const promise = streamSectionGeneration({ projectId: "p1", section, assignmentTopic: "Group work", onChunk, onComplete, onError, ...extra });
   return { promise, onChunk, onComplete, onError };
+}
+
+/** A stream that sends `lines`, then stays open until the request is aborted. */
+function openStream(lines: string[], signal: AbortSignal): Response {
+  const enc = new TextEncoder();
+  const body = new ReadableStream<Uint8Array>({
+    start(ctl) {
+      for (const l of lines) ctl.enqueue(enc.encode(`data: ${l}\n\n`));
+      signal.addEventListener("abort", () => ctl.error(new DOMException("Aborted", "AbortError")), { once: true });
+    },
+  });
+  return new Response(body, { status: 200, headers: { "Content-Type": "text/event-stream" } });
 }
 
 beforeEach(() => {
@@ -33,7 +45,7 @@ describe("streamSectionGeneration", () => {
     authedJsonFetch.mockResolvedValue(sse([JSON.stringify({ chunk: "Teams " }), JSON.stringify({ chunk: "decide." }), "[DONE]"]));
     const { promise, onComplete } = run();
     await expect(promise).resolves.toBe("Teams decide.");
-    expect(authedJsonFetch).toHaveBeenCalledWith("/api/projects/p1/assignment/stream-section", "POST", expect.objectContaining({ sectionTitle: "Introduction" }));
+    expect(authedJsonFetch).toHaveBeenCalledWith("/api/projects/p1/assignment/stream-section", "POST", expect.objectContaining({ sectionTitle: "Introduction" }), expect.anything());
     expect(onComplete).toHaveBeenCalledWith("Teams decide.", { scaffold: false });
   });
 
@@ -65,5 +77,41 @@ describe("streamSectionGeneration", () => {
     const { promise, onComplete } = run();
     await expect(promise).rejects.toThrow("network down");
     expect(onComplete).not.toHaveBeenCalled();
+  });
+
+  it("shows the server's replacement text when the router switches model mid-answer", async () => {
+    authedJsonFetch.mockResolvedValue(sse([JSON.stringify({ chunk: "Half an ans" }), JSON.stringify({ replace: "" }), JSON.stringify({ chunk: "A whole answer." }), "[DONE]"]));
+    const { promise, onChunk } = run();
+    await expect(promise).resolves.toBe("A whole answer.");
+    expect(onChunk.mock.calls.map((c) => c[1])).toEqual(["Half an ans", "", "A whole answer."]);
+  });
+
+  it("Stop ends the request and hands back what had arrived, without retrying", async () => {
+    const ctl = new AbortController();
+    authedJsonFetch.mockImplementation(async (_u: string, _m: string, _b: unknown, o: { signal: AbortSignal }) => openStream([JSON.stringify({ chunk: "Teams decide " })], o.signal));
+    const { promise, onChunk, onComplete } = run({ signal: ctl.signal });
+    await vi.waitFor(() => expect(onChunk).toHaveBeenCalled());
+    ctl.abort();
+    const err = await promise.catch((e) => e);
+    expect(err).toBeInstanceOf(SectionDraftStoppedError);
+    expect(err.partialText).toBe("Teams decide ");
+    expect(authedJsonFetch).toHaveBeenCalledTimes(1);
+    expect(onComplete).not.toHaveBeenCalled();
+  });
+
+  it("a stream that fails after text arrived keeps that text on the error and is not retried", async () => {
+    authedJsonFetch.mockResolvedValue(sse([JSON.stringify({ chunk: "Teams decide " }), JSON.stringify({ error: "The section draft stopped before it finished.", recoverable: true }), "[DONE]"]));
+    const { promise } = run();
+    const err = await promise.catch((e) => e);
+    expect(err.message).toMatch(/stopped before it finished/);
+    expect(partialTextOf(err)).toBe("Teams decide ");
+    expect(authedJsonFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("Resume sends the text to continue from", async () => {
+    authedJsonFetch.mockResolvedValue(sse([JSON.stringify({ replace: "First part.\n\n" }), JSON.stringify({ chunk: "Second part." }), JSON.stringify({ fullText: "First part.\n\nSecond part." }), "[DONE]"]));
+    const { promise } = run({ continueFrom: "First part." });
+    await expect(promise).resolves.toBe("First part.\n\nSecond part.");
+    expect(authedJsonFetch.mock.calls[0][2]).toMatchObject({ continueFrom: "First part." });
   });
 });

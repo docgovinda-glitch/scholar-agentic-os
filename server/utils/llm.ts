@@ -245,17 +245,36 @@ export async function callOpenRouterJSON<T = any>(
   return parseJsonFromLlm<T>(text) as T;
 }
 
+/** Live output of a text call: tokens as they arrive, and a reset when the router drops partial output to switch model. */
+export interface TextCallStream {
+  onToken?: (text: string) => void;
+  onReset?: () => void;
+  /** Aborts the model call (e.g. when the client disconnects). */
+  signal?: AbortSignal;
+}
+
 export async function callOpenRouterText(
   req: LlmRequestLike,
   res: LlmResponseLike,
   systemPrompt: string,
   userPrompt: string,
   _model?: string,
-  taskType: string = "reasoning"
+  taskType: string = "reasoning",
+  stream: TextCallStream = {}
 ): Promise<string> {
   const override = handleFrontendLLMOverride(req, res, systemPrompt, userPrompt);
-  if (override) return override;
-  return routeOrHandOff(req, res, systemPrompt, userPrompt, taskType);
+  if (override) {
+    // The browser already ran the model: its whole answer is the only "token".
+    stream.onToken?.(override);
+    return override;
+  }
+  const onEvent = stream.onToken || stream.onReset
+    ? (ev: RouterEvent) => {
+        if (ev.type === "token") stream.onToken?.(ev.text);
+        else if (ev.type === "fallback" && ev.partialOutputDiscarded) stream.onReset?.();
+      }
+    : undefined;
+  return routeOrHandOff(req, res, systemPrompt, userPrompt, taskType, { onEvent, signal: stream.signal });
 }
 
 /**

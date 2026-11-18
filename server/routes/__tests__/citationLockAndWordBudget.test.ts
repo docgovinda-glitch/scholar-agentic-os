@@ -342,7 +342,7 @@ describe("Journal Step A: Two-Pass Sub-Section Drafting & Exact Word-Count Contr
       .set(AI_HEADERS)
       .send({ subSectionId: "sec-1-sub-1", subSectionTitle: "Background", targetWords: 400 });
 
-    expect(res.status).toBe(502);
+    expect(res.status).toBe(503);
     expect(res.body.code).toBe("ai_unavailable");
     expect(JSON.stringify(res.body)).not.toMatch(/p < 0\.001/);
     const saved = await getProjectStore().get(projectId);

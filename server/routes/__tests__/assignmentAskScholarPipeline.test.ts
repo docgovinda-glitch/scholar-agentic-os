@@ -102,6 +102,7 @@ describe("Coursework & Essays (OT-01) Ask Scholar Unified Pipeline", () => {
       {
         id: "ev-vaswani-2017",
         source_id: "src-1",
+        title: "Attention is all you need",
         claim: "Self-attention replaces recurrence completely",
         evidenceSnippet: "The Transformer allows significantly more parallelization",
         citation: "Vaswani et al. (2017)",
@@ -112,6 +113,7 @@ describe("Coursework & Essays (OT-01) Ask Scholar Unified Pipeline", () => {
       {
         id: "ev-he-2016",
         source_id: "src-2",
+        title: "Deep residual learning for image recognition",
         claim: "Residual connections prevent gradient degradation",
         evidenceSnippet: "Deep residual nets are easier to optimize",
         citation: "He et al. (2016)",

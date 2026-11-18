@@ -63,7 +63,8 @@ describe("Coursework copilot-chat", () => {
   it("reports a failure instead of canned advice when the AI does not answer", async () => {
     vi.mocked(callOpenRouterText).mockRejectedValue(new Error("provider down"));
     const res = await request(app).post(`/api/projects/${ID}/assignment/copilot-chat`).send({ phase: "understand", message: "What do the marking criteria mean?" });
-    expect(res.status).toBe(502);
+    expect(res.status).toBe(503);
+    expect(res.headers["retry-after"]).toBe("10");
     expect(res.body.code).toBe("ai_unavailable");
     expect(JSON.stringify(res.body)).not.toMatch(/First Class|Rubric Alignment|70%/);
   });

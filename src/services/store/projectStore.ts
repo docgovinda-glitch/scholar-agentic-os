@@ -11,7 +11,7 @@ import path from "path";
 import * as inMemory from "../../app/conductor/projectStore";
 import { createPgProjectStore, createPool } from "./pgProjectStore";
 import { createRestProjectStore } from "./restProjectStore";
-import type { ProjectRecord, ProjectStore } from "./types";
+import { applyAnswersPatch, type ProjectRecord, type ProjectStore } from "./types";
 
 function inMemoryAsStore(): ProjectStore {
   return {
@@ -100,7 +100,10 @@ export function createDiskFallbackStore(filePath: string = "data/.scholar_local_
   };
 }
 
-let store: ProjectStore | undefined;
+/** The store every caller gets: patchAnswers is always available. */
+export type PatchableProjectStore = ProjectStore & Required<Pick<ProjectStore, "patchAnswers">>;
+
+let store: PatchableProjectStore | undefined;
 
 type SavedListener = (record: ProjectRecord) => void;
 const savedListeners = new Set<SavedListener>();
@@ -123,7 +126,17 @@ function normalizeRecord<T extends ProjectRecord | undefined>(record: T): T {
   return record;
 }
 
-function withSaveListeners(inner: ProjectStore): ProjectStore {
+function notifySaved(saved: ProjectRecord): void {
+  for (const listener of savedListeners) {
+    try {
+      listener(saved);
+    } catch (err) {
+      console.warn("services/store: a project-saved listener threw", err);
+    }
+  }
+}
+
+function withSaveListeners(inner: ProjectStore): PatchableProjectStore {
   return {
     ...inner,
     async get(projectId) {
@@ -134,14 +147,23 @@ function withSaveListeners(inner: ProjectStore): ProjectStore {
     },
     async save(record) {
       const saved = await inner.save(normalizeRecord(record));
-      for (const listener of savedListeners) {
-        try {
-          listener(saved);
-        } catch (err) {
-          console.warn("services/store: a project-saved listener threw", err);
-        }
-      }
+      notifySaved(saved);
       return saved;
+    },
+    async patchAnswers(projectId, patch) {
+      let patched: ProjectRecord | undefined;
+      if (inner.patchAnswers) {
+        patched = await inner.patchAnswers(projectId, patch);
+      } else {
+        // Single-process stores: nothing else writes between this read and save.
+        const current = await inner.get(projectId);
+        if (!current) return undefined;
+        patched = await inner.save({ ...current, answers: applyAnswersPatch(current.answers, patch) });
+      }
+      if (!patched) return undefined;
+      const normalized = normalizeRecord(patched);
+      notifySaved(normalized);
+      return normalized;
     },
   };
 }
@@ -152,7 +174,7 @@ function withSaveListeners(inner: ProjectStore): ProjectStore {
  * effect, and so importing this module never opens a database connection
  * as a side effect.
  */
-export function getProjectStore(): ProjectStore {
+export function getProjectStore(): PatchableProjectStore {
   if (!store) {
     store = withSaveListeners(resolveStore());
   }

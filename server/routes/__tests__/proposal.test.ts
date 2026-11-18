@@ -132,7 +132,7 @@ describe("Proposal Endpoints (/api/projects/:id/proposal)", () => {
       .post(`/api/projects/${projectId}/proposal/aims-audit`)
       .set(AI)
       .send({ aimsText: "Our central hypothesis is that consensus protocols reduce citation errors. Aim 1: build it." });
-    expect(res.status).toBe(502);
+    expect(res.status).toBe(503);
     expect(res.body.checks).toBeUndefined();
   });
 

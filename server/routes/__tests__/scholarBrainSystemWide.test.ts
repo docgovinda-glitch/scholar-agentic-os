@@ -298,13 +298,13 @@ describe("Architectural Unification Step 2: System-Wide scholarBrain Integration
       completeSpy.mockRestore();
     });
 
-    it("a failing provider is reported (502), not silently handed to the browser", async () => {
+    it("a failing provider is reported (503), not silently handed to the browser", async () => {
       const completeSpy = vi.spyOn(scholarBrain, "complete").mockRejectedValue(new Error("provider 500"));
       const res = await request(app)
         .post("/api/ai/agent")
         .set(keyringHeader("openai", "mock-model", "test-key"))
         .send({ prompt: "Explain conformal prediction briefly.", mode: "chat" });
-      expect(res.status).toBe(502);
+      expect(res.status).toBe(503);
       expect(res.body.code).toBe("ai_unavailable");
       expect(res.body.requireFrontendLLM).toBeUndefined();
       completeSpy.mockRestore();
@@ -399,7 +399,7 @@ describe("Architectural Unification Step 2: System-Wide scholarBrain Integration
     // The route used to return a fixed, topic-independent Q&A set (with invented
     // results) whenever the AI call failed, and this test asserted it. It now
     // returns only the AI's questions (PRODUCT_AUDIT P0-11), so the answer is mocked.
-    it("POST /qa-simulate returns the AI's referee questions, and a 502 with none when the AI fails", async () => {
+    it("POST /qa-simulate returns the AI's referee questions, and a 503 with none when the AI fails", async () => {
       const projectId = await createTestPresentationProject("proj-presentation-qa-test");
       mockBrain({
         qaScenarios: [
@@ -420,7 +420,7 @@ describe("Architectural Unification Step 2: System-Wide scholarBrain Integration
         .post(`/api/projects/${projectId}/presentation/qa-simulate`)
         .set(aiHeaders)
         .send({});
-      expect(failed.status).toBe(502);
+      expect(failed.status).toBe(503);
       expect(failed.body.qaScenarios).toBeUndefined();
     });
   });
@@ -491,7 +491,7 @@ describe("Architectural Unification Step 2: System-Wide scholarBrain Integration
       ]);
     });
 
-    it("POST /draft-section returns the AI draft, and a 502 with no text when the AI fails", async () => {
+    it("POST /draft-section returns the AI draft, and a 503 with no text when the AI fails", async () => {
       const projectId = await createTestProposalProject("proj-proposal-draft-test");
       mockBrain(undefined, "The significance of this work rests on [CITE:src_vault_1].");
 
@@ -508,7 +508,7 @@ describe("Architectural Unification Step 2: System-Wide scholarBrain Integration
         .post(`/api/projects/${projectId}/proposal/draft-section`)
         .set(aiHeaders)
         .send({ sectionTitle: "Significance" });
-      expect(failed.status).toBe(502);
+      expect(failed.status).toBe(503);
       expect(failed.body.code).toBe("ai_unavailable");
       expect(failed.body.content).toBeUndefined();
     });
@@ -566,7 +566,7 @@ describe("Architectural Unification Step 2: System-Wide scholarBrain Integration
       expect(Array.isArray(res.body.chapterSummaries)).toBe(true);
     });
 
-    it("POST /draft-chapter returns the AI draft, and a 502 with no text when the AI fails", async () => {
+    it("POST /draft-chapter returns the AI draft, and a 503 with no text when the AI fails", async () => {
       const projectId = await createTestThesisProject("proj-thesis-draft-test");
       mockBrain(undefined, "Calibration has been studied extensively [CITE:src_vault_1].");
 
@@ -583,7 +583,7 @@ describe("Architectural Unification Step 2: System-Wide scholarBrain Integration
         .post(`/api/projects/${projectId}/thesis/draft-chapter`)
         .set(aiHeaders)
         .send({ chapterNumber: 2, chapterTitle: "Critical Literature Review" });
-      expect(failed.status).toBe(502);
+      expect(failed.status).toBe(503);
       expect(failed.body.content).toBeUndefined();
     });
   });

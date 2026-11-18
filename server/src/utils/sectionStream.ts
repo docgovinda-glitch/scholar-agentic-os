@@ -5,6 +5,11 @@
  * socket silent (proxies drop silent sockets, which the browser reports as
  * "TypeError: Failed to fetch"); a comment heartbeat keeps it alive, and once
  * open, failures are sent as `{ error, recoverable: true }` events.
+ *
+ * Events (`data: {...}`): `chunk` (model tokens, appended as they arrive),
+ * `replace` (set the shown text, e.g. when the router switched model and
+ * dropped a partial answer), `fullText` (the final, cleaned text), `fallback`,
+ * `error`; then `[DONE]`.
  */
 import type { Response } from "express";
 import {
@@ -36,30 +41,9 @@ export function openSseStream(res: Response): void {
   res.write(": connected\n\n");
 }
 
-/**
- * Cut text into chunks of `wordsPerChunk` words, keeping every whitespace run
- * exactly as written, so blank lines between paragraphs survive streaming.
- * `chunks.join("") === text`.
- */
-export function chunkPreservingWhitespace(text: string, wordsPerChunk = 5): string[] {
-  if (!text) return [];
-  const tokens = text.split(/(\s+)/);
-  const chunks: string[] = [];
-  let current = "";
-  let words = 0;
-  for (const token of tokens) {
-    if (!token) continue;
-    const isWord = !/^\s+$/.test(token);
-    if (isWord && words >= wordsPerChunk) {
-      chunks.push(current);
-      current = "";
-      words = 0;
-    }
-    current += token;
-    if (isWord) words += 1;
-  }
-  if (current) chunks.push(current);
-  return chunks;
+/** One `data:` event; nothing is written once the response has ended. */
+export function sendEvent(res: Response, payload: Record<string, unknown>): void {
+  if (!res.writableEnded && !res.destroyed) res.write(`data: ${JSON.stringify(payload)}\n\n`);
 }
 
 /** How many paragraphs a section of this length should have (2-4). */
