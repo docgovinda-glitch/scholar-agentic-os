@@ -1,3 +1,4 @@
+import { openSse } from "../src/utils/sse.ts";
 import express, { Request, Response } from "express";
 import { requireAuth } from "../src/middleware/auth.ts";
 import { readVerifiedBrowserResult, signLlmChallenge, computePromptHash, routedCompletion } from "../src/services/scholarBrain.ts";
@@ -460,25 +461,16 @@ export function registerAIRoutes(
           typeof req.headers.accept === "string" &&
           req.headers.accept.includes("text/event-stream");
 
-        if (wantsSse) {
-          res.setHeader("Content-Type", "text/event-stream");
-          res.setHeader("Cache-Control", "no-cache");
-          res.setHeader("Connection", "keep-alive");
-        }
+        // Stage updates stream as events (shared plumbing: headers flushed,
+        // heartbeat during long stages, abort when the client goes away). Once
+        // the stream is open, a failure is an `{ type: "error" }` event.
+        const sse = wantsSse ? openSse(res) : undefined;
 
         try {
           const research = await executeDeepResearch(
             effectivePrompt,
             researchLlm(req),
-            wantsSse
-              ? (status, stage) => {
-                  try {
-                    res.write(`data: ${JSON.stringify({ type: "stage", status, stage })}\n\n`);
-                  } catch {
-                    // ignore stream write errors
-                  }
-                }
-              : undefined,
+            sse ? (status, stage) => sse.send({ type: "stage", status, stage }) : undefined,
             files,
             normalizedImages,
             vaultSources,
@@ -513,12 +505,22 @@ export function registerAIRoutes(
             burstinessMetrics: burstiness,
             recommendedWorkspaceHandoff: deliverableIntent,
           };
-          if (wantsSse) {
-            res.write(`data: ${JSON.stringify({ type: "complete", payload: finalPayload })}\n\n`);
-            return res.end();
+          if (sse) {
+            sse.send({ type: "complete", payload: finalPayload });
+            return sse.close();
           }
           return res.json(finalPayload);
         } catch (deepErr: unknown) {
+          if (sse) {
+            if (sse.signal.aborted) return sse.close();
+            const message =
+              deepErr instanceof DeepResearchBrowserHandOffError
+                ? "The next model in your AI chain runs on your device, which this server cannot reach. Choose a cloud model in AI Access, or open the app where your local model runs."
+                : `Deep research stopped: ${deepErr instanceof Error && deepErr.message ? deepErr.message : "the AI provider failed"}. Nothing was produced. Try again.`;
+            console.warn("[deep-research] stream failed:", deepErr instanceof Error ? deepErr.message : deepErr);
+            sse.send({ type: "error", message });
+            return sse.close();
+          }
           if (deepErr instanceof DeepResearchBrowserHandOffError) {
             return res.status(426).json({
               requireFrontendLLM: true,

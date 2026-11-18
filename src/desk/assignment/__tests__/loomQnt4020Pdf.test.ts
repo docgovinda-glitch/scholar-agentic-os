@@ -92,7 +92,7 @@ for (const [layout, BRIEF] of Object.entries(LAYOUTS)) {
       words.forEach((w, i) => expect(Math.abs(w - (MARKS[i] / 90) * 2000)).toBeLessThanOrEqual(10));
     });
 
-    it("re-shapes an AI outline grouped by Part into one section per question (no Part headings, no duplicates)", () => {
+    it("keeps an AI outline grouped by Part as the AI wrote it, and adds (and notes) a section for each question it left uncovered", () => {
       const ai = JSON.stringify({
         sections: [
           { title: "Quantum Hardware Architectures and Physical Modalities", subsections: [{ title: "Qubit realisations", words: 300 }] },
@@ -101,9 +101,22 @@ for (const [layout, BRIEF] of Object.entries(LAYOUTS)) {
           { title: "Quantum Cryptography, Simulation, and Synthesis", subsections: [{ title: "QKD and VQE", words: 400 }] },
         ],
       });
-      const secs = structureToInternalSections(structureFromAi(ai, 2000, { briefText: BRIEF })!);
-      expect(secs.map((s) => s.title)).toEqual(TITLES.map((t, i) => `${i + 1}.0 ${t}`));
+      const out = structureFromAi(ai, 2000, { briefText: BRIEF })!;
+      // The AI's headings stay, in its order, unrenamed.
+      expect(out.headings.slice(0, 4).map((h) => h.title)).toEqual([
+        "Quantum Hardware Architectures and Physical Modalities",
+        "Quantum Algorithms and Computational Complexity",
+        "Quantum Error Correction (QEC) and Fault Tolerance",
+        "Quantum Cryptography, Simulation, and Synthesis",
+      ]);
+      // Every one of the brief's 7 questions has a section: matched, or added from the brief's own title.
+      const added = out.headings.slice(4);
+      expect(out.headings.length).toBeGreaterThanOrEqual(TITLES.length);
+      expect(out.budgetNotes!.filter((n) => /no section for/.test(n))).toHaveLength(added.length);
+      for (const h of added) expect(TITLES.some((t) => h.title.includes(t) || t.includes(h.title))).toBe(true);
+      const secs = structureToInternalSections(out);
       expect(sum(secs.map((s) => s.targetWordCount))).toBe(2000);
+      expect(new Set(out.headings.map((h) => h.title)).size).toBe(out.headings.length);
     });
 
     it("grounds the working thesis in the brief's title and questions, never in one sub-part", () => {

@@ -23,11 +23,11 @@ vi.mock("../services/realScholarlyDiscoveryService", async (importOriginal) => {
   const fixtures = await import("./fixtures/sourceFixtures");
   return {
     ...actual,
-    discoverRealScholarlySourcesFromServer: vi.fn(async (question: string, style = "apa7") =>
-      fixtures.fixtureSources(question, style)
+    discoverRealScholarlySourcesFromServer: vi.fn(async (_projectId: string, req: { queries?: string[]; topic?: string }) =>
+      fixtures.fixtureSources((req.queries ?? [req.topic ?? ""]).join(" "), "apa7")
     ),
-    fetchMoreRealSources: vi.fn(async (existing: Parameters<typeof fixtures.fixtureMoreSources>[0], question: string, n = 10) =>
-      fixtures.fixtureMoreSources(existing, question, n)
+    fetchMoreRealSources: vi.fn(async (_projectId: string, existing: Parameters<typeof fixtures.fixtureMoreSources>[0], n = 10) =>
+      fixtures.fixtureMoreSources(existing, "", n)
     ),
   };
 });

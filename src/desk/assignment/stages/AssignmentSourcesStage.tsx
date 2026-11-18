@@ -1,6 +1,6 @@
 import { DEFAULT_CITATION_STYLE } from "../../../domain/assignment/answerKeys";
 import { SourcesAgentPanel } from "../components/AgentPanels";
-import { filterAndSortSources,normalizeRelevance } from "../services/sourceFilters";
+import { filterAndSortSources,normalizeRelevance,splitNeedsChecking } from "../services/sourceFilters";
 import { useSourceFilters } from "../components/sources/useSourceFilters";
 import { splitAuthorList } from "../services/personName";
 import { formatSourceBibliography } from "../services/citationFormatService";
@@ -64,7 +64,6 @@ export default function AssignmentSourcesStage({
     project,
     saveAnswers,
     question,
-    assignmentBriefText,
     citationStyle,
     structure,
     sources,
@@ -277,7 +276,7 @@ export default function AssignmentSourcesStage({
     // search replaces only unreviewed results; nothing found is approved for the student.
     let cancelled = false;
     setIsDiscoveringInitial(true);
-    discoverSourcesForAssignment({ question, briefText: assignmentBriefText, citationStyle })
+    discoverSourcesForAssignment(projectId)
       .then((discovered) => {
         if (!cancelled) {
           const { sources: next, added } = mergeSearchResults(sourcesRef.current, discovered, approvedRef.current, "replace");
@@ -313,13 +312,13 @@ export default function AssignmentSourcesStage({
   const handleReCurateForPrompt = async () => {
     setIsFindingMore(true);
     try {
-      const discovered = await discoverSourcesForAssignment({ question, briefText: assignmentBriefText, citationStyle });
+      const discovered = await discoverSourcesForAssignment(projectId);
       // Approved, prescribed, Vault and hand-added sources stay; approvals are untouched.
       const { sources: next, added } = mergeSearchResults(sources, discovered, approvedSourceIds, "replace");
       await setSources(next);
       flash(
         added.length > 0
-          ? `Found ${added.length} new sources from OpenAlex, Crossref, DOAJ, DataCite & arXiv. Your approved and own sources were kept.`
+          ? `Found ${added.length} new sources in OpenAlex, Crossref and Semantic Scholar. Your approved and own sources were kept.`
           : "No new sources found for this question. Try rewording it, or add your own sources."
       );
     } catch {
@@ -332,7 +331,7 @@ export default function AssignmentSourcesStage({
   const handleFindMoreLiterature = async () => {
     setIsFindingMore(true);
     try {
-      const moreBatch = await fetchMoreRealSources(sources, question, 10);
+      const moreBatch = await fetchMoreRealSources(projectId, sources, 10);
       const { sources: next, added } = mergeSearchResults(sources, moreBatch, approvedSourceIds, "add");
       if (added.length > 0) await setSources(next);
       flash(
@@ -353,8 +352,8 @@ export default function AssignmentSourcesStage({
 
     setIsAISearching(true);
     try {
-      const combinedTopic = question ? `${question} — ${queryToRun}` : queryToRun;
-      const found = await discoverRealScholarlySourcesFromServer(combinedTopic, citationStyle);
+      // The student's phrase; the server adds the brief's subject word to it.
+      const found = await discoverRealScholarlySourcesFromServer(projectId, { queries: [queryToRun], limit: 15 });
       const { sources: next, added } = mergeSearchResults(
         sources,
         found.map((s) => ({ ...s, sourceOrigin: "ai_research", originTag: "ai-research" as const })),
@@ -597,8 +596,9 @@ export default function AssignmentSourcesStage({
   }, [allMasterSources, approvedSourceIds]);
 
   // Filter and sort sources
-  const displayedSources = useMemo(
-    () => filterAndSortSources(allMasterSources, filters, { approvedSourceIds, bookmarkedIds, excludedIds }),
+  // Records that cannot be cited as they stand go under "Needs checking".
+  const { main: displayedSources, needsChecking } = useMemo(
+    () => splitNeedsChecking(filterAndSortSources(allMasterSources, filters, { approvedSourceIds, bookmarkedIds, excludedIds }), approvedSourceIds),
     [allMasterSources, filters, approvedSourceIds, bookmarkedIds, excludedIds]
   );
 
@@ -834,6 +834,17 @@ export default function AssignmentSourcesStage({
             )}
 
             <SourcesCatalog approvedSourceIds={approvedSourceIds} bookmarkedIds={bookmarkedIds} citationStyle={citationStyle} displayedSources={displayedSources} handleDismissSource={handleDismissSource} handleSaveSourceUpdates={handleSaveSourceUpdates} handleToggleApproval={handleToggleApproval} handleToggleBookmark={handleToggleBookmark} resetAllFilters={resetAllFilters} subheadings={subheadings} viewMode={viewMode} />
+            {needsChecking.length > 0 && (
+              <details className="mt-4 rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]/50 px-3 py-2" data-testid="sources-needs-checking">
+                <summary className="cursor-pointer text-xs font-medium text-[color:var(--text-secondary)]">
+                  Needs checking ({needsChecking.length}): found, but missing an author, year or title, so they cannot be cited as they stand
+                </summary>
+                <p className="mt-2 text-xs text-[color:var(--text-muted)]">Open the record and add what is missing before you approve one. Nothing is filled in for you.</p>
+                <div className="mt-2">
+                  <SourcesCatalog approvedSourceIds={approvedSourceIds} bookmarkedIds={bookmarkedIds} citationStyle={citationStyle} displayedSources={needsChecking} handleDismissSource={handleDismissSource} handleSaveSourceUpdates={handleSaveSourceUpdates} handleToggleApproval={handleToggleApproval} handleToggleBookmark={handleToggleBookmark} resetAllFilters={resetAllFilters} subheadings={subheadings} viewMode={viewMode} />
+                </div>
+              </details>
+            )}
 
             <SourcesFindMore handleFindMoreLiterature={handleFindMoreLiterature} isFindingMore={isFindingMore} />
           </section>

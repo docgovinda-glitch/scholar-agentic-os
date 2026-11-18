@@ -4,15 +4,18 @@ import { parseBody, StreamSectionBody } from "./schemas.ts";
 import express from "express";
 import { buildSectionScaffold,type ScaffoldSource } from "../../../src/utils/sectionScaffold.ts";
 import { BrowserAiRequiredError,InvalidLlmChallengeError,LocalModelUnreachableError,NoClientAiProviderError } from "../../../src/ai/aiRouteErrors.ts";
-import { fitDraftToBudget,sectionWordRange,trimToSentenceWithinWords } from "../../../src/utils/sectionBudget.ts";
+import { repeatsDraft,sectionWordRange,trimToSentenceWithinWords } from "../../../src/utils/sectionBudget.ts";
+import { countProseWords } from "../../../../src/shared/proseBlocks.ts";
 import {
 buildScholarlyVoiceSystemPrompt,
 sanitizeScholarlyText,
 normalizeUnicodeNFC,
 } from "../../../src/utils/scholarlyVoiceGuard.ts";
 import { callOpenRouterText,handOffBeforeStream } from "../../../src/services/scholarBrain.ts";
+import type { Completer } from "../../../../src/platform/completion.ts";
 import { ensureParagraphBreaks } from "../../../../src/shared/proseParagraphs.ts";
-import { chunkPreservingWhitespace,openSseStream,SSE_HEARTBEAT_MS,streamErrorMessage } from "../../../src/utils/sectionStream.ts";
+import { streamErrorMessage } from "../../../src/utils/sectionStream.ts";
+import { openSse, type SseStream } from "../../../src/utils/sse.ts";
 import { scholarBrain } from "../../../src/services/scholarBrain.ts";
 import { sendAiFailure,UnusableAiResponseError } from "../../../src/ai/aiRouteErrors.ts";
 import {
@@ -56,7 +59,9 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
     outlineTitles,
     previousTail,
     writingStyle,
+    continueFrom: continueFromRaw,
   } = body;
+  const continueFrom = String(continueFromRaw ?? "").trim();
   // The section's exact budget from the outline (±5%), never more than what the
   // whole essay still has left, so a 1,000-word paper cannot reach 1,450.
   const allocated = Math.round(Number(allocatedWords ?? requestedTarget) || 500);
@@ -67,48 +72,64 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
 
   // A missing AI is still a 426 hand-off (checked before the stream opens);
   // once the stream is open, failures are SSE events (P0-20).
-  let heartbeat: ReturnType<typeof setInterval> | undefined;
+  // The event stream (shared plumbing: headers, heartbeat, abort on close).
+  let sse: SseStream | undefined;
+  const aborted = () => sse?.signal.aborted ?? false;
   try {
-    const mappedSources: WebsiteCitationItem[] = (
-      Array.isArray(boundSources) ? boundSources : []
-    ).map((s: unknown, idx: number) => {
-      const src = (s && typeof s === "object" ? s : {}) as Record<string, unknown>;
-      const id = (src.id as string) || (src.source_id as string) || (src.sourceId as string) || `src-${idx + 1}`;
-      const title = (src.title as string) || "Scholarly Resource";
-      const authors = Array.isArray(src.authors)
-        ? (src.authors as string[])
-        : typeof src.authors === "string"
-        ? [src.authors]
-        : typeof src.author === "string"
-        ? [src.author]
-        : ["Author"];
-      const year = (src.year as string | number) || "n.d.";
-      const journal = (src.journal as string) || (src.venue as string) || (src.type as string) || undefined;
-      const doi = (src.doi as string) || undefined;
-      const url = (src.url as string) || undefined;
-      const citation = (src.citation as string) || undefined;
+    // Only sources the citation engine can verify (a title, at least one author
+    // and a year; see cslEngine.verifyAndConvertToCSL) are offered to the model. Missing metadata is never filled in
+    // ("Author", "Scholarly Resource", "n.d."): such a source cannot be cited.
+    const mappedSources: WebsiteCitationItem[] = (Array.isArray(boundSources) ? boundSources : [])
+      .map((s: unknown, idx: number): WebsiteCitationItem | null => {
+        const src = (s && typeof s === "object" ? s : {}) as Record<string, unknown>;
+        const id = (src.id as string) || (src.source_id as string) || (src.sourceId as string) || `src-${idx + 1}`;
+        const title = typeof src.title === "string" ? src.title.trim() : "";
+        const authors = (
+          Array.isArray(src.authors) ? (src.authors as unknown[]) : typeof src.authors === "string" ? [src.authors] : typeof src.author === "string" ? [src.author] : []
+        )
+          .filter((a): a is string => typeof a === "string")
+          .map((a) => a.trim())
+          .filter(Boolean);
+        const yearRaw = src.year as string | number | undefined;
+        const year = yearRaw !== undefined && /\d{4}/.test(String(yearRaw)) ? yearRaw : undefined;
+        if (!title || authors.length === 0 || year === undefined) return null;
+        const journal = (src.journal as string) || (src.venue as string) || undefined;
+        return {
+          id,
+          title,
+          authors,
+          year,
+          journal,
+          venue: journal,
+          doi: (src.doi as string) || undefined,
+          url: (src.url as string) || undefined,
+          citation: (src.citation as string) || undefined,
+          mainFinding: (src.mainFinding as string) || (src.suggestedUse as string) || undefined,
+          suggestedUse: (src.suggestedUse as string) || undefined,
+        };
+      })
+      .filter((x): x is WebsiteCitationItem => x !== null);
 
-      return {
-        id,
-        title,
-        authors,
-        year,
-        journal,
-        venue: journal,
-        doi,
-        url,
-        citation,
-        mainFinding: (src.mainFinding as string) || (src.suggestedUse as string) || undefined,
-        suggestedUse: (src.suggestedUse as string) || undefined,
-      };
-    });
+    // Tokens of bound sources that cannot be cited (missing metadata) are
+    // removed; the rest become in-text citations in the project's style.
+    // Trailing whitespace is kept, so streamed text continues on its own line.
+    const citableIds = new Set(mappedSources.map((x) => String(x.id)));
+    const uncitableIds = (Array.isArray(boundSources) ? boundSources : [])
+      .map((x) => String(((x ?? {}) as Record<string, unknown>).id ?? ""))
+      .filter((x) => x && !citableIds.has(x));
+    const formatCitations = (text: string): string => {
+      let t = text;
+      for (const id of uncitableIds) t = t.split(`[${id}]`).join("");
+      const tail = /\s*$/.exec(text)?.[0] ?? "";
+      return replaceBracketTokensWithDeterministicCitations(t, mappedSources, citationStyle).trimEnd() + tail;
+    };
 
     // Use structured evidence pack if provided (Production Spec §4.1–4.3),
     // otherwise fall back to the basic flat evidence list
     const evidenceBlock = evidencePackPrompt
       ? evidencePackPrompt
       : mappedSources
-          .map((s, i) => `[${i + 1}] (Token ID: [${s.id}]) Title: ${s.title} | Author(s): ${(s.authors || []).join(", ")} (${s.year || "n.d."}) | Venue: ${s.journal || "Scholarly"} | Rationale: ${s.suggestedUse || s.mainFinding || ""}`)
+          .map((s, i) => `[${i + 1}] (Token ID: [${s.id}]) Title: ${s.title} | Author(s): ${(s.authors || []).join(", ")} (${s.year}) | Venue: ${s.journal || "not recorded"} | Rationale: ${s.suggestedUse || s.mainFinding || ""}`)
           .join("\n");
 
     const revisionInstruction = scholarBrain.courseworkPrompts.streamSectionRevisionInstruction({ revisionPrompt });
@@ -153,43 +174,63 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
     });
     const systemPrompt = scholarBrain.courseworkPrompts.streamSectionSystemPrompt({ scholarlyDirectives });
 
+    const midpoint = Math.round((budgetRange.min + budgetRange.max) / 2);
+    const continuePrompt = (draftSoFar: string) =>
+      scholarBrain.courseworkPrompts.streamSectionContinuePrompt({ prompt, draft: draftSoFar, missingWords: Math.max(50, midpoint - countProseWords(draftSoFar)) });
+    // Resume continues a stopped draft; otherwise the section is written from the prompt.
+    const firstPrompt = continueFrom ? continuePrompt(continueFrom) : prompt;
+
     // No server-side model (or the user's local model goes first): hand off with
     // a 426 now, while a status can still be sent.
-    if (await handOffBeforeStream(req, res, systemPrompt, prompt, "drafting")) return;
+    if (await handOffBeforeStream(req, res, systemPrompt, firstPrompt, "drafting")) return;
 
     // Open the event stream BEFORE the model call, and keep it alive while the
     // model thinks, so proxies (Render, Vite) never drop a silent socket.
-    openSseStream(res);
-    heartbeat = setInterval(() => {
-      if (!res.writableEnded) res.write(": keep-alive\n\n");
-    }, SSE_HEARTBEAT_MS);
-    res.on("close", () => {
-      if (heartbeat) clearInterval(heartbeat);
+    // The student closing the page or pressing Stop aborts `stream.signal`, which stops the model too.
+    const stream = openSse(res);
+    sse = stream;
+
+    // The shared drafting loop (scholarBrain.runSectionDraft): the model's own
+    // tokens go to the browser as they arrive; a draft short of its budget (the
+    // app's own word count) gets one continuation, streamed visibly as new
+    // paragraphs, dropped when it restates the draft; Resume continues the text
+    // a stopped draft reached. When the router drops a partial answer to switch
+    // model, or a continuation starts, the browser is told what to show
+    // instead (citation tokens already formatted). A revision keeps the
+    // student's request as asked; a draft the browser's model wrote (hand-off)
+    // is used as returned.
+    const fromBrowser = Boolean((req.body as { llmResult?: unknown })?.llmResult);
+    const complete: Completer = async (call) => ({
+      text:
+        (await callOpenRouterText(req, res, call.systemPrompt ?? "", call.userPrompt, undefined, "drafting", {
+          onToken: call.onToken,
+          onReset: call.onReset,
+          signal: call.signal,
+        })) ?? "",
+      provider: "router",
+      model: "",
+      inputTokensEstimate: 0,
+      outputTokensEstimate: 0,
     });
+    const { text: loopText } = await scholarBrain.runSectionDraft(complete, {
+      systemPrompt,
+      userPrompt: prompt,
+      minWords: budgetRange.min,
+      ...(continueFrom || (!revisionPrompt && !fromBrowser)
+        ? { lengthen: { mode: "continue" as const, prompt: (draftSoFar: string) => continuePrompt(draftSoFar), accept: (more: string, draftSoFar: string) => !repeatsDraft(more, draftSoFar) } }
+        : {}),
+      ...(continueFrom ? { startFrom: continueFrom } : {}),
+      stream: {
+        onToken: (t) => stream.send({ chunk: t }),
+        onReplace: (text) => stream.send({ replace: formatCitations(text) }),
+      },
+      signal: stream.signal,
+      countWords: countProseWords,
+    });
+    let effectiveDraft = loopText;
 
-    const draft = await callOpenRouterText(req, res, systemPrompt, prompt, undefined, "drafting");
-
-    let effectiveDraft = draft?.trim() ?? "";
-    if (!effectiveDraft) throw new UnusableAiResponseError("section draft");
-
-    // Enforce the budget with the app's own word count: when short, one full
-    // rewrite and then one continuation (a revision keeps the student's request).
-    if (!revisionPrompt) {
-      effectiveDraft = await fitDraftToBudget(effectiveDraft, budgetRange, {
-        rewriteLonger: (current, words) =>
-          callOpenRouterText(req, res, systemPrompt, scholarBrain.courseworkPrompts.streamSectionLongerPrompt({ prompt, draft: current, draftWords: words, targetWordCount, budgetRange }), undefined, "drafting"),
-        continueDraft: (current, missingWords) =>
-          callOpenRouterText(req, res, systemPrompt, scholarBrain.courseworkPrompts.streamSectionContinuePrompt({ prompt, draft: current, missingWords }), undefined, "drafting"),
-      });
-    }
-
-
-    // Pipe streamed draft through deterministic citation interceptor
-    effectiveDraft = replaceBracketTokensWithDeterministicCitations(
-      effectiveDraft,
-      mappedSources,
-      citationStyle
-    );
+    // Citation tokens become in-text citations in the project's style.
+    effectiveDraft = formatCitations(effectiveDraft).trim();
 
     // Apply Discourse-Level Scholarly Voice Guardrails (cliché suppression, British English, NFC Unicode preservation)
     effectiveDraft = sanitizeScholarlyText(effectiveDraft, { dialect: "en-GB", stripCliches: true });
@@ -199,13 +240,16 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
     // Trim an overrun last: expanding citation tokens and cleaning the prose change the count.
     effectiveDraft = trimToSentenceWithinWords(effectiveDraft, budgetRange.max);
 
-    for (const chunk of chunkPreservingWhitespace(effectiveDraft, 5)) {
-      res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
-    }
-    res.write(`data: ${JSON.stringify({ fullText: effectiveDraft })}\n\n`);
-    res.write("data: [DONE]\n\n");
-    res.end();
+    // The final text (citations expanded, prose cleaned, trimmed to budget)
+    // replaces what was streamed.
+    stream.send({ fullText: effectiveDraft });
+    stream.close({ done: true });
   } catch (err: unknown) {
+    // The student stopped it: nothing to report to a closed page.
+    if (aborted()) {
+      sse?.close();
+      return;
+    }
     const handedOff = errorText(err) === "RequireFrontendLLMException";
     if (handedOff && !res.headersSent) return;
     if (!res.headersSent) return sendAiFailure(res, err, "Section draft");
@@ -220,7 +264,7 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
       err instanceof LocalModelUnreachableError ||
       err instanceof NoClientAiProviderError ||
       err instanceof UnusableAiResponseError;
-    if (!res.writableEnded && !keepsOwnStatus && !revisionPrompt && !String(existingContent || "").trim()) {
+    if (!res.writableEnded && !keepsOwnStatus && !revisionPrompt && !continueFrom && !String(existingContent || "").trim()) {
       const scaffold = buildSectionScaffold({
         title: String(sectionTitle || ""),
         prompt: String(sectionGuidance || ""),
@@ -230,20 +274,16 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
         targetWords: targetWordCount,
       });
       console.warn("[stream-section] AI unavailable, sending offline scaffold:", err instanceof Error ? errorText(err) : err);
-      res.write(`data: ${JSON.stringify({ fallback: { mode: "offline_scaffold", reason: "No AI provider could answer right now." } })}\n\n`);
-      res.write(`data: ${JSON.stringify({ fullText: scaffold })}\n\n`);
-      res.write("data: [DONE]\n\n");
-      res.end();
+      sse?.send({ fallback: { mode: "offline_scaffold", reason: "No AI provider could answer right now." } });
+      sse?.send({ fullText: scaffold });
+      sse?.close({ done: true });
       return;
     }
     console.error("Stream section error:", err instanceof Error ? errorText(err) : err);
-    if (!res.writableEnded) {
-      res.write(`data: ${JSON.stringify({ error: streamErrorMessage(err, handedOff), recoverable: true })}\n\n`);
-      res.write("data: [DONE]\n\n");
-      res.end();
-    }
+    sse?.send({ error: streamErrorMessage(err, handedOff), recoverable: true });
+    sse?.close({ done: true });
   } finally {
-    if (heartbeat) clearInterval(heartbeat);
+    sse?.close();
   }
 });
 

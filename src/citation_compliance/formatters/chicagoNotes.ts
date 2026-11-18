@@ -30,6 +30,7 @@
 
 import type { CitationStyle, InTextOptions, NoteOptions } from "../styleTypes";
 import type { CanonicalReference, ReferenceAuthor } from "../model/reference";
+import { doiUrl, endSentence, pageRange } from "./bibParts";
 
 const SHORT_TITLE_MAX_WORDS = 5;
 
@@ -40,7 +41,8 @@ export class ChicagoNotesFormatter implements CitationStyle {
 
   /** The in-text marker is the footnote/endnote number, not a parenthetical — the note's content comes from formatNote/formatShortNote. */
   formatInText(_reference: CanonicalReference, options?: InTextOptions): string {
-    return String(options?.position ?? 1);
+    // In stored text the note marker is shown in brackets ("[1]"); a bare digit would read as part of the sentence.
+    return `[${options?.position ?? 1}]`;
   }
 
   /** The full note — first citation of this source. CMOS 17 §14.19 (journal article), §14.30 (book). */
@@ -85,14 +87,16 @@ export class ChicagoNotesFormatter implements CitationStyle {
       let entry = `${author} "${reference.title}."`;
       const container = this.journalContainer(reference);
       if (container) entry += ` ${container}`;
-      if (reference.pages) entry += `: ${reference.pages}`;
-      return `${entry}.`;
+      if (reference.pages) entry += `: ${pageRange(reference.pages)}`;
+      const link = doiUrl(reference);
+      return `${entry}.${link ? ` ${link}.` : ""}`;
     }
 
     const publisherYear = this.publisherYear(reference);
     let entry = `${author} *${reference.title}*.`;
     if (publisherYear) entry += ` ${publisherYear}.`;
-    return entry;
+    const link = doiUrl(reference);
+    return link ? `${entry} ${link}.` : entry;
   }
 
   /** Alphabetical ordering of the returned entries is the caller's responsibility — same convention as every other formatter in this registry. */
@@ -103,7 +107,7 @@ export class ChicagoNotesFormatter implements CitationStyle {
   private journalContainer(reference: CanonicalReference): string {
     if (!reference.journal) return "";
     const year = reference.publicationDate?.substring(0, 4) ?? reference.year;
-    const volume = reference.volume ? ` ${reference.volume}` : "";
+    const volume = reference.volume ? ` ${reference.volume}${reference.issue ? `, no. ${reference.issue}` : ""}` : reference.issue ? ` no. ${reference.issue}` : "";
     const yearPart = year ? ` (${year})` : "";
     return `*${reference.journal}*${volume}${yearPart}`;
   }
@@ -135,10 +139,10 @@ export class ChicagoNotesFormatter implements CitationStyle {
   private authorsInverted(authors: ReferenceAuthor[]): string {
     if (!authors || authors.length === 0) return "";
     const first = `${authors[0].lastName}, ${authors[0].firstName}`.trim();
-    if (authors.length === 1) return `${first}.`;
+    if (authors.length === 1) return endSentence(first);
     if (authors.length > 3) return `${first}, et al.`;
     const rest = authors.slice(1).map((a) => `${a.firstName} ${a.lastName}`.trim());
     const allButLast = [first, ...rest.slice(0, -1)].join(", ");
-    return `${allButLast}, and ${rest[rest.length - 1]}.`;
+    return endSentence(`${allButLast}, and ${rest[rest.length - 1]}`);
   }
 }

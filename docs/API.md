@@ -99,9 +99,11 @@ Requests to the old `/api/projects/:id/agent/*` address (browser tabs from befor
 
 Every body is validated with zod (`schemas.ts`); a bad body is a 400 `{ code: "invalid_body", fields }`.
 
-- Extract: `/parse-brief` (multipart), `/analyze`, `/outline`.
-- Drafting: `/stream-section` (SSE opened before the model call, `: keep-alive` every 5 s, failures as `{ error, recoverable: true }` events; 426 hand-off only before the stream opens; accepts `allocatedWords`).
-- Submission: `/export-pdf`, `/copilot-chat` (the student's AI answers or a 502 `{ code: "ai_unavailable" }`; never canned advice).
+- Extract: `/parse-brief` (multipart; reads the file, no AI call), `/build` (`{ force? }`; SSE `{ step, status, message }`, then `{ done, cached? }` or `{ error, step, recoverable }`; 409 `build_running`; 400 `ai_provider_required` / `ai_local_model_unreachable` before streaming), `/outline` (`{ instruction? }`), `/outline/section` (`{ headingId, instruction? }`; one section rewritten, budget kept), `/thesis/refine` (`{ thesis, instruction? }` → `{ thesis, note }`; saves nothing).
+- Sources: `/sources/search` (`{ queries?, topic?, limit? (≤50), includePrescribed? }` → `{ sources, queries, searched, providers }`; runs `retrieveSources` on the server, one record per work, verification and measured relevance; saves and approves nothing), `/agent/sources` (the AI's reading).
+- Drafting: `/stream-section` (SSE opened before the model call, `: keep-alive` every 5 s; events `{ chunk }` (model tokens as they arrive), `{ replace }` (text to show instead, e.g. after a model switch), `{ fullText }` (final, citations formatted), `{ fallback }`, `{ error, recoverable: true }`, then `[DONE]`; 426 hand-off only before the stream opens; accepts `allocatedWords` and `continueFrom` (resume a stopped draft). Closing the connection stops the model).
+- Submission: `/export-pdf`, `/copilot-chat` (the student's AI answers or a 503 `{ code: "ai_unavailable" }` with `Retry-After`; never canned advice).
+- When no AI provider can answer, AI routes reply **503** `{ code: "ai_unavailable" }` with `Retry-After: 10` (`sendAiFailure`), never 502, so provider outages are not mistaken for gateway failures.
 - Stage agents: `/agent/extract`, `/agent/understand`, `/agent/sources`, `/agent/review`, `/agent/evidence` (excerpts from an uploaded document, kept only when found word for word).
 
 ### 5.5 Thesis, proposal, presentation
@@ -136,8 +138,6 @@ GET `/status`; POST `/connections` (tier `local` or `byok`); DELETE `/connection
 | :--- | :--- | :--- |
 | GET | `/api/search?q=` | Searches the user's projects and sources |
 | POST, GET | `/api/search/live` | Live scholarly search (every `/api/search/*` route is `requireAuth`) |
-| POST | `/api/search/multi-portal` | Multi-portal discovery |
-| | `/api/discovery/*` | Alias of `/api/search/*` |
 
 `/api/vault/*` (`requireAuth`): POST `/parse-file` (multipart), `/parse-url` (SSRF-guarded), `/lookup-doi`, `/search-semantic`, `/zotero/sync`, `/mendeley/sync`, `/reset`; GET `/drive/files`, `/onedrive/files`; GET, POST `/cloud/connections`; DELETE `/cloud/connections/:provider`. `POST /api/lookup-doi` is an alias of `/api/vault/lookup-doi`.
 

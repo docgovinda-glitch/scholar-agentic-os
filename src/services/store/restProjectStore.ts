@@ -41,7 +41,7 @@ import { emptyGraph } from "../../domain/claim/graph";
 import { emptyLedger } from "../../domain/evidence/types";
 import { emptyPeerReviewHistory } from "../../domain/review/types";
 import { generateProjectId } from "../../app/conductor/projectStore";
-import type { ProjectRecord, ProjectStore } from "./types";
+import { applyAnswersPatch, type AnswersPatch, type ProjectRecord, type ProjectStore } from "./types";
 
 /** The subset of `fetch` this store uses, so tests can supply their own. */
 export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
@@ -134,7 +134,11 @@ export interface RestStoreConfig {
 }
 
 export function createRestProjectStore(config: RestStoreConfig): ProjectStore {
-  const base = `${config.supabaseUrl.replace(/\/+$/, "")}/rest/v1/${TABLE}`;
+  const root = `${config.supabaseUrl.replace(/\/+$/, "")}/rest/v1`;
+  const base = `${root}/${TABLE}`;
+  // Until the patch_project_answers migration is applied, patches fall back to
+  // read-merge-write (narrower than a whole-record save, but not atomic).
+  let patchRpcMissing = false;
   const doFetch = config.fetchImpl ?? ((url, init) => fetch(url, init));
 
   async function request(url: string, init: RequestInit = {}): Promise<unknown> {
@@ -173,7 +177,7 @@ export function createRestProjectStore(config: RestStoreConfig): ProjectStore {
     }
   }
 
-  return {
+  const store: ProjectStore = {
     async create(outputTypeId: string, ownerId: string): Promise<ProjectRecord> {
       // Bound once: initialProjectGateState keys off the project's own id, so
       // calling generateProjectId() inline in both places would silently give
@@ -221,6 +225,28 @@ export function createRestProjectStore(config: RestStoreConfig): ProjectStore {
       return record;
     },
 
+    async patchAnswers(projectId: string, patch: AnswersPatch): Promise<ProjectRecord | undefined> {
+      if (!patchRpcMissing) {
+        try {
+          const rows = (await request(`${root}/rpc/patch_project_answers`, {
+            method: "POST",
+            body: JSON.stringify({ p_project_id: projectId, p_patch: patch }),
+          })) as ProjectRow[] | null;
+          return rows?.[0] ? rowToRecord(rows[0]) : undefined;
+        } catch (err) {
+          // PostgREST answers 404 / PGRST202 for a function it does not know.
+          if (!/Data API 404|PGRST202/.test(err instanceof Error ? err.message : String(err))) throw err;
+          patchRpcMissing = true;
+          console.warn("services/store: patch_project_answers is not deployed; using read-merge-write. Apply migration 20261118100000.");
+        }
+      }
+      const current = await store.get(projectId);
+      if (!current) return undefined;
+      const next = { ...current, answers: applyAnswersPatch(current.answers, patch) };
+      await store.save(next);
+      return next;
+    },
+
     async listByOwner(ownerId: string): Promise<ProjectRecord[]> {
       // Owner scoping is in the query, not applied after fetching — there is
       // no request here that can return another user's rows.
@@ -236,4 +262,5 @@ export function createRestProjectStore(config: RestStoreConfig): ProjectStore {
       });
     },
   };
+  return store;
 }

@@ -73,12 +73,7 @@ PARAGRAPH STRUCTURE (mandatory): ${isShortQA ? "write 1-2 paragraphs" : `write $
 Output ONLY the section text in clean academic Markdown prose. Do not print a heading for the section.`;
 }
 
-/** Second attempt when a section draft came back under its word budget. */
-export function streamSectionLongerPrompt({ prompt, draft, draftWords, targetWordCount, budgetRange }: { prompt: string; draft: string; draftWords: number; targetWordCount: number; budgetRange: { min: number; max: number } }): string {
-  return `${prompt}\n\nYOUR PREVIOUS ATTEMPT WAS ${draftWords} WORDS, BELOW THE BUDGET. Rewrite it fully at ${targetWordCount} words (${budgetRange.min}-${budgetRange.max}) in ${paragraphRange(targetWordCount)} paragraphs separated by blank lines, keeping every citation token.\nPREVIOUS ATTEMPT:\n${draft}`;
-}
-
-/** Last step when a draft is still short: continue it, never repeat it. */
+/** When a draft is short of its budget: continue it, never repeat it. */
 export function streamSectionContinuePrompt({ prompt, draft, missingWords }: { prompt: string; draft: string; missingWords: number }): string {
   const paragraphs = missingWords > 180 ? "two new paragraphs" : "one new paragraph";
   return `${prompt}\n\nTHE SECTION BELOW IS ${missingWords} WORDS SHORT OF ITS BUDGET. Write ONLY the continuation: ${paragraphs} of about ${missingWords} words that extend the argument with further analysis of the same question, using the same citation tokens where they apply. Do not repeat, summarise or restate the text below, add no heading, and write only text that follows on from its last sentence.\nSECTION SO FAR:\n${draft}`;
@@ -211,15 +206,6 @@ Never predict a mark or grade, and never assume a grading scale the brief does n
   return { personaName, personaRole, scopedContextSummary, systemPrompt };
 }
 
-/** One-line role prompts for the Coursework agents. */
-export const ROLES = {
-  titleRegistrar: "You are an expert academic research registrar. Craft a concise, formal academic title (3-7 words).",
-} as const;
-
-export function academicTitlePrompt({ briefText }: { briefText: string }): string {
-  return `Generate a concise, academic title (3 to 7 words, e.g. "Quantum Computing Cryptographic Architectures", "Algorithmic Bias in Healthcare") based on this assignment brief. Output ONLY the plain text title, with NO punctuation, NO quotes, NO explanation:\n\n${briefText.slice(0, 1500)}`;
-}
-
 /* ------------------- Coursework agent steps (extract, understand, sources, review) ------------------- */
 // The domain modules keep the types and the parsers that validate the AI's answers;
 // the prompt text lives here, reached through scholarBrain.courseworkPrompts.
@@ -270,16 +256,17 @@ export function understandUserPrompt(e: Extraction, brief: string, extra?: { lev
 export function sourcesPrompt(): string {
   return [
     "You assess real search results for a student's coursework. You see each source's title, authors, year, venue and abstract only, not the full text; say nothing beyond what these show.",
-    "For each source: relevance to this assignment (high, medium or low); credibility in one short phrase based on the venue, peer review and citations shown; its main point from the abstract; up to 2 pieces of evidence, each a claim with an exact quote from the abstract; and which outline sections (by id) it supports.",
+    "For each source: relevance to this assignment and its working thesis (high, medium or low: high only when it bears directly on a question the brief sets or on the thesis; a source that only shares a keyword is low); credibility in one short phrase based on the venue, peer review and citations shown; its main point from the abstract; fit: one sentence on what it does for this assignment (supports, challenges or gives context to which point); up to 2 pieces of evidence, each a claim with an exact quote from the abstract; and which outline sections (by id) it supports, only where it bears on that section's purpose.",
     "If a source has no abstract, give no evidence and judge relevance from the title only.",
-    'Respond with ONLY JSON: {"sources": [{"id": "...", "relevance": "high|medium|low", "credibility": "...", "mainPoint": "...", "evidence": [{"claim": "...", "quote": "<exact words from the abstract>"}], "sections": ["<section id>"]}]}',
+    'Respond with ONLY JSON: {"sources": [{"id": "...", "relevance": "high|medium|low", "credibility": "...", "mainPoint": "...", "fit": "...", "evidence": [{"claim": "...", "quote": "<exact words from the abstract>"}], "sections": ["<section id>"]}]}',
   ].join("\n");
 }
 
-export function sourcesUserPrompt(task: string, sections: Array<{ id: string; title: string }>, sources: SourceForAnalysis[]): string {
+export function sourcesUserPrompt(task: string, sections: Array<{ id: string; title: string; purpose?: string }>, sources: SourceForAnalysis[], thesis?: string): string {
   return [
     `Assignment: ${clip(task, 800)}`,
-    `Outline sections:\n${sections.slice(0, 30).map((s) => `- ${s.id}: ${clip(s.title, 140)}`).join("\n") || "(none yet)"}`,
+    thesis ? `Working thesis: ${clip(thesis, 600)}` : "",
+    `Outline sections:\n${sections.slice(0, 30).map((s) => `- ${s.id}: ${clip(s.title, 140)}${s.purpose ? ` (purpose: ${clip(s.purpose, 160)})` : ""}`).join("\n") || "(none yet)"}`,
     `Sources:\n${sources
       .slice(0, 20)
       .map(
@@ -287,7 +274,7 @@ export function sourcesUserPrompt(task: string, sections: Array<{ id: string; ti
           `[${s.id}] ${clip(s.title, 300)} — ${clip((s.authors ?? []).slice(0, 4).join(", "), 160)} (${s.year || "n.d."}). ${clip(s.venue, 160)}${s.peerReviewed ? ", peer-reviewed" : ""}${typeof s.citationCount === "number" ? `, cited ${s.citationCount} times` : ""}\nAbstract: ${clip(s.abstract, 1500) || "(none)"}`
       )
       .join("\n\n")}`,
-  ].join("\n\n");
+  ].filter(Boolean).join("\n\n");
 }
 
 export function reviewPrompt(): string {
@@ -316,14 +303,16 @@ export function reviewUserPrompt(i: ReviewInput): string {
 
 export function assignmentOutlinePrompt(): string {
   return [
-    "You design the outline of one piece of student coursework from its brief.",
-    "Decide the structure this brief needs; do not use a fixed template. A report or case study usually has an introduction, analysis sections and conclusions or recommendations; an essay has an introduction, a line of argument in several sections and a conclusion; a literature review is organised by themes or debates. Follow any structure the brief itself asks for.",
-    "Name sections after what this assignment is about (its organisation, case, theory, question), not generic labels like 'Body' or 'Main points' alone.",
-    "Give 2 to 7 sections with 1 to 4 sub-sections each. Each sub-section is a writing unit of about 150 to 700 words, with one sentence of guidance on what it must do. Word targets must add up to the target total.",
-    "Weight sections by the marking criteria when the brief gives them (a criterion worth 40% deserves about 40% of the effort).",
+    "You design the outline (table of contents) of one piece of student coursework from its brief, and propose its working thesis.",
+    "Decide the structure this brief needs; do not use a fixed template. A report or case study usually has an introduction, analysis sections and conclusions or recommendations; an essay has an introduction, a line of argument in several sections and a conclusion; a literature review is organised by themes or debates. Follow any structure the brief itself asks for, and give every question the brief sets its own section.",
+    "Name headings after what this assignment is about (its organisation, case, theory, question), not generic labels like 'Body' or 'Main points' alone.",
+    "Levels: sections are H1; give a section H2 sub-sections when it needs them, and an H2 its own H3 sub-sections only when the argument needs that depth. Each writing unit (an H2 without H3s, an H3, or an undivided section) is about 120 to 700 words.",
+    "You decide the word budget of every unit; together they must add up to the target total. Weigh them by what each part must achieve: use the marks the brief gives each question and the marking criteria as a guide (a question worth 40% of the marks usually deserves about 40% of the words), and say in a unit's purpose if you depart from that and why.",
+    "For every section and unit give its purpose: one sentence on its academic role (what it must establish for the argument). Where a section builds on an earlier one, list the earlier titles in dependsOn. For a section that answers a question of the brief, set questionRef to that question's label (for example Q2).",
+    "Propose three distinct working theses: defensible one-sentence answers to the assignment's central question, each taking a different angle, phrased as claims to test. Put the strongest first.",
     "Do not state findings, figures, sources or quotations that are not in the brief.",
     "When the student asks for a change, apply it to the current outline and keep everything else, especially sections that already have text. If they ask for a new total length, set totalWords to it.",
-    'Respond with ONLY JSON: {"totalWords": <number, only if the student asked for a new total>, "thesis": "<one-sentence working answer to the question, or empty>", "sections": [{"title": "...", "subsections": [{"title": "...", "words": <number>, "guidance": "..."}]}]}',
+    'Respond with ONLY JSON: {"totalWords": <number, only if the student asked for a new total>, "thesisOptions": [{"statement": "...", "angle": "<2-4 words>"}], "sections": [{"title": "...", "purpose": "...", "questionRef": "<Q label or omit>", "dependsOn": ["<earlier title>"], "words": <number, only if the section has no sub-sections>, "subsections": [{"title": "...", "words": <number>, "purpose": "...", "guidance": "<one sentence on what it must do>", "dependsOn": [], "subsections": [{"title": "...", "words": <number>, "purpose": "...", "guidance": "..."}]}]}]}',
   ].join("\n");
 }
 
@@ -334,6 +323,9 @@ export function assignmentOutlineUserPrompt(c: AssignmentOutlineContext): string
     `Form: ${c.assignmentType || "essay"}. Level: ${c.academicLevel || "undergraduate"}. Referencing: ${c.citationStyle || "as the brief says"}.`,
     `Target length: ${c.targetWords} words.`,
     c.criteria?.length ? `Marking criteria from the brief:\n- ${c.criteria.slice(0, 10).map((x) => clip(x, 200)).join("\n- ")}` : "The brief gives no marking criteria.",
+    c.questions?.length
+      ? `Questions the brief sets (each needs its own section; marks are a guide to the words):\n- ${c.questions.slice(0, 12).map((q) => `${q.key}: ${clip(q.title, 200)}${q.marks ? ` (${q.marks} marks)` : ""}`).join("\n- ")}`
+      : "",
     structureLens(c.discipline, c.assignmentType),
     c.plan ? `Plan for this assignment (from reading the brief):\n${clip(c.plan, 2500)}` : "",
   ];
@@ -347,6 +339,61 @@ export function assignmentOutlineUserPrompt(c: AssignmentOutlineContext): string
   }
   if (c.instruction) lines.push(`The student asks: ${clip(c.instruction, 600)}`);
   return lines.filter(Boolean).join("\n\n");
+}
+
+/* ------------------------------- Thesis refinement ------------------------------- */
+
+/** Sharpen a working thesis the student wrote (or chose), keeping their position. */
+export function thesisRefinePrompt(): string {
+  return [
+    "You help a student sharpen the working thesis of one piece of coursework.",
+    "Keep the student's position and claim; do not replace it with a different argument. Make it a single, specific, arguable sentence that answers the assignment's central question, names its scope, and can be tested with evidence.",
+    "If the student asks for a particular change, make that change.",
+    "Do not add findings, figures, sources or quotations that are not in the brief or the thesis.",
+    'Respond with ONLY JSON: {"thesis": "<the refined thesis, one sentence>", "note": "<one short sentence on what you changed and why>"}',
+  ].join("\n");
+}
+
+export function thesisRefineUserPrompt(i: { brief: string; thesis: string; instruction?: string; level?: string }): string {
+  return [
+    `Brief:\n${clip(i.brief, 4000)}`,
+    i.level ? `Level: ${clip(i.level, 60)}.` : "",
+    `Student's working thesis:\n${clip(i.thesis, 1200)}`,
+    i.instruction ? `The student asks: ${clip(i.instruction, 400)}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+/* ------------------------------- One outline section ------------------------------- */
+
+/** Rewrite one section of the outline; the rest of the outline and the section's budget stay. */
+export function outlineSectionPrompt(): string {
+  return [
+    "You rewrite ONE section of a student's coursework outline. The rest of the outline stays as it is.",
+    "Keep the section's role in the outline unless the student asks otherwise; improve its heading, its H2 (and, only where the argument needs it, H3) sub-sections, their purposes and their share of the section's words. Name headings after what the assignment is about, not generic labels.",
+    "The section's word budget is fixed: the sub-section words must add up to it.",
+    "Do not state findings, figures, sources or quotations that are not in the brief.",
+    'Respond with ONLY JSON: {"section": {"title": "...", "purpose": "...", "questionRef": "<Q label or omit>", "dependsOn": [], "subsections": [{"title": "...", "words": <number>, "purpose": "...", "guidance": "...", "subsections": [{"title": "...", "words": <number>, "purpose": "...", "guidance": "..."}]}]}}',
+  ].join("\n");
+}
+
+export function outlineSectionUserPrompt(i: {
+  brief: string;
+  thesis?: string;
+  outline: Array<{ title: string; words: number; isTarget: boolean }>;
+  target: { title: string; purpose?: string; words: number; units: Array<{ title: string; words: number }> };
+  instruction?: string;
+}): string {
+  return [
+    `Brief:\n${clip(i.brief, 4000)}`,
+    i.thesis ? `Working thesis: ${clip(i.thesis, 600)}` : "",
+    `The whole outline (the section to rewrite is marked):\n${i.outline.map((h, k) => `${k + 1}. ${clip(h.title, 160)} (${h.words} words)${h.isTarget ? "  <- rewrite this one" : ""}`).join("\n")}`,
+    `Section to rewrite: "${clip(i.target.title, 160)}", ${i.target.words} words in total.${i.target.purpose ? ` Its purpose: ${clip(i.target.purpose, 300)}` : ""}\nIts current sub-sections:\n${i.target.units.map((u) => `- ${clip(u.title, 160)} (${u.words} words)`).join("\n") || "- (none)"}`,
+    i.instruction ? `The student asks: ${clip(i.instruction, 600)}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 /* ------------------------------- Evidence from an upload ------------------------------- */

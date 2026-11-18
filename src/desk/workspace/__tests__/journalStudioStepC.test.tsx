@@ -278,8 +278,9 @@ describe("Journal Rebuild Step C — Mode 3 Grounded Manuscript Studio & Mode 4 
       expect(within(panel).getByText("Literature")).toBeInTheDocument();
       // References from the citations already in the text: nothing claimed beyond the record.
       // In the project's style (APA 7 by default), from the same formatter as Delivery.
-      expect(within(panel).getByText("Kovacs, L. (2026). FPGA Latency Benchmark Data [Data set].")).toBeInTheDocument();
-      expect(within(panel).getByText("Smith, J. (2024). Real-Time Syndrome Decoding in Surface Codes.")).toBeInTheDocument();
+      // APA 7 italicises a data set's title (rendered as <em>), so the entry is matched on its text.
+      expect(within(panel).getByText((_, el) => el?.tagName === "LI" && el.textContent === "Kovacs, L. (2026). FPGA Latency Benchmark Data [Data set].")).toBeInTheDocument();
+      expect(within(panel).getByText((_, el) => el?.tagName === "LI" && el.textContent === "Smith, J. (2024). Real-Time Syndrome Decoding in Surface Codes.")).toBeInTheDocument();
       expect(panel.textContent).not.toMatch(/Verified Scholarly Publication|Primary User Ingestion/);
 
       fireEvent.click(within(panel).getByRole("button", { name: "Cite Real-Time Syndrome Decoding in Surface Codes" }));

@@ -157,6 +157,9 @@ export interface CanonicalReference {
 
   /** Engine-produced numeric position within a reference list */
   _position?: number;
+
+  /** "a", "b", … when two works in one list share the author-date label (2021a, 2021b). */
+  yearSuffix?: string;
 }
 
 /**
@@ -164,7 +167,13 @@ export interface CanonicalReference {
  * publication date's year, else the reference's own year, else "n.d." as those
  * styles require. Never a made-up year.
  */
-export function authorDateYear(reference: Pick<CanonicalReference, "publicationDate" | "year">): string {
+export function authorDateYear(reference: Pick<CanonicalReference, "publicationDate" | "year" | "yearSuffix">): string {
+  const year = bareAuthorDateYear(reference);
+  const suffix = reference.yearSuffix ?? "";
+  return suffix ? (year === "n.d." ? `n.d.-${suffix}` : `${year}${suffix}`) : year;
+}
+
+function bareAuthorDateYear(reference: Pick<CanonicalReference, "publicationDate" | "year">): string {
   const fromDate = reference.publicationDate?.match(/^\d{4}/)?.[0];
   if (fromDate) return fromDate;
   if (typeof reference.year === "string") {

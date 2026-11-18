@@ -188,7 +188,7 @@ describe("POST /api/projects/:id/journal-requirements/extract — BYOK path", ()
     expect(res.body.proposal.unresolvedFields).toEqual(["citationStyle", "wordLimit"]);
   });
 
-  it("502s with a real error, never a fabricated proposal, when the model's response can't be parsed", async () => {
+  it("503s with a real error, never a fabricated proposal, when the model's response can't be parsed", async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -200,7 +200,7 @@ describe("POST /api/projects/:id/journal-requirements/extract — BYOK path", ()
       .post(`/api/projects/${projectId}/journal-requirements/extract`)
       .set(AI_HEADERS).send({ guidelinesText: GUIDELINES_TEXT });
 
-    expect(res.status).toBe(502);
+    expect(res.status).toBe(503);
     expect(res.body.error).toMatch(/could not be generated/i);
   });
 

@@ -10,7 +10,7 @@
  * 6. True Telemetry: Calculates exact deterministic word count, burstiness metrics, and verified reference lists.
  */
 
-import { discoverMultiPortalSources, type DiscoveredSourceDraft } from "../discovery/discovery.ts";
+import { discoverScholarlySources, type DiscoveredSourceDraft } from "../discovery/discovery.ts";
 import {
   buildScholarlyVoiceSystemPrompt,
   sanitizeScholarlyText,
@@ -308,7 +308,7 @@ export async function retrieveCanonicalSourcesForPrompt(
 
   let drafts: DiscoveredSourceDraft[] = [];
   try {
-    drafts = await discoverMultiPortalSources(query, maxResults * 2);
+    drafts = await discoverScholarlySources(query, maxResults * 2);
   } catch {
     drafts = [];
   }

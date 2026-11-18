@@ -218,7 +218,7 @@ export function aiRouteDecorator(req: Request, res: Response, next: NextFunction
 /**
  * `routedText` for routes that run only on the server: errors come back as the
  * classes `sendAiFailure` already answers (400 ai_provider_required, 400
- * ai_local_model_unreachable, 502 ai_unavailable).
+ * ai_local_model_unreachable, 503 ai_unavailable).
  */
 export async function routedCompletion(req: Request, call: RoutedCall): Promise<string> {
   try {

@@ -165,9 +165,25 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            {source.aiRelevance && (
+              <span
+                className="text-xs font-semibold px-2 py-0.5 rounded-md bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] capitalize"
+                title="Your AI's reading of the abstract against your brief and thesis"
+              >
+                AI: {source.aiRelevance} relevance
+              </span>
+            )}
             {source.relevanceScore !== undefined && (
-              <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded-md bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]">
+              <span
+                className="text-xs font-mono font-semibold px-2 py-0.5 rounded-md bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]"
+                title="Share of your brief's subject words and search phrases found in the title, venue and abstract"
+              >
                 {source.relevanceScore}% Match
+              </span>
+            )}
+            {source.verificationStatus === "verified" && (
+              <span className="text-xs px-2 py-0.5 rounded-md text-[color:var(--text-muted)]" title="Title, author, year and a DOI from a scholarly index">
+                DOI
               </span>
             )}
 

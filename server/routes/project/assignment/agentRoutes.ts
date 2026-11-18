@@ -4,7 +4,6 @@ import { scholarBrain } from "../../../src/services/scholarBrain.ts";
 import express from "express";
 import { routedCompletion } from "../../../src/services/scholarBrain.ts";
 import { sendAiFailure, UnusableAiResponseError } from "../../../src/ai/aiRouteErrors.ts";
-import { getProjectStore } from "../../../../src/services/store/projectStore.ts";
 import {
   parseExtraction,
   parseUnderstanding,
@@ -16,7 +15,7 @@ import {
   type Understanding,
   type SourceForAnalysis,
 } from "../../../../src/domain/assignment/assignmentAgent.ts";
-import { getProjectSafe, safeParseObject } from "./helpers.ts";
+import { abortOnClose, getProjectSafe, safeParseObject, saveChangedAnswers } from "./helpers.ts";
 import { cleanAnswerString, extractStandardizedInstructions } from "../../../../src/desk/assignment/types.ts";
 import { writeOutlineForProject } from "./extractRoutes.ts";
 
@@ -46,80 +45,123 @@ function materialsOf(a: Record<string, unknown>): Array<{ name: string; text: st
     .filter((m) => m.text.trim().length > 20);
 }
 
+/** A step that cannot run yet; the route answers 400 with `code`. */
+export class StepNotReadyError extends Error {
+  constructor(public readonly code: string, message: string) {
+    super(message);
+    this.name = "StepNotReadyError";
+  }
+}
+
+type Project = NonNullable<Awaited<ReturnType<typeof getProjectSafe>>>;
+
+/**
+ * Extract: the student's AI reads the brief (and uploaded materials) and lists
+ * what it asks for; only what can be found in the brief is kept. Saves the
+ * result and fills settings the student has not set.
+ */
+export async function extractStep(req: Req, project: Project, clarificationsRaw?: unknown): Promise<Extraction> {
+  const a = project.answers;
+  const brief = briefOf(a);
+  if (!brief || brief.trim().length < 10) throw new StepNotReadyError("missing_brief", "Paste or upload your assignment brief first.");
+  const clarifications = typeof clarificationsRaw === "string" ? clarificationsRaw.trim().slice(0, 2000) : String(a["assignment_clarifications"] ?? "");
+  const input = { brief, materials: materialsOf(a), clarifications };
+  const text = await routedCompletion(req, { signal: abortOnClose(req), task: "reasoning", systemPrompt: scholarBrain.courseworkPrompts.extractPrompt(), userPrompt: scholarBrain.courseworkPrompts.extractUserPrompt(input) });
+  const extraction = parseExtraction(text ?? "", input);
+  if (!extraction) throw new UnusableAiResponseError("brief extraction");
+  project.answers.assignment_extraction = JSON.stringify({ ...extraction, at: now() });
+  if (clarifications) project.answers.assignment_clarifications = clarifications;
+  // Fill settings the student has not set, from what the brief states.
+  if (extraction.constraints.wordCount && !Number(a["word_limit"])) project.answers.word_limit = String(extraction.constraints.wordCount);
+  if (extraction.constraints.citationStyle && !a["citation_style"]) project.answers.citation_style = extraction.constraints.citationStyle;
+  // Later steps were based on an older reading of the brief.
+  delete project.answers.assignment_understanding;
+  await saveChangedAnswers(project);
+  return extraction;
+}
+
+/**
+ * Understand: the student's AI works out what to produce and how, then writes
+ * the outline (with its proposed theses) from that plan. A thesis is filled in
+ * only when the student has none.
+ */
+export async function understandStep(
+  req: Req,
+  project: Project
+): Promise<{ understanding: Understanding; structure: Awaited<ReturnType<typeof writeOutlineForProject>> | null; outlineError?: string }> {
+  const a = project.answers;
+  const extraction = safeParseObject(a["assignment_extraction"]) as Extraction | null;
+  if (!extraction) throw new StepNotReadyError("missing_extraction", "Run Extract first, so Scholar knows what the brief asks for.");
+  const text = await routedCompletion(req, {
+    signal: abortOnClose(req),
+    task: "reasoning",
+    systemPrompt: scholarBrain.courseworkPrompts.understandPrompt(),
+    userPrompt: scholarBrain.courseworkPrompts.understandUserPrompt(extraction, briefOf(a), {
+      level: String(a["academic_level"] || ""),
+      citationStyle: String(a["citation_style"] || ""),
+      words: Number(a["word_limit"]) || undefined,
+    }),
+  });
+  const understanding = parseUnderstanding(text ?? "");
+  if (!understanding) throw new UnusableAiResponseError("assignment analysis");
+  project.answers.assignment_understanding = JSON.stringify({ ...understanding, at: now() });
+  await saveChangedAnswers(project);
+
+  // The outline follows from this understanding.
+  const plan = [
+    `What to produce: ${understanding.produce}`,
+    `Approach: ${understanding.approach}`,
+    `Structure: ${understanding.structure}`,
+    understanding.criteria.length ? `Criteria: ${understanding.criteria.map((c) => `${c.criterion}: ${c.howToMeet}`).join("; ")}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+  let structure: Awaited<ReturnType<typeof writeOutlineForProject>> | null = null;
+  let outlineError: string | undefined;
+  try {
+    structure = await writeOutlineForProject(req, project, { plan });
+  } catch (e) {
+    if (abortOnClose(req).aborted) throw e;
+    outlineError = e instanceof Error ? e.message : "The outline could not be written.";
+  }
+  // A starting thesis to test, only when the student has not written one: the
+  // outline's first proposal, else the plan's line of argument.
+  if (!cleanAnswerString(project.answers["assignment_thesis"])) {
+    const thesis = structure?.thesisOptions?.[0]?.statement || understanding.thesisDirection;
+    if (thesis) {
+      project.answers.assignment_thesis = thesis;
+      await saveChangedAnswers(project);
+    }
+  }
+  return { understanding, structure, outlineError };
+}
+
+function sendStepFailure(res: express.Response, err: unknown, feature: string) {
+  if (err instanceof StepNotReadyError) {
+    res.status(400).json({ error: err.message, code: err.code });
+    return;
+  }
+  sendAiFailure(res, err, feature);
+}
+
 router.post("/agent/extract", async (req: Req, res: express.Response) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
-  const a = project.answers;
-  const brief = briefOf(a);
-  if (!brief || brief.trim().length < 10) {
-    return res.status(400).json({ error: "Paste or upload your assignment brief first.", code: "missing_brief" });
-  }
-  const raw = req.body?.clarifications;
-  const clarifications = typeof raw === "string" ? raw.trim().slice(0, 2000) : String(a["assignment_clarifications"] ?? "");
-  const input = { brief, materials: materialsOf(a), clarifications };
   try {
-    const text = await routedCompletion(req, { task: "reasoning", systemPrompt: scholarBrain.courseworkPrompts.extractPrompt(), userPrompt: scholarBrain.courseworkPrompts.extractUserPrompt(input) });
-    const extraction = parseExtraction(text ?? "", input);
-    if (!extraction) return sendAiFailure(res, new UnusableAiResponseError("brief extraction"), "Extract");
-    project.answers.assignment_extraction = JSON.stringify({ ...extraction, at: now() });
-    if (clarifications) project.answers.assignment_clarifications = clarifications;
-    // Fill settings the student has not set, from what the brief states.
-    if (extraction.constraints.wordCount && !Number(a["word_limit"])) project.answers.word_limit = String(extraction.constraints.wordCount);
-    if (extraction.constraints.citationStyle && !a["citation_style"]) project.answers.citation_style = extraction.constraints.citationStyle;
-    // Later steps were based on an older reading of the brief.
-    delete project.answers.assignment_understanding;
-    await getProjectStore().save(project);
+    const extraction = await extractStep(req, project, req.body?.clarifications);
     res.json({ extraction });
   } catch (err) {
-    sendAiFailure(res, err, "Extract");
+    sendStepFailure(res, err, "Extract");
   }
 });
 
 router.post("/agent/understand", async (req: Req, res: express.Response) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
-  const a = project.answers;
-  const extraction = safeParseObject(a["assignment_extraction"]) as Extraction | null;
-  if (!extraction) return res.status(400).json({ error: "Run Extract first, so Scholar knows what the brief asks for.", code: "missing_extraction" });
   try {
-    const text = await routedCompletion(req, {
-      task: "reasoning",
-      systemPrompt: scholarBrain.courseworkPrompts.understandPrompt(),
-      userPrompt: scholarBrain.courseworkPrompts.understandUserPrompt(extraction, briefOf(a), {
-        level: String(a["academic_level"] || ""),
-        citationStyle: String(a["citation_style"] || ""),
-        words: Number(a["word_limit"]) || undefined,
-      }),
-    });
-    const understanding = parseUnderstanding(text ?? "");
-    if (!understanding) return sendAiFailure(res, new UnusableAiResponseError("assignment analysis"), "Understand");
-    project.answers.assignment_understanding = JSON.stringify({ ...understanding, at: now() });
-    // A starting thesis to test, only when the student has not written one.
-    if (understanding.thesisDirection && !cleanAnswerString(a["assignment_thesis"])) {
-      project.answers.assignment_thesis = understanding.thesisDirection;
-      project.answers.thesis_statement = understanding.thesisDirection;
-    }
-    await getProjectStore().save(project);
-
-    // The outline follows from this understanding.
-    const plan = [
-      `What to produce: ${understanding.produce}`,
-      `Approach: ${understanding.approach}`,
-      `Structure: ${understanding.structure}`,
-      understanding.criteria.length ? `Criteria: ${understanding.criteria.map((c) => `${c.criterion}: ${c.howToMeet}`).join("; ")}` : "",
-    ]
-      .filter(Boolean)
-      .join("\n");
-    let structure = null;
-    let outlineError: string | undefined;
-    try {
-      structure = await writeOutlineForProject(req, project, { plan });
-    } catch (e) {
-      outlineError = e instanceof Error ? e.message : "The outline could not be written.";
-    }
-    res.json({ understanding, structure, outlineError });
+    res.json(await understandStep(req, project));
   } catch (err) {
-    sendAiFailure(res, err, "Understand");
+    sendStepFailure(res, err, "Understand");
   }
 });
 
@@ -146,16 +188,20 @@ router.post("/agent/sources", async (req: Req, res: express.Response) => {
 
   const extraction = safeParseObject(a["assignment_extraction"]) as Extraction | null;
   const understanding = safeParseObject(a["assignment_understanding"]) as Understanding | null;
-  const structure = safeParseObject(a["assignment_structure"]) as { headings?: Array<{ subheadings?: Array<{ id: string; numberStr?: string; title: string }> }> } | null;
-  const sections = (structure?.headings ?? []).flatMap((h) => h.subheadings ?? []).map((s) => ({ id: s.id, title: `${s.numberStr ?? ""} ${s.title}`.trim() }));
+  const structure = safeParseObject(a["assignment_structure"]) as { headings?: Array<{ purpose?: string; subheadings?: Array<{ id: string; numberStr?: string; title: string; purpose?: string }> }> } | null;
+  // Each unit with its purpose (the section's when the unit has none), so mapping follows the plan.
+  const sections = (structure?.headings ?? []).flatMap((h) =>
+    (h.subheadings ?? []).map((s) => ({ id: s.id, title: `${s.numberStr ?? ""} ${s.title}`.trim(), purpose: s.purpose || h.purpose }))
+  );
+  const thesis = cleanAnswerString(a["assignment_thesis"]) || undefined;
   const task = understanding?.produce || extraction?.task || briefOf(a).slice(0, 600);
   try {
-    const text = await routedCompletion(req, { task: "reasoning", systemPrompt: scholarBrain.courseworkPrompts.sourcesPrompt(), userPrompt: scholarBrain.courseworkPrompts.sourcesUserPrompt(task, sections, sources) });
+    const text = await routedCompletion(req, { signal: abortOnClose(req), task: "reasoning", systemPrompt: scholarBrain.courseworkPrompts.sourcesPrompt(), userPrompt: scholarBrain.courseworkPrompts.sourcesUserPrompt(task, sections, sources, thesis) });
     const analyses = parseSourceAnalysis(text ?? "", sources, sections.map((s) => s.id));
     if (!analyses) return sendAiFailure(res, new UnusableAiResponseError("source analysis"), "Sources");
     const prev = (safeParseObject(a["assignment_source_analysis"]) as Record<string, unknown> | null) ?? {};
     project.answers.assignment_source_analysis = JSON.stringify({ ...prev, ...Object.fromEntries(analyses.map((x) => [x.id, { ...x, at: now() }])) });
-    await getProjectStore().save(project);
+    await saveChangedAnswers(project);
     res.json({ analyses });
   } catch (err) {
     sendAiFailure(res, err, "Sources");
@@ -189,7 +235,7 @@ router.post("/agent/evidence", async (req: Req, res: express.Response) => {
   }
   const input: EvidenceInput = { question, ...body.data };
   try {
-    const text = await routedCompletion(req, {
+    const text = await routedCompletion(req, { signal: abortOnClose(req),
       task: "reasoning",
       systemPrompt: scholarBrain.courseworkPrompts.evidencePrompt(),
       userPrompt: scholarBrain.courseworkPrompts.evidenceUserPrompt(input),
@@ -224,11 +270,11 @@ router.post("/agent/review", async (req: Req, res: express.Response) => {
     targetWords: Number(a["word_limit"]) || undefined,
   };
   try {
-    const text = await routedCompletion(req, { task: "long-context", systemPrompt: scholarBrain.courseworkPrompts.reviewPrompt(), userPrompt: scholarBrain.courseworkPrompts.reviewUserPrompt(input) });
+    const text = await routedCompletion(req, { signal: abortOnClose(req), task: "long-context", systemPrompt: scholarBrain.courseworkPrompts.reviewPrompt(), userPrompt: scholarBrain.courseworkPrompts.reviewUserPrompt(input) });
     const review = parseReview(text ?? "", input);
     if (!review) return sendAiFailure(res, new UnusableAiResponseError("draft review"), "Review");
     project.answers.assignment_ai_review = JSON.stringify({ ...review, at: now(), words: countProseWords(draft) });
-    await getProjectStore().save(project);
+    await saveChangedAnswers(project);
     res.json({ review });
   } catch (err) {
     sendAiFailure(res, err, "Review");

@@ -9,11 +9,10 @@ import { briefGroundedStances } from "../../../domain/assignment/briefThesis";
 import { applyQuestionWordTargets } from "../../../domain/assignment/outlineBudget";
 import { useState,useRef,useEffect,useCallback,useMemo } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
-import { authedJsonFetch,authedFetch } from "../../api";
+import { authedFetch } from "../../api";
 import {
 type AcademicLevel,
 type AssignmentType,
-type AssignmentAnalysis,
 type AssignmentStructure,
 type SectionBudgetItem,type WritingStyleConfig,
 type WritingStylePreset,ACADEMIC_LEVEL_OPTIONS,
@@ -22,8 +21,9 @@ STAGE_CITATION_STYLES as CITATION_STYLES,
 WRITING_TONE_OPTIONS,
 ARCHETYPE_DEFAULT_TONES,
 AGENTIC_THINKING_STAGES,
-AI_OUTLINE_TIMEOUT_MS,
 cleanAnswerString,
+emptyAssignmentStructure,
+hasOutline,
 extractStandardizedInstructions,
 structureToInternalSections,
 structureToSectionBudgets
@@ -35,8 +35,8 @@ ChevronDown,ArrowRight,RotateCcw
 import type { SectionBreakdown } from "../../../components/forms/TargetWordCountInput";
 import DynamicStructurePlanner from "../components/DynamicStructurePlanner";
 import { TONE_SUGGESTION_CHIPS } from "../components/WritingStyleSelector";
-import { generateDynamicAssignmentStructure } from "../services/dynamicStructure";
 import { autoBalanceStructure } from "../services/outlineEditing";
+import { generateDynamicAssignmentStructure } from "../services/dynamicStructure";
 import { briefSubQuestions } from "../services/briefSemantics";
 import { isDeepEqual } from "../../../utils/briefExtractor";
 import { validateBriefFile } from "../../../services/documentParser";
@@ -78,13 +78,16 @@ export default function AssignmentUnderstandStage({
     structure,
     setStructure,
     saveAnswers,
-    setAnalysis,
     advancePhase,
     setPhase,
     ensurePersisted,
     isLoading,
     executionMode,
     agent,
+    build,
+    rewriteOutline,
+    regenerateOutlineSection,
+    refineThesis,
   } = useAssignmentWorkspace();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -148,9 +151,12 @@ export default function AssignmentUnderstandStage({
 
   const initialStepSetRef = useRef(false);
   const userOverrideStepRef = useRef(false);
+  // The review opens once the brief has been read (or is being read): the
+  // outline then arrives in it, instead of the brief form showing again.
+  const briefReadOrBuilding = (answers: Record<string, unknown> | undefined) =>
+    Boolean(answers?.["assignment_structure"] || answers?.["assignment_extraction"]) || build.state.status === "running";
   const [understandStep, setUnderstandStep] = useState<"brief_input" | "outline_review">(() => {
-    const rawStruct: unknown = project?.answers?.["assignment_structure"];
-    if (rawStruct) {
+    if (briefReadOrBuilding(project?.answers as Record<string, unknown> | undefined)) {
       initialStepSetRef.current = true;
       return "outline_review";
     }
@@ -161,8 +167,7 @@ export default function AssignmentUnderstandStage({
     if (isLoading || initialStepSetRef.current || userOverrideStepRef.current) return;
     if (project) {
       initialStepSetRef.current = true;
-      const rawStruct: unknown = project?.answers?.["assignment_structure"];
-      if (rawStruct) {
+      if (briefReadOrBuilding(project?.answers as Record<string, unknown> | undefined)) {
         setUnderstandStep("outline_review");
       }
     }
@@ -196,28 +201,17 @@ export default function AssignmentUnderstandStage({
   }, [isLoading, question, academicLevel, assignmentType, targetWordCount, citationStyle, writingTone, project?.answers]);
 
   // Dynamic Structure state
-  const [localStructure, setLocalStructure] = useState<AssignmentStructure>(() => {
-    if (structure && structure.headings && structure.headings.length > 0) {
-      return autoBalanceStructure(structure, localWordCount);
-    }
-    const generated = generateDynamicAssignmentStructure({
-      question: cleanAnswerString(question),
-      assignmentType: localType,
-      academicLevel: localLevel,
-      targetWordCount: localWordCount,
-      writingTone: localTone,
-      citationStyle: localCitation,
-      briefText: cleanAnswerString(assignmentBriefText),
-    });
-    return autoBalanceStructure(generated, localWordCount);
-  });
+  const [localStructure, setLocalStructure] = useState<AssignmentStructure>(() =>
+    // No template stands in for the AI's outline: with none saved, there are no headings yet.
+    hasOutline(structure) ? autoBalanceStructure(structure, localWordCount) : emptyAssignmentStructure(localWordCount)
+  );
 
   // Active Thesis Statement state
   const [activeThesis, setActiveThesis] = useState<string>(() => {
     const existing = project?.answers?.["assignment_thesis"] || project?.answers?.["thesis_statement"] || structure?.thesisStatement;
     if (typeof existing === "string" && existing.trim().length > 0) return existing;
-    const defaultStances = briefGroundedStances([cleanAnswerString(assignmentBriefText), cleanAnswerString(question)].filter(Boolean).join("\n"));
-    return defaultStances[0]?.statement || "";
+    // No thesis is filled in from a template: the AI proposes, the student chooses.
+    return "";
   });
 
   const [isGeneratingStructure, setIsGeneratingStructure] = useState(false);
@@ -444,22 +438,10 @@ export default function AssignmentUnderstandStage({
 
     if (validCount <= 0) return;
 
-    let updated: AssignmentStructure;
-    if (localStructure && localStructure.headings && localStructure.headings.length > 0) {
-      updated = autoBalanceStructure(localStructure, validCount);
-    } else {
-      updated = generateDynamicAssignmentStructure({
-        question: localQuestion,
-        assignmentType: localType,
-        academicLevel: localLevel,
-        targetWordCount: validCount,
-        writingTone: localTone,
-        citationStyle: localCitation,
-        currentStructure: localStructure,
-        briefText: localBrief,
-      });
-      updated = autoBalanceStructure(updated, validCount);
-    }
+    // The AI's proportions, fitted to the new total; with no outline, only the total changes.
+    const updated: AssignmentStructure = hasOutline(localStructure)
+      ? autoBalanceStructure(localStructure, validCount)
+      : { ...localStructure, targetWordCount: validCount };
     setLocalStructure(updated);
     if (setStructure) {
       setStructure(updated);
@@ -593,18 +575,74 @@ export default function AssignmentUnderstandStage({
     return first.length > 200 ? `${first.slice(0, 199)}…` : first;
   }, [localBrief, localQuestion, subQuestions]);
 
+  // The AI's proposed theses when it has written them; otherwise starting
+  // points from the brief's own wording, labelled as not written by AI.
+  const aiThesisOptions = structure?.thesisOptions ?? [];
+  const thesisSource: "ai" | "brief" = aiThesisOptions.length > 0 ? "ai" : "brief";
   const thesisStances = useMemo(() => {
-    // Only stances grounded in the brief's own title and questions; none are made up.
+    if (aiThesisOptions.length > 0) {
+      return aiThesisOptions.map((o, i) => ({ id: `ai-thesis-${i}`, badge: "AI suggestion", title: o.angle ?? "", statement: o.statement, isRecommended: i === 0 }));
+    }
     return briefGroundedStances([localBrief, localQuestion].filter(Boolean).join("\n"));
-  }, [localQuestion, localBrief]);
+  }, [aiThesisOptions, localQuestion, localBrief]);
 
-  // Synchronize active thesis if empty: the AI's own line of argument first.
+  // An empty thesis takes the student's saved one, else the AI's first proposal
+  // (never a template stance). Waits for the project, so a saved thesis wins.
   useEffect(() => {
-    if (activeThesis) return;
-    const aiThesis = agent?.understanding?.thesisDirection?.trim();
+    if (isLoading || activeThesis) return;
+    const saved = cleanAnswerString(project?.answers?.["assignment_thesis"]);
+    if (saved) {
+      setActiveThesis(saved);
+      return;
+    }
+    const aiThesis = aiThesisOptions[0]?.statement?.trim() || agent?.understanding?.thesisDirection?.trim();
     if (aiThesis) setActiveThesis(aiThesis);
-    else if (thesisStances.length > 0) setActiveThesis(thesisStances[0].statement);
-  }, [activeThesis, thesisStances, agent?.understanding?.thesisDirection]);
+  }, [isLoading, activeThesis, project?.answers, aiThesisOptions, agent?.understanding?.thesisDirection]);
+
+  // What the build is doing, shown where its results will appear.
+  const buildRunning = build.state.status === "running";
+  const buildingMessage = buildRunning
+    ? build.state.steps.understand.message || build.state.steps.extract.message || "Reading your brief…"
+    : null;
+  const [regeneratingHeadingId, setRegeneratingHeadingId] = useState<string | null>(null);
+  const [outlineActionError, setOutlineActionError] = useState<string | null>(null);
+  const handleRegenerateOutline = async () => {
+    if (buildRunning) return;
+    setOutlineActionError(null);
+    // No outline yet (or none from AI): run the whole build; otherwise rewrite the outline only.
+    if (!hasOutline(localStructure)) {
+      await build.run({ force: true });
+      return;
+    }
+    setIsGeneratingStructure(true);
+    const out = await rewriteOutline();
+    setIsGeneratingStructure(false);
+    if (!out.ok) setOutlineActionError(out.error);
+  };
+  const handleRegenerateHeading = async (headingId: string) => {
+    if (regeneratingHeadingId) return;
+    setRegeneratingHeadingId(headingId);
+    setOutlineActionError(null);
+    const out = await regenerateOutlineSection(headingId);
+    setRegeneratingHeadingId(null);
+    if (!out.ok) setOutlineActionError(out.error);
+  };
+  // A plain outline from the brief's wording, only when the student asks for it.
+  const handleUseStarterOutline = () => {
+    const starter: AssignmentStructure = {
+      ...generateDynamicAssignmentStructure({
+        question: localQuestion,
+        assignmentType: localType,
+        academicLevel: localLevel,
+        targetWordCount: localWordCount,
+        citationStyle: localCitation,
+        briefText: localBrief,
+      }),
+      source: "starter",
+      rationale: "A plain outline from your brief's wording (not written by AI). Edit it as you need.",
+    };
+    handleStructureChange(starter);
+  };
 
   const handleProceedToSources = async () => {
     if (!canProceedToSources) return;
@@ -681,141 +719,32 @@ export default function AssignmentUnderstandStage({
     }
   };
 
+  /**
+   * Build (or rebuild) from the brief with the student's AI: one server build
+   * reads the brief, plans it and writes the outline with thesis options.
+   * Nothing is drawn from a template while it runs or if it fails.
+   */
   const handleGenerateStructure = async () => {
     if (!canGenerate || isGeneratingStructure) return;
     setIsGeneratingStructure(true);
-
-    let proposedStructure = generateDynamicAssignmentStructure({
-      question: localQuestion,
-      assignmentType: localType,
-      academicLevel: localLevel,
-      targetWordCount: localWordCount,
-      writingTone: localTone,
-      citationStyle: localCitation,
-      briefText: localBrief,
-    });
-
-    proposedStructure = autoBalanceStructure(proposedStructure, localWordCount);
-
-    // Update state immediately so outline_review renders without delay
-    setLocalStructure(proposedStructure);
-    if (setStructure) {
-      setStructure(proposedStructure);
-    }
-    userOverrideStepRef.current = false;
-    setUnderstandStep("outline_review");
-
-    const defaultStances = briefGroundedStances([localBrief, localQuestion].filter(Boolean).join("\n"));
-    if (!activeThesis && defaultStances.length > 0) {
-      setActiveThesis(defaultStances[0].statement);
-    }
-
-    let serverAnalysis: AssignmentAnalysis | null = null;
-
     try {
-      const targetProjectId = await ensurePersisted();
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Structure generation timeout")), AI_OUTLINE_TIMEOUT_MS)
-      );
-
-      const response = await Promise.race([
-        authedJsonFetch(
-          `/api/projects/${targetProjectId}/assignment/analyze`,
-          "POST",
-          {
-            question: localQuestion,
-            assignmentType: localType,
-            academicLevel: localLevel,
-            targetWordCount: localWordCount,
-            citationStyle: localCitation,
-            writingTone: localTone,
-            writing_tone: localTone,
-            briefText: localBrief,
-          }
-        ),
-        timeoutPromise,
-      ]);
-
-      if (response && response.ok) {
-        const data = await response.json();
-        const incomingAnalysis: AssignmentAnalysis = data.analysis || data;
-        if (data.structure && data.structure.headings?.length > 0) {
-          proposedStructure = autoBalanceStructure(data.structure, localWordCount);
-          setLocalStructure(proposedStructure);
-          if (setStructure) {
-            setStructure(proposedStructure);
-          }
-        }
-        if (incomingAnalysis && (incomingAnalysis.commandVerbs || incomingAnalysis.briefLedger || incomingAnalysis.summary)) {
-          serverAnalysis = incomingAnalysis;
-        }
-      }
-    } catch (err: unknown) {
-      console.warn("Using resilient client structure generation:", err);
-    }
-
-    const internalSecs = structureToInternalSections(proposedStructure);
-    const budgets = structureToSectionBudgets(proposedStructure);
-    const budget = computeWordBudgetFromSections(localWordCount, budgets);
-    const legacyBreakdown = computeSectionBreakdown(localWordCount, budgets);
-
-    const updates: Record<string, unknown> = {
-      instructions: localQuestion,
-      research_topic: localQuestion,
-      assignment_question: localQuestion,
-      assignment_prompt: localQuestion,
-      assignment_brief: localQuestion,
-      academic_level: localLevel,
-      academicLevel: localLevel,
-      assignment_type: localType,
-      assignmentType: localType,
-      word_count: localWordCount,
-      word_limit: localWordCount,
-      targetWordCount: localWordCount,
-      target_word_count: localWordCount,
-      citation_style: localCitation,
-      citationStyle: localCitation,
-      writing_tone: localTone,
-      writingTone: localTone,
-      assignment_structure: proposedStructure,
-      structure: proposedStructure,
-      sectionBudgets: budgets,
-      section_budgets: budgets,
-      assignment_internal_sections: internalSecs,
-      assignment_outline: internalSecs,
-      wordBudget: budget,
-      word_budget: budget,
-      sections: legacyBreakdown,
-      writingStyle: {
-        ...localStyle,
-        preset: localTone as WritingStylePreset,
-      },
-      writing_style: {
-        ...localStyle,
-        preset: localTone as WritingStylePreset,
-      },
-      assignment_brief_text: localBrief || localQuestion,
-      course_name: course,
-      institution,
-      deadline,
-      marking_rubric: rubricText,
-      courseDetails: {
-        courseCode: course,
+      await ensurePersisted();
+      await saveAnswers({
+        assignment_brief: localBrief || localQuestion,
+        academic_level: localLevel,
+        assignment_type: localType,
+        word_limit: localWordCount,
+        citation_style: localCitation,
+        writing_tone: localTone,
+        writing_style: { ...localStyle, preset: localTone as WritingStylePreset },
+        course_name: course,
         institution,
         deadline,
-        rubric: rubricText,
-      },
-    };
-
-    if (serverAnalysis) {
-      updates.assignment_analysis = typeof serverAnalysis === "string" ? serverAnalysis : JSON.stringify(serverAnalysis);
-      setAnalysis(serverAnalysis);
-    }
-
-    try {
-      await saveAnswers(updates);
-    } catch (saveErr) {
-      console.warn("Could not save answers during structure generation:", saveErr);
+        marking_rubric: rubricText,
+      });
+      userOverrideStepRef.current = false;
+      setUnderstandStep("outline_review");
+      await build.run({ force: true });
     } finally {
       setIsGeneratingStructure(false);
     }
@@ -872,35 +801,14 @@ export default function AssignmentUnderstandStage({
       if (data.detectedLevel) setLocalLevel(data.detectedLevel);
       if (data.detectedCitation) setLocalCitation(data.detectedCitation);
 
-      let dynamicStruct = generateDynamicAssignmentStructure({
-        question: cleanPrompt,
-        assignmentType: localType,
-        targetWordCount: newWordCount,
-        writingTone: localTone,
-        citationStyle: nextCitation,
-      });
-      dynamicStruct = autoBalanceStructure(dynamicStruct, newWordCount);
-
-      setLocalStructure(dynamicStruct);
+      // Reading the brief and writing the outline is Build's job (one server build);
+      // the review shows what was read, and the outline area offers to build it.
       setUnderstandStep("outline_review");
-
-      const budgets = structureToSectionBudgets(dynamicStruct);
-      const internalSecs = structureToInternalSections(dynamicStruct);
-
       await saveAnswers({
-        instructions: cleanPrompt,
-        assignment_question: cleanPrompt,
-        assignment_prompt: cleanPrompt,
-        assignment_brief_text: cleanPrompt,
+        assignment_brief: cleanPrompt,
         academic_level: nextLevel,
-        targetWordCount: newWordCount,
-        target_word_count: newWordCount,
-        word_count: newWordCount,
+        word_limit: newWordCount,
         citation_style: nextCitation,
-        assignment_structure: dynamicStruct,
-        section_budgets: budgets,
-        assignment_internal_sections: internalSecs,
-        wordBudget: computeWordBudgetFromSections(newWordCount, budgets),
       });
     } catch (err: unknown) {
       console.warn("Upload error:", err);
@@ -977,7 +885,7 @@ export default function AssignmentUnderstandStage({
           />
           <GradingCriteriaCard briefText={cleanAnswerString(localBrief) || cleanAnswerString(localQuestion)} rubricText={rubricText || markingRubricText} />
 
-          <UnderstandAngleAndVoice activeThesis={activeThesis} coreTopic={coreTopic} dispatchToneAssistantSuggestions={dispatchToneAssistantSuggestions} handleToneChange={handleToneChange} localStyle={localStyle} localTone={localTone} saveAnswers={saveAnswers} setActiveThesis={setActiveThesis} setLocalStyle={setLocalStyle} setWritingStyle={setWritingStyle} thesisStances={thesisStances} toneSectionRef={toneSectionRef} />
+          <UnderstandAngleAndVoice activeThesis={activeThesis} coreTopic={coreTopic} dispatchToneAssistantSuggestions={dispatchToneAssistantSuggestions} handleToneChange={handleToneChange} localStyle={localStyle} localTone={localTone} saveAnswers={saveAnswers} setActiveThesis={setActiveThesis} setLocalStyle={setLocalStyle} setWritingStyle={setWritingStyle} thesisStances={thesisStances} thesisSource={thesisSource} thesisPending={buildRunning && thesisSource !== "ai" ? "Your AI is proposing working theses…" : null} onRefineThesis={refineThesis} toneSectionRef={toneSectionRef} />
 
             {/* Collapsed-by-default Fine-Tune Accordion */}
             <details className="rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]/50 group">
@@ -993,12 +901,31 @@ export default function AssignmentUnderstandStage({
                 </span>
               </summary>
               <div className="p-4 pt-1 border-t border-[color:var(--border-subtle)]">
+                {(outlineActionError || (build.state.status === "error" && build.state.error) || build.state.status === "interrupted") && (
+                  <div role="alert" className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--state-danger-subtle)] px-3 py-2 text-xs text-[color:var(--state-danger)]">
+                    <span>
+                      {outlineActionError ||
+                        (build.state.status === "interrupted"
+                          ? "Reading your brief was interrupted before it finished."
+                          : build.state.error)}
+                    </span>
+                    {!outlineActionError && (
+                      <button type="button" onClick={() => void build.run({ force: true })} className="px-3 py-1 rounded-full border border-current font-medium cursor-pointer">
+                        Try again
+                      </button>
+                    )}
+                  </div>
+                )}
                 <DynamicStructurePlanner
                   structure={localStructure}
                   targetWordCount={localWordCount}
                   onStructureChange={handleStructureChange}
                   onTargetWordCountChange={handleTargetWordCountChange}
-                  onRegenerateOutline={handleGenerateStructure}
+                  onRegenerateOutline={handleRegenerateOutline}
+                  onRegenerateHeading={handleRegenerateHeading}
+                  regeneratingHeadingId={regeneratingHeadingId}
+                  buildingMessage={buildingMessage}
+                  onUseStarterOutline={handleUseStarterOutline}
                   question={localQuestion}
                   assignmentType={localType}
                   academicLevel={localLevel}
@@ -1031,8 +958,8 @@ export default function AssignmentUnderstandStage({
             <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full sm:w-auto">
               <button
                 type="button"
-                disabled={isGeneratingStructure}
-                onClick={handleGenerateStructure}
+                disabled={isGeneratingStructure || buildRunning}
+                onClick={() => void handleRegenerateOutline()}
                 aria-label="Regenerate Outline (Generate Structure)"
                 className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-[color:var(--border-default)] hover:bg-[color:var(--surface-hover)] text-xs font-semibold text-[color:var(--text-primary)] transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
               >
@@ -1044,19 +971,20 @@ export default function AssignmentUnderstandStage({
                 ) : (
                   <>
                     <RotateCcw className="w-3.5 h-3.5 text-purple-500" />
-                    <span>Regenerate Outline</span>
+                    <span>Regenerate outline with AI</span>
                   </>
                 )}
               </button>
 
               <button
                 type="button"
-                disabled={!canProceedToSources || isGeneratingStructure}
+                disabled={!canProceedToSources || isGeneratingStructure || buildRunning || !hasOutline(localStructure)}
                 onClick={handleProceedToSources}
+                title={hasOutline(localStructure) ? "Approves this thesis and outline; you can still change them later" : "Your outline comes first"}
                 aria-label="Proceed (Approve Outline & Proceed / Confirm Structure & Proceed to Sources / Proceed to Sources)"
                 className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 active:scale-[0.99] font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <span>Proceed to Sources</span>
+                <span>Approve outline &amp; continue to Sources</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>

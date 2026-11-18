@@ -4,7 +4,7 @@
  * Formats citations and references according to APA 7th edition style.
  */
 
-import { pageRange } from "./bibParts";
+import { inTextSurnames, pageRange } from "./bibParts";
 import type { CitationStyle, InTextOptions } from "../styleTypes";
 import { authorDateYear, type CanonicalReference, type ReferenceAuthor } from "../model/reference";
 
@@ -15,31 +15,17 @@ import { authorDateYear, type CanonicalReference, type ReferenceAuthor } from ".
 /**
  * APA 7th edition formatter.
  */
+const APA_STANDALONE = new Set<CanonicalReference["kind"]>(["Book", "TechnicalReport", "Website", "Dataset", "Software", "Thesis", "Dissertation", "Preprint", "GovernmentPublication", "Standard"]);
+
 export class APA7Formatter implements CitationStyle {
   id = "apa-7";
   name = "APA 7th Edition";
   version = "7";
 
   formatInText(reference: CanonicalReference, options?: InTextOptions): string {
-    const author = this.inTextAuthors(reference.authors);
+    const author = inTextSurnames(reference, 2, "&");
 
-    if (options?.position !== undefined && options.locator) {
-      return `${author}, ${options.position}`;
-    }
-
-    return `(${author}, ${authorDateYear(reference)})`;
-  }
-
-  /**
-   * APA 7 in-text names: surnames only (8.17): one author "Kubin", two
-   * "Kubin & von Sikorski", three or more "Kubin et al.".
-   */
-  private inTextAuthors(authors: CanonicalReference["authors"]): string {
-    const names = (authors ?? []).map((a) => a.lastName).filter(Boolean);
-    if (names.length === 0) return "";
-    if (names.length === 1) return names[0];
-    if (names.length === 2) return `${names[0]} & ${names[1]}`;
-    return `${names[0]} et al.`;
+    return `(${author}, ${authorDateYear(reference)}${options?.locator ? `, ${options.locator}` : ""})`;
   }
 
   /**
@@ -53,7 +39,10 @@ export class APA7Formatter implements CitationStyle {
     const year = `(${authorDateYear(reference)}).`;
     const endSentence = (t: string) => (/[.?!]$/.test(t) ? t : `${t}.`);
     const parts: string[] = [];
-    const title = reference.kind === "Book" ? endSentence(`*${reference.title}*`) : endSentence(reference.title);
+    // APA 7 (6.22): titles of works that stand alone are italic; articles, chapters and papers in a container are not.
+    const title = APA_STANDALONE.has(reference.kind)
+      ? endSentence(`*${reference.title.replace(/\.$/, "")}*${reference.kind === "Dataset" ? " [Data set]" : ""}`) // APA 7 (10.9)
+      : endSentence(reference.title);
     // APA 7 (9.12): with no author, the title moves to the author position.
     if (authors) parts.push(endSentence(authors), year, title);
     else parts.push(title, year);
@@ -70,6 +59,9 @@ export class APA7Formatter implements CitationStyle {
         if (reference.pages) container += `, ${pageRange(reference.pages)}`;
         parts.push(endSentence(container));
       }
+    } else if ((reference.kind === "ConferencePaper" || reference.kind === "BookChapter") && reference.source) {
+      // APA 7 (10.3, 10.5): "In *Proceedings or book* (pp. 770–778)."
+      parts.push(endSentence(`In *${reference.source}*${reference.pages ? ` (pp. ${pageRange(reference.pages)})` : ""}`));
     } else {
       if (reference.source) parts.push(endSentence(reference.source));
     }

@@ -14,7 +14,6 @@ How AI requests are authored, routed, paid for and kept safe. Entry layers and c
 | `callJSON`, `callText`, `streamJSON` | Wrappers over the llm helpers |
 | `readVerifiedBrowserResult` | Verifies a result the browser produced for a hand-off prompt |
 | `signLlmChallenge`, `computePromptHash` | Signed challenge for prompts that the browser runs and returns |
-| `generateGeminiEmbedding` | Embeddings for semantic RAG |
 | `retrieveEvidence` | Live scholarly discovery (OpenAlex, Crossref, EuropePMC/PubMed, arXiv) plus Vault and uploaded datasets |
 | `scrubAndFormatCitations` | Citation-lock scrub: removes unverified author-year strings and formats verified `[CITE:id]` tokens in the requested style (`apa7`, `harvard`, `ieee`, `chicago`, `mla9`, `vancouver`, `oscola`) |
 | `enforceScholarlyVoice` | British orthography, cliché suppression, burstiness check |
@@ -91,10 +90,9 @@ Model names are never listed in code: they come live from the provider (`GET /ap
 - Scholarly retrieval: `server/src/research/scholarlyRetrievalPipeline.ts`, `server/src/retrieval/retrievalService.ts`, `server/src/discovery/` (`discovery.ts`, `blueprintScout.ts`), and the client-side `src/services/liveSearchService.ts`. Coursework source discovery runs in the browser through `src/desk/assignment/services/realScholarlyDiscoveryService.ts` (OpenAlex, Crossref, Semantic Scholar, DOAJ, DataCite, arXiv with `Promise.allSettled` and timeouts).
 - Optional keys: `TAVILY_API_KEY`, `SERPER_API_KEY`, `BRAVE_SEARCH_API_KEY`, `OPENALEX_API_KEY`, `OPENALEX_MAILTO`. The `search-proxy` Edge Function restricts Tavily to basic and advanced search.
 
-## 8. Multi-agent mesh and LangGraph
+## 8. Multi-agent mesh
 
 - `src/app/mesh/` is the agent registry and executor (`registry.ts`, `executor.ts`); four agents are registered by `registerBuiltinAgents()`: `ag14CitationManager`, `ag18ReadabilityAnalyst`, `ag25PrivacyGuard`, `ag26WorkflowCoordinator`. `GET /api/projects/:id/mesh/agents` lists them and `POST .../mesh/run` runs one.
-- `server/services/briefScannerGraph.ts` is a LangGraph workflow for brief scanning.
 - Journal peer review simulates referee lenses (`src/app/review/peerReview.ts`, `server/routes/project/agentic/reviewRoutes.ts`).
 
 ## 9. Offline scaffold

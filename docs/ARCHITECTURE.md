@@ -42,7 +42,7 @@ Process start order in `server.ts`: helmet and CSP, request-header redaction, Su
 | Server | Express 4 (`express-async-errors`), helmet 8, multer 2, run with `tsx` in development and bundled by esbuild to `dist/server.cjs` (`--packages=external`) |
 | Language | TypeScript ~5.8, strict; path alias `@/*` resolves to the repository root |
 | Validation | zod 4 |
-| AI libraries | LangGraph with LangChain core (`server/services/briefScannerGraph.ts`); providers are called through the app's own router adapters (`src/platform/router`), not vendor SDKs |
+| AI libraries | None: providers are called through the app's own router adapters (`src/platform/router`), not vendor SDKs |
 | Documents | `pdf-parse`, `mammoth`, `docx`, `pdfmake`, `pptxgenjs`, `jszip` |
 | Data | `@supabase/supabase-js` (client), Supabase Data API over HTTPS from the server, optional `pg` direct connection |
 | Tests | Vitest 4 + Testing Library (unit and route tests), Playwright + axe (end to end) |
@@ -63,7 +63,7 @@ Registered in `server.ts` in this order: health, admin, auth, `/api/ai/run` and 
 | `studio.ts` | `/api/studio/*` (voice profile, refine, consent, restrict, egress audit) |
 | `project.ts` | `/api/projects/*` and `/api/atlas/output-types`, `/api/user/saved-authors`; mounts the sub-routers in `server/routes/project/` |
 | `aiAccess.ts` | `/api/ai-access/*` |
-| `search.ts` | `/api/search/*` and the alias `/api/discovery/*` |
+| `search.ts` | `/api/search/*` |
 | `vault.ts` | `/api/vault/*` and `POST /api/lookup-doi` |
 | `presentations.ts` | `/api/presentations/*` |
 | `supabaseProxy.ts` | `/api/supabase/*` (HTTP) and WebSocket upgrade |
@@ -129,7 +129,7 @@ The server imports from `src/` (citation formatters, `document_intelligence`, me
 | `src/features/` | `slides` (Presentation Studio and Gamma card engine), `coursework` (style engine, legacy coursework components), `drafting`, `sources`, `understand` |
 | `src/platform/` | `router/` (the one AI engine: adapters, failover, key rotation, circuit breaker, model listing and curation, SSE bridge), `completion.ts` (the `Completer` app modules use), `warden/` (egress policy, used by the mesh agents) |
 | `src/services/` | Auth, Supabase client, vault, store, offline queue, crypto, capabilities, AI settings and diagnostics |
-| `src/citation_compliance/` | The one citation engine: formatters, validation, CSL engine, BibTeX/RIS importers (the Vault's Add Source dialog reads pasted records through them) |
+| `src/citation_compliance/` | The one citation engine: formatters (the only reference-entry renderer), validation, CSL engine (verifies sources; its entries and in-text citations, like those of Journal and Thesis (`domain/journal/citationStyles.ts`), are rendered by the formatters), BibTeX/RIS importers (the Vault's Add Source dialog reads pasted records through them) |
 | `src/config/` | `providerCatalog.ts`, `localRunnerCatalog.ts`, `keySlots.ts`, `askScholarConfig.ts`, `accountSchema.ts` |
 | `src/shared/` | Cross-cutting helpers (project state schema, LLM JSON parser, guardrails, style weights) |
 

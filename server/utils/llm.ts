@@ -5,6 +5,7 @@ import { parseAndRepairLLMJson } from "../../src/shared/llmJsonParser.ts";
 import { InvalidLlmChallengeError } from "../src/ai/aiRouteErrors.ts";
 import { chainFor, NoAiConnectedError, routedText, RouterHandoffError, toRouterTask } from "../src/ai/routerBridge.ts";
 import type { RouterEvent } from "../../src/platform/router/types.ts";
+import { openSse, type SseResponse } from "../src/utils/sse.ts";
 
 if (!process.env.VITEST && process.env.NODE_ENV !== "test") {
   dotenv.config();
@@ -245,17 +246,36 @@ export async function callOpenRouterJSON<T = any>(
   return parseJsonFromLlm<T>(text) as T;
 }
 
+/** Live output of a text call: tokens as they arrive, and a reset when the router drops partial output to switch model. */
+export interface TextCallStream {
+  onToken?: (text: string) => void;
+  onReset?: () => void;
+  /** Aborts the model call (e.g. when the client disconnects). */
+  signal?: AbortSignal;
+}
+
 export async function callOpenRouterText(
   req: LlmRequestLike,
   res: LlmResponseLike,
   systemPrompt: string,
   userPrompt: string,
   _model?: string,
-  taskType: string = "reasoning"
+  taskType: string = "reasoning",
+  stream: TextCallStream = {}
 ): Promise<string> {
   const override = handleFrontendLLMOverride(req, res, systemPrompt, userPrompt);
-  if (override) return override;
-  return routeOrHandOff(req, res, systemPrompt, userPrompt, taskType);
+  if (override) {
+    // The browser already ran the model: its whole answer is the only "token".
+    stream.onToken?.(override);
+    return override;
+  }
+  const onEvent = stream.onToken || stream.onReset
+    ? (ev: RouterEvent) => {
+        if (ev.type === "token") stream.onToken?.(ev.text);
+        else if (ev.type === "fallback" && ev.partialOutputDiscarded) stream.onReset?.();
+      }
+    : undefined;
+  return routeOrHandOff(req, res, systemPrompt, userPrompt, taskType, { onEvent, signal: stream.signal });
 }
 
 /**
@@ -311,13 +331,10 @@ async function streamThroughRouter(
     if (err instanceof NoAiConnectedError) return handOff();
     throw err;
   }
-  if (!res.headersSent && res.writeHead) {
-    res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
-  }
-  const sendEvent = (event: string, data: unknown) => { res.write?.(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
-  const streamAbort = new AbortController();
-  const onClose = () => { if (!(res as { writableFinished?: boolean }).writableFinished) streamAbort.abort(); };
-  (res as any)?.on?.("close", onClose);
+  // Shared plumbing: headers flushed, heartbeat, abort when the client goes away.
+  const sse = openSse(res as SseResponse);
+  const sendEvent = (event: string, data: unknown) => sse.send(data, event);
+  const streamAbort = { signal: sse.signal };
   let full = "";
   try {
     full = await routedText(req as unknown as express.Request, {
@@ -331,8 +348,6 @@ async function streamThroughRouter(
       return undefined;
     }
     throw err;
-  } finally {
-    (res as any)?.off?.("close", onClose);
   }
 }
 
@@ -350,45 +365,4 @@ export async function streamOpenRouterJSON(
   if (text === undefined) return undefined;
   res.write?.(`event: log\ndata: ${JSON.stringify({ message: "> Parsing final JSON..." })}\n\n`);
   return parseJsonFromLlm(text);
-}
-
-export async function streamOpenRouterText(
-  req: LlmRequestLike,
-  res: LlmResponseLike,
-  systemPrompt: string,
-  userPrompt: string,
-  _model?: string,
-  taskType: string = "reasoning"
-) {
-  const override = handleFrontendLLMOverride(req, res, systemPrompt, userPrompt);
-  if (override) return override;
-  return streamThroughRouter(req, res, systemPrompt, userPrompt, taskType);
-}
-
-export async function generateGeminiEmbedding(text: string, apiKey?: string): Promise<number[]> {
-  if (!apiKey) {
-    throw new Error("Client BYOK Gemini API key is required for embeddings.");
-  }
-
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${encodeURIComponent(
-      apiKey
-    )}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "models/text-embedding-004",
-        content: { parts: [{ text }] },
-      }),
-    }
-  );
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Gemini Embedding API error: ${response.status} ${errorText}`);
-  }
-
-  const data = await response.json();
-  return data.embedding.values;
 }

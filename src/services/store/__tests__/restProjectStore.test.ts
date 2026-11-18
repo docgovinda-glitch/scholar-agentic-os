@@ -449,3 +449,35 @@ describe("restProjectStore: failures", () => {
     await expect(s.get("proj-abc")).rejects.toThrow(/500/);
   });
 });
+
+describe("restProjectStore: patchAnswers", () => {
+  it("merges through the patch_project_answers function and returns the stored row", async () => {
+    const { s, calls } = store(() => ({ body: [row({ answers: { keep: "me", title: "T" } })] }));
+    const out = await s.patchAnswers!("proj-abc", { title: "T", gone: null });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe(`${URL_BASE}/rest/v1/rpc/patch_project_answers`);
+    expect(calls[0].method).toBe("POST");
+    expect(calls[0].body).toEqual({ p_project_id: "proj-abc", p_patch: { title: "T", gone: null } });
+    expect(out?.answers).toEqual({ keep: "me", title: "T" });
+  });
+
+  it("falls back to read-merge-write while the function is not deployed", async () => {
+    const { s, calls } = store((c) => {
+      if (c.url.includes("/rpc/")) return { status: 404, body: { code: "PGRST202", message: "Could not find the function" } };
+      if (c.method === "GET") return { body: [row({ answers: { keep: "me", gone: "x" } })] };
+      return { status: 201, body: undefined };
+    });
+    const out = await s.patchAnswers!("proj-abc", { title: "T", gone: null });
+    expect(out?.answers).toEqual({ keep: "me", title: "T" });
+    const write = calls.find((c) => c.method === "POST" && !c.url.includes("/rpc/"));
+    expect((write?.body as { answers: unknown }).answers).toEqual({ keep: "me", title: "T" });
+    // The missing function is not asked for again.
+    await s.patchAnswers!("proj-abc", { title: "U" });
+    expect(calls.filter((c) => c.url.includes("/rpc/"))).toHaveLength(1);
+  });
+
+  it("does not hide other failures", async () => {
+    const { s } = store(() => ({ status: 500, body: { message: "boom" } }));
+    await expect(s.patchAnswers!("proj-abc", { a: 1 })).rejects.toThrow(/500/);
+  });
+});

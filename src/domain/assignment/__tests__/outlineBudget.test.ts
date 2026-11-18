@@ -67,7 +67,7 @@ describe("marks-aware AI outlines", () => {
     expect(out.headings[0].targetWordCount % 10).toBe(0);
   });
 
-  it("is applied to what the AI returns via structureFromAi", () => {
+  it("is not applied to what the AI returns: the AI's proportions stay, and marks only add a note", () => {
     const aiJson = JSON.stringify({
       sections: [
         { title: "Q1 Qubit modalities", subsections: [{ title: "Coherence", words: 900 }] },
@@ -75,7 +75,11 @@ describe("marks-aware AI outlines", () => {
         { title: "Q3 Surface code thresholds", subsections: [{ title: "Thresholds", words: 150 }] },
       ],
     });
-    const out = structureFromAi(aiJson, 2000, { briefText: BRIEF });
-    expect(out?.headings.map((h) => h.targetWordCount)).toEqual([400, 600, 1000]);
+    const out = structureFromAi(aiJson, 2000, { briefText: BRIEF })!;
+    const words = out.headings.map((h) => h.targetWordCount);
+    expect(sum(words)).toBe(2000);
+    // 900 : 800 : 150, scaled to 2,000 (clean multiples of 10).
+    expect(words).toEqual([980, 860, 160]);
+    expect(out.budgetNotes?.join(" ")).toMatch(/Q3 carries 50% of the marks/);
   });
 });

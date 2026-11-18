@@ -123,26 +123,26 @@ describe("CSL-JSON Golden-File Citation Engine (Section 6)", () => {
     expect(formatCSLInTextSingle(csl, "chicago-notes", 1)).toBe("[1]");
     expect(formatCSLInTextSingle(csl, "harvard", 1)).toBe("(Turing, 1950)");
     expect(formatCSLInTextSingle(csl, "ieee", 1)).toBe("[1]");
-    expect(formatCSLInTextSingle(csl, "vancouver", 1)).toBe("(1)");
+    expect(formatCSLInTextSingle(csl, "vancouver", 1)).toBe("[1]");
 
     // Bibliography golden output
     expect(formatCSLBibliographyEntry(csl, "apa", 1).markdownText).toBe(
-      "Turing, A. M. (1950). Computing Machinery and Intelligence. *Mind*, *59*(236), 433-460. https://doi.org/10.1093/mind/LIX.236.433"
+      "Turing, A. M. (1950). Computing Machinery and Intelligence. *Mind*, *59*(236), 433\u2013460. https://doi.org/10.1093/mind/LIX.236.433"
     );
     expect(formatCSLBibliographyEntry(csl, "mla", 1).markdownText).toBe(
-      'Turing, Alan M. "Computing Machinery and Intelligence." *Mind*, vol. 59, no. 236, 1950, pp. 433-460. https://doi.org/10.1093/mind/LIX.236.433.'
+      'Turing, Alan M. "Computing Machinery and Intelligence." *Mind*, vol. 59, no. 236, 1950, pp. 433–460, https://doi.org/10.1093/mind/LIX.236.433.'
     );
     expect(formatCSLBibliographyEntry(csl, "chicago", 1).markdownText).toBe(
-      'Turing, Alan M. 1950. "Computing Machinery and Intelligence." *Mind* 59 (236): 433-460. https://doi.org/10.1093/mind/LIX.236.433.'
+      'Turing, Alan M. 1950. "Computing Machinery and Intelligence." *Mind* 59 (236): 433–460. https://doi.org/10.1093/mind/LIX.236.433.'
     );
     expect(formatCSLBibliographyEntry(csl, "chicago-notes", 1).markdownText).toBe(
-      'Turing, Alan M. "Computing Machinery and Intelligence." *Mind* 59, no. 236 (1950): 433-460. https://doi.org/10.1093/mind/LIX.236.433.'
+      'Turing, Alan M. "Computing Machinery and Intelligence." *Mind* 59, no. 236 (1950): 433–460. https://doi.org/10.1093/mind/LIX.236.433.'
     );
     expect(formatCSLBibliographyEntry(csl, "harvard", 1).markdownText).toBe(
-      "Turing, A.M. (1950) 'Computing Machinery and Intelligence', *Mind*, 59(236), pp. 433-460. doi:10.1093/mind/LIX.236.433."
+      "Turing, A.M. (1950) 'Computing Machinery and Intelligence', *Mind*, 59(236), pp. 433\u2013460. Available at: https://doi.org/10.1093/mind/LIX.236.433."
     );
     expect(formatCSLBibliographyEntry(csl, "ieee", 1).markdownText).toBe(
-      '[1] A. M. Turing, "Computing Machinery and Intelligence," *Mind*, vol. 59, no. 236, pp. 433-460, 1950, doi: 10.1093/mind/LIX.236.433.'
+      '[1] A. M. Turing, "Computing Machinery and Intelligence," *Mind*, vol. 59, no. 236, pp. 433–460, 1950, doi: 10.1093/mind/LIX.236.433.'
     );
     expect(formatCSLBibliographyEntry(csl, "vancouver", 1).markdownText).toBe(
       "1. Turing AM. Computing Machinery and Intelligence. Mind. 1950;59(236):433-460. doi:10.1093/mind/LIX.236.433"
@@ -160,22 +160,22 @@ describe("CSL-JSON Golden-File Citation Engine (Section 6)", () => {
     expect(formatCSLInTextSingle(csl, "chicago", 2)).toBe("(Kahneman and Tversky 1979)");
     expect(formatCSLInTextSingle(csl, "harvard", 2)).toBe("(Kahneman and Tversky, 1979)");
     expect(formatCSLInTextSingle(csl, "ieee", 2)).toBe("[2]");
-    expect(formatCSLInTextSingle(csl, "vancouver", 2)).toBe("(2)");
+    expect(formatCSLInTextSingle(csl, "vancouver", 2)).toBe("[2]");
 
     expect(formatCSLBibliographyEntry(csl, "apa", 2).markdownText).toBe(
-      "Kahneman, D., & Tversky, A. (1979). Prospect Theory: An Analysis of Decision under Risk. *Econometrica*, *47*(2), 263-291. https://doi.org/10.2307/1914185"
+      "Kahneman, D., & Tversky, A. (1979). Prospect Theory: An Analysis of Decision under Risk. *Econometrica*, *47*(2), 263\u2013291. https://doi.org/10.2307/1914185"
     );
     expect(formatCSLBibliographyEntry(csl, "mla", 2).markdownText).toBe(
-      'Kahneman, Daniel, and Amos Tversky. "Prospect Theory: An Analysis of Decision under Risk." *Econometrica*, vol. 47, no. 2, 1979, pp. 263-291. https://doi.org/10.2307/1914185.'
+      'Kahneman, Daniel, and Amos Tversky. "Prospect Theory: An Analysis of Decision under Risk." *Econometrica*, vol. 47, no. 2, 1979, pp. 263–291, https://doi.org/10.2307/1914185.'
     );
     expect(formatCSLBibliographyEntry(csl, "chicago", 2).markdownText).toBe(
-      'Kahneman, Daniel, and Amos Tversky. 1979. "Prospect Theory: An Analysis of Decision under Risk." *Econometrica* 47 (2): 263-291. https://doi.org/10.2307/1914185.'
+      'Kahneman, Daniel, and Amos Tversky. 1979. "Prospect Theory: An Analysis of Decision under Risk." *Econometrica* 47 (2): 263–291. https://doi.org/10.2307/1914185.'
     );
     expect(formatCSLBibliographyEntry(csl, "harvard", 2).markdownText).toBe(
-      "Kahneman, D. and Tversky, A. (1979) 'Prospect Theory: An Analysis of Decision under Risk', *Econometrica*, 47(2), pp. 263-291. doi:10.2307/1914185."
+      "Kahneman, D. and Tversky, A. (1979) 'Prospect Theory: An Analysis of Decision under Risk', *Econometrica*, 47(2), pp. 263\u2013291. Available at: https://doi.org/10.2307/1914185."
     );
     expect(formatCSLBibliographyEntry(csl, "ieee", 2).markdownText).toBe(
-      '[2] D. Kahneman and A. Tversky, "Prospect Theory: An Analysis of Decision under Risk," *Econometrica*, vol. 47, no. 2, pp. 263-291, 1979, doi: 10.2307/1914185.'
+      '[2] D. Kahneman and A. Tversky, "Prospect Theory: An Analysis of Decision under Risk," *Econometrica*, vol. 47, no. 2, pp. 263–291, 1979, doi: 10.2307/1914185.'
     );
     expect(formatCSLBibliographyEntry(csl, "vancouver", 2).markdownText).toBe(
       "2. Kahneman D, Tversky A. Prospect Theory: An Analysis of Decision under Risk. Econometrica. 1979;47(2):263-291. doi:10.2307/1914185"
@@ -190,17 +190,17 @@ describe("CSL-JSON Golden-File Citation Engine (Section 6)", () => {
 
     expect(formatCSLInTextSingle(csl, "apa", 3)).toBe("(Jinek et al., 2012)");
     expect(formatCSLInTextSingle(csl, "mla", 3)).toBe("(Jinek et al.)");
-    expect(formatCSLInTextSingle(csl, "chicago", 3)).toBe("(Jinek et al. 2012)");
-    expect(formatCSLInTextSingle(csl, "harvard", 3)).toBe("(Jinek et al., 2012)");
+    expect(formatCSLInTextSingle(csl, "chicago", 3)).toBe("(Jinek, Doudna, and Charpentier 2012)");
+    expect(formatCSLInTextSingle(csl, "harvard", 3)).toBe("(Jinek, Doudna and Charpentier, 2012)");
 
     expect(formatCSLBibliographyEntry(csl, "apa", 3).markdownText).toBe(
-      "Jinek, M., Doudna, J. A., & Charpentier, E. (2012). A Programmable Dual-RNA-Guided DNA Endonuclease in Adaptive Bacterial Immunity. *Science*, *337*(6096), 816-821. https://doi.org/10.1126/science.1225829"
+      "Jinek, M., Doudna, J. A., & Charpentier, E. (2012). A Programmable Dual-RNA-Guided DNA Endonuclease in Adaptive Bacterial Immunity. *Science*, *337*(6096), 816\u2013821. https://doi.org/10.1126/science.1225829"
     );
     expect(formatCSLBibliographyEntry(csl, "mla", 3).markdownText).toBe(
-      'Jinek, Martin, et al. "A Programmable Dual-RNA-Guided DNA Endonuclease in Adaptive Bacterial Immunity." *Science*, vol. 337, no. 6096, 2012, pp. 816-821. https://doi.org/10.1126/science.1225829.'
+      'Jinek, Martin, et al. "A Programmable Dual-RNA-Guided DNA Endonuclease in Adaptive Bacterial Immunity." *Science*, vol. 337, no. 6096, 2012, pp. 816–821, https://doi.org/10.1126/science.1225829.'
     );
     expect(formatCSLBibliographyEntry(csl, "chicago", 3).markdownText).toBe(
-      'Jinek, Martin, Jennifer A. Doudna, and Emmanuelle Charpentier. 2012. "A Programmable Dual-RNA-Guided DNA Endonuclease in Adaptive Bacterial Immunity." *Science* 337 (6096): 816-821. https://doi.org/10.1126/science.1225829.'
+      'Jinek, Martin, Jennifer A. Doudna, and Emmanuelle Charpentier. 2012. "A Programmable Dual-RNA-Guided DNA Endonuclease in Adaptive Bacterial Immunity." *Science* 337 (6096): 816–821. https://doi.org/10.1126/science.1225829.'
     );
   });
 
@@ -211,14 +211,14 @@ describe("CSL-JSON Golden-File Citation Engine (Section 6)", () => {
     if (!resHe.ok || !resVas.ok) return;
 
     expect(formatCSLBibliographyEntry(resHe.item, "apa", 4).markdownText).toBe(
-      "He, K., Zhang, X., Ren, S., & Sun, J. (2016). Deep Residual Learning for Image Recognition. *IEEE Conference on Computer Vision and Pattern Recognition*, 770-778. https://doi.org/10.1109/CVPR.2016.90"
+      "He, K., Zhang, X., Ren, S., & Sun, J. (2016). Deep Residual Learning for Image Recognition. In *IEEE Conference on Computer Vision and Pattern Recognition* (pp. 770\u2013778). https://doi.org/10.1109/CVPR.2016.90"
     );
     expect(formatCSLBibliographyEntry(resHe.item, "harvard", 4).markdownText).toBe(
-      "He, K. et al. (2016) 'Deep Residual Learning for Image Recognition', *IEEE Conference on Computer Vision and Pattern Recognition*, pp. 770-778. doi:10.1109/CVPR.2016.90."
+      "He, K., Zhang, X., Ren, S. and Sun, J. (2016) 'Deep Residual Learning for Image Recognition', *IEEE Conference on Computer Vision and Pattern Recognition*, pp. 770\u2013778. Available at: https://doi.org/10.1109/CVPR.2016.90."
     );
 
     expect(formatCSLBibliographyEntry(resVas.item, "apa", 5).markdownText).toBe(
-      "Vaswani, A., Shazeer, N., Parmar, N., & Uszkoreit, J. (2017). Attention Is All You Need. *Advances in Neural Information Processing Systems*, *30*, 5998-6008. https://doi.org/10.48550/arXiv.1706.03762"
+      "Vaswani, A., Shazeer, N., Parmar, N., & Uszkoreit, J. (2017). Attention Is All You Need. *Advances in Neural Information Processing Systems*, *30*, 5998\u20136008. https://doi.org/10.48550/arXiv.1706.03762"
     );
     expect(formatCSLBibliographyEntry(resVas.item, "vancouver", 5).markdownText).toBe(
       "5. Vaswani A, Shazeer N, Parmar N, Uszkoreit J. Attention Is All You Need. Advances in Neural Information Processing Systems. 2017;30:5998-6008. doi:10.48550/arXiv.1706.03762"
@@ -234,7 +234,7 @@ describe("CSL-JSON Golden-File Citation Engine (Section 6)", () => {
     // Web Page 1: Pew Research Center (human authors)
     expect(formatCSLInTextSingle(resPew.item, "apa", 6)).toBe("(Anderson & Faverio, 2023)");
     expect(formatCSLBibliographyEntry(resPew.item, "apa", 6).markdownText).toBe(
-      "Anderson, M., & Faverio, M. (2023). Teens, Social Media and Technology 2023. *Pew Research Center*. https://www.pewresearch.org/internet/2023/12/11/teens-social-media-and-technology-2023/"
+      "Anderson, M., & Faverio, M. (2023). *Teens, Social Media and Technology 2023*. Pew Research Center. https://www.pewresearch.org/internet/2023/12/11/teens-social-media-and-technology-2023/"
     );
     expect(formatCSLBibliographyEntry(resPew.item, "ieee", 6).markdownText).toBe(
       '[6] M. Anderson and M. Faverio, "Teens, Social Media and Technology 2023," *Pew Research Center*, 2023, [Online]. Available: https://www.pewresearch.org/internet/2023/12/11/teens-social-media-and-technology-2023/.'
@@ -243,10 +243,10 @@ describe("CSL-JSON Golden-File Citation Engine (Section 6)", () => {
     // Web Page 2: World Health Organization (institutional author)
     expect(formatCSLInTextSingle(resWho.item, "apa", 7)).toBe("(World Health Organization, 2024)");
     expect(formatCSLBibliographyEntry(resWho.item, "apa", 7).markdownText).toBe(
-      "World Health Organization. (2024). Global Health Estimates: Leading Causes of Death and Disability. *World Health Organization*. https://www.who.int/data/gho/data/themes/mortality-and-global-health-estimates"
+      "World Health Organization. (2024). *Global Health Estimates: Leading Causes of Death and Disability*. World Health Organization. https://www.who.int/data/gho/data/themes/mortality-and-global-health-estimates"
     );
     expect(formatCSLBibliographyEntry(resWho.item, "harvard", 7).markdownText).toBe(
-      "World Health Organization (2024) 'Global Health Estimates: Leading Causes of Death and Disability', *World Health Organization*. Available at: https://www.who.int/data/gho/data/themes/mortality-and-global-health-estimates."
+      "World Health Organization (2024) Global Health Estimates: Leading Causes of Death and Disability. World Health Organization. Available at: https://www.who.int/data/gho/data/themes/mortality-and-global-health-estimates."
     );
   });
 

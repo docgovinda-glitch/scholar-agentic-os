@@ -126,8 +126,10 @@ describe("Phase 1 — Unified Assignment Setup Box & Question-Specific Dynamic S
     expect(generateBtn).toBeInTheDocument();
     expect(generateBtn).not.toBeDisabled();
 
-    // 5. Click "Generate Structure"
+    // 5. Click "Generate Structure". No AI answers in this test, so no outline is
+    // made up; the student asks for the plain outline from the brief's wording.
     fireEvent.click(generateBtn);
+    fireEvent.click(await screen.findByRole("button", { name: /Start from a plain outline \(not AI\)/i }));
 
     // 6. Verify Question A generates specific analytical sections, NOT generic Intro/Body/Conclusion
     await waitFor(() => {
@@ -199,6 +201,7 @@ describe("Phase 1 — Unified Assignment Setup Box & Question-Specific Dynamic S
     expect(await screen.findByText(/Phase 1: Understand the Assignment Brief/i)).toBeInTheDocument();
     const generateBtn = screen.getByRole("button", { name: /Generate Structure/i });
     fireEvent.click(generateBtn);
+    fireEvent.click(await screen.findByRole("button", { name: /Start from a plain outline \(not AI\)/i }));
 
     // Verify cancer cell therapy structure appeared
     await waitFor(() => {
@@ -256,6 +259,7 @@ describe("Phase 1 — Unified Assignment Setup Box & Question-Specific Dynamic S
 
     const generateBtn = screen.getByRole("button", { name: /Generate Structure/i });
     fireEvent.click(generateBtn);
+    fireEvent.click(await screen.findByRole("button", { name: /Start from a plain outline \(not AI\)/i }));
 
     await waitFor(() => {
       expect(screen.queryAllByDisplayValue(/Cell Therapy in Cancer Remedy/i).length + screen.queryAllByText(/Cell Therapy in Cancer Remedy/i).length).toBeGreaterThan(0);

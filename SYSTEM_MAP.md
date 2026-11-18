@@ -7,7 +7,7 @@ A navigational map of the repository: where things live and where to start when 
 | Path | Contents |
 | :--- | :--- |
 | `server.ts` | Express entry: helmet and CSP, header redaction, Supabase proxy, body parsers, route registration, Vite middleware (dev) or static `dist/` (prod), process guards, graceful shutdown |
-| `server/` | API: `routes/` (HTTP modules), `src/` (middleware, AI engine, research, discovery, services, utils), `services/briefScannerGraph.ts` (LangGraph), `utils/llm.ts` and `utils/ssrfGuard.ts`, `db/` |
+| `server/` | API: `routes/` (HTTP modules), `src/` (middleware, AI engine, research, discovery, services, utils), `utils/llm.ts` and `utils/ssrfGuard.ts`, `db/` |
 | `src/` | The React SPA plus code shared with the server (see section 3) |
 | `supabase/` | `schema*.sql`, `migrations/`, `functions/` (Deno Edge Functions) |
 | `ml-style-engine/` | Offline Python corpus, training scripts and exported model |

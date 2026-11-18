@@ -305,8 +305,9 @@ describe("Phase 1: Dynamic Target Word Count & Brief-Specific Outline Generation
       });
       expect(buildButton).toBeInTheDocument();
 
-      // Click "Save & Build" to generate tailored outline
+      // Click "Save & Build"; with no AI in this test, start from the plain outline.
       fireEvent.click(buildButton);
+      fireEvent.click(await screen.findByRole("button", { name: /Start from a plain outline \(not AI\)/i }));
 
       // Outline Planner Step should appear with generated sections
       await waitFor(() => {
@@ -318,7 +319,8 @@ describe("Phase 1: Dynamic Target Word Count & Brief-Specific Outline Generation
         name: /^Proceed/i,
       });
       expect(proceedButton).toBeInTheDocument();
-      expect(proceedButton).toHaveTextContent("Proceed");
+      // The visible label says what proceeding does: it approves the outline.
+      expect(proceedButton).toHaveTextContent(/Approve outline & continue/);
     });
   });
 
@@ -347,6 +349,7 @@ describe("Phase 1: Dynamic Target Word Count & Brief-Specific Outline Generation
       // Trigger outline generation
       const buildBtn = screen.getByRole("button", { name: /Save & Build/i });
       fireEvent.click(buildBtn);
+      fireEvent.click(await screen.findByRole("button", { name: /Start from a plain outline \(not AI\)/i }));
 
       await waitFor(() => {
         expect(screen.getByText(/Target Word Count & Section Allocations/i)).toBeInTheDocument();

@@ -20,6 +20,10 @@ export interface CompletionCall {
   /** Asks for JSON where the provider supports it. */
   responseFormat?: "json";
   signal?: AbortSignal;
+  /** Streaming: the model's tokens as they arrive (where the completer can stream). */
+  onToken?: (text: string) => void;
+  /** Streaming: the router dropped a partial answer to switch model; what was shown is void. */
+  onReset?: () => void;
 }
 
 export interface CompletionOutcome {

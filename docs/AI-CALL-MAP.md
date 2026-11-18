@@ -24,7 +24,6 @@ A user's own key reaches the server only on AI routes (`routeUsesClientAi` in `s
 | `server/routes/project/agentic/*`, `server/routes/project/assignment/*`, `thesis.ts`, `proposal.ts`, `presentation.ts` | scholarBrain wrappers and `scholarBrain.*`, `routedCompletion` (Coursework prompt text: `scholarBrain.courseworkPrompts`, `server/src/services/prompts/courseworkPrompts.ts`; manuscript section drafting for the Journal studio and the desk generation job: `scholarBrain.draftSection`, prompts in `server/src/services/prompts/journalPrompts.ts`) |
 | `server/routes/project/core/manuscriptAndGateRoutes.ts`, `server/routes/project.ts`, `server/routes/studio.ts` | `requestCompleter` (`browserHandoff.ts`) |
 | `server/src/research/deepResearchEngine.ts`, `server/src/aiEngine/opportunityAgent.ts` | `routedCompletion` / router bridge |
-| `server/services/briefScannerGraph.ts` | LangGraph workflow |
 
 ## 3. Browser call sites
 
@@ -39,7 +38,8 @@ A user's own key reaches the server only on AI routes (`routeUsesClientAi` in `s
 - No credentials: `NoAiConnectedError` ("Add your own AI key or a local model in AI Access"), surfaced through `server/src/ai/aiRouteErrors.ts` (`NoClientAiProviderError`).
 - Next candidate is a model on the user's device and the server cannot reach it: browser hand-off (HTTP 426 `requireFrontendLLM` with prompts and a signed challenge, or `BrowserAiRequiredError` for scholarBrain routes with `browserFallback`). The browser result is accepted only with a valid challenge (`readVerifiedBrowserResult`).
 - A user-named base URL that is not https or not public: `AiEndpointBlockedError`, candidate skipped with a reason.
-- All candidates fail: `RouterExhaustedError` (`exhausted`, `context_overflow`, `non_retryable`).
+- All candidates fail: `RouterExhaustedError` (`exhausted`, `context_overflow`, `non_retryable`); routes answer 503 `ai_unavailable` with `Retry-After` (413 `ai_context_overflow` for overflow).
+- Streaming and cancellation: `callOpenRouterText(req, res, sys, user, model, task, { onToken, onReset, signal })` relays router tokens (and a reset when a fallback drops partial output) and aborts the router call with `signal`. Coursework `/stream-section` streams through it; Coursework routes pass `abortOnClose(req)` to `routedCompletion`.
 - Coursework drafting when every provider is out of credit: labelled offline scaffold ([`AI-SYSTEM.md`](AI-SYSTEM.md) §9).
 
 ## 5. Known limits

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import type { Completer, CompletionCall } from "../../../../src/platform/completion";
-import { draftSection, priorSectionsContext, researchContextFromAnswers, sectionMemory, type DraftSectionInput } from "../sectionDrafter";
+import { draftSection, priorSectionsContext, researchContextFromAnswers, sectionMemory, type DraftSectionInput, runSectionDraft } from "../sectionDrafter";
 import { BrowserAiRequiredError, UnusableAiResponseError } from "../../ai/aiRouteErrors";
 
 /** A completer that answers each call with the next text, and records the calls. */
@@ -114,5 +114,91 @@ describe("priorSectionsContext and sectionMemory", () => {
 
   it("keeps a section's opening sentences as its memory", () => {
     expect(sectionMemory("One. Two [CITE:a]. Three.", 12)).toBe("One. Two.");
+  });
+});
+
+describe("runSectionDraft: the shared drafting loop", () => {
+  type Call = Parameters<Completer>[0];
+  const outcome = (text: string) => ({ text, provider: "p", model: "m", inputTokensEstimate: 1, outputTokensEstimate: 1 });
+  /** A completer that streams each answer token by token. */
+  const streaming = (answers: string[]) => {
+    const calls: Call[] = [];
+    const complete: Completer = async (call) => {
+      calls.push(call);
+      const text = answers.shift() ?? "";
+      for (const t of text.split(/(\s+)/).filter(Boolean)) call.onToken?.(t);
+      return outcome(text);
+    };
+    return { complete, calls };
+  };
+  const words = (n: number, w = "word") => Array.from({ length: n }, (_, i) => `${w}${i}`).join(" ") + ".";
+
+  it("continues a short draft visibly and keeps the continuation", async () => {
+    const { complete, calls } = streaming([words(20, "a"), words(30, "b")]);
+    const seen: string[] = [];
+    const out = await runSectionDraft(complete, {
+      systemPrompt: "s",
+      userPrompt: "u",
+      minWords: 45,
+      lengthen: { mode: "continue", prompt: (d) => `continue: ${d.length}` },
+      stream: { onToken: (t) => seen.push(`t:${t.trim()}`), onReplace: (t) => seen.push(`r:${t.slice(0, 2)}`) },
+    });
+    expect(out.text).toMatch(/^a0[\s\S]*\n\nb0/);
+    expect(calls[1].userPrompt).toMatch(/^continue:/);
+    // The continuation starts from the draft shown as it is, then streams on.
+    expect(seen.filter((x) => x.startsWith("r:"))).toEqual(["r:a0"]);
+    expect(out.calls).toHaveLength(2);
+  });
+
+  it("drops a continuation that is not accepted and shows the draft as kept", async () => {
+    const { complete } = streaming([words(10), words(10)]);
+    const replaced: string[] = [];
+    const out = await runSectionDraft(complete, {
+      systemPrompt: "s",
+      userPrompt: "u",
+      minWords: 50,
+      lengthen: { mode: "continue", prompt: () => "c", accept: () => false },
+      stream: { onToken: () => {}, onReplace: (t) => replaced.push(t) },
+    });
+    expect(out.text).toBe(words(10));
+    expect(replaced.at(-1)).toBe(words(10));
+  });
+
+  it("expand mode keeps a rewrite only when it is longer", async () => {
+    const shorter = await runSectionDraft(streaming([words(20), words(10)]).complete, { systemPrompt: "s", userPrompt: "u", minWords: 40, lengthen: { mode: "expand", prompt: () => "e" } });
+    expect(shorter.text).toBe(words(20));
+    const longer = await runSectionDraft(streaming([words(20), words(40)]).complete, { systemPrompt: "s", userPrompt: "u", minWords: 40, lengthen: { mode: "expand", prompt: () => "e" } });
+    expect(longer.text).toBe(words(40));
+  });
+
+  it("resumes from the text a stopped draft reached", async () => {
+    const { complete, calls } = streaming(["More text."]);
+    const out = await runSectionDraft(complete, { systemPrompt: "s", userPrompt: "u", minWords: 10, startFrom: "Earlier text.", lengthen: { mode: "continue", prompt: (d) => `after ${d}` } });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].userPrompt).toBe("after Earlier text.");
+    expect(out.text).toBe("Earlier text.\n\nMore text.");
+  });
+
+  it("keeps the draft when lengthening fails, but stops when the call was cancelled", async () => {
+    let n = 0;
+    const failing: Completer = async () => {
+      if (n++ === 0) return outcome(words(5));
+      throw new Error("provider down");
+    };
+    const kept = await runSectionDraft(failing, { systemPrompt: "s", userPrompt: "u", minWords: 50, lengthen: { mode: "continue", prompt: () => "c" } });
+    expect(kept.text).toBe(words(5));
+
+    const ctl = new AbortController();
+    let m = 0;
+    const cancelled: Completer = async () => {
+      if (m++ === 0) return outcome(words(5));
+      ctl.abort();
+      throw new Error("aborted");
+    };
+    await expect(runSectionDraft(cancelled, { systemPrompt: "s", userPrompt: "u", minWords: 50, lengthen: { mode: "continue", prompt: () => "c" }, signal: ctl.signal })).rejects.toThrow("aborted");
+  });
+
+  it("an empty first answer is an error, never invented text", async () => {
+    await expect(runSectionDraft(streaming([""]).complete, { systemPrompt: "s", userPrompt: "u", minWords: 10 })).rejects.toThrow();
   });
 });

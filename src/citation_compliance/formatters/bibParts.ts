@@ -52,6 +52,25 @@ export function joinNames(names: string[], conj: "and" | ", and" | "none" = "and
   return `${names.slice(0, -1).join(", ")}${conj === ", and" ? ", and" : " and"} ${names[names.length - 1]}`;
 }
 
+/**
+ * In-text surnames for author-date styles: every author up to `listUpTo`
+ * (joined with `conj`), else the first author and "et al.".
+ */
+export function inTextSurnames(reference: CanonicalReference, listUpTo: number, conj: "and" | ", and" | "&" = "and"): string {
+  const names = sortedAuthors(reference).map((a) => a.lastName);
+  if (names.length === 0) return shortTitleLead(reference);
+  if (names.length > listUpTo) return `${names[0]} et al.`;
+  if (conj === "&") return names.length === 2 ? `${names[0]} & ${names[1]}` : joinNames(names, "and");
+  // Two names never take the serial comma ("Smith and Jones").
+  return joinNames(names, names.length === 2 ? "and" : conj);
+}
+
+/** With no author, an in-text citation leads with the first words of the title in quotes (APA 8.14, CTR, CMOS 15.32, MLA 6.11). */
+export function shortTitleLead(reference: CanonicalReference): string {
+  const words = (reference.title ?? "").trim().split(/\s+/).filter(Boolean).slice(0, 4).join(" ");
+  return words ? `“${words.replace(/[.,:;]$/, "")}”` : "";
+}
+
 /** Add a full stop unless the text already ends a sentence. */
 export function endSentence(text: string): string {
   const t = text.trim();

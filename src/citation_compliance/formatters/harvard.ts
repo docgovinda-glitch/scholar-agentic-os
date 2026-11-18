@@ -2,7 +2,7 @@
  * Harvard Citation Formatter
  */
 
-import { doiUrl, endSentence, familyInitialsTight, joinNames, journalOf, pageRange, publisherOf, sortedAuthors } from "./bibParts";
+import { doiUrl, endSentence, familyInitialsTight, inTextSurnames, joinNames, journalOf, pageRange, publisherOf, sortedAuthors } from "./bibParts";
 import type { CitationStyle, InTextOptions } from "../styleTypes";
 import { authorDateYear, type CanonicalReference } from "../model/reference";
 
@@ -12,16 +12,13 @@ export class HarvardFormatter implements CitationStyle {
   version = "latest";
 
   formatInText(reference: CanonicalReference, options?: InTextOptions): string {
-    if (!reference.authors || reference.authors.length === 0) {
-      return "(????)";
-    }
-
-    const author = reference.authors[0].lastName;
+    const author = inTextSurnames(reference, 3);
     const year = authorDateYear(reference);
     if (options && options.locator) {
-      return "(" + author + " " + year + " " + options.locator + ")";
+      return `(${author}, ${year}, ${options.locator})`;
     }
-    return "(" + author + " " + year + ")";
+    // Cite Them Right: "(Smith, 2019)", "(Smith, 2019, p. 4)".
+    return `(${author}, ${year})`;
   }
 
   /**
@@ -56,6 +53,11 @@ export class HarvardFormatter implements CitationStyle {
       const vol = reference.volume ? `, ${reference.volume}${reference.issue ? `(${reference.issue})` : ""}` : reference.issue ? `, (${reference.issue})` : "";
       const pages = reference.pages ? `, pp. ${pageRange(reference.pages)}` : "";
       return `${head} '${reference.title}', *${journal}*${vol}${pages}.${tail}`;
+    }
+    if ((reference.kind === "ConferencePaper" || reference.kind === "BookChapter") && reference.source) {
+      // Cite Them Right: a paper or chapter in a named collection is quoted, the collection italic.
+      const pages = reference.pages ? `, pp. ${pageRange(reference.pages)}` : "";
+      return `${head} '${reference.title}', *${reference.source}*${pages}.${tail}`;
     }
     const body = names.length ? ` ${endSentence(reference.title)}` : "";
     const src = reference.source && reference.source !== reference.title ? ` ${endSentence(reference.source)}` : "";

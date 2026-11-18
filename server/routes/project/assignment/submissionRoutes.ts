@@ -1,3 +1,4 @@
+import { AI_RETRY_AFTER_SECONDS } from "../../../src/ai/aiRouteErrors.ts";
 import { DEFAULT_CITATION_STYLE } from "../../../../src/domain/assignment/answerKeys.ts";
 import { parseBody, CopilotChatBody } from "./schemas.ts";
 import express from "express";
@@ -220,7 +221,7 @@ router.post("/copilot-chat", async (req: express.Request<{ id: string }>, res) =
     if ((err as Error)?.message === "RequireFrontendLLMException") return;
     console.warn("Coursework copilot: the AI did not answer:", (err as Error)?.message);
     if (!res.headersSent) {
-      return res.status(502).json({
+      return res.status(503).set("Retry-After", AI_RETRY_AFTER_SECONDS).json({
         error: "Your AI did not answer, so the Copilot has no reply. Nothing was changed. Try again, or check AI Access.",
         code: "ai_unavailable",
       });

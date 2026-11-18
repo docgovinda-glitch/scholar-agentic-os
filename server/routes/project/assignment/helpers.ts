@@ -1,16 +1,8 @@
-import { DEFAULT_CITATION_STYLE } from "../../../../src/domain/assignment/answerKeys.ts";
-import { routedCompletion } from "../../../src/services/scholarBrain.ts";
 import type { ProjectRecord } from "../../../../src/services/store/types.ts";
 import express from "express";
 import { createUploadInstance } from "../../../src/middleware/uploadGuard.ts";
 import { getProjectStore } from "../../../../src/services/store/projectStore.ts";
-import { scholarBrain } from "../../../src/services/scholarBrain.ts";
-import {
-cleanAnswerString
-} from "../../../../src/desk/assignment/types.ts";
-import type { AcademicLevel, AssignmentType } from "../../../../src/desk/assignment/types.ts";
-import { generateDynamicAssignmentStructure } from "../../../../src/desk/assignment/services/dynamicStructure.ts";
-import { isClassroomLogisticsLine, isTutorialOrShortQABrief } from "../../../../src/utils/briefExtractor.ts";
+import { isClassroomLogisticsLine } from "../../../../src/utils/briefExtractor.ts";
 import { hasLeakedTemplateHeadings } from "../../../../src/domain/assignment/legacyPurge.ts";
 
 type HeadingLike = { title?: string; subheadings?: Array<{ title?: string }> };
@@ -37,20 +29,9 @@ export function healCorruptedProjectStructure(project: { answers?: Record<string
     try {
       const parsed = typeof rawStructure === "string" ? JSON.parse(rawStructure) : rawStructure;
       if (parsed?.headings && isCorruptedOutlineHeadings(parsed.headings, topic)) {
-        const briefText = cleanAnswerString(project.answers["assignment_brief"]) || topic;
-        const targetWords = Number(
-          project.answers["word_limit"] ||
-          (isTutorialOrShortQABrief(briefText) ? 400 : 2000)
-        );
-        const repaired = generateDynamicAssignmentStructure({
-          question: project.answers["assignment_brief"] || topic,
-          assignmentType: (project.answers["assignment_type"] || "essay") as AssignmentType,
-          academicLevel: (project.answers["academic_level"] || "undergraduate") as AcademicLevel,
-          targetWordCount: targetWords,
-          citationStyle: project.answers["citation_style"] || DEFAULT_CITATION_STYLE,
-          briefText,
-        });
-        project.answers["assignment_structure"] = JSON.stringify(repaired);
+        // An outline made of old template text is removed, not replaced with
+        // another template: the student builds it again from their brief.
+        delete project.answers["assignment_structure"];
         if (project.answers["assignment_internal_sections"]) {
           delete project.answers["assignment_internal_sections"];
         }
@@ -180,49 +161,6 @@ export function deriveHeuristicTitle(rawText: string): string {
   return "Academic Assignment";
 }
 
-/**
- * Intelligent Semantic Auto-Naming:
- * Generates a concise academic research title (3 to 7 words).
- * Tries LLM if configured; otherwise gracefully falls back to deterministic heuristic.
- */
-export async function deriveSemanticAcademicTitle(
-  briefText: string,
-  req?: express.Request
-): Promise<string> {
-  const heuristic = deriveHeuristicTitle(briefText);
-  if (!briefText || briefText.trim().length < 15) {
-    return heuristic;
-  }
-
-  try {
-    if (req && process.env.NODE_ENV !== "test" && !process.env.VITEST) {
-      const prompt = scholarBrain.courseworkPrompts.academicTitlePrompt({ briefText });
-      const text = await routedCompletion(req, {
-        task: "fast",
-        systemPrompt: scholarBrain.courseworkPrompts.ROLES.titleRegistrar,
-        userPrompt: prompt,
-        maxOutputTokens: 64,
-      });
-
-      if (text) {
-        const candidate = text
-          .trim()
-          .replace(/^["'“”‘’]+|["'“”‘’]+$/g, "")
-          .replace(/^(?:title|topic)[:\s\-–]+/i, "")
-          .replace(/[.?!;:]+$/, "")
-          .trim();
-        const wordCount = candidate.split(/\s+/).length;
-        if (wordCount >= 2 && wordCount <= 10 && candidate.length >= 5 && candidate.length <= 75) {
-          return capitalizeTitleWords(candidate);
-        }
-      }
-    }
-  } catch {
-    // Fall back to heuristic
-  }
-
-  return heuristic;
-}
 
 /**
  * Automatically updates project title in answers & record if currently untitled.
@@ -251,7 +189,7 @@ export async function autoUpdateProjectTitleIfUntitled(
     if (typeof project.title === "string") {
       project.title = derivedTitle;
     }
-    await getProjectStore().save(project);
+    await saveChangedAnswers(project);
     return derivedTitle;
   }
 
@@ -259,6 +197,65 @@ export async function autoUpdateProjectTitleIfUntitled(
 }
 
 export const upload = createUploadInstance({ enforceHeavyParseLimit: true });
+
+const requestSignals = new WeakMap<object, AbortSignal>();
+
+/**
+ * Aborted when the client goes away before the response is sent (the student
+ * left, or the browser gave up waiting), so the AI call stops instead of
+ * running on, spending the student's credit, for nobody.
+ */
+export function abortOnClose(req: express.Request<unknown>): AbortSignal {
+  const known = requestSignals.get(req);
+  if (known) return known;
+  const ctl = new AbortController();
+  const res = req.res;
+  res?.on("close", () => {
+    if (!res.writableEnded) ctl.abort();
+  });
+  requestSignals.set(req, ctl.signal);
+  return ctl.signal;
+}
+
+/** Answers as they were when each project was loaded by getProjectSafe. */
+const answersAtLoad = new WeakMap<object, Record<string, unknown>>();
+
+const sameValue = (a: unknown, b: unknown) => a === b || JSON.stringify(a) === JSON.stringify(b);
+
+/** The keys this request changed since it loaded the project; removed keys are null. */
+export function changedAnswers(before: Record<string, unknown>, after: Record<string, unknown>): Record<string, unknown> {
+  const patch: Record<string, unknown> = {};
+  for (const k of Object.keys(after)) {
+    if (after[k] === undefined) {
+      if (k in before && before[k] !== undefined) patch[k] = null;
+    } else if (!sameValue(before[k], after[k])) {
+      patch[k] = after[k];
+    }
+  }
+  for (const k of Object.keys(before)) {
+    if (!(k in after) && before[k] !== undefined) patch[k] = null;
+  }
+  return patch;
+}
+
+/**
+ * Saves only the answer keys this request changed, merged atomically into the
+ * stored record. A route waits on the AI for a long time; saving the whole
+ * record it loaded would overwrite whatever the student saved meanwhile.
+ * The in-memory project then reflects the merged, stored answers.
+ */
+export async function saveChangedAnswers(project: ProjectRecord): Promise<void> {
+  const after = (project.answers ?? {}) as Record<string, unknown>;
+  const before = answersAtLoad.get(project) ?? {};
+  const patch = changedAnswers(before, after);
+  if (Object.keys(patch).length === 0) return;
+  const stored = await getProjectStore().patchAnswers(project.projectId, patch);
+  if (stored) {
+    project.answers = { ...stored.answers };
+    project.version = stored.version;
+  }
+  answersAtLoad.set(project, { ...(project.answers as Record<string, unknown>) });
+}
 
 export async function getProjectSafe(req: express.Request<unknown>, res: express.Response) {
   const projectId = (req.params as Record<string, string>).id;
@@ -272,8 +269,9 @@ export async function getProjectSafe(req: express.Request<unknown>, res: express
     res.status(404).json({ error: "Project not found" });
     return null;
   }
+  answersAtLoad.set(project, { ...(project.answers as Record<string, unknown>) });
   if (healCorruptedProjectStructure(project)) {
-    await getProjectStore().save(project);
+    await saveChangedAnswers(project);
   }
   return project;
 }

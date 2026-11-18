@@ -96,6 +96,8 @@ describe("Unified Assignment Brief & 2-Step Outline Review Progression", () => {
       expect(screen.getByText(/From your brief/i)).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /Edit Brief/i })).toBeInTheDocument();
     });
+    // No AI answers in this test, so no outline is made up; the student asks for the plain one.
+    fireEvent.click(await screen.findByRole("button", { name: /Start from a plain outline \(not AI\)/i }));
 
     // Check tone-tailored Introduction/Thesis statement exists
     expect(screen.getAllByText(/Introduction & Core Working Thesis/i)[0]).toBeInTheDocument();

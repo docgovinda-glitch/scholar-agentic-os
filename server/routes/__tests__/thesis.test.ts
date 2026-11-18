@@ -97,7 +97,7 @@ describe("Thesis Endpoints (/api/projects/:id/thesis)", () => {
       .post(`/api/projects/${projectId}/thesis/viva-simulate`)
       .set(AI)
       .send({ title: "T", researchQuestions: ["RQ1?"] });
-    expect(res.status).toBe(502);
+    expect(res.status).toBe(503);
     expect(res.body.code).toBe("ai_unavailable");
     expect(res.body.questions).toBeUndefined();
   });
@@ -166,7 +166,7 @@ describe("Thesis Endpoints (/api/projects/:id/thesis)", () => {
       .post(`/api/projects/${projectId}/thesis/chapter-audit`)
       .set(AI)
       .send({ chapters: [{ chapterNumber: 1, title: "Intro", wordCount: 10, targetWordCount: 100, status: "drafting" }] });
-    expect(res.status).toBe(502);
+    expect(res.status).toBe(503);
     expect(res.body.audit).toBeUndefined();
   });
 

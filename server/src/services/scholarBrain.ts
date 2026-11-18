@@ -17,10 +17,10 @@ import * as journalPrompts from "./prompts/journalPrompts.ts";
 import * as thesisPrompts from "./prompts/thesisPrompts.ts";
 import * as proposalPrompts from "./prompts/proposalPrompts.ts";
 import * as presentationPrompts from "./prompts/presentationPrompts.ts";
-import { draftSection, priorSectionsContext, researchContextFromAnswers } from "./sectionDrafter.ts";
-import { searchEuropePmc } from "../../../src/shared/retrieval/providers.ts";
+import { draftSection, priorSectionsContext, researchContextFromAnswers, runSectionDraft } from "./sectionDrafter.ts";
+import { openSse } from "../utils/sse.ts";
 import { buildAskGeneralPrompt, buildAskSearchPrompt } from "../../../src/shared/askPrompts.ts";
-import { NoAiConnectedError, routedCompletion as rawRoutedCompletion, routedText, RouterHandoffError, toRouterTask } from "../ai/routerBridge.ts";
+import { aiAvailability as rawAiAvailability, NoAiConnectedError, routedCompletion as rawRoutedCompletion, routedText, RouterHandoffError, toRouterTask } from "../ai/routerBridge.ts";
 import { BrowserAiRequiredError, LocalModelUnreachableError, NoClientAiProviderError } from "../ai/aiRouteErrors.ts";
 import {
   createChallengeTokenForRequest,
@@ -44,7 +44,6 @@ import {
   streamOpenRouterJSON as rawStreamOpenRouterJSON,
   signLlmChallenge,
   computePromptHash,
-  generateGeminiEmbedding,
 } from "../../utils/llm.ts";
 import { loadArchetypeModelWeights, type ArchetypeModelWeights } from "../../../src/shared/archetypeModelWeights.ts";
 import {
@@ -62,10 +61,7 @@ import {
 } from "../utils/citationLockScrubber.ts";
 import { CitationStyleRegistry } from "../../../src/citation_compliance/formattingEngine.ts";
 import type { CanonicalReference, ReferenceAuthor } from "../../../src/citation_compliance/model/reference.ts";
-import {
-  discoverMultiPortalSources,
-  type DiscoveredSourceDraft,
-} from "../discovery/discovery.ts";
+import { discoverScholarlySources } from "../discovery/discovery.ts";
 import {
   allocateWordsByMarks,
   parseQuestionMarks,
@@ -171,24 +167,6 @@ export interface UnifiedCitationScrubResult extends ScrubResult {
 }
 
 /**
- * Fetches biomedical and life sciences evidence from Europe PMC / PubMed.
- */
-async function discoverEuropePmcSources(query: string, maxResults = 10): Promise<DiscoveredSourceDraft[]> {
-  const { items } = await searchEuropePmc(query, Math.min(maxResults, 25), { timeoutMs: 5000 });
-  return items.map((item) => ({
-    title: item.title as string,
-    authors: Array.isArray(item.authors) ? (item.authors as unknown[]).filter((a): a is string => typeof a === "string") : [],
-    year: typeof item.year === "number" ? item.year : Number(item.year) || undefined,
-    doi: item.doi,
-    url: item.url || undefined,
-    venue: item.venue,
-    discoveredVia: "europepmc" as const,
-    sourceType: "scholarly" as const,
-    authorityTier: "A" as const,
-  }));
-}
-
-/**
  * Maps raw author strings to ReferenceAuthor array.
  */
 function parseAuthorsForCitation(authors: string[] | string): ReferenceAuthor[] {
@@ -225,7 +203,7 @@ function parseAuthorsForCitation(authors: string[] | string): ReferenceAuthor[] 
  */
 const LIVE_DISCOVERY_TTL_MS = 20 * 60 * 1000;
 const LIVE_DISCOVERY_MAX_ENTRIES = 200;
-type LiveDraft = Awaited<ReturnType<typeof discoverMultiPortalSources>>[number];
+type LiveDraft = Awaited<ReturnType<typeof discoverScholarlySources>>[number];
 const liveDiscoveryCache = new Map<string, { at: number; results: Promise<LiveDraft[]> }>();
 
 export function __clearLiveDiscoveryCacheForTests(): void {
@@ -238,10 +216,8 @@ function cachedLiveDiscovery(query: string, maxResults: number): Promise<LiveDra
   const hit = liveDiscoveryCache.get(key);
   if (hit && now - hit.at < LIVE_DISCOVERY_TTL_MS) return hit.results;
 
-  const results = Promise.all([
-    discoverMultiPortalSources(query, maxResults),
-    discoverEuropePmcSources(query, Math.min(10, Math.ceil(maxResults / 3))),
-  ]).then(([multi, epmc]) => [...multi, ...epmc] as LiveDraft[]);
+  // The shared pipeline (Europe PMC included for health, STEM and general questions).
+  const results = discoverScholarlySources(query, maxResults);
   // A failed lookup is not cached, so the next request retries it.
   results.catch(() => liveDiscoveryCache.delete(key));
 
@@ -266,7 +242,6 @@ function cachedLiveDiscovery(query: string, maxResults: number): Promise<LiveDra
 export {
   signLlmChallenge,
   computePromptHash,
-  generateGeminiEmbedding,
   readVerifiedBrowserResult,
 };
 
@@ -281,6 +256,11 @@ async function runGatewayCall<T>(kind: string, taskType: string | undefined, fn:
     console.warn(`[scholarBrain] ${kind} failed task=${taskType ?? "reasoning"} ms=${Date.now() - started} error=${name}`);
     throw err;
   }
+}
+
+/** Where this request's AI would run ("server", "browser" or "none"), without calling it: lets a route say so before it starts long work. */
+export function aiAvailability(...args: Parameters<typeof rawAiAvailability>): ReturnType<typeof rawAiAvailability> {
+  return rawAiAvailability(...args);
 }
 
 /** The router call routes use (Coursework agent steps, the Journal studio): timed and logged like the other gateway calls, NFC-normalised, errors rethrown unchanged. */
@@ -472,6 +452,8 @@ export const scholarBrain = {
    * See sectionDrafter.ts.
    */
   draftSection,
+  /** The drafting loop every workspace shares (draft, lengthen, stream, resume); see sectionDrafter.ts. */
+  runSectionDraft,
   /** The research context a section draft is given, from a project's answers. */
   researchContextFromAnswers,
   /** Excerpts of sections already written, for drafting the next one. */
@@ -489,7 +471,6 @@ export const scholarBrain = {
   streamJSON: (...args: Parameters<typeof streamOpenRouterJSON>) => streamOpenRouterJSON(...args),
   signLlmChallenge: (...args: Parameters<typeof signLlmChallenge>) => signLlmChallenge(...args),
   computePromptHash: (...args: Parameters<typeof computePromptHash>) => computePromptHash(...args),
-  generateGeminiEmbedding: (...args: Parameters<typeof generateGeminiEmbedding>) => generateGeminiEmbedding(...args),
   readVerifiedBrowserResult: (...args: Parameters<typeof readVerifiedBrowserResult>) => readVerifiedBrowserResult(...args),
   getArchetypeModelWeights,
   /**
@@ -590,25 +571,14 @@ export const scholarBrain = {
     const effectiveUserPrompt = userPrompt || (promptConfig as any).prompt || "Empirical scholarly inquiry";
     const effectiveSystemPrompt = systemPrompt || (promptConfig as any).systemInstruction || "You are an elite academic peer reviewer and scholarly researcher.";
 
-    if (!res.headersSent) {
-      res.setHeader("Content-Type", "text/event-stream");
-      res.setHeader("Cache-Control", "no-cache, no-transform");
-      res.setHeader("Connection", "keep-alive");
-      if (typeof res.flushHeaders === "function") {
-        res.flushHeaders();
-      }
-    }
-
-    const sendSSE = (event: string, data: any) => {
-      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-    };
+    // Shared plumbing: headers flushed, heartbeat, abort when the client goes away.
+    const sse = openSse(res);
+    const sendSSE = (event: string, data: unknown) => sse.send(data, event);
 
     const fullSystemPrompt = buildScholarlyVoiceSystemPrompt({ dialect }) + "\n\n" + effectiveSystemPrompt;
     let fullText = "";
 
-    const streamAbort = new AbortController();
-    const onClose = () => { if (!res.writableFinished) streamAbort.abort(); };
-    res?.on?.("close", onClose);
+    const streamAbort = { signal: sse.signal };
 
     try {
       sendSSE("status", { message: "Generating scholarly draft via streaming..." });
@@ -650,17 +620,17 @@ export const scholarBrain = {
         },
       });
 
-      res.end();
+      sse.close();
       return { text: guardrails.text, fullText };
     } catch (err: unknown) {
       if (!streamAbort.signal.aborted) {
         const errMsg = (err as Error)?.message || "Streaming failed";
         sendSSE("error", { message: errMsg });
-        res.end();
+        sse.close();
       }
       throw err;
     } finally {
-      res?.off?.("close", onClose);
+      sse.close();
     }
   },
 

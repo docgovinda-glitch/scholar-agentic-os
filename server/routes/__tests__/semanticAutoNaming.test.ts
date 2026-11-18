@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   deriveHeuristicTitle,
-  deriveSemanticAcademicTitle,
   autoUpdateProjectTitleIfUntitled,
 } from "../project/assignment";
 
@@ -37,15 +36,6 @@ describe("Semantic Academic Auto-Naming", () => {
     it("falls back gracefully for empty or short text", () => {
       expect(deriveHeuristicTitle("")).toBe("Academic Assignment");
       expect(deriveHeuristicTitle("   \n\n  ")).toBe("Academic Assignment");
-    });
-  });
-
-  describe("deriveSemanticAcademicTitle", () => {
-    it("derives academic topic title from brief", async () => {
-      const brief = `POLI3002: Contemporary Nuclear Deterrence and Strategic Stability\nStudent ID: 12345`;
-      const title = await deriveSemanticAcademicTitle(brief);
-      expect(title).toMatch(/Nuclear Deterrence/i);
-      expect(deriveHeuristicTitle(brief)).toMatch(/POLI3002/i);
     });
   });
 

@@ -40,12 +40,12 @@ describe("ChicagoNotesFormatter: identity", () => {
 
 describe("ChicagoNotesFormatter: in-text marker", () => {
   it("is the plain footnote number, not a parenthetical", () => {
-    expect(formatter.formatInText(book, { position: 1 })).toBe("1");
-    expect(formatter.formatInText(book, { position: 7 })).toBe("7");
+    expect(formatter.formatInText(book, { position: 1 })).toBe("[1]");
+    expect(formatter.formatInText(book, { position: 7 })).toBe("[7]");
   });
 
   it("defaults to 1 when no position is given", () => {
-    expect(formatter.formatInText(book)).toBe("1");
+    expect(formatter.formatInText(book)).toBe("[1]");
   });
 });
 
@@ -91,7 +91,7 @@ describe("ChicagoNotesFormatter: bibliography", () => {
 
   it("formats a journal article bibliography entry with the full page range", () => {
     expect(formatter.formatBibliography(article)).toBe(
-      'Stein, John. "Music in Plato\'s Republic." *Music Journal* 44 (2009): 439-58.'
+      'Stein, John. "Music in Plato\'s Republic." *Music Journal* 44 (2009): 439–58.'
     );
   });
 
@@ -147,5 +147,14 @@ describe("ChicagoNotesFormatter: short-title heuristic", () => {
       title: "One Two Three Four Five Six Seven",
     };
     expect(formatter.formatShortNote(longTitle, { locator: "1" })).toContain("*One Two Three Four Five*");
+  });
+});
+
+describe("ChicagoNotesFormatter: issue and DOI", () => {
+  it("prints the issue after the volume and the DOI as a link (CMOS 17 §14.171)", () => {
+    const ref = { kind: "JournalArticle", title: "Computing Machinery and Intelligence", authors: [{ firstName: "Alan M.", lastName: "Turing", order: 0 }], source: "Mind", journal: "Mind", volume: "59", issue: "236", pages: "433-460", doi: "10.1093/mind/LIX.236.433", publicationDate: "1950" } as const;
+    expect(new ChicagoNotesFormatter().formatBibliography({ ...ref, authors: [...ref.authors] })).toBe(
+      'Turing, Alan M. "Computing Machinery and Intelligence." *Mind* 59, no. 236 (1950): 433–460. https://doi.org/10.1093/mind/LIX.236.433.'
+    );
   });
 });

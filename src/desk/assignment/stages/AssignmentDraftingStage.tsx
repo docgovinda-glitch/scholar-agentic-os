@@ -11,13 +11,18 @@ import { useAssignmentWorkspace } from "../AssignmentContext";
 import { DraftingSectionIndex } from "../components/DraftingSectionIndex";
 import { DraftingActiveEditor } from "../components/DraftingActiveEditor";
 import {
+partialTextOf,
+SectionDraftStoppedError,
 streamSectionGeneration,
 type InternalSectionPlan,
 } from "../services/invisibleChunkerService";
+import { previewDraftText } from "../services/draftPreview";
+import { trimToLastSentence } from "../../../domain/assignment/draftPartials";
 import { buildEvidencePack,serializeEvidencePackForPrompt } from "../services/evidencePackService";
 import { buildContextContinuity,updateContextContinuityAfterSection } from "../services/contextContinuityService";
 import type { ContextContinuityState } from "../services/evidencePackService";
 import type { AssignmentDraftingSection } from "../types";
+import { hasOutline } from "../types";
 import {
 ArrowRight,
 ArrowLeft,
@@ -79,10 +84,35 @@ export function AssignmentDraftingStage({
   // The offline scaffold is a guide shown beside the section, never saved as its text:
   // it must not count as drafted words or mark the section ready.
   const [offlineScaffold, setOfflineScaffold] = useState<{ sectionId: string; title: string; text: string } | null>(null);
-  const { showError } = useToast();
+  const { showError, showInfo } = useToast();
   const [activeStreamingSectionId, setActiveStreamingSectionId] = useState<string | null>(null);
-  const [isGeneratingAll, setIsGeneratingAll] = useState(false);
-  const [isTuning, setIsTuning] = useState(false);
+  // One draft at a time: its controller, so Stop can end it (the server then
+  // stops the model). A second click while it runs does nothing.
+  const inFlightRef = useRef<{ sectionId: string; controller: AbortController } | null>(null);
+  // The latest sections, so a draft started right after another finishes
+  // gives the model the text the section before it now has.
+  const sectionsRef = useRef(internalSections);
+  sectionsRef.current = internalSections;
+  // Text a stopped or failed draft reached, kept (and saved) until the student
+  // resumes, keeps or discards it.
+  const savedPartials = useMemo(() => {
+    const raw = project?.answers?.["assignment_section_partials"];
+    return raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, string>) : {};
+  }, [project?.answers]);
+  const partialsRef = useRef<Record<string, string>>(savedPartials);
+  useEffect(() => {
+    partialsRef.current = savedPartials;
+  }, [savedPartials]);
+  const savePartial = useCallback(
+    (sectionId: string, text: string | null) => {
+      const next = { ...partialsRef.current };
+      if (text && text.trim()) next[sectionId] = text;
+      else delete next[sectionId];
+      partialsRef.current = next;
+      void saveAnswers?.({ assignment_section_partials: Object.keys(next).length ? next : null });
+    },
+    [saveAnswers]
+  );
   const [showPresentation, setShowPresentation] = useState(false);
   const [presentationDeck, setPresentationDeck] = useState<SlideDeck | null>(null);
   // Beside the editor on wide screens; on phones it would push the writing
@@ -120,14 +150,6 @@ export function AssignmentDraftingStage({
     }
   }, [internalSections, question, project?.answers, tuneOutlineWithQuestion]);
 
-  const handleTuneOutline = useCallback(async () => {
-    setIsTuning(true);
-    try {
-      await tuneOutlineWithQuestion();
-    } finally {
-      setIsTuning(false);
-    }
-  }, [tuneOutlineWithQuestion]);
 
   // Active section entity
   const activeSection = useMemo(() => {
@@ -154,11 +176,23 @@ export function AssignmentDraftingStage({
     return selectApprovedSources(sources, approvedSourceIds);
   }, [sources, approvedSourceIds]);
 
-  // Stream single section (or revision)
+  // Stream single section (or revision, or resume from a stopped draft)
   const handleStreamSection = useCallback(
-    async (targetSection?: AssignmentDraftingSection, revisionPrompt?: "deepen" | "expand" | "condense" | string) => {
+    async (
+      targetSection?: AssignmentDraftingSection,
+      revisionPrompt?: "deepen" | "expand" | "condense" | string,
+      opts: { continueFrom?: string } = {}
+    ): Promise<"done" | "stopped" | "failed"> => {
       const sec = targetSection || activeSection;
-      if (!sec) return;
+      if (!sec) return "failed";
+      if (inFlightRef.current) {
+        if (inFlightRef.current.sectionId !== sec.id) showInfo?.("One section is being written. Stop it or wait for it to finish.");
+        return "failed";
+      }
+      const controller = new AbortController();
+      inFlightRef.current = { sectionId: sec.id, controller };
+
+      const sections = sectionsRef.current;
 
       setActiveSectionId(sec.id);
       setActiveStreamingSectionId(sec.id);
@@ -166,12 +200,12 @@ export function AssignmentDraftingStage({
       setDraftError(null);
       setOfflineNotice(null);
       setOfflineScaffold(null);
-      setStreamingChunk(sec.draftContent || "");
+      setStreamingChunk(opts.continueFrom ? previewDraftText(opts.continueFrom, approvedSources, citationStyle || DEFAULT_CITATION_STYLE) : "");
 
       // ── Evidence Pack Construction (Production Spec §4.1–4.3) ──
       // Build context continuity from completed sections
-      const sectionIndex = internalSections.findIndex((s) => s.id === sec.id);
-      const continuity = buildContextContinuity(internalSections, sectionIndex);
+      const sectionIndex = sections.findIndex((s) => s.id === sec.id);
+      const continuity = buildContextContinuity(sections, sectionIndex);
 
       // Get analytical syntheses from project answers
       const projectAnswers = project?.answers || {};
@@ -189,9 +223,11 @@ export function AssignmentDraftingStage({
       // Serialize evidence pack for prompt injection
       const evidencePackPrompt = serializeEvidencePackForPrompt(evidencePack);
 
-      const mappedIds = approvedSources
-        .filter((s) => s.mappedSubheadingIds?.includes(sec.id))
-        .map((s) => s.id);
+      // Sources mapped to this section (by the student, or by the AI's reading).
+      const mappedTo = (src: (typeof approvedSources)[number]) => [...(src.mappedSubheadingIds ?? []), ...(src.aiSections ?? [])];
+      const mappedIds = approvedSources.filter((s) => mappedTo(s).includes(sec.id)).map((s) => s.id);
+      // A section with none mapped gets the approved sources not mapped to another section.
+      const unmappedIds = approvedSources.filter((s) => mappedTo(s).length === 0).map((s) => s.id);
 
       const planSection: InternalSectionPlan = {
         ...sec,
@@ -202,8 +238,19 @@ export function AssignmentDraftingStage({
             ? sec.boundSourceIds
             : mappedIds.length > 0
             ? mappedIds
+            : unmappedIds.length > 0
+            ? unmappedIds
             : approvedSources.map((s) => s.id),
       };
+
+      const finish = () => {
+        setStreamingChunk("");
+        setActiveStreamingSectionId(null);
+        setGeneratingSection(sec.id, false);
+        if (inFlightRef.current?.controller === controller) inFlightRef.current = null;
+      };
+      // What has arrived is saved every few seconds, so a reload or crash keeps it.
+      let lastPartialSave = Date.now();
 
       try {
         await streamSectionGeneration({
@@ -215,36 +262,39 @@ export function AssignmentDraftingStage({
           approvedSources,
           revisionPrompt,
           evidencePackPrompt, // Injected into the LLM prompt
+          signal: controller.signal,
+          continueFrom: opts.continueFrom,
           onChunk: (_chunk, aggregated) => {
-            setStreamingChunk(aggregated);
+            setStreamingChunk(previewDraftText(aggregated, approvedSources, citationStyle || DEFAULT_CITATION_STYLE));
+            if (!revisionPrompt && Date.now() - lastPartialSave > 5000) {
+              lastPartialSave = Date.now();
+              savePartial(sec.id, aggregated);
+            }
           },
           onComplete: async (fullText, meta) => {
             if (meta?.scaffold) {
               setOfflineScaffold({ sectionId: sec.id, title: sec.title, text: fullText });
-              setStreamingChunk("");
-              setActiveStreamingSectionId(null);
-              setGeneratingSection(sec.id, false);
+              finish();
               return;
             }
             await updateSectionContent(sec.id, fullText);
+            if (partialsRef.current[sec.id]) savePartial(sec.id, null);
             // Update context continuity state after section completion
             contextContinuityRef.current = updateContextContinuityAfterSection(
               contextContinuityRef.current,
               { ...sec, draftContent: fullText }
             );
-            setStreamingChunk("");
-            setActiveStreamingSectionId(null);
-            setGeneratingSection(sec.id, false);
+            finish();
           },
           report: {
             sectionIndex,
-            sectionCount: internalSections.length,
-            outlineTitles: internalSections.map((x) => x.title),
-            previousTail: sectionIndex > 0 ? (internalSections[sectionIndex - 1].draftContent || "").slice(-400) : undefined,
+            sectionCount: sections.length,
+            outlineTitles: sections.map((x) => x.title),
+            previousTail: sectionIndex > 0 ? (sections[sectionIndex - 1].draftContent || "").slice(-400) : undefined,
             remainingEssayWords: Math.max(
               0,
               (targetWordCount || 0) -
-                internalSections.filter((x) => x.id !== sec.id).reduce((n, x) => n + countProseWords(x.draftContent || ""), 0)
+                sections.filter((x) => x.id !== sec.id).reduce((n, x) => n + countProseWords(x.draftContent || ""), 0)
             ),
           },
           writingStyle: writingStyle && typeof writingStyle === "object" ? (writingStyle as { preset?: string; customSampleText?: string }) : undefined,
@@ -252,13 +302,16 @@ export function AssignmentDraftingStage({
             setOfflineNotice(`${reason} Nothing was written into the section. Below is a scaffold built from your outline: try again, or insert it and write the analysis yourself.`);
           },
         });
+        return "done";
       } catch (err) {
         // Keep whatever the section had before; never fill it with stand-in text.
-        // One clean toast; no uncaught console stack traces.
+        // Text that had arrived is kept aside to resume or keep.
+        const partial = err instanceof SectionDraftStoppedError ? err.partialText : partialTextOf(err);
+        if (partial.trim() && !revisionPrompt) savePartial(sec.id, partial);
+        finish();
+        if (err instanceof SectionDraftStoppedError) return "stopped";
         showError(`"${clipHeadingWords(sec.title)}" was not ${revisionPrompt ? "revised" : "drafted"}: ${err instanceof Error ? err.message : String(err)}`);
-        setStreamingChunk("");
-        setActiveStreamingSectionId(null);
-        setGeneratingSection(sec.id, false);
+        return "failed";
       }
     },
     [
@@ -272,11 +325,28 @@ export function AssignmentDraftingStage({
       citationStyle,
       approvedSources,
       userUploadedSources,
-      internalSections,
       setActiveSectionId,
       setGeneratingSection,
       updateSectionContent,
+      savePartial,
+      showError,
+      showInfo,
     ]
+  );
+
+  /** Stop the section being written; the server stops the model too. */
+  const handleStop = useCallback(() => {
+    inFlightRef.current?.controller.abort();
+  }, []);
+
+  // A stopped draft carries on from where it ended.
+  const handleResume = useCallback(
+    (section: AssignmentDraftingSection) => {
+      const partial = trimToLastSentence(partialsRef.current[section.id] || "");
+      if (!partial) return;
+      void handleStreamSection(section, undefined, { continueFrom: partial });
+    },
+    [handleStreamSection]
   );
 
   // Generate Next Section (first incomplete)
@@ -294,18 +364,7 @@ export function AssignmentDraftingStage({
     }
   }, [internalSections, generatingSectionIds, activeSection, handleStreamSection]);
 
-  // Generate All Remaining sequentially
-  const handleGenerateAll = useCallback(async () => {
-    setIsGeneratingAll(true);
-    const pendingList = internalSections.filter(
-      (s) => !s.draftContent || s.draftContent.trim().length === 0
-    );
-
-    for (const pending of pendingList) {
-      await handleStreamSection(pending);
-    }
-    setIsGeneratingAll(false);
-  }, [internalSections, handleStreamSection]);
+  const activePartial = activeSection && !activeStreamingSectionId ? savedPartials[activeSection.id] : undefined;
 
   // Phase 3 Exit Gate Validation:
   // 1. All internalSections have status completed or non-empty draftContent
@@ -357,6 +416,31 @@ export function AssignmentDraftingStage({
             className="mt-2 px-4 py-2 rounded-xl text-xs font-semibold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 cursor-pointer"
           >
             Go to Extract
+          </button>
+        </section>
+      </div>
+    );
+  }
+
+  // No outline yet: sections come from the outline the AI wrote (or the
+  // student's own), never from a template.
+  if (!isLoading && project && internalSections.length === 0 && !hasOutline(structure)) {
+    return (
+      <div className="max-w-3xl mx-auto p-4 sm:p-6 lg:p-8 text-[color:var(--text-primary)]">
+        <section
+          data-testid="drafting-needs-outline"
+          className="rounded-2xl p-6 sm:p-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-xs space-y-3 text-center"
+        >
+          <h1 className="text-lg sm:text-xl font-semibold tracking-tight">Plan your outline first</h1>
+          <p className="text-sm text-[color:var(--text-muted)] max-w-md mx-auto">
+            Drafting writes one section at a time from your approved outline. Build it with your AI, or write your own, in Understand.
+          </p>
+          <button
+            type="button"
+            onClick={() => setPhase("understand")}
+            className="mt-2 px-4 py-2 rounded-xl text-xs font-semibold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 cursor-pointer"
+          >
+            Go to Understand
           </button>
         </section>
       </div>
@@ -440,6 +524,56 @@ export function AssignmentDraftingStage({
         </div>
       </header>
 
+      {activeStreamingSectionId && (
+        <div role="status" data-testid="drafting-live" className="flex items-center gap-3 rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-3 py-2 text-xs">
+          <span className="w-2 h-2 rounded-full bg-[color:var(--accent-solid)] animate-pulse shrink-0" aria-hidden="true" />
+          <span className="flex-1 min-w-0 truncate text-[color:var(--text-secondary)]">
+            Writing "{clipHeadingWords(internalSections.find((x) => x.id === activeStreamingSectionId)?.title || "section")}"
+          </span>
+          <button
+            type="button"
+            onClick={handleStop}
+            className="px-3 py-1 rounded-full border border-[color:var(--border-default)] font-medium hover:bg-[color:var(--surface-hover)] cursor-pointer"
+          >
+            Stop
+          </button>
+        </div>
+      )}
+
+      {activeSection && activePartial && (
+        <div role="status" data-testid="drafting-partial" className="rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]/70 px-3 py-2 text-xs space-y-2">
+          <p className="text-[color:var(--text-secondary)]">
+            Drafting of "{clipHeadingWords(activeSection.title)}" stopped after {countProseWords(activePartial).toLocaleString()} words. It is kept here, not in the section yet.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => handleResume(activeSection)}
+              className="px-3 py-1 rounded-full bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] font-medium cursor-pointer"
+            >
+              Resume
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                await updateSectionContent(activeSection.id, previewDraftText(activePartial, approvedSources, citationStyle || DEFAULT_CITATION_STYLE).trim());
+                savePartial(activeSection.id, null);
+              }}
+              className="px-3 py-1 rounded-full border border-[color:var(--border-default)] font-medium cursor-pointer"
+            >
+              Keep this text
+            </button>
+            <button
+              type="button"
+              onClick={() => savePartial(activeSection.id, null)}
+              className="px-3 py-1 rounded-full font-medium text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] cursor-pointer"
+            >
+              Discard
+            </button>
+          </div>
+        </div>
+      )}
+
       {offlineNotice && (
         <div role="status" className="text-xs text-[color:var(--text-secondary)] px-1 space-y-2" data-testid="offline-draft-notice">
           <p>{offlineNotice}</p>
@@ -495,12 +629,9 @@ export function AssignmentDraftingStage({
             activeSectionId={activeSection?.id || null}
             onSelectSection={(id) => setActiveSectionId(id)}
             onGenerateNext={handleGenerateNext}
-            onGenerateAll={handleGenerateAll}
-            onTuneToQuestion={handleTuneOutline}
             onUpdateSectionTitle={updateSectionTitle}
             assignmentTopic={question}
-            isTuning={isTuning}
-            isGenerating={Boolean(activeStreamingSectionId) || isGeneratingAll}
+            isGenerating={Boolean(activeStreamingSectionId)}
             generatingSectionId={activeStreamingSectionId}
           />
         </div>

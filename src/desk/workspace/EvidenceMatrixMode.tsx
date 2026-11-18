@@ -13,12 +13,8 @@ import {
   updateProjectUserData,
 } from "../api";
 import { safeParseAnswerField } from "../../shared/projectStateSchema";
-import {
-  harvestFromOpenAlex,
-  harvestFromCrossref,
-  harvestFromArxiv,
-  type PortalHarvestItem,
-} from "../../services/discovery/multiPortalLiteratureHarvester";
+import { dedupeWorks } from "../../shared/retrieval/identity";
+import type { LiteratureItem } from "./agentPrompts/literaturePrompts";
 import { executeLiveSearch } from "../../services/liveSearchService";
 import { normalizeUnicodeNFC } from "../../document_intelligence/index";
 import AddByDoi from "../journal/AddByDoi";
@@ -128,7 +124,7 @@ export default function EvidenceMatrixMode() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPortal, setSelectedPortal] = useState<"all" | "openalex" | "crossref" | "arxiv" | "web">("all");
   const [isSearching, setIsSearching] = useState(false);
-  const [searchResults, setSearchResults] = useState<PortalHarvestItem[]>([]);
+  const [searchResults, setSearchResults] = useState<LiteratureItem[]>([]);
   const [searchError, setSearchError] = useState<string | null>(null);
 
   // State: Matrix Filtering & View Drawer
@@ -237,47 +233,34 @@ export default function EvidenceMatrixMode() {
 
     try {
       const q = searchQuery.trim();
-      let results: PortalHarvestItem[] = [];
+      // One search through the shared pipeline on the server (/api/search/live):
+      // the browser never calls a scholarly index itself. A chosen index filters
+      // the merged results; nothing missing (author, year, score) is filled in.
+      const live = await executeLiveSearch(q, { mode: selectedPortal === "web" ? "web" : "scholarly", limit: 30 });
+      const results: LiteratureItem[] = live
+        .filter((item) => selectedPortal === "all" || selectedPortal === "web" || item.source === selectedPortal)
+        .map((item, idx) => {
+          const year = Number(String(item.year ?? "").slice(0, 4)) || undefined;
+          return {
+            id: item.id || item.doi || `live_${idx}_${item.title.slice(0, 40)}`,
+            title: item.title,
+            authors: item.authors ?? [],
+            ...(year ? { year } : {}),
+            journal: item.venue || item.journal || "",
+            source: "external" as const,
+            relevanceScore: typeof item.score === "number" ? Math.max(0, Math.min(100, Math.round(item.score))) : 0,
+            themes: [],
+            abstract: item.snippet || "",
+            doi: item.doi,
+            portal: item.source ?? (selectedPortal === "web" ? "web" : undefined),
+            url: item.url,
+            isOpenAccess: Boolean(item.openAccessUrl),
+            openAccessPdfUrl: item.openAccessUrl,
+          };
+        });
 
-      if (selectedPortal === "openalex" || selectedPortal === "all") {
-        const alex = await harvestFromOpenAlex(q, 15).catch(() => []);
-        results = [...results, ...alex];
-      }
-      if (selectedPortal === "crossref" || selectedPortal === "all") {
-        const cross = await harvestFromCrossref(q, 15).catch(() => []);
-        results = [...results, ...cross];
-      }
-      if (selectedPortal === "arxiv" || selectedPortal === "all") {
-        const arxiv = await harvestFromArxiv(q, 15).catch(() => []);
-        results = [...results, ...arxiv];
-      }
-      if (selectedPortal === "web") {
-        const live = await executeLiveSearch(q, { limit: 10 }).catch(() => []);
-        const formatted: PortalHarvestItem[] = live.map((item, idx) => ({
-          id: `web_${Date.now()}_${idx}`,
-          title: item.title,
-          authors: item.authors || ["Live Web"],
-          year: new Date().getFullYear(),
-          journal: "Live Web Grounding",
-          source: "external" as const,
-          relevanceScore: 85,
-          themes: ["empirical", "web_grounding"],
-          doi: undefined,
-          abstract: item.snippet,
-          portal: "web",
-          url: item.url,
-        }));
-        results = [...results, ...formatted];
-      }
-
-      // Deduplicate by title
-      const seen = new Set<string>();
-      const deduped = results.filter((r) => {
-        const key = r.title.toLowerCase().replace(/[^a-z0-9]/g, "");
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
+      // One record per work (the server merged providers; this also covers the shared identity rules).
+      const deduped = dedupeWorks(results);
 
       setSearchResults(deduped);
       if (deduped.length === 0) {
@@ -292,7 +275,7 @@ export default function EvidenceMatrixMode() {
   };
 
   // Add search result to evidence matrix
-  const handleAddSearchResult = async (item: PortalHarvestItem) => {
+  const handleAddSearchResult = async (item: LiteratureItem) => {
     if (!effectiveProjectId) return;
 
     const id = item.id.replace(/[^a-zA-Z0-9_-]/g, "_");

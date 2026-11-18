@@ -74,8 +74,13 @@ export const AI_PROVIDER_REQUIRED_MESSAGE =
  * 400 ai_local_model_unreachable: the user's AI is a local model the server can't reach.
  * 426 requireFrontendLLM: the route opted into running the prompt on the user's browser-local AI.
  * 403 ai_challenge_invalid: a browser result came back without a valid challenge.
- * 502 ai_unavailable: the provider failed or returned something unusable.
+ * 503 ai_unavailable (Retry-After): the provider failed or returned something
+ *   unusable. Not 502: that reads as the platform's own gateway failing, and
+ *   hid real infrastructure errors among provider outages.
  */
+/** Seconds a client should wait before retrying an AI request no provider could answer. */
+export const AI_RETRY_AFTER_SECONDS = "10";
+
 export function sendAiFailure(res: Response, err: unknown, feature: string): void {
   if (res.headersSent) return;
   if (err instanceof BrowserAiRequiredError) {
@@ -96,11 +101,15 @@ export function sendAiFailure(res: Response, err: unknown, feature: string): voi
   }
   if (err instanceof Error && err.name === "RouterExhaustedError") {
     const code = (err as Error & { code?: string }).code;
-    res.status(code === "context_overflow" ? 413 : 502).json({ error: err.message, code: code === "context_overflow" ? "ai_context_overflow" : "ai_unavailable" });
+    if (code === "context_overflow") {
+      res.status(413).json({ error: err.message, code: "ai_context_overflow" });
+      return;
+    }
+    res.status(503).set("Retry-After", AI_RETRY_AFTER_SECONDS).json({ error: err.message, code: "ai_unavailable" });
     return;
   }
   console.warn(`[${feature}] AI request failed:`, err instanceof Error ? err.message : err);
-  res.status(502).json({
+  res.status(503).set("Retry-After", AI_RETRY_AFTER_SECONDS).json({
     error: `${feature} could not be generated: the AI provider failed or returned an unusable answer. Nothing was produced. Try again.`,
     code: "ai_unavailable",
   });

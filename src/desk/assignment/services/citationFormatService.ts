@@ -7,68 +7,23 @@
 import { CitationFormatterFactory } from "../../../citation_compliance/formattingEngine";
 import type { DiscoveredSource } from "../types";
 import { formatReference } from "./referenceListGenerator";
-import { parsePersonName } from "./personName";
 
 export { parseAuthorStringToCanonical, discoveredSourceToCanonical } from "./sourceCanonical";
 import { discoveredSourceToCanonical } from "./sourceCanonical";
 
 /**
- * Formats an in-text citation for a source using the active citation style.
- * Fallbacks are provided if formatting fails for any unexpected input.
+ * The in-text citation for a source in the active style, from the shared
+ * formatters (the one citation engine): author-date styles name the authors
+ * (the title's first words when there is no author) and year; IEEE and
+ * Vancouver give the source's number.
  */
 export function formatSourceInTextCitation(
   source: Partial<DiscoveredSource>,
   styleId: string = "apa7",
   citationIndex?: number
 ): string {
-  const styleNorm = (styleId || "apa7").toLowerCase();
-
-  if (styleNorm.includes("ieee")) {
-    return `[${citationIndex || 1}]`;
-  }
-  if (styleNorm.includes("vancouver")) {
-    return `(${citationIndex || 1})`;
-  }
-
-  try {
-    const canonical = source.canonicalReference || discoveredSourceToCanonical(source);
-    const inText = CitationFormatterFactory.formatInText(styleId, canonical);
-    if (inText && inText.trim() && !inText.startsWith("[Citation:")) {
-      return inText.trim();
-    }
-  } catch (err) {
-    console.warn("Citation compliance engine fallback for in-text citation:", err);
-  }
-
-  // Graceful deterministic fallback
-  const year = source.year || "n.d.";
-  const rawAuthors: unknown = source.authors; // older saves may hold one string
-  const authorList = Array.isArray(rawAuthors)
-    ? rawAuthors
-    : typeof rawAuthors === "string" && rawAuthors.trim()
-    ? [rawAuthors.trim()]
-    : [];
-
-  if (authorList.length === 0) {
-    const shortTitle = source.title ? source.title.split(" ").slice(0, 3).join(" ") : "Source";
-    return `(${shortTitle}, ${year})`;
-  }
-
-  const getLastName = (authorStr: string) => parsePersonName(authorStr).family || authorStr.trim();
-
-  const firstAuthor = getLastName(authorList[0]);
-
-  if (authorList.length === 1) {
-    if (styleNorm.includes("mla")) return `(${firstAuthor})`;
-    return `(${firstAuthor}, ${year})`;
-  }
-  if (authorList.length === 2) {
-    const secondAuthor = getLastName(authorList[1]);
-    if (styleNorm.includes("mla")) return `(${firstAuthor} and ${secondAuthor})`;
-    return `(${firstAuthor} & ${secondAuthor}, ${year})`;
-  }
-  if (styleNorm.includes("mla")) return `(${firstAuthor} et al.)`;
-  return `(${firstAuthor} et al., ${year})`;
+  const canonical = source.canonicalReference || discoveredSourceToCanonical(source);
+  return CitationFormatterFactory.formatInText(styleId || "apa7", canonical, { position: citationIndex || 1 }).trim();
 }
 
 /**

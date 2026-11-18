@@ -33,7 +33,7 @@ describe("Assignment State Integrity & Corruption Healing", () => {
     expect(isCorruptedOutlineHeadings(classroomHeadings, "Any Topic")).toBe(true);
   });
 
-  it("heals a corrupted project structure in project answers", () => {
+  it("removes a corrupted project structure instead of replacing it with a template", () => {
     const corruptedProject = {
       projectId: "test-proj-corruption",
       answers: {
@@ -52,12 +52,9 @@ describe("Assignment State Integrity & Corruption Healing", () => {
     const healed = healCorruptedProjectStructure(corruptedProject);
     expect(healed).toBe(true);
 
-    const healedStructure = safeParseAnswerField<{ headings: any[] }>(corruptedProject.answers.assignment_structure, { headings: [] });
-    expect(healedStructure.headings.length).toBeGreaterThan(0);
-    // Verified no ML headings remain
-    const allTitles = healedStructure.headings.map((h: any) => h.title.toLowerCase());
-    expect(allTitles.some((t: string) => t.includes("loss optimization"))).toBe(false);
-    expect(allTitles.some((t: string) => t.includes("divide yourself"))).toBe(false);
+    // The outline made of old template text is removed, not swapped for another
+    // template: the student builds it again from the brief.
+    expect(corruptedProject.answers.assignment_structure).toBeUndefined();
     // Verified stale internal sections were purged
     expect(corruptedProject.answers.assignment_internal_sections).toBeUndefined();
   });

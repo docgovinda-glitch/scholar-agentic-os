@@ -1,4 +1,3 @@
-import type { AcademicLevel,AssignmentType } from "../types";
 import React,{ useState } from "react";
 import {
 Sparkles,
@@ -12,7 +11,6 @@ import { CSS } from "@dnd-kit/utilities";
 import type {
 AssignmentStructure
 } from "../types";
-import { generateDynamicAssignmentStructure } from "../services/dynamicStructure";
 import { updateThesisStatement } from "../services/outlineEditing";
 import { removeTargetFramework } from "../services/outlineEditing";
 import { addTargetFramework } from "../services/outlineEditing";
@@ -73,6 +71,14 @@ export interface DynamicStructurePlannerProps {
   isConfirmed?: boolean;
   onConfirmStructure?: () => void;
   className?: string;
+  /** Ask the AI to rewrite one section (its budget stays). */
+  onRegenerateHeading?: (headingId: string) => void;
+  /** The section being rewritten, if any. */
+  regeneratingHeadingId?: string | null;
+  /** With no outline yet: what the build is doing ("Planning your outline…"), if it runs. */
+  buildingMessage?: string | null;
+  /** With no outline yet: start from a starter outline the student then edits (not the AI's). */
+  onUseStarterOutline?: () => void;
 }
 
 export function DynamicStructurePlanner({
@@ -90,6 +96,10 @@ export function DynamicStructurePlanner({
   citationStyle,
   isConfirmed = false,
   className = "",
+  onRegenerateHeading,
+  regeneratingHeadingId = null,
+  buildingMessage = null,
+  onUseStarterOutline,
 }: DynamicStructurePlannerProps) {
   const [expandedNotes, setExpandedNotes] = useState<Record<string, boolean>>({});
   const [expandedBlueprintHeadings, setExpandedBlueprintHeadings] = useState<Record<string, boolean>>({});
@@ -105,8 +115,6 @@ export function DynamicStructurePlanner({
   const toggleSubheadingBlueprint = (subId: string) => {
     setExpandedBlueprintSubheadings((prev) => ({ ...prev, [subId]: !prev[subId] }));
   };
-
-  const effectiveQuestion = question || assignmentQuestion || "";
 
   const notifyChange = (updated: AssignmentStructure) => {
     onStructureChange?.(updated);
@@ -181,19 +189,6 @@ export function DynamicStructurePlanner({
     notifyChange(updated);
   };
 
-  const handleResetToAI = () => {
-    const fresh = generateDynamicAssignmentStructure({
-      question: effectiveQuestion,
-      assignmentType: assignmentType as AssignmentType,
-      academicLevel: academicLevel as AcademicLevel,
-      targetWordCount,
-      writingTone,
-      citationStyle,
-      currentStructure: structure,
-    });
-    notifyChange(fresh);
-  };
-
   const handleCreateHeading = () => {
     const title = newHeadingTitle.trim();
     const updated = addMainHeading(structure, title || undefined);
@@ -226,6 +221,48 @@ export function DynamicStructurePlanner({
     const updated = reorderSubheadings(structure, headingId, fromIdx, toIdx);
     notifyChange(updated);
   };
+
+  // No outline yet: say what is happening, never show a made-up one.
+  if (!structure.headings || structure.headings.length === 0) {
+    return (
+      <div className={`rounded-2xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]/50 p-5 space-y-3 text-center ${className}`} data-testid="outline-empty">
+        {buildingMessage ? (
+          <p role="status" className="text-xs text-[color:var(--text-secondary)] flex items-center justify-center gap-2">
+            <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+            {buildingMessage}
+          </p>
+        ) : (
+          <>
+            <p className="text-sm font-medium text-[color:var(--text-primary)]">No outline yet</p>
+            <p className="text-xs text-[color:var(--text-muted)] max-w-md mx-auto">
+              Your AI plans the outline for this assignment: headings, their purpose and word budgets. You can then edit, reorder and approve it.
+            </p>
+            <div className="flex flex-wrap justify-center gap-2 pt-1">
+              {onRegenerateOutline && (
+                <button
+                  type="button"
+                  onClick={onRegenerateOutline}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 cursor-pointer"
+                >
+                  Write the outline with AI
+                </button>
+              )}
+              {onUseStarterOutline && (
+                <button
+                  type="button"
+                  onClick={onUseStarterOutline}
+                  className="px-4 py-2 rounded-xl text-xs font-medium border border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] cursor-pointer"
+                  title="A plain outline built from the brief's wording (not written by AI) that you edit yourself"
+                >
+                  Start from a plain outline (not AI)
+                </button>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className={`space-y-4 ${className}`}>
@@ -358,26 +395,24 @@ export function DynamicStructurePlanner({
                 type="button"
                 onClick={onRegenerateOutline}
                 className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] hover:border-neutral-300 transition-colors cursor-pointer shadow-2xs"
-                title="Regenerate outline from current brief"
+                title="Ask your AI to write the outline again"
                 aria-label="Regenerate Outline"
               >
                 <RotateCcw className="w-3 h-3 text-purple-500" />
-                <span>Regenerate Outline</span>
+                <span>Regenerate outline with AI</span>
               </button>
             )}
 
-            <button
-              type="button"
-              onClick={handleResetToAI}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] transition-colors cursor-pointer"
-              title="Reset to AI-generated analytical structure"
-              aria-label="Reset AI Suggestions"
-            >
-              <RotateCcw className="w-3 h-3" />
-              <span>Reset AI Suggestions</span>
-            </button>
           </div>
         </div>
+
+        {structure.budgetNotes && structure.budgetNotes.length > 0 && (
+          <ul className="text-xs text-[color:var(--text-secondary)] space-y-1 list-disc pl-4" aria-label="Notes on the word budgets" data-testid="outline-budget-notes">
+            {structure.budgetNotes.map((n) => (
+              <li key={n}>{n}</li>
+            ))}
+          </ul>
+        )}
 
         {/* Introduction & Core Working Thesis (tailored to writing tone) */}
         <div className="p-3.5 sm:px-4 rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] shadow-xs space-y-2">
@@ -422,7 +457,7 @@ export function DynamicStructurePlanner({
 
                 return (
                   <SortableHeadingWrapper key={heading.id} id={heading.id}>
-                    <StructureHeadingCard expandedBlueprintHeadings={expandedBlueprintHeadings} expandedBlueprintSubheadings={expandedBlueprintSubheadings} expandedNotes={expandedNotes} hIdx={hIdx} handleAdjustHeadingWords={handleAdjustHeadingWords} handleAdjustWords={handleAdjustWords} handleCreateSubheading={handleCreateSubheading} handleDeleteHeading={handleDeleteHeading} handleDeleteSubheading={handleDeleteSubheading} handleExactHeadingWords={handleExactHeadingWords} handleExactWords={handleExactWords} handleMoveHeading={handleMoveHeading} handleMoveSubheading={handleMoveSubheading} heading={heading} headingPercentage={headingPercentage} notifyChange={notifyChange} structure={structure} targetWordCount={targetWordCount} toggleHeadingBlueprint={toggleHeadingBlueprint} toggleNotes={toggleNotes} toggleSubheadingBlueprint={toggleSubheadingBlueprint} />
+                    <StructureHeadingCard expandedBlueprintHeadings={expandedBlueprintHeadings} expandedBlueprintSubheadings={expandedBlueprintSubheadings} expandedNotes={expandedNotes} hIdx={hIdx} handleAdjustHeadingWords={handleAdjustHeadingWords} handleAdjustWords={handleAdjustWords} handleCreateSubheading={handleCreateSubheading} handleDeleteHeading={handleDeleteHeading} handleDeleteSubheading={handleDeleteSubheading} handleExactHeadingWords={handleExactHeadingWords} handleExactWords={handleExactWords} handleMoveHeading={handleMoveHeading} handleMoveSubheading={handleMoveSubheading} heading={heading} headingPercentage={headingPercentage} notifyChange={notifyChange} structure={structure} targetWordCount={targetWordCount} toggleHeadingBlueprint={toggleHeadingBlueprint} toggleNotes={toggleNotes} toggleSubheadingBlueprint={toggleSubheadingBlueprint} onRegenerateHeading={onRegenerateHeading} regenerating={regeneratingHeadingId === heading.id} />
                   </SortableHeadingWrapper>
                 );
               })}

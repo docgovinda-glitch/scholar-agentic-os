@@ -1,3 +1,4 @@
+import { readSse } from "../../shared/sseReader";
 import { authHeaders } from "./authHeaders";
 import { buildKeyring, encodeKeyring } from "../ai/keyring";
 import { inspectAiResponse } from "../ai/aiRouteNotices";
@@ -188,12 +189,14 @@ export async function authedJsonFetch(
   input: string,
   method: string,
   body: unknown,
-  options?: { skipLlmFallback?: boolean }
+  options?: { skipLlmFallback?: boolean; signal?: AbortSignal }
 ): Promise<Response> {
+  const signal = options?.signal;
   let res = await authedFetch(input, {
     method,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    signal,
   });
 
   if (res.status === 426 && !options?.skipLlmFallback) {
@@ -209,6 +212,7 @@ export async function authedJsonFetch(
           challengeToken: data.challengeToken,
           canonicalSources: data.canonicalSources,
         }),
+        signal,
       });
     } else {
       res = new Response(JSON.stringify(data), { status: 426, headers: res.headers });
@@ -283,48 +287,8 @@ async function streamFetch(
           }),
         });
 
-        const reader = postRes.body?.getReader();
-        const decoder = new TextDecoder("utf-8");
-        if (reader) {
-          let fallbackCurrentEvent = "";
-          let fallbackBuffer = "";
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) {
-              if (fallbackBuffer) {
-                processFallbackChunk(fallbackBuffer);
-              }
-              break;
-            }
-            fallbackBuffer += decoder.decode(value, { stream: true });
-
-            let newlineIndex;
-            while ((newlineIndex = fallbackBuffer.indexOf("\n")) >= 0) {
-              const line = fallbackBuffer.slice(0, newlineIndex).trim();
-              fallbackBuffer = fallbackBuffer.slice(newlineIndex + 1);
-              processFallbackChunk(line);
-            }
-          }
-
-          function processFallbackChunk(line: string) {
-            if (!line) return;
-            if (line.startsWith("event: ")) {
-              fallbackCurrentEvent = line.substring(7).trim();
-            } else if (line.startsWith("data: ")) {
-              let evtData;
-              try {
-                evtData = JSON.parse(line.substring(6));
-              } catch {
-                return;
-              }
-              if (fallbackCurrentEvent) {
-                const evtToDispatch = fallbackCurrentEvent;
-                fallbackCurrentEvent = "";
-                onEvent(evtToDispatch, evtData);
-              }
-            }
-          }
-        }
+        // Named events only (the stream's format), through the shared reader.
+        if (postRes.body) await readSse(postRes.body, (m) => (m.event && m.json ? onEvent(m.event, m.data) : undefined));
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         try {
@@ -369,48 +333,8 @@ async function streamFetch(
     return;
   }
 
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder("utf-8");
-  let currentEvent = "";
-  let buffer = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) {
-      if (buffer) {
-        processChunk(buffer);
-      }
-      break;
-    }
-    buffer += decoder.decode(value, { stream: true });
-
-    let newlineIndex;
-    while ((newlineIndex = buffer.indexOf("\n")) >= 0) {
-      const line = buffer.slice(0, newlineIndex).trim();
-      buffer = buffer.slice(newlineIndex + 1);
-      processChunk(line);
-    }
-  }
-
-  function processChunk(line: string) {
-    if (!line) return;
-    if (line.startsWith("event: ")) {
-      currentEvent = line.substring(7).trim();
-    } else if (line.startsWith("data: ")) {
-      let evtData;
-      try {
-        evtData = JSON.parse(line.substring(6));
-      } catch {
-        return;
-      }
-
-      if (currentEvent) {
-        const evtToDispatch = currentEvent;
-        currentEvent = "";
-        onEvent(evtToDispatch, evtData);
-      }
-    }
-  }
+  // Named events only (the stream's format), through the shared reader.
+  await readSse(res.body, (m) => (m.event && m.json ? onEvent(m.event, m.data) : undefined));
 }
 
 /**

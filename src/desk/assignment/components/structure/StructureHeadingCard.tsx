@@ -1,5 +1,6 @@
 import {
 Plus,
+RotateCcw,
 Trash2,ArrowUp,
 ArrowDown,StickyNote,
 X,
@@ -41,9 +42,13 @@ export interface StructureHeadingCardProps {
   toggleHeadingBlueprint: (headingId: string) => void;
   toggleNotes: (id: string) => void;
   toggleSubheadingBlueprint: (subId: string) => void;
+  /** Ask the AI to rewrite this one section (its budget stays). */
+  onRegenerateHeading?: (headingId: string) => void;
+  /** This section is being rewritten. */
+  regenerating?: boolean;
 }
 
-export function StructureHeadingCard({ expandedBlueprintHeadings, expandedBlueprintSubheadings, expandedNotes, hIdx, handleAdjustHeadingWords, handleAdjustWords, handleCreateSubheading, handleDeleteHeading, handleDeleteSubheading, handleExactHeadingWords, handleExactWords, handleMoveHeading, handleMoveSubheading, heading, headingPercentage, notifyChange, structure, targetWordCount, toggleHeadingBlueprint, toggleNotes, toggleSubheadingBlueprint }: StructureHeadingCardProps) {
+export function StructureHeadingCard({ expandedBlueprintHeadings, expandedBlueprintSubheadings, expandedNotes, hIdx, handleAdjustHeadingWords, handleAdjustWords, handleCreateSubheading, handleDeleteHeading, handleDeleteSubheading, handleExactHeadingWords, handleExactWords, handleMoveHeading, handleMoveSubheading, heading, headingPercentage, notifyChange, structure, targetWordCount, toggleHeadingBlueprint, toggleNotes, toggleSubheadingBlueprint, onRegenerateHeading, regenerating = false }: StructureHeadingCardProps) {
   return (
     <>
                     <div
@@ -167,6 +172,20 @@ export function StructureHeadingCard({ expandedBlueprintHeadings, expandedBluepr
                         )}
                       </button>
 
+                      {onRegenerateHeading && (
+                        <button
+                          type="button"
+                          onClick={() => onRegenerateHeading(heading.id)}
+                          disabled={regenerating}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-[color:var(--surface-sunken)]/70 hover:bg-[color:var(--surface-hover)] text-[color:var(--text-secondary)] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-wait"
+                          title="Ask your AI to rewrite this section; its word budget stays"
+                          aria-label={`Regenerate section ${heading.number} with AI`}
+                        >
+                          <RotateCcw className={`w-3 h-3 ${regenerating ? "animate-spin" : ""}`} />
+                          <span>{regenerating ? "Rewriting…" : "Regenerate"}</span>
+                        </button>
+                      )}
+
                       {/* Add Subheading Button */}
                       <button
                         type="button"
@@ -194,6 +213,12 @@ export function StructureHeadingCard({ expandedBlueprintHeadings, expandedBluepr
                     </div>
                   </div>
                 </div>
+
+                {heading.purpose && (
+                  <p className="px-3.5 sm:px-4 pt-2 text-xs text-[color:var(--text-muted)]" data-testid={`heading-purpose-${heading.id}`}>
+                    {heading.purpose}
+                  </p>
+                )}
 
                 {/* Main Heading Research Basis Drawer */}
                 {expandedBlueprintHeadings[heading.id] && (
@@ -306,8 +331,11 @@ export function StructureHeadingCard({ expandedBlueprintHeadings, expandedBluepr
                       return (
                         <div
                           key={sub.id}
-                          className="p-2.5 sm:p-3 rounded-lg border border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]/70 hover:border-[color:var(--border-default)] transition-all space-y-2 group/sub"
+                          className={`p-2.5 sm:p-3 rounded-lg border border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]/70 hover:border-[color:var(--border-default)] transition-all space-y-2 group/sub ${sub.level === 3 ? "ml-4 sm:ml-6" : ""}`}
                         >
+                          {sub.level === 3 && sub.parentTitle && (
+                            <p className="text-xs text-[color:var(--text-muted)]">Under: {sub.parentTitle}</p>
+                          )}
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                             {/* Subheading Title & Number */}
                             <div className="flex-1 min-w-0 flex items-center gap-2">
