@@ -14,7 +14,6 @@ How AI requests are authored, routed, paid for and kept safe. Entry layers and c
 | `callJSON`, `callText`, `streamJSON` | Wrappers over the llm helpers |
 | `readVerifiedBrowserResult` | Verifies a result the browser produced for a hand-off prompt |
 | `signLlmChallenge`, `computePromptHash` | Signed challenge for prompts that the browser runs and returns |
-| `generateGeminiEmbedding` | Embeddings for semantic RAG |
 | `retrieveEvidence` | Live scholarly discovery (OpenAlex, Crossref, EuropePMC/PubMed, arXiv) plus Vault and uploaded datasets |
 | `scrubAndFormatCitations` | Citation-lock scrub: removes unverified author-year strings and formats verified `[CITE:id]` tokens in the requested style (`apa7`, `harvard`, `ieee`, `chicago`, `mla9`, `vancouver`, `oscola`) |
 | `enforceScholarlyVoice` | British orthography, cliché suppression, burstiness check |

@@ -2,7 +2,7 @@
  * Chicago Author-Date Citation Formatter
  */
 
-import { doiUrl, endSentence, familyGiven, givenFamily, joinNames, journalOf, pageRange, publisherOf, quotedTitle, sortedAuthors } from "./bibParts";
+import { doiUrl, endSentence, familyGiven, givenFamily, inTextSurnames, joinNames, journalOf, pageRange, publisherOf, quotedTitle, sortedAuthors } from "./bibParts";
 import type { CitationStyle, InTextOptions } from "../styleTypes";
 import { authorDateYear, type CanonicalReference } from "../model/reference";
 
@@ -16,7 +16,7 @@ export class ChicagoFormatter implements CitationStyle {
       return "(????)";
     }
 
-    const author = reference.authors[0].lastName;
+    const author = inTextSurnames(reference, 3, ", and");
     const year = authorDateYear(reference);
     if (options && options.locator) {
       return "(" + author + " " + year + ", " + options.locator + ")";

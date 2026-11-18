@@ -366,31 +366,3 @@ export async function streamOpenRouterJSON(
   res.write?.(`event: log\ndata: ${JSON.stringify({ message: "> Parsing final JSON..." })}\n\n`);
   return parseJsonFromLlm(text);
 }
-
-export async function generateGeminiEmbedding(text: string, apiKey?: string): Promise<number[]> {
-  if (!apiKey) {
-    throw new Error("Client BYOK Gemini API key is required for embeddings.");
-  }
-
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${encodeURIComponent(
-      apiKey
-    )}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "models/text-embedding-004",
-        content: { parts: [{ text }] },
-      }),
-    }
-  );
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Gemini Embedding API error: ${response.status} ${errorText}`);
-  }
-
-  const data = await response.json();
-  return data.embedding.values;
-}

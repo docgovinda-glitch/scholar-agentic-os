@@ -75,7 +75,8 @@ src/app/                  Client-side engines: mesh/ (agent registry + executor,
 src/domain/               Pure domain models/schemas (zod) — no React, no I/O
 src/platform/             router/ (the one AI engine: adapters, fallback, key rotation, model listing/curation),
                           completion.ts (the Completer app modules receive), warden/ (policy/classification, used by the mesh)
-src/citation_compliance/  The one citation engine: formatters (APA7, IEEE, MLA9, Chicago, Harvard, Vancouver) + BibTeX/RIS
+src/citation_compliance/  The one citation engine: formatters (APA7, IEEE, MLA9, Chicago, Harvard, Vancouver; the only reference-entry renderer,
+                          `cslEngine` verifies sources and renders its entries through them via `cslItemToCanonical`) + BibTeX/RIS
                           importers (the Vault's Add Source dialog reads pasted records through `src/desk/vault/referenceImport.ts`)
 src/services/             Client services (auth, vault, store, offline, crypto, serverWarmup …)
 supabase/                 schema*.sql, migrations/ (timestamped), functions/ (Deno Edge Functions,

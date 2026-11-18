@@ -4,7 +4,7 @@
  * Formats citations and references according to MLA 9th edition style.
  */
 
-import { doiUrl, endSentence, familyGiven, givenFamily, journalOf, pageRange, publisherOf, quotedTitle, sortedAuthors } from "./bibParts";
+import { doiUrl, endSentence, familyGiven, givenFamily, inTextSurnames, journalOf, pageRange, publisherOf, quotedTitle, sortedAuthors } from "./bibParts";
 import type { CitationStyle, InTextOptions } from "../styleTypes";
 import type { CanonicalReference } from "../model/reference";
 
@@ -22,8 +22,7 @@ export class MLA9Formatter implements CitationStyle {
       return "( ? )";
     }
 
-    const author = reference.authors[0];
-    const authorPart = author.lastName;
+    const authorPart = inTextSurnames(reference, 2);
 
     if (options && options.locator) {
       return "(" + authorPart + " " + options.locator + ")";

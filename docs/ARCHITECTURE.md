@@ -129,7 +129,7 @@ The server imports from `src/` (citation formatters, `document_intelligence`, me
 | `src/features/` | `slides` (Presentation Studio and Gamma card engine), `coursework` (style engine, legacy coursework components), `drafting`, `sources`, `understand` |
 | `src/platform/` | `router/` (the one AI engine: adapters, failover, key rotation, circuit breaker, model listing and curation, SSE bridge), `completion.ts` (the `Completer` app modules use), `warden/` (egress policy, used by the mesh agents) |
 | `src/services/` | Auth, Supabase client, vault, store, offline queue, crypto, capabilities, AI settings and diagnostics |
-| `src/citation_compliance/` | The one citation engine: formatters, validation, CSL engine, BibTeX/RIS importers (the Vault's Add Source dialog reads pasted records through them) |
+| `src/citation_compliance/` | The one citation engine: formatters (the only reference-entry renderer), validation, CSL engine (verifies sources; renders entries through the formatters), BibTeX/RIS importers (the Vault's Add Source dialog reads pasted records through them) |
 | `src/config/` | `providerCatalog.ts`, `localRunnerCatalog.ts`, `keySlots.ts`, `askScholarConfig.ts`, `accountSchema.ts` |
 | `src/shared/` | Cross-cutting helpers (project state schema, LLM JSON parser, guardrails, style weights) |
 

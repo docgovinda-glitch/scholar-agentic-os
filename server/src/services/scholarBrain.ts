@@ -44,7 +44,6 @@ import {
   streamOpenRouterJSON as rawStreamOpenRouterJSON,
   signLlmChallenge,
   computePromptHash,
-  generateGeminiEmbedding,
 } from "../../utils/llm.ts";
 import { loadArchetypeModelWeights, type ArchetypeModelWeights } from "../../../src/shared/archetypeModelWeights.ts";
 import {
@@ -243,7 +242,6 @@ function cachedLiveDiscovery(query: string, maxResults: number): Promise<LiveDra
 export {
   signLlmChallenge,
   computePromptHash,
-  generateGeminiEmbedding,
   readVerifiedBrowserResult,
 };
 
@@ -473,7 +471,6 @@ export const scholarBrain = {
   streamJSON: (...args: Parameters<typeof streamOpenRouterJSON>) => streamOpenRouterJSON(...args),
   signLlmChallenge: (...args: Parameters<typeof signLlmChallenge>) => signLlmChallenge(...args),
   computePromptHash: (...args: Parameters<typeof computePromptHash>) => computePromptHash(...args),
-  generateGeminiEmbedding: (...args: Parameters<typeof generateGeminiEmbedding>) => generateGeminiEmbedding(...args),
   readVerifiedBrowserResult: (...args: Parameters<typeof readVerifiedBrowserResult>) => readVerifiedBrowserResult(...args),
   getArchetypeModelWeights,
   /**

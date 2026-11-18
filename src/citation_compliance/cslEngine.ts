@@ -1,4 +1,6 @@
 import { lookupCrossrefByDoi } from "../shared/retrieval/providers";
+import { CitationFormatterFactory } from "./formattingEngine";
+import type { CanonicalReference, ReferenceKind } from "./model/reference";
 /**
  * CSL-JSON Citation Verification, Retraction Checking, Metadata Extraction,
  * and Multi-Style Rendering Engine (Section 6).
@@ -784,17 +786,6 @@ function getAuthorSurname(a: CSLAuthor): string {
   return (a.family || a.literal || "").trim();
 }
 
-function getInitials(given?: string, withPeriods = true, withSpaces = true): string {
-  if (!given) return "";
-  const parts = given
-    .trim()
-    .split(/[\s.-]+/)
-    .filter(Boolean);
-  return parts
-    .map((p) => `${p.charAt(0).toUpperCase()}${withPeriods ? "." : ""}`)
-    .join(withSpaces ? " " : "");
-}
-
 function getYear(item: CSLItem): number {
   return item.issued["date-parts"][0][0];
 }
@@ -888,9 +879,48 @@ export function formatCSLInTextGroup(
   return `(${innerList.join("; ")})`;
 }
 
+const CSL_KIND: Record<CSLItemType, ReferenceKind> = {
+  "article-journal": "JournalArticle",
+  book: "Book",
+  chapter: "BookChapter",
+  "paper-conference": "ConferencePaper",
+  report: "TechnicalReport",
+  webpage: "Website",
+  legislation: "GovernmentPublication",
+  dataset: "Dataset",
+  manuscript: "Preprint",
+};
+
+const PREPRINT_SERVER = /arxiv|biorxiv|medrxiv|ssrn|preprints?|research square|chemrxiv|psyarxiv|osf/i;
+
+/** A verified CSL item as the shared formatters' reference (nothing added). */
+export function cslItemToCanonical(item: CSLItem): CanonicalReference {
+  const year = String(getYear(item));
+  const container = item["container-title"] || "";
+  const doi = item.DOI ? item.DOI.replace(/^https?:\/\/(dx\.)?doi\.org\//i, "") : undefined;
+  return {
+    // A paper with an arXiv DOI that was published in a named venue keeps the venue's details.
+    kind: item.type === "manuscript" && container && !PREPRINT_SERVER.test(container) ? "JournalArticle" : (CSL_KIND[item.type] ?? "JournalArticle"),
+    title: item.title.replace(/\.$/, ""),
+    authors: item.author.map((a, i) => ({ firstName: a.literal ? "" : (a.given ?? ""), lastName: (a.literal || a.family || "").trim(), order: i })),
+    source: container || item.publisher || "",
+    ...(container && item.type !== "book" ? { journal: container } : {}),
+    ...(item.publisher ? { publisher: item.publisher } : {}),
+    ...(item.volume ? { volume: item.volume } : {}),
+    ...(item.issue ? { issue: item.issue } : {}),
+    ...(item.page || item["article-number"] ? { pages: item.page || item["article-number"] } : {}),
+    ...(doi ? { doi } : {}),
+    ...(item.URL ? { url: item.URL } : {}),
+    publicationDate: year,
+    year,
+  };
+}
+
 /**
- * Formats a single CSLItem into a full Reference List / Bibliography entry
- * in both Markdown (with *italics*) and HTML (with <em>italics</em>) for rich rendering and Word export.
+ * A reference-list entry for a verified CSL item, rendered by the shared
+ * formatters (`citation_compliance/formatters`, the one renderer), in
+ * Markdown (*italics*), plain text and HTML (<em>). Numbered styles keep the
+ * list number ("[1] " for IEEE, "1. " for Vancouver).
  */
 export function formatCSLBibliographyEntry(
   item: CSLItem,
@@ -903,244 +933,8 @@ export function formatCSLBibliographyEntry(
   displayNumber: number;
   csl: CSLItem;
 } {
-  const year = getYear(item);
-  const title = item.title.replace(/\.$/, "");
-  const container = item["container-title"] || item.publisher || "";
-  const vol = item.volume || "";
-  const iss = item.issue || "";
-  const pg = item.page || item["article-number"] || "";
-  const doiUrl = item.DOI
-    ? item.DOI.startsWith("http")
-      ? item.DOI
-      : `https://doi.org/${item.DOI}`
-    : "";
-  const webUrl = !doiUrl && item.URL ? item.URL : "";
-
-  let md = "";
-
-  if (style === "apa") {
-    // APA 7th: Author, A. A., & Author, B. B. (Year). Title of work. *Container*, *Volume*(Issue), Pages. https://doi.org/xxx
-    const fmtAuth = (a: CSLAuthor) => {
-      if (a.literal) return a.literal;
-      const init = getInitials(a.given, true, true);
-      return init ? `${a.family}, ${init}` : a.family || "";
-    };
-    let authorStr = "";
-    if (item.author.length === 1) {
-      authorStr = fmtAuth(item.author[0]);
-    } else if (item.author.length <= 20) {
-      const allButLast = item.author.slice(0, -1).map(fmtAuth).join(", ");
-      const last = fmtAuth(item.author[item.author.length - 1]);
-      authorStr = `${allButLast}, & ${last}`;
-    } else {
-      const first19 = item.author.slice(0, 19).map(fmtAuth).join(", ");
-      const finalAuth = fmtAuth(item.author[item.author.length - 1]);
-      authorStr = `${first19}, ... ${finalAuth}`;
-    }
-    const cleanAuthor = authorStr.replace(/\.$/, "");
-
-    let sourcePart = "";
-    if (container) {
-      sourcePart = ` *${container}*`;
-      if (vol) {
-        sourcePart += `, *${vol}*`;
-        if (iss) sourcePart += `(${iss})`;
-      }
-      if (pg) sourcePart += `, ${pg}`;
-      sourcePart += ".";
-    }
-    const linkPart = doiUrl ? ` ${doiUrl}` : webUrl ? ` ${webUrl}` : "";
-    md = `${cleanAuthor}. (${year}). ${title}.${sourcePart}${linkPart}`;
-  } else if (style === "mla") {
-    // MLA 9th: Author, First, and Second Author. "Title." *Container*, vol. V, no. I, Year, pp. P. DOI/URL.
-    const fmtFirst = (a: CSLAuthor) => {
-      if (a.literal) return a.literal;
-      return a.given ? `${a.family}, ${a.given}` : a.family || "";
-    };
-    const fmtSecond = (a: CSLAuthor) => {
-      if (a.literal) return a.literal;
-      return a.given ? `${a.given} ${a.family}` : a.family || "";
-    };
-    let authorStr = "";
-    if (item.author.length === 1) {
-      authorStr = fmtFirst(item.author[0]);
-    } else if (item.author.length === 2) {
-      authorStr = `${fmtFirst(item.author[0])}, and ${fmtSecond(item.author[1])}`;
-    } else {
-      authorStr = `${fmtFirst(item.author[0])}, et al.`;
-    }
-    const cleanAuthor = authorStr.replace(/\.$/, "");
-
-    const containerPieces: string[] = [];
-    if (container) containerPieces.push(`*${container}*`);
-    if (vol) containerPieces.push(`vol. ${vol}`);
-    if (iss) containerPieces.push(`no. ${iss}`);
-    containerPieces.push(String(year));
-    if (pg) containerPieces.push(`pp. ${pg}`);
-
-    const containerBlock = containerPieces.join(", ");
-    const linkPart = doiUrl ? ` ${doiUrl}.` : webUrl ? ` ${webUrl}.` : "";
-    md = `${cleanAuthor}. "${title}." ${containerBlock}.${linkPart}`;
-  } else if (style === "chicago") {
-    // Chicago 17th Author-Date: Author, First, and Second Author. Year. "Title." *Container* Volume (Issue): Pages. https://doi.org/xxx.
-    const fmtFirst = (a: CSLAuthor) => {
-      if (a.literal) return a.literal;
-      return a.given ? `${a.family}, ${a.given}` : a.family || "";
-    };
-    const fmtOther = (a: CSLAuthor) => {
-      if (a.literal) return a.literal;
-      return a.given ? `${a.given} ${a.family}` : a.family || "";
-    };
-    let authorStr = "";
-    if (item.author.length === 1) {
-      authorStr = fmtFirst(item.author[0]);
-    } else if (item.author.length <= 3) {
-      const others = item.author.slice(1, -1).map(fmtOther);
-      const last = fmtOther(item.author[item.author.length - 1]);
-      authorStr = [fmtFirst(item.author[0]), ...others].join(", ") + `, and ${last}`;
-    } else {
-      authorStr = `${fmtFirst(item.author[0])} et al.`;
-    }
-    const cleanAuthor = authorStr.replace(/\.$/, "");
-
-    let sourcePart = "";
-    if (container) {
-      sourcePart = ` *${container}*`;
-      if (vol) {
-        sourcePart += ` ${vol}`;
-        if (iss) sourcePart += ` (${iss})`;
-      }
-      if (pg) sourcePart += `: ${pg}`;
-      sourcePart += ".";
-    }
-    const linkPart = doiUrl ? ` ${doiUrl}.` : webUrl ? ` ${webUrl}.` : "";
-    md = `${cleanAuthor}. ${year}. "${title}."${sourcePart}${linkPart}`;
-  } else if (style === "chicago-notes") {
-    // Chicago 17th Notes & Bibliography: Author, First, and Second Author. "Title." *Container* Volume, no. Issue (Year): Pages. https://doi.org/xxx.
-    const fmtFirst = (a: CSLAuthor) => {
-      if (a.literal) return a.literal;
-      return a.given ? `${a.family}, ${a.given}` : a.family || "";
-    };
-    const fmtOther = (a: CSLAuthor) => {
-      if (a.literal) return a.literal;
-      return a.given ? `${a.given} ${a.family}` : a.family || "";
-    };
-    let authorStr = "";
-    if (item.author.length === 1) {
-      authorStr = fmtFirst(item.author[0]);
-    } else if (item.author.length <= 3) {
-      const others = item.author.slice(1, -1).map(fmtOther);
-      const last = fmtOther(item.author[item.author.length - 1]);
-      authorStr = [fmtFirst(item.author[0]), ...others].join(", ") + `, and ${last}`;
-    } else {
-      authorStr = `${fmtFirst(item.author[0])}, et al.`;
-    }
-    const cleanAuthor = authorStr.replace(/\.$/, "");
-
-    let sourcePart = "";
-    if (container) {
-      sourcePart = ` *${container}*`;
-      if (vol) {
-        sourcePart += ` ${vol}`;
-        if (iss) sourcePart += `, no. ${iss}`;
-      }
-      sourcePart += ` (${year})`;
-      if (pg) sourcePart += `: ${pg}`;
-      sourcePart += ".";
-    } else {
-      sourcePart = ` (${year}).`;
-    }
-    const linkPart = doiUrl ? ` ${doiUrl}.` : webUrl ? ` ${webUrl}.` : "";
-    md = `${cleanAuthor}. "${title}."${sourcePart}${linkPart}`;
-  } else if (style === "harvard") {
-    // Harvard: Author, A.A. and Author, B.B. (Year) 'Title', *Container*, Volume(Issue), pp. Pages. Available at: DOI/URL.
-    const fmtAuth = (a: CSLAuthor) => {
-      if (a.literal) return a.literal;
-      const init = getInitials(a.given, true, false);
-      return init ? `${a.family}, ${init}` : a.family || "";
-    };
-    let authorStr = "";
-    if (item.author.length === 1) {
-      authorStr = fmtAuth(item.author[0]);
-    } else if (item.author.length <= 3) {
-      const allButLast = item.author.slice(0, -1).map(fmtAuth).join(", ");
-      const last = fmtAuth(item.author[item.author.length - 1]);
-      authorStr = `${allButLast} and ${last}`;
-    } else {
-      authorStr = `${fmtAuth(item.author[0])} et al.`;
-    }
-
-    const pieces: string[] = [`'${title}'`];
-    if (container) pieces.push(`*${container}*`);
-    if (vol) {
-      pieces.push(iss ? `${vol}(${iss})` : vol);
-    }
-    if (pg) pieces.push(`pp. ${pg}`);
-
-    const linkPart = doiUrl
-      ? ` doi:${item.DOI}.`
-      : webUrl
-        ? ` Available at: ${webUrl}.`
-        : "";
-    md = `${authorStr} (${year}) ${pieces.join(", ")}.${linkPart}`;
-  } else if (style === "ieee") {
-    // IEEE: [1] A. A. Author and B. B. Author, "Title," *Container*, vol. V, no. I, pp. P, Year, doi: 10.xxxx.
-    const fmtAuth = (a: CSLAuthor) => {
-      if (a.literal) return a.literal;
-      const init = getInitials(a.given, true, true);
-      return init ? `${init} ${a.family}` : a.family || "";
-    };
-    let authorStr = "";
-    if (item.author.length === 1) {
-      authorStr = fmtAuth(item.author[0]);
-    } else if (item.author.length === 2) {
-      authorStr = `${fmtAuth(item.author[0])} and ${fmtAuth(item.author[1])}`;
-    } else if (item.author.length <= 6) {
-      const allButLast = item.author.slice(0, -1).map(fmtAuth).join(", ");
-      const last = fmtAuth(item.author[item.author.length - 1]);
-      authorStr = `${allButLast}, and ${last}`;
-    } else {
-      authorStr = `${fmtAuth(item.author[0])} et al.`;
-    }
-
-    const pieces: string[] = [];
-    if (container) pieces.push(`*${container}*`);
-    if (vol) pieces.push(`vol. ${vol}`);
-    if (iss) pieces.push(`no. ${iss}`);
-    if (pg) pieces.push(`pp. ${pg}`);
-    pieces.push(String(year));
-    if (item.DOI) pieces.push(`doi: ${item.DOI}`);
-    else if (webUrl) pieces.push(`[Online]. Available: ${webUrl}`);
-
-    md = `[${displayNumber}] ${authorStr}, "${title}," ${pieces.join(", ")}.`;
-  } else {
-    // Vancouver: 1. Author AA, Author BB. Title. Container. Year;Volume(Issue):Pages. doi:10.xxxx
-    const fmtAuth = (a: CSLAuthor) => {
-      if (a.literal) return a.literal;
-      const init = getInitials(a.given, false, false);
-      return init ? `${a.family} ${init}` : a.family || "";
-    };
-    const authorList =
-      item.author.length <= 6
-        ? item.author.map(fmtAuth).join(", ")
-        : `${item.author.slice(0, 6).map(fmtAuth).join(", ")}, et al`;
-
-    let sourcePart = container ? ` ${container}.` : "";
-    let dateVolPart = ` ${year}`;
-    if (vol) {
-      dateVolPart += `;${vol}`;
-      if (iss) dateVolPart += `(${iss})`;
-    }
-    if (pg) dateVolPart += `:${pg}`;
-    dateVolPart += ".";
-    const linkPart = item.DOI
-      ? ` doi:${item.DOI}`
-      : webUrl
-        ? ` Available from: ${webUrl}`
-        : "";
-    md = `${displayNumber}. ${authorList.replace(/\.$/, "")}. ${title}.${sourcePart}${dateVolPart}${linkPart}`;
-  }
-
+  const entry = CitationFormatterFactory.formatBibliography(style, cslItemToCanonical(item)).trim();
+  const md = style === "ieee" ? `[${displayNumber}] ${entry}` : style === "vancouver" ? `${displayNumber}. ${entry}` : entry;
   const plainText = md.replace(/\*([^*]+)\*/g, "$1").trim();
   const htmlText = md
     .replace(/&/g, "&amp;")
@@ -1148,14 +942,7 @@ export function formatCSLBibliographyEntry(
     .replace(/>/g, "&gt;")
     .replace(/\*([^*]+)\*/g, "<em>$1</em>")
     .trim();
-
-  return {
-    plainText,
-    markdownText: md.trim(),
-    htmlText,
-    displayNumber,
-    csl: item,
-  };
+  return { plainText, markdownText: md, htmlText, displayNumber, csl: item };
 }
 
 /**

@@ -52,6 +52,17 @@ export function joinNames(names: string[], conj: "and" | ", and" | "none" = "and
   return `${names.slice(0, -1).join(", ")}${conj === ", and" ? ", and" : " and"} ${names[names.length - 1]}`;
 }
 
+/**
+ * In-text surnames for author-date styles: every author up to `listUpTo`
+ * (joined with `conj`), else the first author and "et al.".
+ */
+export function inTextSurnames(reference: CanonicalReference, listUpTo: number, conj: "and" | ", and" = "and"): string {
+  const names = sortedAuthors(reference).map((a) => a.lastName);
+  if (names.length === 0) return "";
+  if (names.length > listUpTo) return `${names[0]} et al.`;
+  return joinNames(names, conj);
+}
+
 /** Add a full stop unless the text already ends a sentence. */
 export function endSentence(text: string): string {
   const t = text.trim();
