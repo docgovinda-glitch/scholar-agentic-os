@@ -13,6 +13,7 @@
 import type { Request } from "express";
 import { z } from "zod";
 import type { Completer } from "../../../src/platform/completion.ts";
+import type { RouterEvent } from "../../../src/platform/router/types.ts";
 import { computePromptHash, createChallengeTokenForRequest, verifyLlmChallenge } from "../../utils/llm.ts";
 import { BrowserAiRequiredError, NoClientAiProviderError, LocalModelUnreachableError } from "./aiRouteErrors.ts";
 import { NoAiConnectedError, RouterHandoffError, routedResult, toRouterTask } from "./routerBridge.ts";
@@ -29,6 +30,8 @@ export function requestCompleter(req: Request): Completer {
     const hash = computePromptHash(system, call.userPrompt);
     const done = results.find((r) => verifyLlmChallenge(r.challengeToken, userId, hash));
     if (done) {
+      // The browser already ran the model: its whole answer is the only "token".
+      call.onToken?.(done.llmResult);
       return { text: done.llmResult, provider: "local", model: "your device", inputTokensEstimate: Math.ceil(call.userPrompt.length / 4), outputTokensEstimate: Math.ceil(done.llmResult.length / 4) };
     }
     try {
@@ -38,6 +41,14 @@ export function requestCompleter(req: Request): Completer {
         userPrompt: call.userPrompt,
         temperature: call.temperature,
         signal: call.signal,
+        ...(call.onToken || call.onReset
+          ? {
+              onEvent: (ev: RouterEvent) => {
+                if (ev.type === "token") call.onToken?.(ev.text);
+                else if (ev.type === "fallback" && ev.partialOutputDiscarded) call.onReset?.();
+              },
+            }
+          : {}),
       });
       return { text: r.text, provider: r.provider, model: r.model, inputTokensEstimate: r.usage.inputTokens, outputTokensEstimate: r.usage.outputTokens };
     } catch (err) {

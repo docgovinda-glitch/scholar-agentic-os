@@ -147,6 +147,101 @@ export function researchContextFromAnswers(answers: Record<string, unknown> | un
   return out;
 }
 
+/**
+ * The drafting loop every workspace shares: one draft, then, when it is short
+ * of `minWords`, one lengthening step, with the model's tokens streamed as
+ * they arrive. Each workspace configures it:
+ *   - `lengthen.mode: "expand"` (Journal): a full rewrite, kept only when longer;
+ *   - `lengthen.mode: "continue"` (Coursework): new paragraphs appended after
+ *     the draft, shown as they arrive, dropped when `accept` rejects them (a
+ *     continuation that restates the draft);
+ *   - `startFrom` (resume): the draft so far; the loop only continues it.
+ * A step that fails keeps the real text already written; nothing is invented.
+ * A cancelled call (`signal`) ends the loop. Prompts, citation handling and
+ * the voice pass stay with the workspace.
+ */
+export interface SectionDraftLoop {
+  systemPrompt: string;
+  userPrompt: string;
+  minWords: number;
+  lengthen?: {
+    mode: "expand" | "continue";
+    prompt: (draft: string, draftWords: number) => string;
+    accept?: (more: string, draft: string) => boolean;
+  };
+  startFrom?: string;
+  stream?: {
+    onToken: (text: string) => void;
+    /** Show this text instead of what was shown (a continuation starts, or a model switch dropped output). */
+    onReplace: (text: string) => void;
+  };
+  signal?: AbortSignal;
+  countWords?: (text: string) => number;
+}
+
+export interface SectionDraftLoopResult {
+  text: string;
+  calls: Array<Pick<Awaited<ReturnType<Completer>>, "provider" | "model" | "inputTokensEstimate" | "outputTokensEstimate">>;
+}
+
+export async function runSectionDraft(complete: Completer, loop: SectionDraftLoop): Promise<SectionDraftLoopResult> {
+  const count = loop.countWords ?? countExactWords;
+  const calls: SectionDraftLoopResult["calls"] = [];
+  const call = async (userPrompt: string, shownBefore: string) => {
+    const r = await complete({
+      taskClass: "drafting",
+      systemPrompt: loop.systemPrompt,
+      userPrompt,
+      signal: loop.signal,
+      ...(loop.stream ? { onToken: loop.stream.onToken, onReset: () => loop.stream?.onReplace(shownBefore) } : {}),
+    });
+    calls.push(r);
+    return r.text.trim();
+  };
+
+  // Resume: continue the draft so far; nothing else.
+  if (loop.startFrom) {
+    if (!loop.lengthen) throw new Error("runSectionDraft: startFrom needs a lengthen prompt.");
+    const prefix = `${loop.startFrom}\n\n`;
+    loop.stream?.onReplace(prefix);
+    const more = await call(loop.lengthen.prompt(loop.startFrom, count(loop.startFrom)), prefix);
+    if (!more) throw new UnusableAiResponseError("section draft");
+    return { text: `${loop.startFrom}\n\n${more}`, calls };
+  }
+
+  // 1. The draft. No usable text means no section: nothing is invented in its place.
+  let draft = await call(loop.userPrompt, "");
+  if (!draft) throw new UnusableAiResponseError("section draft");
+
+  // 2. One lengthening step when short; a failure keeps the real draft.
+  const words = count(draft);
+  if (loop.lengthen && words < loop.minWords) {
+    const { mode, prompt, accept } = loop.lengthen;
+    const prefix = mode === "continue" ? `${draft}\n\n` : "";
+    loop.stream?.onReplace(prefix);
+    let adopted = false;
+    try {
+      const more = await call(prompt(draft, words), prefix);
+      if (mode === "continue" && more && (accept ? accept(more, draft) : true)) {
+        draft = `${draft}\n\n${more}`;
+        adopted = true;
+      } else if (mode === "expand" && more && count(more) > words) {
+        draft = more;
+        adopted = true;
+      }
+    } catch (e) {
+      if (loop.signal?.aborted) throw e;
+      console.warn(
+        isInterrupt(e) ? "[sectionDrafter] lengthening needs another AI step; keeping the first draft" : "[sectionDrafter] lengthening failed; keeping the shorter draft",
+        e instanceof Error ? e.message : ""
+      );
+    }
+    // The step was not kept: show the draft as it stands again.
+    if (!adopted) loop.stream?.onReplace(draft);
+  }
+  return { text: draft, calls };
+}
+
 export async function draftSection(complete: Completer, input: DraftSectionInput): Promise<DraftSectionResult> {
   const { ledgerPrompt, sourceMap } = formatCitationLedger(input.sources);
   const rag = chunkAndRerankEvidence(input.title, input.sources, 2500);
@@ -167,40 +262,27 @@ export async function draftSection(complete: Completer, input: DraftSectionInput
     targetWords: input.targetWords,
   });
 
-  // 1. The draft. No usable text means no section: nothing is invented in its place.
-  const first = await complete({ taskClass: "drafting", systemPrompt, userPrompt });
-  let draft = first.text.trim();
-  if (!draft) throw new UnusableAiResponseError("section draft");
-  let outputTokens = first.outputTokensEstimate;
-  let inputTokens = first.inputTokensEstimate;
-
-  // 2. One expansion when the draft is more than 8% short; the shorter real draft is kept if it fails.
-  const words1 = countExactWords(draft);
-  if (words1 < input.targetWords * 0.92) {
-    try {
-      const expanded = await complete({
-        taskClass: "drafting",
-        systemPrompt,
-        userPrompt: journalPrompts.sectionExpansionPrompt({
+  // 1-2. The draft, and one expansion when it is more than 8% short (kept only when longer).
+  const loop = await runSectionDraft(complete, {
+    systemPrompt,
+    userPrompt,
+    minWords: input.targetWords * 0.92,
+    lengthen: {
+      mode: "expand",
+      prompt: (draft, draftWords) =>
+        journalPrompts.sectionExpansionPrompt({
           sectionTitle: input.title,
           draft,
-          draftWords: words1,
+          draftWords,
           targetWords: input.targetWords,
           citationIds: input.sources.map((s) => s.id),
         }),
-      });
-      if (countExactWords(expanded.text) > words1) draft = expanded.text.trim();
-      outputTokens += expanded.outputTokensEstimate;
-      inputTokens += expanded.inputTokensEstimate;
-    } catch (e) {
-      if (isInterrupt(e)) {
-        // The first draft is real; keep it rather than handing the whole call to the browser again.
-        console.warn("[sectionDrafter] expansion needs another AI step; keeping the first draft");
-      } else {
-        console.warn("[sectionDrafter] expansion failed; keeping the shorter draft", e instanceof Error ? e.message : e);
-      }
-    }
-  }
+    },
+  });
+  const draft = loop.text;
+  const first = loop.calls[0];
+  const inputTokens = loop.calls.reduce((n, c) => n + c.inputTokensEstimate, 0);
+  const outputTokens = loop.calls.reduce((n, c) => n + c.outputTokensEstimate, 0);
 
   // 3-4. Citations checked against the source list, then the voice pass.
   const scrub = scrubCitations(draft, sourceMap, { dialect: input.dialect, keepTokens: true });

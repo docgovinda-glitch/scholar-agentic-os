@@ -12,6 +12,7 @@ sanitizeScholarlyText,
 normalizeUnicodeNFC,
 } from "../../../src/utils/scholarlyVoiceGuard.ts";
 import { callOpenRouterText,handOffBeforeStream } from "../../../src/services/scholarBrain.ts";
+import type { Completer } from "../../../../src/platform/completion.ts";
 import { ensureParagraphBreaks } from "../../../../src/shared/proseParagraphs.ts";
 import { streamErrorMessage } from "../../../src/utils/sectionStream.ts";
 import { openSse, type SseStream } from "../../../src/utils/sse.ts";
@@ -189,46 +190,44 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
     const stream = openSse(res);
     sse = stream;
 
-    // The model's own tokens go to the browser as they arrive. When the router
-    // drops a partial answer to switch model, the browser is told to replace
-    // what it shows.
-    let shown = "";
-    // Text the browser shows in place of what it had: citation tokens already
-    // formatted (tokens inside streamed chunks are formatted in the final text).
-    const showInstead = (text: string) => {
-      shown = text;
-      stream.send({ replace: formatCitations(text) });
-    };
-    if (continueFrom) showInstead(`${continueFrom}\n\n`);
-    const relay = (prefix: string) => ({
-      signal: stream.signal,
-      onToken: (t: string) => {
-        shown += t;
-        stream.send({ chunk: t });
-      },
-      onReset: () => showInstead(prefix),
-    });
-    const draft = (await callOpenRouterText(req, res, systemPrompt, firstPrompt, undefined, "drafting", relay(shown)))?.trim() ?? "";
-    if (!draft) throw new UnusableAiResponseError("section draft");
-    let effectiveDraft = continueFrom ? `${continueFrom}\n\n${draft}` : draft;
-
-    // Short of its budget (the app's own word count): one continuation, streamed
-    // visibly as new paragraphs. A continuation that restates the draft is
-    // dropped. A revision keeps the student's request as asked; a draft the
-    // browser's model wrote (hand-off) is used as returned.
+    // The shared drafting loop (scholarBrain.runSectionDraft): the model's own
+    // tokens go to the browser as they arrive; a draft short of its budget (the
+    // app's own word count) gets one continuation, streamed visibly as new
+    // paragraphs, dropped when it restates the draft; Resume continues the text
+    // a stopped draft reached. When the router drops a partial answer to switch
+    // model, or a continuation starts, the browser is told what to show
+    // instead (citation tokens already formatted). A revision keeps the
+    // student's request as asked; a draft the browser's model wrote (hand-off)
+    // is used as returned.
     const fromBrowser = Boolean((req.body as { llmResult?: unknown })?.llmResult);
-    const draftWords = countProseWords(effectiveDraft);
-    if (!revisionPrompt && !continueFrom && !fromBrowser && draftWords < budgetRange.min) {
-      const prefix = `${effectiveDraft}\n\n`;
-      showInstead(prefix);
-      try {
-        const more = (await callOpenRouterText(req, res, systemPrompt, continuePrompt(effectiveDraft), undefined, "drafting", relay(prefix)))?.trim();
-        if (more && !repeatsDraft(more, effectiveDraft)) effectiveDraft = `${effectiveDraft}\n\n${more}`;
-      } catch (contErr) {
-        if (aborted()) throw contErr;
-        // Keep the draft we have; the final text below replaces what was shown.
-      }
-    }
+    const complete: Completer = async (call) => ({
+      text:
+        (await callOpenRouterText(req, res, call.systemPrompt ?? "", call.userPrompt, undefined, "drafting", {
+          onToken: call.onToken,
+          onReset: call.onReset,
+          signal: call.signal,
+        })) ?? "",
+      provider: "router",
+      model: "",
+      inputTokensEstimate: 0,
+      outputTokensEstimate: 0,
+    });
+    const { text: loopText } = await scholarBrain.runSectionDraft(complete, {
+      systemPrompt,
+      userPrompt: prompt,
+      minWords: budgetRange.min,
+      ...(continueFrom || (!revisionPrompt && !fromBrowser)
+        ? { lengthen: { mode: "continue" as const, prompt: (draftSoFar: string) => continuePrompt(draftSoFar), accept: (more: string, draftSoFar: string) => !repeatsDraft(more, draftSoFar) } }
+        : {}),
+      ...(continueFrom ? { startFrom: continueFrom } : {}),
+      stream: {
+        onToken: (t) => stream.send({ chunk: t }),
+        onReplace: (text) => stream.send({ replace: formatCitations(text) }),
+      },
+      signal: stream.signal,
+      countWords: countProseWords,
+    });
+    let effectiveDraft = loopText;
 
     // Citation tokens become in-text citations in the project's style.
     effectiveDraft = formatCitations(effectiveDraft).trim();

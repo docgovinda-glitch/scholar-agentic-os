@@ -4,6 +4,7 @@ import express from "express";
 import request from "supertest";
 import { aiRouteDecorator, configureRouterBridge, keyringFromRequest } from "../routerBridge";
 import { callOpenRouterText, streamOpenRouterJSON } from "../../../utils/llm";
+import { requestCompleter } from "../browserHandoff";
 import { CircuitBreaker, MemoryBreakerStore } from "../../../../src/platform/router/circuitBreaker";
 import { ProviderHttpError } from "../../../../src/platform/router/errors";
 import type { AdapterChunk, Candidate, ProviderAdapter } from "../../../../src/platform/router/types";
@@ -148,5 +149,13 @@ describe("existing AI steps through the router", () => {
     } finally {
       if (saved === undefined) delete process.env.ALLOW_SERVER_LOCAL_AI; else process.env.ALLOW_SERVER_LOCAL_AI = saved;
     }
+  });
+
+  it("the server Completer streams tokens to a caller that asks", async () => {
+    const tokens: string[] = [];
+    const req = { headers: { "x-ai-keyring": ring([{ provider: "openai", model: "bad-1", apiKey: SECRET }, { provider: "anthropic", model: "good-1", apiKey: SECRET }]) }, body: {}, user: { id: "u1" } } as never;
+    const out = await requestCompleter(req)({ taskClass: "drafting", userPrompt: "p", onToken: (t) => tokens.push(t) });
+    expect(out.text).toBe("ok from good-1");
+    expect(tokens.join("")).toContain("ok from good-1");
   });
 });

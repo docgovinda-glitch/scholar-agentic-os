@@ -17,7 +17,7 @@ import * as journalPrompts from "./prompts/journalPrompts.ts";
 import * as thesisPrompts from "./prompts/thesisPrompts.ts";
 import * as proposalPrompts from "./prompts/proposalPrompts.ts";
 import * as presentationPrompts from "./prompts/presentationPrompts.ts";
-import { draftSection, priorSectionsContext, researchContextFromAnswers } from "./sectionDrafter.ts";
+import { draftSection, priorSectionsContext, researchContextFromAnswers, runSectionDraft } from "./sectionDrafter.ts";
 import { openSse } from "../utils/sse.ts";
 import { buildAskGeneralPrompt, buildAskSearchPrompt } from "../../../src/shared/askPrompts.ts";
 import { aiAvailability as rawAiAvailability, NoAiConnectedError, routedCompletion as rawRoutedCompletion, routedText, RouterHandoffError, toRouterTask } from "../ai/routerBridge.ts";
@@ -454,6 +454,8 @@ export const scholarBrain = {
    * See sectionDrafter.ts.
    */
   draftSection,
+  /** The drafting loop every workspace shares (draft, lengthen, stream, resume); see sectionDrafter.ts. */
+  runSectionDraft,
   /** The research context a section draft is given, from a project's answers. */
   researchContextFromAnswers,
   /** Excerpts of sections already written, for drafting the next one. */
