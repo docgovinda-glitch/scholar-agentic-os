@@ -1,4 +1,5 @@
 import { authedFetch, authedJsonFetch } from "./client";
+import { readSse } from "../../shared/sseReader";
 import type { AgenticQueryRequest, AgenticQueryResponse } from "./types";
 import type {
   WordBudgetBlueprint,
@@ -45,41 +46,30 @@ export async function executeAgenticQuery(
 
   const isEventStream = Boolean(res.headers.get("content-type")?.includes("text/event-stream"));
   if (isEventStream && res.body) {
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let finalPayload: AgenticQueryResponse | null = null;
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const events = buffer.split("\n\n");
-      buffer = events.pop() || "";
-
-      for (const ev of events) {
-        const trimmed = ev.trim();
-        if (!trimmed.startsWith("data:")) continue;
-        const jsonStr = trimmed.replace(/^data:\s*/, "");
-        try {
-          const parsed = JSON.parse(jsonStr);
-          if (parsed.type === "stage" && req.onStageUpdate) {
-            req.onStageUpdate({ status: parsed.status, stage: parsed.stage });
-          } else if (parsed.type === "complete" && parsed.payload) {
-            finalPayload = parsed.payload;
-          }
-        } catch {
-          // ignore stream parse errors
-        }
+    // Set from inside the reader's callback.
+    const got: { payload: AgenticQueryResponse | null; error: string } = { payload: null, error: "" };
+    await readSse(res.body, (m) => {
+      if (!m.json || !m.data || typeof m.data !== "object") return;
+      const parsed = m.data as { type?: string; status?: string; stage?: string; payload?: AgenticQueryResponse; message?: unknown };
+      if (parsed.type === "stage" && req.onStageUpdate) {
+        req.onStageUpdate({ status: parsed.status, stage: parsed.stage } as Parameters<NonNullable<typeof req.onStageUpdate>>[0]);
+      } else if (parsed.type === "complete" && parsed.payload) {
+        got.payload = parsed.payload;
+      } else if (parsed.type === "error") {
+        got.error = typeof parsed.message === "string" && parsed.message ? parsed.message : "Deep research stopped before it finished. Try again.";
       }
-    }
+    });
 
+    const finalPayload = got.payload;
+    const streamError = got.error;
     if (finalPayload) {
       if (finalPayload.text && req.onChunk) {
         req.onChunk(finalPayload.text);
       }
       return finalPayload;
     }
+    // The stream ended without a result: say why (its body is already read).
+    throw new Error(streamError || "Deep research stopped before it finished. Try again.");
   }
 
   const data = await res.json();

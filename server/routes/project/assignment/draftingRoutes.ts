@@ -13,7 +13,8 @@ normalizeUnicodeNFC,
 } from "../../../src/utils/scholarlyVoiceGuard.ts";
 import { callOpenRouterText,handOffBeforeStream } from "../../../src/services/scholarBrain.ts";
 import { ensureParagraphBreaks } from "../../../../src/shared/proseParagraphs.ts";
-import { openSseStream,sendEvent,SSE_HEARTBEAT_MS,streamErrorMessage } from "../../../src/utils/sectionStream.ts";
+import { streamErrorMessage } from "../../../src/utils/sectionStream.ts";
+import { openSse, type SseStream } from "../../../src/utils/sse.ts";
 import { scholarBrain } from "../../../src/services/scholarBrain.ts";
 import { sendAiFailure,UnusableAiResponseError } from "../../../src/ai/aiRouteErrors.ts";
 import {
@@ -70,8 +71,9 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
 
   // A missing AI is still a 426 hand-off (checked before the stream opens);
   // once the stream is open, failures are SSE events (P0-20).
-  let heartbeat: ReturnType<typeof setInterval> | undefined;
-  const abort = new AbortController();
+  // The event stream (shared plumbing: headers, heartbeat, abort on close).
+  let sse: SseStream | undefined;
+  const aborted = () => sse?.signal.aborted ?? false;
   try {
     // Only sources the citation engine can verify (a title, at least one author
     // and a year; see cslEngine.verifyAndConvertToCSL) are offered to the model. Missing metadata is never filled in
@@ -183,15 +185,9 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
 
     // Open the event stream BEFORE the model call, and keep it alive while the
     // model thinks, so proxies (Render, Vite) never drop a silent socket.
-    openSseStream(res);
-    heartbeat = setInterval(() => {
-      if (!res.writableEnded) res.write(": keep-alive\n\n");
-    }, SSE_HEARTBEAT_MS);
-    // The student closed the page or pressed Stop: stop the model too.
-    res.on("close", () => {
-      if (heartbeat) clearInterval(heartbeat);
-      if (!res.writableEnded) abort.abort();
-    });
+    // The student closing the page or pressing Stop aborts `stream.signal`, which stops the model too.
+    const stream = openSse(res);
+    sse = stream;
 
     // The model's own tokens go to the browser as they arrive. When the router
     // drops a partial answer to switch model, the browser is told to replace
@@ -201,14 +197,14 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
     // formatted (tokens inside streamed chunks are formatted in the final text).
     const showInstead = (text: string) => {
       shown = text;
-      sendEvent(res, { replace: formatCitations(text) });
+      stream.send({ replace: formatCitations(text) });
     };
     if (continueFrom) showInstead(`${continueFrom}\n\n`);
     const relay = (prefix: string) => ({
-      signal: abort.signal,
+      signal: stream.signal,
       onToken: (t: string) => {
         shown += t;
-        sendEvent(res, { chunk: t });
+        stream.send({ chunk: t });
       },
       onReset: () => showInstead(prefix),
     });
@@ -229,7 +225,7 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
         const more = (await callOpenRouterText(req, res, systemPrompt, continuePrompt(effectiveDraft), undefined, "drafting", relay(prefix)))?.trim();
         if (more && !repeatsDraft(more, effectiveDraft)) effectiveDraft = `${effectiveDraft}\n\n${more}`;
       } catch (contErr) {
-        if (abort.signal.aborted) throw contErr;
+        if (aborted()) throw contErr;
         // Keep the draft we have; the final text below replaces what was shown.
       }
     }
@@ -247,13 +243,12 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
 
     // The final text (citations expanded, prose cleaned, trimmed to budget)
     // replaces what was streamed.
-    sendEvent(res, { fullText: effectiveDraft });
-    res.write("data: [DONE]\n\n");
-    res.end();
+    stream.send({ fullText: effectiveDraft });
+    stream.close({ done: true });
   } catch (err: unknown) {
     // The student stopped it: nothing to report to a closed page.
-    if (abort.signal.aborted) {
-      if (!res.writableEnded) res.end();
+    if (aborted()) {
+      sse?.close();
       return;
     }
     const handedOff = errorText(err) === "RequireFrontendLLMException";
@@ -280,20 +275,16 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
         targetWords: targetWordCount,
       });
       console.warn("[stream-section] AI unavailable, sending offline scaffold:", err instanceof Error ? errorText(err) : err);
-      res.write(`data: ${JSON.stringify({ fallback: { mode: "offline_scaffold", reason: "No AI provider could answer right now." } })}\n\n`);
-      res.write(`data: ${JSON.stringify({ fullText: scaffold })}\n\n`);
-      res.write("data: [DONE]\n\n");
-      res.end();
+      sse?.send({ fallback: { mode: "offline_scaffold", reason: "No AI provider could answer right now." } });
+      sse?.send({ fullText: scaffold });
+      sse?.close({ done: true });
       return;
     }
     console.error("Stream section error:", err instanceof Error ? errorText(err) : err);
-    if (!res.writableEnded) {
-      res.write(`data: ${JSON.stringify({ error: streamErrorMessage(err, handedOff), recoverable: true })}\n\n`);
-      res.write("data: [DONE]\n\n");
-      res.end();
-    }
+    sse?.send({ error: streamErrorMessage(err, handedOff), recoverable: true });
+    sse?.close({ done: true });
   } finally {
-    if (heartbeat) clearInterval(heartbeat);
+    sse?.close();
   }
 });
 

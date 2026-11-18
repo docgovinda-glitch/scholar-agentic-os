@@ -22,7 +22,7 @@ import { createHash } from "node:crypto";
 import express from "express";
 import { aiAvailability } from "../../../src/services/scholarBrain.ts";
 import { AI_PROVIDER_REQUIRED_MESSAGE, LOCAL_MODEL_UNREACHABLE_MESSAGE, LocalModelUnreachableError, NoClientAiProviderError, UnusableAiResponseError } from "../../../src/ai/aiRouteErrors.ts";
-import { openSseStream, sendEvent, SSE_HEARTBEAT_MS } from "../../../src/utils/sectionStream.ts";
+import { openSse } from "../../../src/utils/sse.ts";
 import { cleanAnswerString, extractStandardizedInstructions } from "../../../../src/desk/assignment/types.ts";
 import { extractStep, StepNotReadyError, understandStep } from "./agentRoutes.ts";
 import { abortOnClose, autoUpdateProjectTitleIfUntitled, deriveHeuristicTitle, getProjectSafe, safeParseObject, saveChangedAnswers } from "./helpers.ts";
@@ -83,24 +83,18 @@ router.post("/build", async (req: Req, res: express.Response) => {
     !body.force && previous?.state === "done" && previous.hash === hash && Boolean(a["assignment_structure"]) && Boolean(a["assignment_extraction"]);
 
   running.add(project.projectId);
-  openSseStream(res);
-  const heartbeat = setInterval(() => {
-    if (!res.writableEnded) res.write(": keep-alive\n\n");
-  }, SSE_HEARTBEAT_MS);
+  const sse = openSse(res);
+  // The same request signal the AI calls use (abortOnClose): set when the client goes away.
   const signal = abortOnClose(req);
   const finish = () => {
-    clearInterval(heartbeat);
     running.delete(project.projectId);
-    if (!res.writableEnded) {
-      res.write("data: [DONE]\n\n");
-      res.end();
-    }
+    sse.close({ done: true });
   };
 
   if (upToDate) {
-    sendEvent(res, { step: "extract", status: "done", message: "Already read; your brief has not changed." });
-    sendEvent(res, { step: "understand", status: "done", message: "Plan and outline are up to date." });
-    sendEvent(res, { done: true, cached: true });
+    sse.send({ step: "extract", status: "done", message: "Already read; your brief has not changed." });
+    sse.send({ step: "understand", status: "done", message: "Plan and outline are up to date." });
+    sse.send({ done: true, cached: true });
     return finish();
   }
 
@@ -116,25 +110,25 @@ router.post("/build", async (req: Req, res: express.Response) => {
     await autoUpdateProjectTitleIfUntitled(project, deriveHeuristicTitle(brief));
 
     await saveState({ step: "extract" });
-    sendEvent(res, { step: "extract", status: "running", message: "Reading your brief…" });
+    sse.send({ step: "extract", status: "running", message: "Reading your brief…" });
     const extraction = await extractStep(req, project);
     const parts = [
       `${extraction.requirements.length} requirement${extraction.requirements.length === 1 ? "" : "s"}`,
       extraction.questions.length ? `${extraction.questions.length} question${extraction.questions.length === 1 ? "" : "s"}` : "",
     ].filter(Boolean);
-    sendEvent(res, { step: "extract", status: "done", message: `Found ${parts.join(" and ")}.` });
+    sse.send({ step: "extract", status: "done", message: `Found ${parts.join(" and ")}.` });
 
     await saveState({ step: "understand" });
-    sendEvent(res, { step: "understand", status: "running", message: "Planning your thesis and outline…" });
+    sse.send({ step: "understand", status: "running", message: "Planning your thesis and outline…" });
     const { structure, outlineError } = await understandStep(req, project);
     if (!structure) throw new Error(outlineError || "The outline could not be written.");
     const n = structure.headings.length;
-    sendEvent(res, { step: "understand", status: "done", message: `Outline of ${n} section${n === 1 ? "" : "s"} and ${structure.thesisOptions?.length ?? 0} thesis option(s) ready.` });
+    sse.send({ step: "understand", status: "done", message: `Outline of ${n} section${n === 1 ? "" : "s"} and ${structure.thesisOptions?.length ?? 0} thesis option(s) ready.` });
 
     // Extract may have filled settings the student had not set: the hash is of
     // the answers as the build leaves them, so the next Build sees no change.
     await saveState({ state: "done", step: undefined, finishedAt: new Date().toISOString(), hash: buildHash(project.answers as Record<string, unknown>) });
-    sendEvent(res, { done: true });
+    sse.send({ done: true });
   } catch (err) {
     const cancelled = signal.aborted;
     const failedStep = state.step;
@@ -145,7 +139,7 @@ router.post("/build", async (req: Req, res: express.Response) => {
     }
     if (!cancelled) {
       console.warn(`[build] ${failedStep ?? "build"} failed:`, err instanceof Error ? err.message : err);
-      sendEvent(res, { error: failureMessage(err), step: failedStep, recoverable: true });
+      sse.send({ error: failureMessage(err), step: failedStep, recoverable: true });
     }
   } finally {
     finish();

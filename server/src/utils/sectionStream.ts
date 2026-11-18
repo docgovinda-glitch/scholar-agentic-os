@@ -1,17 +1,13 @@
 /**
- * Server-Sent Events plumbing for Coursework section drafting (`/stream-section`).
- *
- * The stream opens before the model call so a slow provider never leaves the
- * socket silent (proxies drop silent sockets, which the browser reports as
- * "TypeError: Failed to fetch"); a comment heartbeat keeps it alive, and once
- * open, failures are sent as `{ error, recoverable: true }` events.
+ * Coursework section drafting (`/stream-section`): its event format and the
+ * messages a student reads when a stream fails. The stream plumbing (headers,
+ * heartbeat, abort on close) is the shared `./sse.ts`.
  *
  * Events (`data: {...}`): `chunk` (model tokens, appended as they arrive),
  * `replace` (set the shown text, e.g. when the router switched model and
  * dropped a partial answer), `fullText` (the final, cleaned text), `fallback`,
  * `error`; then `[DONE]`.
  */
-import type { Response } from "express";
 import {
   AI_PROVIDER_REQUIRED_MESSAGE,
   BrowserAiRequiredError,
@@ -21,30 +17,6 @@ import {
   NoClientAiProviderError,
   UnusableAiResponseError,
 } from "../ai/aiRouteErrors.ts";
-
-/** Interval of the `: keep-alive` comment while the model is still answering. */
-export const SSE_HEARTBEAT_MS = 5000;
-
-/** SSE headers, sent and flushed immediately (no buffering by proxies). */
-export const SSE_HEADERS: Readonly<Record<string, string>> = {
-  "Content-Type": "text/event-stream",
-  "Cache-Control": "no-cache, no-transform",
-  Connection: "keep-alive",
-  "X-Accel-Buffering": "no",
-};
-
-export function openSseStream(res: Response): void {
-  res.status(200);
-  for (const [name, value] of Object.entries(SSE_HEADERS)) res.setHeader(name, value);
-  res.flushHeaders?.();
-  // A first byte through every proxy straight away.
-  res.write(": connected\n\n");
-}
-
-/** One `data:` event; nothing is written once the response has ended. */
-export function sendEvent(res: Response, payload: Record<string, unknown>): void {
-  if (!res.writableEnded && !res.destroyed) res.write(`data: ${JSON.stringify(payload)}\n\n`);
-}
 
 /** How many paragraphs a section of this length should have (2-4). */
 export function paragraphRange(targetWords: number): string {

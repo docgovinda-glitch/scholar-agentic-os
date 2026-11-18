@@ -9,6 +9,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { authedJsonFetch } from "../../api";
 import { safeParseAnswerField } from "../../../shared/projectStateSchema";
+import { readSse } from "../../../shared/sseReader";
 
 export type BuildStepId = "extract" | "understand";
 export interface BuildStepState {
@@ -46,29 +47,9 @@ interface BuildEvent {
   error?: string;
 }
 
-/** The events of an SSE body, one call per `data:` line. */
-async function readEvents(body: ReadableStream<Uint8Array>, onEvent: (e: BuildEvent) => Promise<void> | void): Promise<void> {
-  const reader = body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
-    for (const line of lines) {
-      if (!line.startsWith("data: ")) continue;
-      const raw = line.slice(6).trim();
-      if (!raw || raw === "[DONE]") continue;
-      try {
-        await onEvent(JSON.parse(raw) as BuildEvent);
-      } catch (err) {
-        if (err instanceof SyntaxError) continue; // a malformed line
-        throw err;
-      }
-    }
-  }
+/** The build's events from its SSE body (shared reader); `[DONE]` and non-JSON lines are skipped. */
+function readEvents(body: ReadableStream<Uint8Array>, onEvent: (e: BuildEvent) => Promise<void> | void): Promise<void> {
+  return readSse(body, (m) => (m.json && m.data && typeof m.data === "object" ? onEvent(m.data as BuildEvent) : undefined));
 }
 
 export function useBriefBuild(d: Deps): BriefBuild {

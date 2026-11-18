@@ -18,6 +18,7 @@ import * as thesisPrompts from "./prompts/thesisPrompts.ts";
 import * as proposalPrompts from "./prompts/proposalPrompts.ts";
 import * as presentationPrompts from "./prompts/presentationPrompts.ts";
 import { draftSection, priorSectionsContext, researchContextFromAnswers } from "./sectionDrafter.ts";
+import { openSse } from "../utils/sse.ts";
 import { buildAskGeneralPrompt, buildAskSearchPrompt } from "../../../src/shared/askPrompts.ts";
 import { aiAvailability as rawAiAvailability, NoAiConnectedError, routedCompletion as rawRoutedCompletion, routedText, RouterHandoffError, toRouterTask } from "../ai/routerBridge.ts";
 import { BrowserAiRequiredError, LocalModelUnreachableError, NoClientAiProviderError } from "../ai/aiRouteErrors.ts";
@@ -571,25 +572,14 @@ export const scholarBrain = {
     const effectiveUserPrompt = userPrompt || (promptConfig as any).prompt || "Empirical scholarly inquiry";
     const effectiveSystemPrompt = systemPrompt || (promptConfig as any).systemInstruction || "You are an elite academic peer reviewer and scholarly researcher.";
 
-    if (!res.headersSent) {
-      res.setHeader("Content-Type", "text/event-stream");
-      res.setHeader("Cache-Control", "no-cache, no-transform");
-      res.setHeader("Connection", "keep-alive");
-      if (typeof res.flushHeaders === "function") {
-        res.flushHeaders();
-      }
-    }
-
-    const sendSSE = (event: string, data: any) => {
-      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-    };
+    // Shared plumbing: headers flushed, heartbeat, abort when the client goes away.
+    const sse = openSse(res);
+    const sendSSE = (event: string, data: unknown) => sse.send(data, event);
 
     const fullSystemPrompt = buildScholarlyVoiceSystemPrompt({ dialect }) + "\n\n" + effectiveSystemPrompt;
     let fullText = "";
 
-    const streamAbort = new AbortController();
-    const onClose = () => { if (!res.writableFinished) streamAbort.abort(); };
-    res?.on?.("close", onClose);
+    const streamAbort = { signal: sse.signal };
 
     try {
       sendSSE("status", { message: "Generating scholarly draft via streaming..." });
@@ -631,17 +621,17 @@ export const scholarBrain = {
         },
       });
 
-      res.end();
+      sse.close();
       return { text: guardrails.text, fullText };
     } catch (err: unknown) {
       if (!streamAbort.signal.aborted) {
         const errMsg = (err as Error)?.message || "Streaming failed";
         sendSSE("error", { message: errMsg });
-        res.end();
+        sse.close();
       }
       throw err;
     } finally {
-      res?.off?.("close", onClose);
+      sse.close();
     }
   },
 

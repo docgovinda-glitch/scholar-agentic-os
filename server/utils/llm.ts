@@ -5,6 +5,7 @@ import { parseAndRepairLLMJson } from "../../src/shared/llmJsonParser.ts";
 import { InvalidLlmChallengeError } from "../src/ai/aiRouteErrors.ts";
 import { chainFor, NoAiConnectedError, routedText, RouterHandoffError, toRouterTask } from "../src/ai/routerBridge.ts";
 import type { RouterEvent } from "../../src/platform/router/types.ts";
+import { openSse, type SseResponse } from "../src/utils/sse.ts";
 
 if (!process.env.VITEST && process.env.NODE_ENV !== "test") {
   dotenv.config();
@@ -330,13 +331,10 @@ async function streamThroughRouter(
     if (err instanceof NoAiConnectedError) return handOff();
     throw err;
   }
-  if (!res.headersSent && res.writeHead) {
-    res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
-  }
-  const sendEvent = (event: string, data: unknown) => { res.write?.(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
-  const streamAbort = new AbortController();
-  const onClose = () => { if (!(res as { writableFinished?: boolean }).writableFinished) streamAbort.abort(); };
-  (res as any)?.on?.("close", onClose);
+  // Shared plumbing: headers flushed, heartbeat, abort when the client goes away.
+  const sse = openSse(res as SseResponse);
+  const sendEvent = (event: string, data: unknown) => sse.send(data, event);
+  const streamAbort = { signal: sse.signal };
   let full = "";
   try {
     full = await routedText(req as unknown as express.Request, {
@@ -350,8 +348,6 @@ async function streamThroughRouter(
       return undefined;
     }
     throw err;
-  } finally {
-    (res as any)?.off?.("close", onClose);
   }
 }
 
@@ -369,19 +365,6 @@ export async function streamOpenRouterJSON(
   if (text === undefined) return undefined;
   res.write?.(`event: log\ndata: ${JSON.stringify({ message: "> Parsing final JSON..." })}\n\n`);
   return parseJsonFromLlm(text);
-}
-
-export async function streamOpenRouterText(
-  req: LlmRequestLike,
-  res: LlmResponseLike,
-  systemPrompt: string,
-  userPrompt: string,
-  _model?: string,
-  taskType: string = "reasoning"
-) {
-  const override = handleFrontendLLMOverride(req, res, systemPrompt, userPrompt);
-  if (override) return override;
-  return streamThroughRouter(req, res, systemPrompt, userPrompt, taskType);
 }
 
 export async function generateGeminiEmbedding(text: string, apiKey?: string): Promise<number[]> {

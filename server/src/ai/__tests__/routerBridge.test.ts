@@ -3,7 +3,7 @@ import { setLiveModelsFetch, clearLiveModelState } from "../liveModels";
 import express from "express";
 import request from "supertest";
 import { aiRouteDecorator, configureRouterBridge, keyringFromRequest } from "../routerBridge";
-import { callOpenRouterText, streamOpenRouterText } from "../../../utils/llm";
+import { callOpenRouterText, streamOpenRouterJSON } from "../../../utils/llm";
 import { CircuitBreaker, MemoryBreakerStore } from "../../../../src/platform/router/circuitBreaker";
 import { ProviderHttpError } from "../../../../src/platform/router/errors";
 import type { AdapterChunk, Candidate, ProviderAdapter } from "../../../../src/platform/router/types";
@@ -37,8 +37,8 @@ function app() {
     }
   });
   a.post("/stream", async (req, res) => {
-    const text = await streamOpenRouterText(req, res, "system", "user prompt", undefined, "drafting").catch((e) => { res.write(`event: error\ndata: ${JSON.stringify({ message: e.message })}\n\n`); return undefined; });
-    if (text !== undefined) res.write(`event: done\ndata: ${JSON.stringify({ text })}\n\n`);
+    // The router stream (streamThroughRouter, via streamOpenRouterJSON): tokens, logs and routes as named events.
+    await streamOpenRouterJSON(req, res, "system", "user prompt", undefined, "drafting").catch((e) => { res.write(`event: error\ndata: ${JSON.stringify({ message: e.message })}\n\n`); return undefined; });
     res.end();
   });
   return a;
@@ -125,7 +125,7 @@ describe("existing AI steps through the router", () => {
     const text = res.body as string;
     expect(text).toMatch(/event: log\ndata: .*Switched from bad-1 · your key to good-1 · your key/);
     expect(text).toContain('event: route');
-    expect(text).toContain('"text":"ok from good-1"');
+    expect(text).toContain('event: chunk\ndata: {"token":"ok from good-1"}');
   });
 
 

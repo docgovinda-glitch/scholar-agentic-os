@@ -7,6 +7,7 @@
 import { DEFAULT_CITATION_STYLE } from "../../../domain/assignment/answerKeys";
 import type { DiscoveredSource,AssignmentDraftingSection } from "../types";
 import { ensureParagraphBreaks } from "../../../shared/proseParagraphs";
+import { readSse } from "../../../shared/sseReader";
 
 export interface InternalSectionPlan extends AssignmentDraftingSection {
   sectionType: "intro" | "body" | "conclusion";
@@ -153,59 +154,40 @@ export async function streamSectionGeneration(options: StreamSectionOptions): Pr
       );
     }
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
     let aggregatedText = "";
     shownSoFar = "";
-    let buffer = "";
     let streamError = "";
     let finalFromServer = false;
     let scaffold = false;
 
-    while (true) {
-      let chunkRead: ReadableStreamReadResult<Uint8Array>;
-      try {
-        chunkRead = await reader.read();
-      } catch (readErr) {
-        if (signal?.aborted) throw new SectionDraftStoppedError(aggregatedText);
-        throw readErr;
-      }
-      const { done, value } = chunkRead;
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-
-      for (const line of lines) {
-        if (!line.startsWith("data: ")) continue;
-        const rawData = line.slice(6).trim();
-        if (!rawData || rawData === "[DONE]") continue;
-        try {
-          const parsed = JSON.parse(rawData) as { chunk?: string; replace?: string; fullText?: string; error?: string; recoverable?: boolean; fallback?: { reason?: string } };
-          if (parsed.error) streamError = parsed.error;
-          if (parsed.fallback) {
-            scaffold = true;
-            onFallback?.({ reason: parsed.fallback.reason || "No AI provider could answer right now." });
-          }
-          if (typeof parsed.replace === "string") {
-            // The server switched model (or starts a continuation): show this text instead.
-            aggregatedText = parsed.replace;
-            shownSoFar = aggregatedText;
-            onChunk("", aggregatedText);
-          }
-          if (parsed.chunk) {
-            aggregatedText += parsed.chunk;
-            shownSoFar = aggregatedText;
-            onChunk(parsed.chunk, aggregatedText);
-          }
-          if (parsed.fullText) {
-            aggregatedText = parsed.fullText;
-            finalFromServer = true;
-          }
-        } catch {
-          // ignore a malformed line
+    try {
+      await readSse(response.body, (m) => {
+        if (!m.json || !m.data || typeof m.data !== "object") return;
+        const parsed = m.data as { chunk?: string; replace?: string; fullText?: string; error?: string; recoverable?: boolean; fallback?: { reason?: string } };
+        if (parsed.error) streamError = parsed.error;
+        if (parsed.fallback) {
+          scaffold = true;
+          onFallback?.({ reason: parsed.fallback.reason || "No AI provider could answer right now." });
         }
-      }
+        if (typeof parsed.replace === "string") {
+          // The server switched model (or starts a continuation): show this text instead.
+          aggregatedText = parsed.replace;
+          shownSoFar = aggregatedText;
+          onChunk("", aggregatedText);
+        }
+        if (parsed.chunk) {
+          aggregatedText += parsed.chunk;
+          shownSoFar = aggregatedText;
+          onChunk(parsed.chunk, aggregatedText);
+        }
+        if (parsed.fullText) {
+          aggregatedText = parsed.fullText;
+          finalFromServer = true;
+        }
+      });
+    } catch (readErr) {
+      if (signal?.aborted) throw new SectionDraftStoppedError(aggregatedText);
+      throw readErr;
     }
 
     // A failure event (or a stream that ended without its final text) never
