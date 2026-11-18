@@ -155,7 +155,7 @@ export function Field({
             error
               ? "border-rose-400 dark:border-rose-500/80 focus:border-rose-600"
               : "border-neutral-300 dark:border-white/15 hover:border-neutral-400 dark:hover:border-white/25 focus:border-neutral-900 dark:focus:border-white"
-          } rounded-xl text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 focus:outline-none focus-visible:ring-4 focus-visible:ring-neutral-900/10 dark:focus-visible:ring-white/15 transition-[border-color,box-shadow] duration-150 disabled:bg-neutral-50 dark:disabled:bg-ink-850 disabled:text-neutral-400 ${
+          } rounded-xl text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 focus:outline-none focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-neutral-900/10 dark:focus-visible:ring-white/15 transition-[border-color,box-shadow] duration-150 disabled:bg-neutral-50 dark:disabled:bg-ink-850 disabled:text-neutral-400 ${
             showPasswordToggle ? "pr-20" : ""
           }`}
         />
@@ -235,7 +235,7 @@ export function SelectField({
           required={required}
           aria-describedby={hintId}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full h-11 appearance-none px-3.5 py-2 pr-9 text-sm bg-white dark:bg-ink-900 border border-neutral-300 dark:border-white/15 hover:border-neutral-400 dark:hover:border-white/25 focus:border-neutral-900 dark:focus:border-white rounded-xl text-neutral-900 dark:text-neutral-100 focus:outline-none focus-visible:ring-4 focus-visible:ring-neutral-900/10 dark:focus-visible:ring-white/15 transition-[border-color,box-shadow] duration-150 cursor-pointer"
+          className="w-full h-11 appearance-none px-3.5 py-2 pr-9 text-sm bg-white dark:bg-ink-900 border border-neutral-300 dark:border-white/15 hover:border-neutral-400 dark:hover:border-white/25 focus:border-neutral-900 dark:focus:border-white rounded-xl text-neutral-900 dark:text-neutral-100 focus:outline-none focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-neutral-900/10 dark:focus-visible:ring-white/15 transition-[border-color,box-shadow] duration-150 cursor-pointer"
         >
           <option value="" disabled={required}>
             {placeholder}
@@ -469,7 +469,7 @@ export function GoogleSignInButton({ onClick, busy }: { onClick: () => void; bus
       onClick={onClick}
       disabled={busy}
       aria-busy={busy}
-      className="flex w-full h-11 items-center justify-center gap-3 rounded-xl border border-neutral-300 dark:border-white/15 bg-white dark:bg-ink-750 hover:bg-neutral-50 dark:hover:bg-ink-700 hover:border-neutral-400 dark:hover:border-white/25 px-4 text-sm font-semibold text-neutral-800 dark:text-neutral-100 shadow-2xs active:scale-[0.99] transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+      className="flex w-full h-11 items-center justify-center gap-3 rounded-xl border border-neutral-300 dark:border-white/15 bg-white dark:bg-ink-750 hover:bg-neutral-50 dark:hover:bg-ink-700 hover:border-neutral-400 dark:hover:border-white/25 px-4 text-sm font-semibold text-neutral-800 dark:text-neutral-100 shadow-2xs active:scale-[0.99] transition-all duration-150 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-neutral-900/15 dark:focus-visible:ring-white/20 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
     >
       {busy ? (
         <>

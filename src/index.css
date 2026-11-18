@@ -630,15 +630,6 @@ button:disabled {
   outline-offset: 2px;
 }
 
-/* Auth card inputs use a soft radius-matched focus ring instead of a double outer outline */
-.auth-card-shell input:focus,
-.auth-card-shell input:focus-visible,
-.auth-card-shell select:focus,
-.auth-card-shell select:focus-visible {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-subtle);
-}
 
 /* Scrollbars — tokenised so they follow the theme. */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
