@@ -36,3 +36,17 @@ export function streamErrorMessage(err: unknown, handedOff = false): string {
   if (err instanceof UnusableAiResponseError) return "The AI returned an empty answer for this section. Nothing was written. Try again.";
   return "The section draft stopped before it finished. Nothing was overwritten. Try again.";
 }
+
+/**
+ * Why no AI could answer, in the student's words, shown with the offline scaffold. The router's own message already
+ * names the cause (a spent balance, models that used their allowance thinking, every provider failing); the old
+ * fixed sentence hid it. Falls back to the plain sentence for errors whose text is not meant for students.
+ */
+export function scaffoldReason(err: unknown): string {
+  const plain = "No AI provider could answer right now.";
+  if (err instanceof Error && err.name === "RouterExhaustedError" && err.message.trim()) {
+    const text = err.message.trim().replace(/\s+/g, " ");
+    return text.length > 400 ? `${text.slice(0, 397)}...` : text;
+  }
+  return plain;
+}

@@ -89,3 +89,19 @@ describe("Anthropic prompt caching", () => {
     expect(bodies[1].system).toBe("short");
   });
 });
+
+describe("OpenRouter reasoning allowance", () => {
+  const cand = (group: string): Candidate => ({ id: "x", group, lane: "byok", provider: "custom", model: "m", label: "m", contextWindow: 100_000, maxOutputTokens: 32_768, runsIn: "server", credential: { apiKey: "k", baseUrl: "https://example.test/v1" } });
+  const bodyFor = async (c: Candidate, max: number) => {
+    let sent: Record<string, unknown> = {};
+    const f = (async (_u: string, init: RequestInit) => { sent = JSON.parse(String(init.body)); return new Response("data: [DONE]\n\n", { status: 200 }); }) as unknown as typeof fetch;
+    for await (const _ of openAiCompatibleAdapter(f).stream(c, { requestId: "r", task: "drafting", messages: [{ role: "user", content: "hi" }], desiredOutputTokens: max, minOutputTokens: 1 }, max, new AbortController().signal)) { /* drain */ }
+    return sent;
+  };
+  it("asks for brief reasoning on OpenRouter when the allowance is small, and only there", async () => {
+    expect((await bodyFor(cand("openrouter"), 2935)).reasoning).toEqual({ effort: "low" });
+    expect((await bodyFor(cand("openrouter#2"), 2935)).reasoning).toEqual({ effort: "low" });
+    expect((await bodyFor(cand("openrouter"), 32_768)).reasoning).toBeUndefined();
+    expect((await bodyFor(cand("groq"), 2935)).reasoning).toBeUndefined();
+  });
+});

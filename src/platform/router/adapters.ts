@@ -99,6 +99,9 @@ const OPENAI_BASES: Partial<Record<ProviderId, string>> = {
   lmstudio: "http://localhost:1234/v1",
 };
 
+/** At or below this many output tokens, reasoning is kept short on OpenRouter. */
+export const SMALL_OUTPUT_TOKENS = 4_096;
+
 function openAiMessages(messages: ChatMessage[]) {
   return messages.map((m) => {
     if (typeof m.content === "string") return { role: m.role, content: m.content, ...(m.toolCallId ? { tool_call_id: m.toolCallId } : {}) };
@@ -123,6 +126,9 @@ export function openAiCompatibleAdapter(fetchImpl: FetchImpl = fetch): ProviderA
         ...(c.provider === "openai" ? { max_completion_tokens: maxOutputTokens } : { max_tokens: maxOutputTokens }),
         ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
         ...(req.tools?.length ? { tools: req.tools.map((t) => ({ type: "function", function: t })) } : {}),
+        // A small output allowance (a quick task, or a balance that cannot reserve more) must not be spent thinking:
+        // OpenRouter's unified `reasoning` setting asks reasoning models to think briefly. Other providers are untouched.
+        ...(c.group?.startsWith("openrouter") && maxOutputTokens <= SMALL_OUTPUT_TOKENS ? { reasoning: { effort: "low" } } : {}),
       }, signal, fetchImpl);
 
       const calls = new Map<number, { id: string; name: string; args: string }>();

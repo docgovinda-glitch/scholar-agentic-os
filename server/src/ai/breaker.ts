@@ -14,10 +14,15 @@ import type { Candidate } from "../../../src/platform/router/types.ts";
 
 const digest = (s: string) => createHash("sha256").update(s).digest("hex").slice(0, 16);
 
+/** The connection circuit's name: provider connection (with backup-key slot) plus a hash of the key and address. */
+export function connectionName(group: string, apiKey: string | undefined, baseUrl: string | undefined): string {
+  return `conn:${group}|${digest(`${apiKey ?? ""}\0${baseUrl ?? ""}`)}`;
+}
+
 /** Circuit names for one candidate: its model, and its connection (provider + key + address). */
 export function serverBreakerKeys(c: Candidate): { model: string; connection: string } {
   const who = digest(`${c.credential?.apiKey ?? ""}\0${c.credential?.baseUrl ?? ""}`);
-  return { model: `${c.id}|${who}`, connection: `conn:${c.group ?? c.provider}|${who}` };
+  return { model: `${c.id}|${who}`, connection: connectionName(c.group ?? c.provider, c.credential?.apiKey, c.credential?.baseUrl) };
 }
 
 export const serverBreaker = new CircuitBreaker(new MemoryBreakerStore());
