@@ -68,3 +68,35 @@ describe("affordable output ceiling", () => {
     expect((await breaker.acquire("conn:openrouter")).allowed).toBe(false); // genuinely unusable: circuit opens
   });
 });
+
+describe("the learned ceiling is remembered between requests", () => {
+  it("the next request starts at it: no refused request first", async () => {
+    const { TtlOutputCaps } = await import("../outputCaps");
+    const caps = new TtlOutputCaps();
+    const asked: number[] = [];
+    const a = limited(3262, asked);
+    const go = async () => { for await (const _ of route(req, [cand("m1")], new AbortController().signal, { site: "server", adapters: { custom: a }, breaker: new CircuitBreaker(new MemoryBreakerStore()), outputCaps: caps, sleep: async () => {} })) { /* drain */ } };
+    await go();
+    expect(asked).toEqual([32_768, 2935]);
+    asked.length = 0;
+    await go(); // e.g. the continuation of a long answer, or the next request
+    expect(asked).toEqual([2935]);
+  });
+
+  it("forgets it after the time to live, so added credit is used", async () => {
+    const { TtlOutputCaps } = await import("../outputCaps");
+    let t = 0;
+    const caps = new TtlOutputCaps(1000, 10, () => t);
+    caps.set("k", 500);
+    expect(caps.get("k")).toBe(500);
+    t = 1001;
+    expect(caps.get("k")).toBeUndefined();
+  });
+
+  it("is bounded", async () => {
+    const { TtlOutputCaps } = await import("../outputCaps");
+    const caps = new TtlOutputCaps(1000, 3);
+    for (let i = 0; i < 10; i++) caps.set(`k${i}`, 1);
+    expect(caps.size).toBe(3);
+  });
+});

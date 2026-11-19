@@ -1,6 +1,7 @@
 import type { AdapterChunk, AttemptTrace, Candidate, Failure, ProviderAdapter, ProviderId, RouteRequest, RouterEvent, Usage } from "./types";
 import { CircuitBreaker } from "./circuitBreaker";
 import { classify, countsAgainstProvider, EmptyOutputError, TimeoutError } from "./errors";
+import { TtlOutputCaps, type OutputCapStore } from "./outputCaps";
 import { estimateTokens, preflight, type TokenCounter } from "./tokenBudget";
 
 export interface RouterOptions {
@@ -14,6 +15,8 @@ export interface RouterOptions {
    * connection at once, on this request and the next. Default: the candidate id and its group. A server shared by
    * many people must include the credential in both, so one person's spent key never pauses another's.
    */
+  /** Where learned output ceilings are kept between requests (default: this request only). */
+  outputCaps?: OutputCapStore;
   breakerKeys?: (c: Candidate) => { model: string; connection: string };
   countTokens?: TokenCounter;
   retry?: { maxAttempts: number; baseDelayMs: number; maxDelayMs: number; maxWaitMs: number };
@@ -108,8 +111,8 @@ export async function* route(req: RouteRequest, chain: Candidate[], signal: Abor
   const startedAtAll = now();
   const maxTotal = opts.maxTotalMs ?? DEFAULT_MAX_TOTAL_MS;
   const deadGroups = new Set<string>();
-  /** Output ceilings a connection said its balance can afford, so its other models start there instead of failing first. */
-  const affordableByGroup = new Map<string, number>();
+  /** Output ceilings a connection said its balance can afford, so its other models (and later requests) start there instead of failing first. */
+  const caps = opts.outputCaps ?? new TtlOutputCaps();
 
   yield { type: "route_start", requestId: req.requestId, chain: chain.map(({ id, label, lane }) => ({ id, label, lane })) };
 
@@ -177,7 +180,7 @@ export async function* route(req: RouteRequest, chain: Candidate[], signal: Abor
 
     let failure: Failure | undefined;
     let streamed = false;
-    let outputBudget = Math.min(pf.outputBudget, affordableByGroup.get(c.group ?? c.id) ?? Infinity);
+    let outputBudget = Math.min(pf.outputBudget, caps.get(keys.connection) ?? Infinity);
     let reducedForBalance = false;
     for (let attempt = 1; attempt <= retry.maxAttempts; attempt++) {
       yield { type: "attempt_start", candidateId: c.id, label: c.label, lane: c.lane, attempt, maxOutputTokens: outputBudget };
@@ -234,7 +237,7 @@ export async function* route(req: RouteRequest, chain: Candidate[], signal: Abor
           if (cap >= req.minOutputTokens && cap < outputBudget) {
             reducedForBalance = true;
             outputBudget = cap;
-            affordableByGroup.set(c.group ?? c.id, cap);
+            caps.set(keys.connection, cap);
             await Promise.all([opts.breaker.release(keys.connection), opts.breaker.release(keys.model)]);
             yield { type: "retry", candidateId: c.id, attempt, maxAttempts: retry.maxAttempts, waitMs: 0, reason: failure.kind, message: `Your balance covers about ${failure.affordableTokens.toLocaleString("en")} output tokens; retrying with a smaller limit` };
             attempt--; // a smaller request is not one of the failed attempts

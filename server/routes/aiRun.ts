@@ -25,7 +25,7 @@ import { MAX_KEYRING_ENTRIES } from "../../src/platform/router/keyringAssemble.t
 import { isRemoteHttpsEndpoint } from "../../src/platform/router/baseUrl.ts";
 import { orderChain, ROUTING_HEADER, strictOrderFromHeader } from "../../src/platform/router/taskAffinity.ts";
 import { getLocalRunner } from "../../src/config/localRunnerCatalog.ts";
-import { serverBreaker, serverBreakerKeys } from "../src/ai/breaker.ts";
+import { serverBreaker, serverBreakerKeys, serverOutputCaps } from "../src/ai/breaker.ts";
 import { assignBadges, curateModels, type MeasuredSpeed } from "../../src/platform/router/modelCuration.ts";
 import { listLiveModels, ModelListError } from "../../src/platform/router/modelListers.ts";
 import type { Candidate, ProviderId, RouteRequest, RouterEvent } from "../../src/platform/router/types.ts";
@@ -200,7 +200,7 @@ export function registerAiRunRoutes(app: express.Express, deps: AiRunDeps = {}):
         yield { type: "candidate_skipped", candidateId: `notice:${n.text.slice(0, 40)}`, label: "AI connection", reason: "no_credential", detail: n.text };
       }
       const onCandidateFailure = (c: Candidate, f: { kind: string }) => { if (f.kind === "model_unavailable") quarantineModel(c); };
-      for await (const ev of route(request, chain, signal, { site: "server", adapters, breaker, breakerKeys: serverBreakerKeys, onCandidateFailure, ...deps.routerOptions })) {
+      for await (const ev of route(request, chain, signal, { site: "server", adapters, breaker, breakerKeys: serverBreakerKeys, outputCaps: serverOutputCaps, onCandidateFailure, ...deps.routerOptions })) {
         if (ev.type === "metrics") {
           const c = byId.get(ev.candidateId);
           if (c && ev.outputTokens > 50) recordSpeed(`${c.provider}:${c.model}`, ev.tokensPerSecond);

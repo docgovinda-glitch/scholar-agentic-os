@@ -18,7 +18,7 @@ import { route } from "../../../src/platform/router/router.ts";
 import type { CircuitBreaker } from "../../../src/platform/router/circuitBreaker.ts";
 import { MAX_KEYRING_ENTRIES } from "../../../src/platform/router/keyringAssemble.ts";
 import { orderChain, ROUTING_HEADER, strictOrderFromHeader } from "../../../src/platform/router/taskAffinity.ts";
-import { serverBreaker, serverBreakerKeys } from "./breaker.ts";
+import { serverBreaker, serverBreakerKeys, serverOutputCaps } from "./breaker.ts";
 import type { Candidate, ProviderAdapter, ProviderId, RouteRequest, RouterEvent, TaskClass } from "../../../src/platform/router/types.ts";
 import { keyringToCandidates, parseKeyring, type KeyringEntry } from "../../routes/aiRun.ts";
 import { expandKeyring, quarantineModel } from "./liveModels.ts";
@@ -179,7 +179,7 @@ export async function routedResult(req: Request, call: RoutedCall): Promise<Rout
       temperature: call.temperature,
     };
     let text = "";
-    for await (const ev of route(request, chain, call.signal ?? new AbortController().signal, { site: "server", adapters: deps.adapters, breaker: deps.breaker, breakerKeys: serverBreakerKeys, onCandidateFailure: (c, f) => { if (f.kind === "model_unavailable") quarantineModel(c); } })) {
+    for await (const ev of route(request, chain, call.signal ?? new AbortController().signal, { site: "server", adapters: deps.adapters, breaker: deps.breaker, breakerKeys: serverBreakerKeys, outputCaps: serverOutputCaps, onCandidateFailure: (c, f) => { if (f.kind === "model_unavailable") quarantineModel(c); } })) {
       summarise(scoped.aiRoute!, ev);
       call.onEvent?.(ev);
       if (ev.type === "token") text += ev.text;

@@ -9,6 +9,7 @@
  */
 import { createHash } from "node:crypto";
 import { CircuitBreaker, MemoryBreakerStore } from "../../../src/platform/router/circuitBreaker.ts";
+import { TtlOutputCaps } from "../../../src/platform/router/outputCaps.ts";
 import type { Candidate } from "../../../src/platform/router/types.ts";
 
 const digest = (s: string) => createHash("sha256").update(s).digest("hex").slice(0, 16);
@@ -20,3 +21,6 @@ export function serverBreakerKeys(c: Candidate): { model: string; connection: st
 }
 
 export const serverBreaker = new CircuitBreaker(new MemoryBreakerStore());
+
+/** Output ceilings learned from "can only afford N" refusals, per credential, shared like the breaker. */
+export const serverOutputCaps = new TtlOutputCaps();
