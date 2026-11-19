@@ -18,6 +18,24 @@ export type BaseUrlResult = { ok: true; url: string; host: string } | { ok: fals
 const ENDPOINT_TAILS = /\/(?:chat\/completions|completions|models|messages|embeddings|responses)\/?$/i;
 const LOOPBACK = /^(localhost|127\.\d+\.\d+\.\d+|\[::1\])$/i;
 
+const PRIVATE_HOST = /^(10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|0\.)|^\[[^\]]*\]$|\.(local|internal|lan|home|localdomain)$|^[^.]+$/i;
+
+/**
+ * True for an https address that is plausibly reachable from the public
+ * internet (a Cloudflare/ngrok tunnel, Modal, LiteLLM): not loopback, not a
+ * private-range literal, not a single-label or .local/.internal name. A cheap
+ * routing hint only; the server guard (`checkAiEndpoint`) does the real DNS check.
+ */
+export function isRemoteHttpsEndpoint(raw: string | undefined): boolean {
+  if (!raw) return false;
+  try {
+    const u = new URL(raw);
+    return u.protocol === "https:" && !LOOPBACK.test(u.hostname) && !PRIVATE_HOST.test(u.hostname);
+  } catch {
+    return false;
+  }
+}
+
 export function normalizeBaseUrl(raw: string, opts: { allowLoopbackHttp?: boolean; /** Tidy only: accept http too and leave the https/public-address decision to the server guard (self-hosted installs may allow private http endpoints). */ lenient?: boolean } = {}): BaseUrlResult {
   const text = raw.replace(/[^\x20-\x7E]/g, "").trim();
   if (!text) return { ok: false, reason: "Enter the address." };

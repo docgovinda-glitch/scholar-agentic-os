@@ -2,6 +2,8 @@ import { describe, it, expect, vi } from "vitest";
 vi.mock("../../aiAccess/accountKeys", () => ({ syncKeysWithAccount: vi.fn(async () => null) }));
 vi.mock("../../../services/userAiSettings", () => ({ loadUserAiSettings: vi.fn(), providersWithStoredKey: () => [], readProviderKey: vi.fn() }));
 import { buildKeyring, encodeKeyring } from "../keyring";
+import { MAX_KEYRING_ENTRIES } from "../../../platform/router/keyringAssemble";
+import { CLOUD_PROVIDERS } from "../../../config/providerCatalog";
 
 describe("keyring", () => {
   it("puts the primary provider first, maps catalog ids, skips entries without a key, uses auto when no model is saved, and adds an enabled local model last", async () => {
@@ -30,7 +32,11 @@ describe("keyring", () => {
     const ring = await buildKeyring({ provider: "cloudflare", preferences: {} }, ["cloudflare"], async () => "k");
     expect(ring).toEqual([]);
     const many = ["openrouter", "cerebras", "together", "fireworks", "deepinfra", "novita", "hyperbolic", "nebius", "sambanova", "chutes"];
-    expect((await buildKeyring({ provider: "openrouter", preferences: {} }, many, async () => "k")).length).toBe(8);
+    // Ten providers all fit now: the limit is 24 connections, not 8.
+    expect((await buildKeyring({ provider: "openrouter", preferences: {} }, many, async () => "k")).length).toBe(10);
+    const everyProvider = CLOUD_PROVIDERS.map((p) => p.id);
+    const all = await buildKeyring({ provider: "openrouter", preferences: { cloudflareEndpoint: "https://api.cloudflare.com/client/v4/accounts/abc/ai/v1" } }, everyProvider, async () => "k");
+    expect(all.length).toBeLessThanOrEqual(MAX_KEYRING_ENTRIES);
   });
 
   it("encodes as base64url JSON the server can read", () => {

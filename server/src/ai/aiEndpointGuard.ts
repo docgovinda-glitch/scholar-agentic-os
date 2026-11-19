@@ -22,6 +22,7 @@ import { defaultAdapters, ollamaAdapter, openAiCompatibleAdapter } from "../../.
 import { serverCanReachLocalModels } from "./serverLocalAccess.ts";
 import { CLOUD_PROVIDERS } from "../../../src/config/providerCatalog.ts";
 import { COHERE_COMPAT_BASE } from "../../../src/platform/router/providerMap.ts";
+import { isRemoteHttpsEndpoint } from "../../../src/platform/router/baseUrl.ts";
 
 const hostOf = (u: string): string | undefined => { try { return new URL(u).hostname; } catch { return undefined; } };
 
@@ -75,8 +76,9 @@ export async function screenCandidates(candidates: Candidate[]): Promise<{ kept:
   const blocked: Array<{ label: string; reason: string }> = [];
   for (const c of candidates) {
     const baseUrl = c.credential?.baseUrl;
-    // Local runners on the server are governed by serverCanReachLocalModels (serverAdapters).
-    if (c.runsIn !== "server" || !baseUrl || c.lane === "local") { kept.push(c); continue; }
+    // A runner on loopback is governed by serverCanReachLocalModels (serverAdapters). A runner behind a public https
+    // tunnel (Cloudflare Tunnel, Modal, LiteLLM) is called from here, so it is screened like any custom endpoint.
+    if (c.runsIn !== "server" || !baseUrl || (c.lane === "local" && !isRemoteHttpsEndpoint(baseUrl))) { kept.push(c); continue; }
     const check = await checkAiEndpoint(baseUrl);
     if (check.ok) kept.push(c);
     else blocked.push({ label: c.label, reason: check.reason });
@@ -136,18 +138,24 @@ function pinnedRequest(url: URL, init: RequestInit | undefined, allowedIps: Set<
 
 /**
  * Adapters for server-side calls. Cloud providers use the guarded fetch.
- * Local runners (Ollama, LM Studio) run on the server only where it can reach
- * them: development, or a self-hosted install that set
- * ALLOW_SERVER_LOCAL_AI=true. Anywhere else such a call is refused; the
- * router hands local models to the user's browser instead.
+ * Local runners (Ollama, LM Studio, Jan, vLLM, ...) on loopback run on the server
+ * only where it can reach them: development, or a self-hosted install that set
+ * ALLOW_SERVER_LOCAL_AI=true. Anywhere else such a call is refused; the router
+ * hands local models to the user's browser instead. A runner behind a public
+ * https address (a tunnel to a Kaggle/Colab/Modal GPU, a LiteLLM gateway) goes
+ * through the guarded fetch exactly like a custom cloud endpoint: public
+ * addresses only, connection pinned, no redirects.
  */
 export function serverAdapters(baseFetch: typeof fetch = fetch): Partial<Record<ProviderId, ProviderAdapter>> {
-  const localFetch = ((input: Parameters<typeof fetch>[0], init?: RequestInit) =>
-    serverCanReachLocalModels()
+  const guarded = createAiFetch(baseFetch);
+  const localFetch = ((input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+    if (isRemoteHttpsEndpoint(requestUrl(input).href)) return guarded(input, init);
+    return serverCanReachLocalModels()
       ? baseFetch(input, init)
-      : Promise.reject(new AiEndpointBlockedError("this server can't reach a model on your computer"))) as typeof fetch;
+      : Promise.reject(new AiEndpointBlockedError("this server can't reach a model on your computer"));
+  }) as typeof fetch;
   return {
-    ...defaultAdapters(createAiFetch(baseFetch)),
+    ...defaultAdapters(guarded),
     lmstudio: openAiCompatibleAdapter(localFetch),
     ollama: ollamaAdapter(localFetch),
   };

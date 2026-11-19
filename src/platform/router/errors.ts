@@ -30,6 +30,8 @@ function retryAfterFromMessage(msg: string): number | undefined {
   const m = msg.match(/retry(?:\s+in|Delay"?\s*[:=]\s*"?)\s*(\d+(?:\.\d+)?)\s*s/i);
   return m ? Math.round(parseFloat(m[1]) * 1000) : undefined;
 }
+/** The limit that was hit resets daily (Gemini "PerDay", Groq "tokens per day", "RPD"). */
+const DAILY_WINDOW = /per.?day|PerDay|\bRPD\b|\bTPD\b|\bdaily\b|requests per day|tokens per day/i;
 const MODEL_UNAVAILABLE = /model.{0,60}(not found|does not exist|not available|not supported|deprecated|decommissioned|no longer|retired|invalid)|(unknown|invalid|unsupported) model/i;
 
 function retryAfterMs(h: Record<string, string>): number | undefined {
@@ -57,12 +59,12 @@ export function classify(err: unknown, signal: AbortSignal): Failure {
     // A per-minute / per-day / free-tier request limit is a rate limit on this model, not spent credit,
     // even when the provider words it "You exceeded your current quota" (Gemini free tier).
     if (s === 429 && RATE_WINDOW.test(`${err.message} ${code}`) && !/insufficient_quota|credit balance|payment required|out of credits?|billing (?:account )?(?:disabled|not enabled)/i.test(`${err.message} ${code}`)) {
-      return f("rate_limit", msg, true, true, { httpStatus: s, retryAfterMs: retryAfterMs(err.headers) ?? retryAfterFromMessage(err.message) });
+      return f("rate_limit", msg, true, true, { httpStatus: s, retryAfterMs: retryAfterMs(err.headers) ?? retryAfterFromMessage(err.message), ...(DAILY_WINDOW.test(`${err.message} ${code}`) ? { daily: true } : {}) });
     }
     // Spent credit shows up differently per provider: 402 (OpenRouter, DeepSeek), 429 insufficient_quota
     // (OpenAI), 400 "credit balance is too low" (Anthropic), 403 billing/quota (Google). All mean "use the next AI".
     if (s === 402 || (s !== 401 && s < 500 && CREDIT_EXHAUSTED.test(`${msg} ${code}`))) return f("quota", msg, false, true, { httpStatus: s });
-    if (s === 429) return f("rate_limit", msg, true, true, { httpStatus: s, retryAfterMs: retryAfterMs(err.headers) });
+    if (s === 429) return f("rate_limit", msg, true, true, { httpStatus: s, retryAfterMs: retryAfterMs(err.headers), ...(DAILY_WINDOW.test(`${err.message} ${code}`) ? { daily: true } : {}) });
     if (s === 401 || s === 403) return f("auth", msg, false, true, { httpStatus: s });
     if (s === 529 || s === 503) return f("overloaded", msg, true, true, { httpStatus: s, retryAfterMs: retryAfterMs(err.headers) });
     if (s >= 500) return f("server", msg, true, true, { httpStatus: s });

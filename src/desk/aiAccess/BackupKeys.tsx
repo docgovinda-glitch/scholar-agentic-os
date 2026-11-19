@@ -9,7 +9,7 @@ import { verifyProviderKey } from "./aiAccessApi";
  * the next key is used automatically, with a visible notice. Backups are saved
  * to the account like the main key, so they work on every device.
  */
-export default function BackupKeys({ providerId, providerName, baseUrl }: { providerId: string; providerName: string; baseUrl?: string }) {
+export default function BackupKeys({ providerId, providerName, baseUrl, quotaScopeNote }: { providerId: string; providerName: string; baseUrl?: string; /** Set when the provider meters per project/account, so a backup from the same one shares the quota. */ quotaScopeNote?: string }) {
   const [slots, setSlots] = useState<Array<{ slot: number; preview: string }>>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -59,6 +59,11 @@ export default function BackupKeys({ providerId, providerName, baseUrl }: { prov
       <p className="text-xs text-[color:var(--text-muted)]">
         If your main {providerName} key runs out of quota or credits, Scholar switches to a backup key automatically and tells you. Backups are saved to your account like the main key.
       </p>
+      {quotaScopeNote && (
+        <p role="note" data-testid="quota-scope-note" className="rounded-[var(--radius-sm)] border border-[color:var(--state-warning)] bg-[color:var(--state-warning-subtle)] px-2.5 py-1.5 text-xs text-[color:var(--text-primary)]">
+          {quotaScopeNote}
+        </p>
+      )}
       {slots.map(({ slot, preview }) => (
         <div key={slot} className="flex items-center justify-between gap-2 text-sm">
           <span className="font-mono text-[color:var(--text-primary)]">Backup {slot - 1}: {preview}</span>

@@ -8,8 +8,9 @@ import { authHeaders } from "../api/authHeaders";
 import { route } from "../../platform/router/router";
 import { CircuitBreaker, MemoryBreakerStore } from "../../platform/router/circuitBreaker";
 import { ollamaAdapter, openAiCompatibleAdapter, sseEvents } from "../../platform/router/adapters";
+import { isRemoteHttpsEndpoint } from "../../platform/router/baseUrl";
 import type { Candidate, ChatMessage, RouteRequest, RouterEvent, TaskClass, ToolSpec } from "../../platform/router/types";
-import { buildKeyring, encodeKeyring, type KeyringEntry } from "./keyring";
+import { aiRequestParts, encodeKeyring, type KeyringEntry } from "./keyring";
 
 export interface AiRunInput {
   task: TaskClass;
@@ -26,11 +27,18 @@ export class AiRunError extends Error {
 
 const localBreaker = new CircuitBreaker(new MemoryBreakerStore());
 
-function localCandidates(keyring: KeyringEntry[], fromId: string): Candidate[] {
+/**
+ * The local runners this chain continues with after a hand-off. Every catalog runner is either
+ * `ollama` (its own API) or `lmstudio` (any OpenAI-compatible runner: Jan, vLLM, llama.cpp, ...);
+ * `via` carries the runner's id so the candidate ids match the server's (`keyringToCandidates`).
+ * A runner behind a public https address was already tried by the server: the browser's CSP only
+ * allows loopback runners, so it is not offered again here.
+ */
+export function localCandidates(keyring: KeyringEntry[], fromId: string): Candidate[] {
   const local = keyring
-    .filter((k) => k.provider === "ollama" || k.provider === "lmstudio")
+    .filter((k) => (k.provider === "ollama" || k.provider === "lmstudio") && !isRemoteHttpsEndpoint(k.baseUrl))
     .map<Candidate>((k) => ({
-      id: `local:${k.provider}:${k.model}`, lane: "local", provider: k.provider, model: k.model,
+      id: `local:${k.via ?? k.provider}:${k.model}`, group: k.via ?? k.provider, lane: "local", provider: k.provider, model: k.model,
       label: k.label ?? `${k.model} on your device`, contextWindow: k.contextWindow ?? 8_192, maxOutputTokens: k.maxOutputTokens ?? 2_048,
       runsIn: "browser", credential: k.baseUrl ? { baseUrl: k.baseUrl } : undefined,
     }));
@@ -42,12 +50,15 @@ export interface RunDeps { fetchImpl?: typeof fetch; keyring?: KeyringEntry[]; h
 
 export async function* runAi(input: AiRunInput, signal: AbortSignal, deps: RunDeps = {}): AsyncGenerator<RouterEvent> {
   const fetchImpl = deps.fetchImpl ?? fetch;
-  const keyring = deps.keyring ?? (await buildKeyring());
+  const parts = deps.keyring ? undefined : await aiRequestParts();
+  const keyring = deps.keyring ?? parts!.ring;
+  // Only the routing choice rides along with a keyring the caller supplied; the keyring header is built below.
+  const { "x-ai-keyring": _ring, ...routing } = parts?.headers ?? {};
   const body = { desiredOutputTokens: 4096, minOutputTokens: 256, preferLane: "auto", ...input };
   const res = await fetchImpl("/api/ai/run", {
     method: "POST",
     signal,
-    headers: { "Content-Type": "application/json", Accept: "text/event-stream", ...(await (deps.headers ?? authHeaders)()), ...(keyring.length ? { "x-ai-keyring": encodeKeyring(keyring) } : {}) },
+    headers: { "Content-Type": "application/json", Accept: "text/event-stream", ...(await (deps.headers ?? authHeaders)()), ...(keyring.length ? { "x-ai-keyring": encodeKeyring(keyring) } : {}), ...routing },
     body: JSON.stringify(body),
   });
   if (!res.ok || !res.body) {
@@ -78,7 +89,7 @@ export async function runAiText(input: AiRunInput, signal: AbortSignal, onEvent?
   for await (const ev of runAi(input, signal, deps)) {
     onEvent?.(ev);
     if (ev.type === "token") text += ev.text;
-    if (ev.type === "fallback" && ev.partialOutputDiscarded) text = "";
+    if ((ev.type === "fallback" || ev.type === "handoff") && ev.partialOutputDiscarded) text = "";
     if (ev.type === "error") throw new AiRunError(502, ev.code, ev.message);
     if (ev.type === "cancelled") throw new AiRunError(499, "cancelled", "Cancelled");
   }

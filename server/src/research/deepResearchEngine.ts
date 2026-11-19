@@ -775,7 +775,7 @@ Generate the complete, publication-grade Deep Research Report now.`;
     try {
       rawSynthesizedReport = await llm(synthesisSystemPrompt, synthesisUserPrompt, "text", images);
     } catch (llmErr: any) {
-      if (llmErr?.name === "LocalModelUnreachableError" || llmErr?.name === "NoClientAiProviderError" || llmErr?.code === "local_model_unreachable" || llmErr?.code === "no_ai_configured") {
+      if (llmErr?.name === "LocalModelUnreachableError" || llmErr?.name === "BrowserAiRequiredError" || llmErr?.name === "NoClientAiProviderError" || llmErr?.code === "local_model_unreachable" || llmErr?.code === "no_ai_configured") {
         throw new DeepResearchBrowserHandOffError({
           systemPrompt: synthesisSystemPrompt,
           userPrompt: synthesisUserPrompt,

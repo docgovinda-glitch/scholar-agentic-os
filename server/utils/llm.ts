@@ -272,7 +272,7 @@ export async function callOpenRouterText(
   const onEvent = stream.onToken || stream.onReset
     ? (ev: RouterEvent) => {
         if (ev.type === "token") stream.onToken?.(ev.text);
-        else if (ev.type === "fallback" && ev.partialOutputDiscarded) stream.onReset?.();
+        else if ((ev.type === "fallback" || ev.type === "handoff") && ev.partialOutputDiscarded) stream.onReset?.();
       }
     : undefined;
   return routeOrHandOff(req, res, systemPrompt, userPrompt, taskType, { onEvent, signal: stream.signal });

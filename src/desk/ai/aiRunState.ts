@@ -69,7 +69,7 @@ export function reduceAiRun(state: AiRunState, ev: RouterEvent, now: number = Da
     case "limit_warning":
       return { ...state, notices: [...state.notices, { kind: "limit", at: now, text: `Input uses ${Math.round(ev.usedRatio * 100)}% of this model's context; the answer is limited to ${ev.outputClampedTo.toLocaleString("en")} tokens.` }] };
     case "handoff":
-      return { ...state, phase: "handoff", notices: [...state.notices, { kind: "handoff", at: now, text: `Continuing on your device with ${ev.label}.` }] };
+      return { ...state, phase: "handoff", text: ev.partialOutputDiscarded ? "" : state.text, notices: [...state.notices, { kind: "handoff", at: now, text: `Continuing on your device with ${ev.label}.${ev.partialOutputDiscarded ? " The partial answer was discarded and is being rewritten." : ""}` }] };
     case "tool_call":
       return state;
     case "done":

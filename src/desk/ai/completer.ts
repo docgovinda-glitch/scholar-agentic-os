@@ -35,8 +35,9 @@ export const browserCompleter: Completer = async (call) => {
   try {
     for await (const ev of runAi({ task: TASK[call.taskClass], messages, temperature: call.temperature }, signal)) {
       run.publish(ev);
-      if (ev.type === "token") text += ev.text;
-      if (ev.type === "fallback" && ev.partialOutputDiscarded) text = "";
+      if (ev.type === "token") { text += ev.text; call.onToken?.(ev.text); }
+      // A model that failed mid-answer (or a hand-off to the local model) starts over: drop what streamed, tell the caller.
+      if ((ev.type === "fallback" || ev.type === "handoff") && ev.partialOutputDiscarded) { text = ""; call.onReset?.(); }
       if (ev.type === "done") done = ev;
       if (ev.type === "error") throw new AiCallError(ev.message, ev.code);
       if (ev.type === "cancelled") throw new AiCallError("Cancelled", "cancelled");

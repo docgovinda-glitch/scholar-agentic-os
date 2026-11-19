@@ -1,5 +1,5 @@
 /**
- * Maps an AI Access catalog provider (any of the 37 in `providerCatalog.ts`) to
+ * Maps an AI Access catalog provider (any of the 38 in `providerCatalog.ts`) to
  * the router's wire protocol. The router speaks six native protocols plus
  * "custom" (any OpenAI-compatible endpoint), so every catalog provider is
  * reachable without a per-provider adapter:

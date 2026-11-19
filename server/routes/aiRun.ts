@@ -21,6 +21,11 @@ import { serverCanReachLocalModels } from "../src/ai/serverLocalAccess.ts";
 import { route, type RouterOptions } from "../../src/platform/router/router.ts";
 import { pipeToSse } from "../../src/platform/router/sseBridge.ts";
 import { CircuitBreaker, MemoryBreakerStore } from "../../src/platform/router/circuitBreaker.ts";
+import { MAX_KEYRING_ENTRIES } from "../../src/platform/router/keyringAssemble.ts";
+import { isRemoteHttpsEndpoint } from "../../src/platform/router/baseUrl.ts";
+import { orderChain, ROUTING_HEADER, strictOrderFromHeader } from "../../src/platform/router/taskAffinity.ts";
+import { getLocalRunner } from "../../src/config/localRunnerCatalog.ts";
+import { serverBreaker, serverBreakerKeys } from "../src/ai/breaker.ts";
 import { assignBadges, curateModels, type MeasuredSpeed } from "../../src/platform/router/modelCuration.ts";
 import { listLiveModels, ModelListError } from "../../src/platform/router/modelListers.ts";
 import type { Candidate, ProviderId, RouteRequest, RouterEvent } from "../../src/platform/router/types.ts";
@@ -51,7 +56,7 @@ export function parseKeyring(header: unknown): KeyringEntry[] {
   if (typeof header !== "string" || !header) return [];
   try {
     const json = JSON.parse(Buffer.from(header, "base64url").toString("utf8"));
-    return z.array(keyringEntry).max(8).parse(json);
+    return z.array(keyringEntry).max(MAX_KEYRING_ENTRIES).parse(json);
   } catch {
     throw new KeyringError();
   }
@@ -89,22 +94,37 @@ const DEFAULT_CONTEXT = 32_000;
 /** For a model whose real limit is unknown: accepted by nearly every current model, and room for a reasoning model to think and still answer. */
 const DEFAULT_MAX_OUT = 8_192;
 
+const isLocalEntry = (e: KeyringEntry) => LOCAL.has(e.provider);
+
+/**
+ * A local runner runs where it is reachable: on this server in development or a
+ * self-hosted install (ALLOW_SERVER_LOCAL_AI), on this server when its address is
+ * a public https tunnel (screened by `aiEndpointGuard` like any custom endpoint),
+ * otherwise in the browser.
+ */
+function localRunsOnServer(e: KeyringEntry): boolean {
+  if (!isLocalEntry(e) || e.provider === "webllm") return false;
+  return serverCanReachLocalModels() || isRemoteHttpsEndpoint(e.baseUrl);
+}
+
 export function keyringToCandidates(entries: KeyringEntry[]): Candidate[] {
-  return entries.map((e) => ({
-    id: `${LOCAL.has(e.provider) ? "local" : "byok"}:${e.via ?? e.provider}:${e.model}${e.slot && e.slot > 1 ? `#${e.slot}` : ""}`,
-    lane: LOCAL.has(e.provider) ? "local" : "byok",
-    provider: e.provider,
-    // A backup key is its own group: when one key runs out, the next key of the same provider still gets its turn.
-    group: `${e.via ?? e.provider}${e.slot && e.slot > 1 ? `#${e.slot}` : ""}`,
-    model: e.model,
-    label: e.label ?? `${e.model}${LOCAL.has(e.provider) ? " on your device" : e.via ? ` · ${getCloudProvider(e.via)?.name ?? e.via} key` : " · your key"}`,
-    contextWindow: e.contextWindow ?? DEFAULT_CONTEXT,
-    maxOutputTokens: e.maxOutputTokens ?? DEFAULT_MAX_OUT,
-    // A local runner runs where it is reachable: on this server in development
-    // or a self-hosted install (ALLOW_SERVER_LOCAL_AI), otherwise in the browser.
-    runsIn: LOCAL.has(e.provider) && !(e.provider !== "webllm" && serverCanReachLocalModels()) ? "browser" : "server",
-    credential: LOCAL.has(e.provider) ? (e.baseUrl ? { baseUrl: e.baseUrl } : undefined) : { apiKey: e.apiKey, baseUrl: e.baseUrl },
-  }));
+  return entries.map((e) => {
+    const local = isLocalEntry(e);
+    const runner = local && e.via ? getLocalRunner(e.via) : undefined;
+    return {
+      id: `${local ? "local" : "byok"}:${e.via ?? e.provider}:${e.model}${e.slot && e.slot > 1 ? `#${e.slot}` : ""}`,
+      lane: local ? "local" : "byok",
+      provider: e.provider,
+      // A backup key is its own group: when one key runs out, the next key of the same provider still gets its turn.
+      group: `${e.via ?? e.provider}${e.slot && e.slot > 1 ? `#${e.slot}` : ""}`,
+      model: e.model,
+      label: e.label ?? `${e.model}${local ? (isRemoteHttpsEndpoint(e.baseUrl) ? ` · ${runner?.name ?? "your runner"} (remote)` : " on your device") : e.via ? ` · ${getCloudProvider(e.via)?.name ?? e.via} key` : " · your key"}`,
+      contextWindow: e.contextWindow ?? DEFAULT_CONTEXT,
+      maxOutputTokens: e.maxOutputTokens ?? DEFAULT_MAX_OUT,
+      runsIn: local && !localRunsOnServer(e) ? "browser" : "server",
+      credential: local ? (e.baseUrl ? { baseUrl: e.baseUrl } : undefined) : { apiKey: e.apiKey, baseUrl: e.baseUrl },
+    } satisfies Candidate;
+  });
 }
 
 /** Speeds measured from real requests, feeding the "Fastest" badge. */
@@ -128,7 +148,7 @@ const MODEL_CACHE_MS = 6 * 60 * 60_000;
 export function registerAiRunRoutes(app: express.Express, deps: AiRunDeps = {}): void {
   const aiFetch = createAiFetch();
   const adapters = deps.adapters ?? serverAdapters();
-  const breaker = deps.breaker ?? new CircuitBreaker(new MemoryBreakerStore());
+  const breaker = deps.breaker ?? serverBreaker;
 
   app.post("/api/ai/run", requireAuth, async (req, res) => {
     const userId = (req as express.Request & { user?: { id: string } }).user?.id;
@@ -143,7 +163,7 @@ export function registerAiRunRoutes(app: express.Express, deps: AiRunDeps = {}):
     const expanded = await expandKeyring(keyring, body.task);
     const screened = await screenCandidates(keyringToCandidates(expanded.entries));
     const own = screened.kept;
-    const chain = [...own.filter((c) => c.lane === "byok"), ...own.filter((c) => c.lane === "local")];
+    const chain = orderChain(own, body.task, { strict: strictOrderFromHeader(req.headers[ROUTING_HEADER]) });
 
     if (chain.length === 0 && screened.blocked.length) {
       res.status(400).json({ error: screened.blocked.map((b) => `${b.label}: ${b.reason}`).join("; "), code: "ai_endpoint_blocked" });
@@ -180,7 +200,7 @@ export function registerAiRunRoutes(app: express.Express, deps: AiRunDeps = {}):
         yield { type: "candidate_skipped", candidateId: `notice:${n.text.slice(0, 40)}`, label: "AI connection", reason: "no_credential", detail: n.text };
       }
       const onCandidateFailure = (c: Candidate, f: { kind: string }) => { if (f.kind === "model_unavailable") quarantineModel(c); };
-      for await (const ev of route(request, chain, signal, { site: "server", adapters, breaker, onCandidateFailure, ...deps.routerOptions })) {
+      for await (const ev of route(request, chain, signal, { site: "server", adapters, breaker, breakerKeys: serverBreakerKeys, onCandidateFailure, ...deps.routerOptions })) {
         if (ev.type === "metrics") {
           const c = byId.get(ev.candidateId);
           if (c && ev.outputTokens > 50) recordSpeed(`${c.provider}:${c.model}`, ev.tokensPerSecond);

@@ -105,11 +105,12 @@ describe("AI Access navigation", () => {
     expect(LOCAL_RUNNERS.length).toBeGreaterThanOrEqual(8);
   });
 
-  it("offers at least 30 genuinely free-to-use providers under Providers", async () => {
+  it("offers at least 25 providers with a free tier or trial credit under Providers", async () => {
     renderPage();
     fireEvent.click(await screen.findByRole("button", { name: "Providers" }));
 
-    expect(freeProviders().length).toBeGreaterThanOrEqual(30);
+    // Providers that dropped their free trial (Together, DeepInfra, Chutes, Moonshot, Nebius) are listed as paid, not counted here.
+    expect(freeProviders().length).toBeGreaterThanOrEqual(25);
     await waitFor(() => expect(screen.getByPlaceholderText(/Search \d+ providers/)).toBeInTheDocument());
   });
 

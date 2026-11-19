@@ -15,13 +15,16 @@
  */
 import type { NextFunction, Request, Response } from "express";
 import { route } from "../../../src/platform/router/router.ts";
-import { CircuitBreaker, MemoryBreakerStore } from "../../../src/platform/router/circuitBreaker.ts";
+import type { CircuitBreaker } from "../../../src/platform/router/circuitBreaker.ts";
+import { MAX_KEYRING_ENTRIES } from "../../../src/platform/router/keyringAssemble.ts";
+import { orderChain, ROUTING_HEADER, strictOrderFromHeader } from "../../../src/platform/router/taskAffinity.ts";
+import { serverBreaker, serverBreakerKeys } from "./breaker.ts";
 import type { Candidate, ProviderAdapter, ProviderId, RouteRequest, RouterEvent, TaskClass } from "../../../src/platform/router/types.ts";
 import { keyringToCandidates, parseKeyring, type KeyringEntry } from "../../routes/aiRun.ts";
 import { expandKeyring, quarantineModel } from "./liveModels.ts";
 import { accountKeyring } from "./accountAi.ts";
 import { screenCandidates, serverAdapters } from "./aiEndpointGuard.ts";
-import { LocalModelUnreachableError, NoClientAiProviderError } from "./aiRouteErrors.ts";
+import { BrowserAiRequiredError, LocalModelUnreachableError, NoClientAiProviderError } from "./aiRouteErrors.ts";
 
 const ROUTER_TASK: Record<string, TaskClass> = {
   reasoning: "reasoning", drafting: "drafting", "long-context": "long-context", coding: "coding",
@@ -48,7 +51,7 @@ export class NoAiConnectedError extends Error {
 }
 
 interface BridgeDeps { adapters: Partial<Record<ProviderId, ProviderAdapter>>; breaker: CircuitBreaker }
-let deps: BridgeDeps = { adapters: serverAdapters(), breaker: new CircuitBreaker(new MemoryBreakerStore()) };
+let deps: BridgeDeps = { adapters: serverAdapters(), breaker: serverBreaker };
 export function configureRouterBridge(next: Partial<BridgeDeps>): void { deps = { ...deps, ...next }; }
 
 /** The AI connections this request sent: the `x-ai-keyring` header, in the user's order. */
@@ -67,7 +70,7 @@ export async function requestKeyring(req: Scoped): Promise<KeyringEntry[]> {
   const sent = keyringFromRequest(req);
   const fromAccount = await accountKeyring(req.user?.id);
   const have = new Set(sent.map((e) => e.via ?? e.provider));
-  return [...sent, ...fromAccount.filter((e) => !have.has(e.via ?? e.provider))].slice(0, 8);
+  return [...sent, ...fromAccount.filter((e) => !have.has(e.via ?? e.provider))].slice(0, MAX_KEYRING_ENTRIES);
 }
 
 function summarise(target: AiRouteSummary, ev: RouterEvent) {
@@ -94,6 +97,11 @@ export interface RoutedCall {
   /** Forward live events (streaming endpoints). */
   onEvent?: (ev: RouterEvent) => void;
   signal?: AbortSignal;
+  /**
+   * What to do when the next model is one only the user's browser can reach: hand the prompt to the browser
+   * (426, the default while the response is still open) or fail with an actionable message (`false`).
+   */
+  handOff?: boolean;
 }
 
 /** The chain for this request and task. Throws NoAiConnectedError when it is empty. */
@@ -104,7 +112,7 @@ export async function chainFor(req: Scoped, task: TaskClass): Promise<Candidate[
   const offered = keyringToCandidates(expanded.entries);
   const { kept: own, blocked } = await screenCandidates(offered);
   for (const b of blocked) (req.aiRoute ??= { notices: [] }).notices.push({ kind: "skipped", text: `Skipped ${b.label}: ${b.reason}` });
-  const chain = [...own.filter((c) => c.lane === "byok"), ...own.filter((c) => c.lane === "local")];
+  const chain = orderChain(own, task, { strict: strictOrderFromHeader(req.headers?.[ROUTING_HEADER]) });
   if (!chain.length && blocked.length) {
     throw new RouterExhaustedError(blocked.map((b) => `${b.label}: ${b.reason}`).join("; "), "non_retryable");
   }
@@ -171,11 +179,11 @@ export async function routedResult(req: Request, call: RoutedCall): Promise<Rout
       temperature: call.temperature,
     };
     let text = "";
-    for await (const ev of route(request, chain, call.signal ?? new AbortController().signal, { site: "server", adapters: deps.adapters, breaker: deps.breaker, onCandidateFailure: (c, f) => { if (f.kind === "model_unavailable") quarantineModel(c); } })) {
+    for await (const ev of route(request, chain, call.signal ?? new AbortController().signal, { site: "server", adapters: deps.adapters, breaker: deps.breaker, breakerKeys: serverBreakerKeys, onCandidateFailure: (c, f) => { if (f.kind === "model_unavailable") quarantineModel(c); } })) {
       summarise(scoped.aiRoute!, ev);
       call.onEvent?.(ev);
       if (ev.type === "token") text += ev.text;
-      if (ev.type === "fallback" && ev.partialOutputDiscarded) text = "";
+      if ((ev.type === "fallback" || ev.type === "handoff") && ev.partialOutputDiscarded) text = "";
       if (ev.type === "done") {
         const c = byId.get(ev.candidateId);
         answered = { label: ev.label, lane: ev.lane, provider: c?.group ?? c?.provider ?? "", model: c?.model ?? "" };
@@ -216,16 +224,51 @@ export function aiRouteDecorator(req: Request, res: Response, next: NextFunction
 }
 
 /**
- * `routedText` for routes that run only on the server: errors come back as the
- * classes `sendAiFailure` already answers (400 ai_provider_required, 400
- * ai_local_model_unreachable, 503 ai_unavailable).
+ * What the router needs to hand a prompt to the user's browser and take its answer back. The signing lives with
+ * the LLM gateway (`browserHandoff.ts`), which this module cannot import (it imports this one), so the caller
+ * passes it in.
  */
-export async function routedCompletion(req: Request, call: RoutedCall): Promise<string> {
+export interface HandOffSupport {
+  /** The browser's verified answer to exactly this prompt, when the request carries one (`browserResults` or `llmResult`). */
+  answerFor(req: Request, systemPrompt: string, userPrompt: string): string | undefined;
+  /** A signed challenge tying a browser result to this user and this prompt. */
+  challengeFor(req: Request, systemPrompt: string, userPrompt: string): string;
+}
+
+/**
+ * `routedText` for routes that run on the server, with the same local-model fallback as every other AI call
+ * when the caller passes `handOff` support:
+ *
+ * - the request already carries the browser's answer to this exact prompt: that answer is the result;
+ * - the next model is on the user's computer and this response is still open (a JSON route): the prompt is handed
+ *   to the browser (`BrowserAiRequiredError`, answered 426 by `sendAiFailure`), which runs it on the local model
+ *   and re-sends the request with the result in `browserResults`;
+ * - it cannot be handed over (a stream already open, a background job with no response, an image prompt a text
+ *   model cannot read, `call.handOff === false`, no support passed): `LocalModelUnreachableError`, whose message
+ *   tells the user what to do.
+ *
+ * Other errors come back as the classes `sendAiFailure` already answers (400 ai_provider_required,
+ * 400 ai_local_model_unreachable, 426, 503 ai_unavailable).
+ */
+export async function routedCompletion(req: Request, call: RoutedCall, handOff?: HandOffSupport): Promise<string> {
+  const systemPrompt = call.systemPrompt ?? "";
+  const answered = handOff?.answerFor(req, systemPrompt, call.userPrompt);
+  if (answered !== undefined) return answered;
   try {
     return await routedText(req, call);
   } catch (err) {
     if (err instanceof NoAiConnectedError) throw new NoClientAiProviderError();
-    if (err instanceof RouterHandoffError) throw new LocalModelUnreachableError();
+    if (err instanceof RouterHandoffError) {
+      const res = req.res;
+      const canHandOff = Boolean(handOff) && call.handOff !== false && Boolean(res) && !res!.headersSent && !call.images?.some((i) => i.data);
+      if (!canHandOff) throw new LocalModelUnreachableError();
+      throw new BrowserAiRequiredError({
+        challengeToken: handOff!.challengeFor(req, systemPrompt, call.userPrompt),
+        systemPrompt,
+        userPrompt: call.userPrompt,
+        taskType: call.task,
+      });
+    }
     throw err;
   }
 }

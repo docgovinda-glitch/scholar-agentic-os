@@ -85,10 +85,55 @@ export interface CloudProviderSpec {
   /**
    * Set false only for a provider reachable with no account at all. Every
    * cloud provider in this catalog needs one, so this defaults to true via
-   * providerAccessFacts() rather than being repeated on 37 entries.
+   * providerAccessFacts() rather than being repeated on every entry.
    */
   requiresRegistration?: boolean;
+  /**
+   * A large recurring free allowance of fast open models: the provider quick work
+   * (`fast` task class: chat, extraction, classification, summarising) is tried on
+   * first, so scarce reasoning quota elsewhere is kept for work that needs it.
+   * See `src/platform/router/taskAffinity.ts`.
+   */
+  freeWorkhorse?: boolean;
+  /**
+   * What the provider does with prompts sent on the free (or default) tier, when
+   * that is publicly documented. Omitted means we have not confirmed it, which
+   * Confidential mode treats as "may train".
+   */
+  dataPolicy?: ProviderDataPolicy;
+  /**
+   * Set when the provider meters usage per account / project rather than per key,
+   * so a backup key from the same project shares the first key's quota. Shown
+   * beside the backup-key slots.
+   */
+  quotaScopeNote?: string;
 }
+
+/** What happens to prompts and answers sent through a provider's free tier. */
+export type DataPolicyKind =
+  /** Not used for training by default (API terms). */
+  | "no-training"
+  /** Used only if the account opts in to data sharing (e.g. in exchange for free tokens). */
+  | "opt-in-training"
+  /** The free tier may use prompts for training or human review; paid usage does not. */
+  | "free-tier-trains"
+  /** Not confirmed. */
+  | "unknown";
+
+export interface ProviderDataPolicy {
+  trainsOnFreeTier: DataPolicyKind;
+  /** One plain sentence for the AI Access screen. */
+  note: string;
+}
+
+/**
+ * Whether this provider's prompts may stay private without the person doing
+ * anything: only a documented "no-training" default qualifies. Everything else
+ * (free-tier-trains, opt-in-training, unknown) needs the person to say their key
+ * is on a paid / zero-retention plan (see `confidentialModeAllows`).
+ */
+export const isNonTrainingByDefault = (spec: Pick<CloudProviderSpec, "dataPolicy"> | undefined): boolean =>
+  spec?.dataPolicy?.trainsOnFreeTier === "no-training";
 
 /**
  * The plain-language facts the AI Access UI shows for a provider, derived in
@@ -148,11 +193,17 @@ export const CLOUD_PROVIDERS = [
     chatPath: "/models",
     modelsPath: "/models",
     freeTier: "freemium",
-    freeTierNote: "Free tier with a generous daily request allowance; no card required.",
+    freeTierNote: "Free tier with a generous daily allowance; no card required. Quotas are enforced per Google Cloud / AI Studio project, not per key.",
+    usageLimitsNote: "Limits are per project: two keys created in the same AI Studio project share one quota.",
     getKeyUrl: "https://aistudio.google.com/app/apikey",
     description: "Google's multimodal models — fast, with one of the most usable free tiers available.",
     icon: "✦",
     color: "#4285F4",
+    dataPolicy: {
+      trainsOnFreeTier: "free-tier-trains",
+      note: "On the free tier Google may use your prompts and answers to improve its products, and human reviewers may read them. The paid tier does not.",
+    },
+    quotaScopeNote: "Gemini quotas are enforced per Google Cloud / AI Studio project, not per API key. Two keys from the same project share one quota, so a backup key only helps if it was created in a different project.",
   },
   {
     id: "groq",
@@ -162,11 +213,13 @@ export const CLOUD_PROVIDERS = [
     chatPath: "/chat/completions",
     modelsPath: "/models",
     freeTier: "freemium",
-    freeTierNote: "Free tier with per-minute and per-day request limits; no card required.",
+    freeTierNote: "Free tier, no card required. Caps are set per model: tokens per day (TPD), requests per day (RPD) and per minute (RPM).",
+    usageLimitsNote: "Daily and per-minute caps differ per model; small fast models allow far more than the large ones.",
     getKeyUrl: "https://console.groq.com/keys",
     description: "Extremely fast inference on open models — usually the quickest responses of any provider here.",
     icon: "▲",
     color: "#F55036",
+    freeWorkhorse: true,
   },
   {
     id: "cerebras",
@@ -176,11 +229,12 @@ export const CLOUD_PROVIDERS = [
     chatPath: "/chat/completions",
     modelsPath: "/models",
     freeTier: "freemium",
-    freeTierNote: "Free tier with a large daily token allowance; context window is capped on the free plan.",
+    freeTierNote: "Free tier with about 1M tokens per day; the context window is capped on the free plan.",
     getKeyUrl: "https://cloud.cerebras.ai/",
     description: "Wafer-scale hardware giving very high token throughput on open models.",
     icon: "◍",
     color: "#F26B3A",
+    freeWorkhorse: true,
   },
   // GitHub Models was listed here until it was found, by live probe on
   // 2026-07-31, to return HTTP 410 with
@@ -207,7 +261,7 @@ export const CLOUD_PROVIDERS = [
     // model entry and refreshes the real list from /models for the user's own
     // key. If a `:free` id here 404s, that is the rotation, not a broken key.
     freeTier: "freemium",
-    freeTierNote: "Models ending in `:free` cost nothing — the default here is one of them. Others are pay-as-you-go.",
+    freeTierNote: "Models ending in `:free` cost nothing and are limited to about 50 requests/day. Buying $10 of credits once lifts that to 1,000 requests/day on `:free` models, permanently. Other models are pay-as-you-go.",
     getKeyUrl: "https://openrouter.ai/keys",
     description: "One key, hundreds of models across many providers — the single most flexible option here.",
     icon: "◇",
@@ -226,6 +280,10 @@ export const CLOUD_PROVIDERS = [
     description: "European provider with strong multilingual models and solid academic writing quality.",
     icon: "◈",
     color: "#FA520F",
+    dataPolicy: {
+      trainsOnFreeTier: "free-tier-trains",
+      note: "The free Experiment plan may use your prompts and answers to train Mistral models. Paid plans can opt out.",
+    },
   },
   {
     id: "zhipu",
@@ -240,6 +298,7 @@ export const CLOUD_PROVIDERS = [
     description: "Zhipu AI's GLM family — a free fast model plus stronger paid tiers.",
     icon: "◉",
     color: "#3859FF",
+    freeWorkhorse: true,
   },
   {
     id: "huggingface",
@@ -263,7 +322,7 @@ export const CLOUD_PROVIDERS = [
     chatPath: "/chat/completions",
     modelsPath: null,
     freeTier: "freemium",
-    freeTierNote: "Free daily allowance measured in Cloudflare 'neurons'; beyond that it is billed.",
+    freeTierNote: "Free allowance of 10,000 Neurons per day on Workers AI; beyond that it is billed.",
     getKeyUrl: "https://dash.cloudflare.com/profile/api-tokens",
     description: "Runs open models on Cloudflare's edge network — needs your account ID in the address.",
     icon: "☁",
@@ -271,9 +330,25 @@ export const CLOUD_PROVIDERS = [
     requiresCustomBaseUrl: true,
     customBaseUrlHint:
       "https://api.cloudflare.com/client/v4/accounts/YOUR_ACCOUNT_ID/ai/v1 — replace YOUR_ACCOUNT_ID with the ID shown on your Cloudflare dashboard.",
+    freeWorkhorse: true,
   },
 
   // ── Trial credits (real, but finite — not an ongoing free tier) ─────────
+  {
+    id: "ovhcloud",
+    name: "OVHcloud AI Endpoints",
+    apiStyle: "openai-compatible",
+    baseUrl: "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1",
+    chatPath: "/chat/completions",
+    modelsPath: "/models",
+    freeTier: "freemium",
+    freeTierNote: "Serverless open-weight models with a free, rate-limited tier; paid usage lifts the limits.",
+    getKeyUrl: "https://endpoints.ai.cloud.ovh.net/",
+    description: "European, serverless hosting of open-weight models behind an OpenAI-compatible API.",
+    icon: "◉",
+    color: "#123F6D",
+    freeWorkhorse: true,
+  },
   {
     id: "together",
     name: "Together AI",
@@ -281,8 +356,8 @@ export const CLOUD_PROVIDERS = [
     baseUrl: "https://api.together.xyz/v1",
     chatPath: "/chat/completions",
     modelsPath: "/models",
-    freeTier: "trial-credits",
-    freeTierNote: "Starter credits on signup, then pay-as-you-go.",
+    freeTier: "paid",
+    freeTierNote: "No default free trial: a $5 minimum purchase is required. A startup program offers roughly $15k–$50k of credit by application.",
     getKeyUrl: "https://api.together.xyz/settings/api-keys",
     description: "Broad catalog of open models with competitive throughput.",
     icon: "◐",
@@ -309,8 +384,8 @@ export const CLOUD_PROVIDERS = [
     baseUrl: "https://api.deepinfra.com/v1/openai",
     chatPath: "/chat/completions",
     modelsPath: "/models",
-    freeTier: "trial-credits",
-    freeTierNote: "Signup credits, then low per-token pricing.",
+    freeTier: "paid",
+    freeTierNote: "Pay-as-you-go with low per-token prices; a startup program offers credits by application.",
     getKeyUrl: "https://deepinfra.com/dash/api_keys",
     description: "Low-cost hosting for a wide range of open models.",
     icon: "◒",
@@ -351,8 +426,8 @@ export const CLOUD_PROVIDERS = [
     baseUrl: "https://api.studio.nebius.com/v1",
     chatPath: "/chat/completions",
     modelsPath: "/models",
-    freeTier: "trial-credits",
-    freeTierNote: "Free credits on signup, then pay-as-you-go.",
+    freeTier: "paid",
+    freeTierNote: "Pay-as-you-go; credit programs for builders, startups and researchers are available by application.",
     getKeyUrl: "https://studio.nebius.com/settings/api-keys",
     description: "European inference platform hosting open models.",
     icon: "◕",
@@ -366,7 +441,7 @@ export const CLOUD_PROVIDERS = [
     chatPath: "/chat/completions",
     modelsPath: "/models",
     freeTier: "trial-credits",
-    freeTierNote: "Free developer tier with rate limits.",
+    freeTierNote: "$5 of starter credit; the free developer tier is rate-limited.",
     getKeyUrl: "https://cloud.sambanova.ai/apis",
     description: "Custom silicon delivering high throughput on large open models.",
     icon: "◖",
@@ -379,8 +454,8 @@ export const CLOUD_PROVIDERS = [
     baseUrl: "https://llm.chutes.ai/v1",
     chatPath: "/chat/completions",
     modelsPath: "/models",
-    freeTier: "trial-credits",
-    freeTierNote: "Small free allowance on signup; heavier use is paid.",
+    freeTier: "paid",
+    freeTierNote: "Paid, by subscription or pay-as-you-go; there is no free tier.",
     getKeyUrl: "https://chutes.ai/app/api",
     description: "Decentralised serving of very large open models.",
     icon: "◗",
@@ -407,8 +482,8 @@ export const CLOUD_PROVIDERS = [
     baseUrl: "https://api.moonshot.ai/v1",
     chatPath: "/chat/completions",
     modelsPath: "/models",
-    freeTier: "trial-credits",
-    freeTierNote: "Trial credits on signup, then pay-as-you-go.",
+    freeTier: "paid",
+    freeTierNote: "A small initial recharge is needed before promotional vouchers apply; then pay-as-you-go.",
     getKeyUrl: "https://platform.moonshot.ai/console/api-keys",
     description: "Long-context models that handle large source documents well.",
     icon: "☾",
@@ -452,7 +527,7 @@ export const CLOUD_PROVIDERS = [
     chatPath: "/chat/completions",
     modelsPath: null,
     freeTier: "freemium",
-    freeTierNote: "DashScope grants a free token quota per model on signup.",
+    freeTierNote: "DashScope gives about 1M introductory tokens per model on signup.",
     getKeyUrl: "https://dashscope.console.aliyun.com/apiKey",
     description: "Alibaba's multilingual models — notably strong outside English.",
     icon: "◇",
@@ -471,6 +546,10 @@ export const CLOUD_PROVIDERS = [
     description: "GPT models with consistently strong reasoning and writing.",
     icon: "◉",
     color: "#10A37F",
+    dataPolicy: {
+      trainsOnFreeTier: "opt-in-training",
+      note: "Complimentary daily tokens require opting in to data sharing, so prompts sent that way may be used for training. Paid usage without the opt-in is not used for training by default.",
+    },
   },
   {
     id: "claude",
@@ -485,6 +564,10 @@ export const CLOUD_PROVIDERS = [
     description: "Careful, nuanced writing — particularly well suited to academic prose.",
     icon: "◈",
     color: "#D4A574",
+    dataPolicy: {
+      trainsOnFreeTier: "no-training",
+      note: "API prompts and answers are not used to train models by default.",
+    },
   },
   {
     id: "cohere",
@@ -494,7 +577,7 @@ export const CLOUD_PROVIDERS = [
     chatPath: "/chat",
     modelsPath: "/models",
     freeTier: "freemium",
-    freeTierNote: "Trial keys are free but rate-limited and not for production use.",
+    freeTierNote: "Free trial key limited to about 1,000 calls per month; not for production use.",
     getKeyUrl: "https://dashboard.cohere.com/api-keys",
     description: "Enterprise models tuned for retrieval and grounded summarisation.",
     icon: "◎",
@@ -532,7 +615,7 @@ export const CLOUD_PROVIDERS = [
     chatPath: "/chat/completions",
     modelsPath: "/models",
     freeTier: "freemium",
-    freeTierNote: "Free API credits for developer accounts on build.nvidia.com; no card required to start.",
+    freeTierNote: "Free developer credits on build.nvidia.com; no card required to start.",
     usageLimitsNote: "Credits are consumed per request; rate limits apply on the free developer tier.",
     getKeyUrl: "https://build.nvidia.com/",
     description: "NVIDIA's hosted open models — a large catalogue with a genuinely free developer allowance.",
@@ -547,7 +630,7 @@ export const CLOUD_PROVIDERS = [
     chatPath: "/chat/completions",
     modelsPath: "/models",
     freeTier: "freemium",
-    freeTierNote: "Free tier on Scaleway's Generative APIs with published per-minute token limits.",
+    freeTierNote: "1M free tokens for new customers; per-minute token limits apply.",
     usageLimitsNote: "Requests and tokens are capped per minute on the free tier.",
     getKeyUrl: "https://console.scaleway.com/iam/api-keys",
     description: "European cloud provider serving open models from EU data centres.",
@@ -605,7 +688,7 @@ export const CLOUD_PROVIDERS = [
     chatPath: "/chat/completions",
     modelsPath: "/models",
     freeTier: "trial-credits",
-    freeTierNote: "Free trial credits on signup, then pay-as-you-go.",
+    freeTierNote: "About $10 of trial credit on signup, then pay-as-you-go.",
     getKeyUrl: "https://console.upstage.ai/api-keys",
     description: "Korean provider whose Solar models are strong on document understanding.",
     icon: "☀",
@@ -619,7 +702,7 @@ export const CLOUD_PROVIDERS = [
     chatPath: "/chat/completions",
     modelsPath: "/models",
     freeTier: "trial-credits",
-    freeTierNote: "Trial credits on signup, then pay-as-you-go.",
+    freeTierNote: "Trial access is heavily restricted; plan on pay-as-you-go.",
     getKeyUrl: "https://platform.stepfun.com/",
     description: "Chinese provider with long-context and multimodal Step models.",
     icon: "◫",
@@ -660,8 +743,8 @@ export const CLOUD_PROVIDERS = [
     baseUrl: "https://ai-gateway.vercel.sh/v1",
     chatPath: "/chat/completions",
     modelsPath: "/models",
-    freeTier: "trial-credits",
-    freeTierNote: "Free credits for Vercel accounts, then billed per token at provider rates.",
+    freeTier: "freemium",
+    freeTierNote: "A recurring $5 free credit every month, plus free-tier fallback models. One OpenAI-compatible key reaches OpenAI, Anthropic, Google, DeepSeek and more; usage beyond the credit is billed at provider rates.",
     getKeyUrl: "https://vercel.com/dashboard/ai-gateway",
     description: "One key routing to many providers, with automatic failover between them.",
     icon: "▲",
@@ -722,6 +805,11 @@ const PROVIDER_BY_ID: Record<string, CloudProviderSpec> = Object.fromEntries(
 
 export function getCloudProvider(id: string): CloudProviderSpec | undefined {
   return PROVIDER_BY_ID[id];
+}
+
+/** A recurring free allowance big enough to take the quick work (see `freeWorkhorse`). */
+export function isFreeWorkhorse(id: string): boolean {
+  return PROVIDER_BY_ID[id]?.freeWorkhorse === true;
 }
 
 export function isCloudProvider(id: string): boolean {

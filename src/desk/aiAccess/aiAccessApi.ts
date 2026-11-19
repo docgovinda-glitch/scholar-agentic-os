@@ -10,6 +10,10 @@
 
 import { getSupabaseClient, isSupabaseConfigured } from "../../services/supabaseClient";
 import { buildKeyring } from "../ai/keyring";
+import { loadUserAiSettings } from "../../services/userAiSettings";
+import { orderChain } from "../../platform/router/taskAffinity";
+import { manualRouting } from "../../platform/router/privacyPolicy";
+import { isRemoteHttpsEndpoint } from "../../platform/router/baseUrl";
 import { clientVerifyProviderKey } from "../../services/clientProviderVerifier";
 
 async function authHeaders(): Promise<Record<string, string>> {
@@ -192,15 +196,23 @@ export type RoutingDecision = { ok: true; choice: RoutingChoice; fallbacks: Rout
  * own keyring (the same list sent with every AI request, in the same order:
  * own keys, then the local model). Nothing is executed.
  */
-export async function routeDecision(_taskType?: RoutingTaskType): Promise<RoutingDecision> {
-  const ring = await buildKeyring();
-  const choices = ring.map<RoutingChoice>((e) => {
+export async function routeDecision(taskType?: RoutingTaskType): Promise<RoutingDecision> {
+  const settings = await loadUserAiSettings();
+  const ring = await buildKeyring(settings);
+  // The same order the server uses for this kind of task (quick work tries the free workhorses first).
+  const ordered = orderChain(
+    ring.map((e) => ({ e, lane: (e.provider === "ollama" || e.provider === "lmstudio" ? "local" : "byok") as "local" | "byok", provider: e.provider, group: e.via ?? e.provider, runsIn: isRemoteHttpsEndpoint(e.baseUrl) ? ("server" as const) : ("browser" as const) })),
+    taskType === "simple" ? "fast" : "reasoning",
+    { strict: manualRouting(settings.preferences) },
+  ).map((o) => o.e);
+  const choices = ordered.map<RoutingChoice>((e) => {
     const local = e.provider === "ollama" || e.provider === "lmstudio";
+    const id = e.via ?? e.provider;
     return {
       tier: local ? "local" : "byok",
-      providerId: e.provider,
+      providerId: id,
       modelId: e.model,
-      reasoning: local ? `Using your local ${e.provider}. Nothing leaves your device.` : `Using your own ${e.provider} key.`,
+      reasoning: local ? `Using your local ${id}. Nothing leaves your device.` : `Using your own ${id} key.`,
     };
   });
   if (!choices.length) return { ok: false, reasoning: "No AI source is available. Connect a provider in AI Access to continue." };
