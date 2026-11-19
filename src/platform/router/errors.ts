@@ -32,6 +32,12 @@ function retryAfterFromMessage(msg: string): number | undefined {
 }
 /** The limit that was hit resets daily (Gemini "PerDay", Groq "tokens per day", "RPD"). */
 const DAILY_WINDOW = /per.?day|PerDay|\bRPD\b|\bTPD\b|\bdaily\b|requests per day|tokens per day/i;
+/** "You requested up to 32768 tokens, but can only afford 3262" -> 3262. */
+function affordableFromMessage(msg: string): number | undefined {
+  const m = msg.match(/can only afford\s+([\d,]+)/i);
+  const n = m ? Number(m[1].replace(/,/g, "")) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
 const MODEL_UNAVAILABLE = /model.{0,60}(not found|does not exist|not available|not supported|deprecated|decommissioned|no longer|retired|invalid)|(unknown|invalid|unsupported) model/i;
 
 function retryAfterMs(h: Record<string, string>): number | undefined {
@@ -63,7 +69,10 @@ export function classify(err: unknown, signal: AbortSignal): Failure {
     }
     // Spent credit shows up differently per provider: 402 (OpenRouter, DeepSeek), 429 insufficient_quota
     // (OpenAI), 400 "credit balance is too low" (Anthropic), 403 billing/quota (Google). All mean "use the next AI".
-    if (s === 402 || (s !== 401 && s < 500 && CREDIT_EXHAUSTED.test(`${msg} ${code}`))) return f("quota", msg, false, true, { httpStatus: s });
+    if (s === 402 || (s !== 401 && s < 500 && CREDIT_EXHAUSTED.test(`${msg} ${code}`))) {
+      const affordableTokens = affordableFromMessage(err.message);
+      return f("quota", msg, false, true, { httpStatus: s, ...(affordableTokens ? { affordableTokens } : {}) });
+    }
     if (s === 429) return f("rate_limit", msg, true, true, { httpStatus: s, retryAfterMs: retryAfterMs(err.headers), ...(DAILY_WINDOW.test(`${err.message} ${code}`) ? { daily: true } : {}) });
     if (s === 401 || s === 403) return f("auth", msg, false, true, { httpStatus: s });
     if (s === 529 || s === 503) return f("overloaded", msg, true, true, { httpStatus: s, retryAfterMs: retryAfterMs(err.headers) });

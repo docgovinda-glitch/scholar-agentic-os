@@ -1,6 +1,7 @@
 import type { AdapterChunk, AttemptTrace, Candidate, Failure, ProviderAdapter, ProviderId, RouteRequest, RouterEvent, Usage } from "./types";
 import { CircuitBreaker } from "./circuitBreaker";
 import { classify, countsAgainstProvider, EmptyOutputError, TimeoutError } from "./errors";
+import { TtlOutputCaps, type OutputCapStore } from "./outputCaps";
 import { estimateTokens, preflight, type TokenCounter } from "./tokenBudget";
 
 export interface RouterOptions {
@@ -14,6 +15,8 @@ export interface RouterOptions {
    * connection at once, on this request and the next. Default: the candidate id and its group. A server shared by
    * many people must include the credential in both, so one person's spent key never pauses another's.
    */
+  /** Where learned output ceilings are kept between requests (default: this request only). */
+  outputCaps?: OutputCapStore;
   breakerKeys?: (c: Candidate) => { model: string; connection: string };
   countTokens?: TokenCounter;
   retry?: { maxAttempts: number; baseDelayMs: number; maxDelayMs: number; maxWaitMs: number };
@@ -108,6 +111,8 @@ export async function* route(req: RouteRequest, chain: Candidate[], signal: Abor
   const startedAtAll = now();
   const maxTotal = opts.maxTotalMs ?? DEFAULT_MAX_TOTAL_MS;
   const deadGroups = new Set<string>();
+  /** Output ceilings a connection said its balance can afford, so its other models (and later requests) start there instead of failing first. */
+  const caps = opts.outputCaps ?? new TtlOutputCaps();
 
   yield { type: "route_start", requestId: req.requestId, chain: chain.map(({ id, label, lane }) => ({ id, label, lane })) };
 
@@ -175,8 +180,10 @@ export async function* route(req: RouteRequest, chain: Candidate[], signal: Abor
 
     let failure: Failure | undefined;
     let streamed = false;
+    let outputBudget = Math.min(pf.outputBudget, caps.get(keys.connection) ?? Infinity);
+    let reducedForBalance = false;
     for (let attempt = 1; attempt <= retry.maxAttempts; attempt++) {
-      yield { type: "attempt_start", candidateId: c.id, label: c.label, lane: c.lane, attempt, maxOutputTokens: pf.outputBudget };
+      yield { type: "attempt_start", candidateId: c.id, label: c.label, lane: c.lane, attempt, maxOutputTokens: outputBudget };
       const ctl = new AbortController();
       const relay = () => ctl.abort(signal.reason);
       signal.addEventListener("abort", relay, { once: true });
@@ -187,7 +194,7 @@ export async function* route(req: RouteRequest, chain: Candidate[], signal: Abor
       let usage: Usage | undefined;
       let finishReason = "stop";
       try {
-        for await (const ch of guarded(adapter.stream(c, req, pf.outputBudget, ctl.signal), timeouts.firstTokenMs, timeouts.idleMs, ctl)) {
+        for await (const ch of guarded(adapter.stream(c, req, outputBudget, ctl.signal), timeouts.firstTokenMs, timeouts.idleMs, ctl)) {
           if (ch.type === "text") {
             if (!firstTokenAt) firstTokenAt = now();
             streamed = true;
@@ -223,6 +230,20 @@ export async function* route(req: RouteRequest, chain: Candidate[], signal: Abor
           yield { type: "cancelled", candidateId: c.id, outputTokensSoFar: Math.round(outChars / 4) };
           return;
         }
+        // The balance cannot reserve the answer ceiling we asked for, but it is not empty: ask for what it can afford
+        // and try again on the same model. This says nothing bad about the key, so no circuit opens and no model is skipped.
+        if (failure.affordableTokens !== undefined && !streamed && !reducedForBalance) {
+          const cap = Math.floor(failure.affordableTokens * 0.9); // the provider prices the ceiling with some slack
+          if (cap >= req.minOutputTokens && cap < outputBudget) {
+            reducedForBalance = true;
+            outputBudget = cap;
+            caps.set(keys.connection, cap);
+            await Promise.all([opts.breaker.release(keys.connection), opts.breaker.release(keys.model)]);
+            yield { type: "retry", candidateId: c.id, attempt, maxAttempts: retry.maxAttempts, waitMs: 0, reason: failure.kind, message: `Your balance covers about ${failure.affordableTokens.toLocaleString("en")} output tokens; retrying with a smaller limit` };
+            attempt--; // a smaller request is not one of the failed attempts
+            continue;
+          }
+        }
         opts.onCandidateFailure?.(c, failure);
         if (CONNECTION_WIDE.has(failure.kind) && c.group) deadGroups.add(c.group);
         const info = { kind: failure.kind, retryAfterMs: failure.retryAfterMs, daily: failure.daily };
@@ -256,7 +277,10 @@ export async function* route(req: RouteRequest, chain: Candidate[], signal: Abor
   } else {
     const kinds = trace.filter((t) => t.outcome !== "success" && t.outcome !== "skipped").map((t) => t.outcome);
     const allOutOfQuota = kinds.length > 0 && kinds.every((k) => k === "quota");
-    const message = allOutOfQuota
+    const tooPoor = lastFailure?.affordableTokens;
+    const message = allOutOfQuota && tooPoor
+      ? `Your balance only covers about ${tooPoor.toLocaleString("en")} output tokens, too few for this request (it needs at least ${req.minOutputTokens.toLocaleString("en")}). Add credit with your provider or connect another AI in AI Access.`
+      : allOutOfQuota
       ? chain.length === 1
         ? `Your ${chain[0].label} has run out of quota or credits. Add another key or provider in AI Access to keep going.`
         : "Every connected AI has run out of quota or credits. Add another key or provider in AI Access, or try again after your limits reset."
