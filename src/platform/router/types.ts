@@ -93,6 +93,12 @@ export interface Failure {
   retryAfterMs?: number;
   /** A `rate_limit` whose window is a day (RPD/TPD): it will not clear in a minute, so the circuit stays open much longer. */
   daily?: boolean;
+  /**
+   * The provider refused because the requested output ceiling is more than the balance can reserve ("requires more
+   * credits, or fewer max_tokens ... can only afford 3262", OpenRouter's 402). The account is not empty: asking for
+   * at most this many tokens can succeed.
+   */
+  affordableTokens?: number;
 }
 
 /** The single event stream the UI renders. Every state change is one event. */
