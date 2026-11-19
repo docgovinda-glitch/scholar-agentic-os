@@ -14,7 +14,7 @@ normalizeUnicodeNFC,
 import { callOpenRouterText,handOffBeforeStream } from "../../../src/services/scholarBrain.ts";
 import type { Completer } from "../../../../src/platform/completion.ts";
 import { ensureParagraphBreaks } from "../../../../src/shared/proseParagraphs.ts";
-import { streamErrorMessage } from "../../../src/utils/sectionStream.ts";
+import { scaffoldReason, streamErrorMessage } from "../../../src/utils/sectionStream.ts";
 import { openSse, type SseStream } from "../../../src/utils/sse.ts";
 import { scholarBrain } from "../../../src/services/scholarBrain.ts";
 import { sendAiFailure,UnusableAiResponseError } from "../../../src/ai/aiRouteErrors.ts";
@@ -274,7 +274,7 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
         targetWords: targetWordCount,
       });
       console.warn("[stream-section] AI unavailable, sending offline scaffold:", err instanceof Error ? errorText(err) : err);
-      sse?.send({ fallback: { mode: "offline_scaffold", reason: "No AI provider could answer right now." } });
+      sse?.send({ fallback: { mode: "offline_scaffold", reason: scaffoldReason(err) } });
       sse?.send({ fullText: scaffold });
       sse?.close({ done: true });
       return;

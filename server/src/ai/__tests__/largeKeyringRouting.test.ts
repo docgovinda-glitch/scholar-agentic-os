@@ -209,3 +209,26 @@ describe("routedCompletion hands a local model's prompt to the browser", () => {
     expect(chain.map((c) => `${c.group}:${c.runsIn}`)).toEqual(["vllm:server", "jan:browser"]);
   });
 });
+
+describe("a low balance orders a connection's models lightest first", () => {
+  it("uses the fast-tier model first once the connection was refused at a small ceiling, and says why", async () => {
+    const { serverOutputCaps, connectionName } = await import("../breaker");
+    const { balanceHintKey } = await import("../../../../src/platform/router/outputCaps");
+    clearLiveModelState();
+    const models = ["acme-pro-5", "acme-chat-5", "acme-flash-5"].map((id, i) => ({ id, created: 1_790_000_000 - i }));
+    setLiveModelsFetch((async () => new Response(JSON.stringify({ data: models }), { status: 200 })) as unknown as typeof fetch);
+    const e = { provider: "groq" as const, via: "acme", model: "auto", apiKey: "k-low-balance" };
+    const normal = await expandKeyring([e], "drafting");
+    expect(normal.entries[0].model).toBe("acme-chat-5");
+    serverOutputCaps.set(balanceHintKey(connectionName("acme", e.apiKey, undefined)), 2935);
+    const low = await expandKeyring([e], "drafting");
+    expect(low.entries[0].model).toBe("acme-flash-5");
+    expect(low.notices.some((n) => /little credit left.*lighter models/.test(n.text))).toBe(true);
+    // A different key with the same provider is unaffected.
+    expect((await expandKeyring([{ ...e, apiKey: "someone-else" }], "drafting")).entries[0].model).toBe("acme-chat-5");
+    // A balance that is only slightly limited (a large ceiling) does not reorder anything.
+    serverOutputCaps.set(balanceHintKey(connectionName("acme", "roomy", undefined)), 20_000);
+    expect((await expandKeyring([{ ...e, apiKey: "roomy" }], "drafting")).entries[0].model).toBe("acme-chat-5");
+    setLiveModelsFetch(undefined);
+  });
+});

@@ -46,7 +46,7 @@ describe("affordable output ceiling", () => {
     expect((await breaker.acquire("m1")).allowed).toBe(true);
   });
 
-  it("the connection's other models start at the affordable limit instead of failing first", async () => {
+  it("an expensive model's limit does not cap a cheaper model of the same connection (per model)", async () => {
     const asked: number[] = [];
     const failFirst: ProviderAdapter = { async *stream(c, r, max): AsyncIterable<AdapterChunk> {
       asked.push(max);
@@ -98,5 +98,43 @@ describe("the learned ceiling is remembered between requests", () => {
     const caps = new TtlOutputCaps(1000, 3);
     for (let i = 0; i < 10; i++) caps.set(`k${i}`, 1);
     expect(caps.size).toBe(3);
+  });
+});
+
+describe("per-model ceilings and thinking models", () => {
+  it("a limit learned for one model is not applied to another model of the same connection", async () => {
+    const { TtlOutputCaps } = await import("../outputCaps");
+    const caps = new TtlOutputCaps();
+    const asked: Record<string, number[]> = { dear: [], cheap: [] };
+    const a: ProviderAdapter = { async *stream(c, _r, max): AsyncIterable<AdapterChunk> {
+      asked[c.id].push(max);
+      if (c.id === "dear" && max > 1000) throw new ProviderHttpError(402, MSG.replace("3262", "1000"));
+      yield { type: "text", text: "ok" }; yield { type: "finish", reason: "stop" };
+    } };
+    const go = async (chain: Candidate[]) => { for await (const _ of route(req, chain, new AbortController().signal, { site: "server", adapters: { custom: a }, breaker: new CircuitBreaker(new MemoryBreakerStore()), outputCaps: caps, sleep: async () => {} })) { /* drain */ } };
+    await go([cand("dear")]);
+    await go([cand("cheap")]);
+    expect(asked.dear).toEqual([32_768, 900]);
+    expect(asked.cheap).toEqual([32_768]); // not capped by the other model's limit
+  });
+
+  it("records a balance hint for the connection, never used as a limit", async () => {
+    const { TtlOutputCaps, balanceHintKey } = await import("../outputCaps");
+    const caps = new TtlOutputCaps();
+    await run([cand("m1")], limited(3262, []), undefined).catch(() => undefined);
+    for await (const _ of route(req, [cand("m1")], new AbortController().signal, { site: "server", adapters: { custom: limited(3262, []) }, breaker: new CircuitBreaker(new MemoryBreakerStore()), outputCaps: caps, sleep: async () => {} })) { /* drain */ }
+    expect(caps.get(balanceHintKey("conn:openrouter"))).toBe(2935);
+  });
+
+  it("when every model spends the shrunk allowance thinking, the error says so instead of a generic failure", async () => {
+    const thinks: ProviderAdapter = { async *stream(_c, _r, max): AsyncIterable<AdapterChunk> {
+      if (max > 3262) throw new ProviderHttpError(402, MSG);
+      yield { type: "usage", inputTokens: 1, outputTokens: max }; yield { type: "finish", reason: "length" };
+    } };
+    const { out } = await run([cand("m1"), cand("m2")], thinks);
+    const message = (out.at(-1) as { message: string }).message;
+    expect(out.at(-1)).toMatchObject({ type: "error", code: "exhausted" });
+    expect(message).toMatch(/balance only allows about 2,935 output tokens/);
+    expect(message).toMatch(/thinking/);
   });
 });

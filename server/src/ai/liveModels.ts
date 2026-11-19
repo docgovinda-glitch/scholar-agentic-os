@@ -23,6 +23,8 @@ import { resolveRouterTarget } from "../../../src/platform/router/providerMap.ts
 import type { Candidate, TaskClass } from "../../../src/platform/router/types.ts";
 import type { KeyringEntry } from "../../routes/aiRun.ts";
 import { AiEndpointBlockedError, createAiFetch } from "./aiEndpointGuard.ts";
+import { connectionName, serverOutputCaps } from "./breaker.ts";
+import { balanceHintKey } from "../../../src/platform/router/outputCaps.ts";
 
 const LIST_TTL_MS = 6 * 60 * 60_000;
 const FAILED_LIST_TTL_MS = 2 * 60_000;
@@ -33,6 +35,12 @@ const OUTPUT_CAP = 32_768;
 /** A model with an unreported output limit is asked for no more than this: nearly every modern model accepts it. */
 export const UNKNOWN_OUTPUT_LIMIT = 8_192;
 const LOCAL = new Set(["ollama", "lmstudio", "webllm"]);
+/**
+ * A connection whose balance was recently refused at or below this many output tokens is "balance-limited": its
+ * models are ordered lightest first, because a model that thinks before answering can spend the whole allowance.
+ */
+export const LOW_BALANCE_OUTPUT_TOKENS = 6_000;
+const TIER_RANK = { fast: 0, balanced: 1, flagship: 2 } as const;
 
 export type LiveList = { ok: true; models: LiveModel[] } | { ok: false; error: string; unsupported: boolean };
 
@@ -109,9 +117,13 @@ export async function expandEntry(e: KeyringEntry, task: TaskClass, maxAlternate
   const exclude = new Set(list.models.map((m) => m.id).filter((id) => isQuarantined(group, e.apiKey, id)));
   const rec = recommendModels(group, list.models, { exclude });
 
+  const slot = e.slot && e.slot > 1 ? `#${e.slot}` : "";
+  const hint = serverOutputCaps.get(balanceHintKey(connectionName(`${group}${slot}`, e.apiKey, e.baseUrl)));
+  const balanceLimited = hint !== undefined && hint <= LOW_BALANCE_OUTPUT_TOKENS;
+
   let primary = asked && usable(asked) ? asked : undefined;
   if (!primary) {
-    const wanted = task === "fast" ? rec.options.find((o) => o.role === "fastest") : undefined;
+    const wanted = task === "fast" || balanceLimited ? rec.options.find((o) => o.role === "fastest") : undefined;
     primary = (wanted ?? rec.recommended)?.id;
     if (!primary) {
       notices.push({ kind: "skipped", text: `Skipped ${label(e)}: none of the models it lists can be used for text.` });
@@ -120,7 +132,11 @@ export async function expandEntry(e: KeyringEntry, task: TaskClass, maxAlternate
     if (asked) notices.push({ kind: "fallback", text: `${asked} is no longer available from ${label(e)}; using ${primary}, the best model it lists now.` });
   }
 
-  const chosen = [primary, ...rec.options.map((o) => o.id).filter((id) => id !== primary && usable(id)).slice(0, maxAlternates)];
+  const lightFirst = (a: { id: string; tier?: keyof typeof TIER_RANK }, b: { id: string; tier?: keyof typeof TIER_RANK }) => TIER_RANK[a.tier ?? "balanced"] - TIER_RANK[b.tier ?? "balanced"];
+  const alternates = rec.options.filter((o) => o.id !== primary && usable(o.id));
+  if (balanceLimited) alternates.sort(lightFirst);
+  const chosen = [primary, ...alternates.map((o) => o.id).slice(0, maxAlternates)];
+  if (balanceLimited && !asked) notices.push({ kind: "fallback", text: `${label(e)} has little credit left (about ${hint!.toLocaleString("en")} output tokens), so its lighter models are tried first.` });
   const entries = chosen.map((id): KeyringEntry => {
     const m = byId.get(id);
     const out = m?.maxOutputTokens ? Math.min(m.maxOutputTokens, OUTPUT_CAP) : undefined;

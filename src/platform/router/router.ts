@@ -1,7 +1,7 @@
 import type { AdapterChunk, AttemptTrace, Candidate, Failure, ProviderAdapter, ProviderId, RouteRequest, RouterEvent, Usage } from "./types";
 import { CircuitBreaker } from "./circuitBreaker";
 import { classify, countsAgainstProvider, EmptyOutputError, TimeoutError } from "./errors";
-import { TtlOutputCaps, type OutputCapStore } from "./outputCaps";
+import { balanceHintKey, TtlOutputCaps, type OutputCapStore } from "./outputCaps";
 import { estimateTokens, preflight, type TokenCounter } from "./tokenBudget";
 
 export interface RouterOptions {
@@ -113,6 +113,8 @@ export async function* route(req: RouteRequest, chain: Candidate[], signal: Abor
   const deadGroups = new Set<string>();
   /** Output ceilings a connection said its balance can afford, so its other models (and later requests) start there instead of failing first. */
   const caps = opts.outputCaps ?? new TtlOutputCaps();
+  /** The smallest answer ceiling a balance forced in this request, for the final message. */
+  let balanceCap: number | undefined;
 
   yield { type: "route_start", requestId: req.requestId, chain: chain.map(({ id, label, lane }) => ({ id, label, lane })) };
 
@@ -180,7 +182,8 @@ export async function* route(req: RouteRequest, chain: Candidate[], signal: Abor
 
     let failure: Failure | undefined;
     let streamed = false;
-    let outputBudget = Math.min(pf.outputBudget, caps.get(keys.connection) ?? Infinity);
+    // A ceiling learned for this model (the price per token differs by model, so a cheap model may afford far more).
+    let outputBudget = Math.min(pf.outputBudget, caps.get(keys.model) ?? Infinity);
     let reducedForBalance = false;
     for (let attempt = 1; attempt <= retry.maxAttempts; attempt++) {
       yield { type: "attempt_start", candidateId: c.id, label: c.label, lane: c.lane, attempt, maxOutputTokens: outputBudget };
@@ -237,7 +240,9 @@ export async function* route(req: RouteRequest, chain: Candidate[], signal: Abor
           if (cap >= req.minOutputTokens && cap < outputBudget) {
             reducedForBalance = true;
             outputBudget = cap;
-            caps.set(keys.connection, cap);
+            caps.set(keys.model, cap);
+            caps.set(balanceHintKey(keys.connection), cap);
+            balanceCap = balanceCap === undefined ? cap : Math.min(balanceCap, cap);
             await Promise.all([opts.breaker.release(keys.connection), opts.breaker.release(keys.model)]);
             yield { type: "retry", candidateId: c.id, attempt, maxAttempts: retry.maxAttempts, waitMs: 0, reason: failure.kind, message: `Your balance covers about ${failure.affordableTokens.toLocaleString("en")} output tokens; retrying with a smaller limit` };
             attempt--; // a smaller request is not one of the failed attempts
@@ -278,7 +283,11 @@ export async function* route(req: RouteRequest, chain: Candidate[], signal: Abor
     const kinds = trace.filter((t) => t.outcome !== "success" && t.outcome !== "skipped").map((t) => t.outcome);
     const allOutOfQuota = kinds.length > 0 && kinds.every((k) => k === "quota");
     const tooPoor = lastFailure?.affordableTokens;
-    const message = allOutOfQuota && tooPoor
+    // Models answered nothing because their output allowance, shrunk to fit the balance, was spent thinking.
+    const thoughtItAllAway = balanceCap !== undefined && kinds.includes("empty_output");
+    const message = thoughtItAllAway
+      ? `Your balance only allows about ${balanceCap!.toLocaleString("en")} output tokens per answer, and the models used them thinking before writing anything. Add credit with your provider, or choose a model that does not think first in AI Access.`
+      : allOutOfQuota && tooPoor
       ? `Your balance only covers about ${tooPoor.toLocaleString("en")} output tokens, too few for this request (it needs at least ${req.minOutputTokens.toLocaleString("en")}). Add credit with your provider or connect another AI in AI Access.`
       : allOutOfQuota
       ? chain.length === 1
