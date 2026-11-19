@@ -22,6 +22,7 @@ import { openSse } from "../utils/sse.ts";
 import { buildAskGeneralPrompt, buildAskSearchPrompt } from "../../../src/shared/askPrompts.ts";
 import { aiAvailability as rawAiAvailability, NoAiConnectedError, routedCompletion as rawRoutedCompletion, routedText, RouterHandoffError, toRouterTask } from "../ai/routerBridge.ts";
 import { BrowserAiRequiredError, LocalModelUnreachableError, NoClientAiProviderError } from "../ai/aiRouteErrors.ts";
+import { browserHandOffSupport } from "../ai/browserHandoff.ts";
 import {
   createChallengeTokenForRequest,
   readVerifiedBrowserResult,
@@ -266,7 +267,8 @@ export function aiAvailability(...args: Parameters<typeof rawAiAvailability>): R
 /** The router call routes use (Coursework agent steps, the Journal studio): timed and logged like the other gateway calls, NFC-normalised, errors rethrown unchanged. */
 export function routedCompletion(...args: Parameters<typeof rawRoutedCompletion>): ReturnType<typeof rawRoutedCompletion> {
   return runGatewayCall("routed", args[1]?.task, async () => {
-    const text = await rawRoutedCompletion(...args);
+    // A prompt for the user's local model goes to their browser (426) and the answer comes back with the replayed request.
+    const text = await rawRoutedCompletion(args[0], args[1], browserHandOffSupport);
     return typeof text === "string" ? normalizeUnicodeNFC(text) : text;
   });
 }

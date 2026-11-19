@@ -64,6 +64,9 @@ export class InvalidLlmChallengeError extends Error {
 export const LOCAL_MODEL_UNREACHABLE_MESSAGE =
   "This feature runs on Scholar Core's server, which can't reach a model running on your computer. Add a cloud AI key in AI Access to use it.";
 
+export const BROWSER_AI_REQUIRED_MESSAGE =
+  "The next AI in your chain is a model on your computer, which only your browser can run. Open this step from the workspace screen so it can run there, or add a cloud AI key in AI Access.";
+
 export const AI_PROVIDER_REQUIRED_MESSAGE =
   "Connect an AI provider (your own key or a local model) in AI Access to run this.";
 
@@ -84,7 +87,8 @@ export const AI_RETRY_AFTER_SECONDS = "10";
 export function sendAiFailure(res: Response, err: unknown, feature: string): void {
   if (res.headersSent) return;
   if (err instanceof BrowserAiRequiredError) {
-    res.status(426).json({ requireFrontendLLM: true, ...err.payload });
+    // `error` is for clients that do not run the hand-off themselves: they show it instead of a bare failure.
+    res.status(426).json({ requireFrontendLLM: true, error: BROWSER_AI_REQUIRED_MESSAGE, ...err.payload });
     return;
   }
   if (err instanceof InvalidLlmChallengeError) {

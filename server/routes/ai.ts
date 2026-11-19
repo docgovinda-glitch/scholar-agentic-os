@@ -3,7 +3,7 @@ import express, { Request, Response } from "express";
 import { requireAuth } from "../src/middleware/auth.ts";
 import { readVerifiedBrowserResult, signLlmChallenge, computePromptHash, routedCompletion } from "../src/services/scholarBrain.ts";
 import { requestKeyring } from "../src/ai/routerBridge.ts";
-import { InvalidLlmChallengeError, LocalModelUnreachableError, NoClientAiProviderError, sendAiFailure } from "../src/ai/aiRouteErrors.ts";
+import { BrowserAiRequiredError, InvalidLlmChallengeError, LocalModelUnreachableError, NoClientAiProviderError, sendAiFailure } from "../src/ai/aiRouteErrors.ts";
 import { aiAvailability, answeredByLabel } from "../src/ai/routerBridge.ts";
 import type { ResearchLlm } from "../src/research/deepResearchEngine.ts";
 import { executeWebSearch, formatSearchResultsForPrompt, type SearchResultItem } from "../src/research/webSearchEngine.ts";
@@ -758,7 +758,7 @@ Formatting & Verification Rules:
         } catch (execErr: unknown) {
           // No AI, or the user's local model: the browser runs the prompt (426).
           // A provider failure is reported (502), never silently handed off.
-          if (execErr instanceof NoClientAiProviderError || execErr instanceof LocalModelUnreachableError) return chatHandOff();
+          if (execErr instanceof NoClientAiProviderError || execErr instanceof LocalModelUnreachableError || execErr instanceof BrowserAiRequiredError) return chatHandOff();
           return sendAiFailure(res, execErr, "The answer");
         }
       }

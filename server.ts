@@ -340,7 +340,8 @@ async function startServer() {
   });
 
   // Start Server
-  const server = http.createServer(app);
+  // 32 KB header limit (Node's default is 16 KB): the x-ai-keyring header carries up to 24 connections with their keys.
+  const server = http.createServer({ maxHeaderSize: 32 * 1024 }, app);
   registerSupabaseWsProxy(server);
   server.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on port ${PORT}`);

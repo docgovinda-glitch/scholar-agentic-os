@@ -200,3 +200,51 @@ describe("local runner catalog", () => {
     expect(getLocalRunner("llamacpp")!.installGuidance).toMatch(/same default port/i);
   });
 });
+
+describe("2026-11 catalog refresh", () => {
+  const p = (id: string) => getCloudProvider(id)!;
+
+  it("lists OVHcloud AI Endpoints as an OpenAI-compatible free-tier workhorse whose origin the CSP allows", () => {
+    expect(p("ovhcloud")).toMatchObject({ apiStyle: "openai-compatible", freeTier: "freemium", freeWorkhorse: true });
+    expect(p("ovhcloud").baseUrl.startsWith("https://")).toBe(true);
+    expect(DIRECT_BROWSER_CALL_ORIGINS).toContain(new URL(p("ovhcloud").baseUrl).origin);
+  });
+
+  it("Vercel AI Gateway is a recurring $5 monthly credit, not one-off trial credits", () => {
+    expect(p("vercelgateway").freeTier).toBe("freemium");
+    expect(p("vercelgateway").freeTierNote).toMatch(/\$5/);
+    expect(p("vercelgateway").freeTierNote).toMatch(/every month/i);
+  });
+
+  it("providers that tightened their free tiers no longer promise one", () => {
+    for (const id of ["together", "deepinfra", "chutes", "moonshot", "nebius"]) expect(p(id).freeTier, id).toBe("paid");
+    expect(p("together").freeTierNote).toMatch(/\$5 minimum/);
+    expect(p("stepfun").freeTierNote).toMatch(/restricted/i);
+  });
+
+  it("keeps the recurring allowances accurate", () => {
+    expect(p("cerebras").freeTierNote).toMatch(/1M tokens per day/);
+    expect(p("openrouter").freeTierNote).toMatch(/1,000 requests\/day/);
+    expect(p("openrouter").freeTierNote).toMatch(/\$10/);
+    expect(p("cloudflare").freeTierNote).toMatch(/10,000 Neurons/);
+    expect(p("scaleway").freeTierNote).toMatch(/1M free tokens/);
+    expect(p("qwen").freeTierNote).toMatch(/1M/);
+    expect(p("upstage").freeTierNote).toMatch(/\$10/);
+    expect(p("sambanova").freeTierNote).toMatch(/\$5/);
+    expect(p("cohere").freeTierNote).toMatch(/1,000 calls/);
+    expect(p("groq").freeTierNote).toMatch(/per day/);
+  });
+
+  it("marks the free tiers that train on prompts, with an explanation", () => {
+    expect(p("gemini").dataPolicy?.trainsOnFreeTier).toBe("free-tier-trains");
+    expect(p("mistral").dataPolicy?.trainsOnFreeTier).toBe("free-tier-trains");
+    expect(p("openai").dataPolicy?.trainsOnFreeTier).toBe("opt-in-training");
+    expect(p("gemini").quotaScopeNote).toMatch(/per .*project/);
+  });
+
+  it("every catalog id and https base URL stays unique and valid after the additions", () => {
+    const ids = CLOUD_PROVIDERS.map((c) => c.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const c of CLOUD_PROVIDERS) if (c.baseUrl) expect(c.baseUrl.startsWith("https://"), c.id).toBe(true);
+  });
+});

@@ -10,6 +10,8 @@ import {
   type HardwareProfile,
 } from "../../services/hardwareProfiler";
 import ProviderDetail, { Chip } from "./ProviderDetail";
+import { ConfidentialExclusions, FreeTierRecipes, GrantsPanel } from "./AiAccessGuides";
+import { CONFIDENTIAL_PREF, privateTierPref, ROUTING_PREF } from "../../platform/router/privacyPolicy";
 import LocalRunnerDetail from "./LocalRunnerDetail";
 import ManualHardwareForm from "./ManualHardwareForm";
 import { useAiAccess } from "./useAiAccess";
@@ -264,6 +266,8 @@ function DetailPane({
         onSetModel={(m) => access.setModelFor(providerId, m)}
         onMakeDefault={() => access.setDefaultProvider(providerId)}
         onBack={onBack}
+        privateTier={access.settings.preferences[privateTierPref(providerId)] === "true"}
+        onPrivateTierChange={(v) => void access.setPreference(privateTierPref(providerId), v ? "true" : "false")}
       />
     );
   }
@@ -463,6 +467,9 @@ function OverviewSection({
         </>
         )
       )}
+
+      <FreeTierRecipes onOpen={onOpen} />
+      <GrantsPanel />
     </div>
   );
 }
@@ -858,6 +865,22 @@ function PreferencesSection({
             </select>
           </div>
         </div>
+
+        <label className="flex items-start gap-2 text-sm text-[color:var(--text-secondary)] cursor-pointer">
+          <input
+            type="checkbox"
+            checked={access.settings.preferences[ROUTING_PREF] === "manual"}
+            onChange={(e) => void access.setPreference(ROUTING_PREF, e.target.checked ? "manual" : "auto")}
+            className="mt-0.5 rounded border-[color:var(--border-control)]"
+          />
+          <span>
+            <span className="font-medium text-[color:var(--text-primary)]">Use my order exactly</span>
+            <span className="mt-0.5 block text-xs text-[color:var(--text-muted)]">
+              By default, quick tasks (chat, extraction, summaries) try your free high-allowance providers first, such as Cerebras, Groq, Cloudflare and OVHcloud, so your scarcer reasoning quota is kept for drafting and review.
+              Turn this on to use your connections in the order you set for every task.
+            </span>
+          </span>
+        </label>
       </section>
 
       {/* 2. Active Models Section */}
@@ -961,6 +984,25 @@ function PreferencesSection({
             </span>
           </span>
         </label>
+
+        <label className="flex items-start gap-2 text-sm text-[color:var(--text-secondary)] cursor-pointer">
+          <input
+            type="checkbox"
+            checked={access.settings.preferences[CONFIDENTIAL_PREF] === "true"}
+            onChange={(e) => void access.setPreference(CONFIDENTIAL_PREF, e.target.checked ? "true" : "false")}
+            className="mt-0.5 rounded border-[color:var(--border-control)]"
+          />
+          <span>
+            <span className="font-medium text-[color:var(--text-primary)]">Confidential mode</span> — For unpublished thesis and manuscript text.
+            <span className="mt-0.5 block text-xs text-[color:var(--text-muted)]">
+              Only sends your writing to providers that do not train on prompts (or to keys you mark as paid / zero-retention), and to your own local or tunnelled runners.
+              Free tiers that may train on prompts, such as Google AI Studio&apos;s free tier, Mistral Free and OpenAI&apos;s complimentary tokens, are skipped.
+            </span>
+          </span>
+        </label>
+        {access.settings.preferences[CONFIDENTIAL_PREF] === "true" && (
+          <ConfidentialExclusions connectedIds={connected.map((p) => p.id)} preferences={access.settings.preferences} />
+        )}
       </section>
 
       {/* 4. Live Web & Scholarly Search Grounding Section */}

@@ -8,6 +8,13 @@ export interface RouterOptions {
   site: "server" | "browser";
   adapters: Partial<Record<ProviderId, ProviderAdapter>>;
   breaker: CircuitBreaker;
+  /**
+   * Which circuits a candidate belongs to. `model` opens for model-level trouble (5xx, timeouts, rate limits);
+   * `connection` opens for account-wide trouble (spent credit, rejected key) and so skips every model of that
+   * connection at once, on this request and the next. Default: the candidate id and its group. A server shared by
+   * many people must include the credential in both, so one person's spent key never pauses another's.
+   */
+  breakerKeys?: (c: Candidate) => { model: string; connection: string };
   countTokens?: TokenCounter;
   retry?: { maxAttempts: number; baseDelayMs: number; maxDelayMs: number; maxWaitMs: number };
   timeouts?: { firstTokenMs: number; idleMs: number };
@@ -34,6 +41,17 @@ const DEFAULT_MAX_TOTAL_MS = 150_000;
  * providers meter and fail per model far more often than per account.
  */
 const CONNECTION_WIDE = new Set<Failure["kind"]>(["quota", "auth", "network"]);
+/** The subset whose circuit is the connection's, not the model's: deterministic until a person acts or a window resets. */
+const CONNECTION_CIRCUIT = new Set<Failure["kind"]>(["quota", "auth"]);
+
+const defaultBreakerKeys = (c: Candidate) => ({ model: c.id, connection: `conn:${c.group ?? c.id}` });
+
+const WAIT_TEXT = (ms: number) => (ms >= 90_000 ? `${Math.ceil(ms / 60_000)} min` : `${Math.ceil(ms / 1000)}s`);
+const PAUSE_TEXT: Partial<Record<Failure["kind"], string>> = {
+  quota: "Out of quota or credits",
+  auth: "Key was rejected",
+  rate_limit: "Rate limited",
+};
 
 export const abortableSleep = (ms: number, signal: AbortSignal) =>
   new Promise<void>((resolve, reject) => {
@@ -111,7 +129,7 @@ export async function* route(req: RouteRequest, chain: Candidate[], signal: Abor
 
     if (c.runsIn !== opts.site) {
       // The server cannot reach the user's machine: the browser continues the chain from here.
-      yield { type: "handoff", to: c.id, label: c.label, reason: pending ? `${pending.from.label} failed: ${pending.failure.message}` : "Runs on your device" };
+      yield { type: "handoff", to: c.id, label: c.label, reason: pending ? `${pending.from.label} failed: ${pending.failure.message}` : "Runs on your device", ...(pending?.partial ? { partialOutputDiscarded: true } : {}) };
       return;
     }
     if (c.lane === "byok" && !c.credential?.apiKey) {
@@ -123,14 +141,21 @@ export async function* route(req: RouteRequest, chain: Candidate[], signal: Abor
       yield { type: "candidate_skipped", candidateId: c.id, label: c.label, reason: "no_credential", detail: `No adapter for ${c.provider}` };
       continue;
     }
-    const gate = await opts.breaker.acquire(c.id);
+    const keys = (opts.breakerKeys ?? defaultBreakerKeys)(c);
+    const connGate = await opts.breaker.acquire(keys.connection);
+    const gate = connGate.allowed ? await opts.breaker.acquire(keys.model) : connGate;
     if (!gate.allowed) {
-      yield { type: "candidate_skipped", candidateId: c.id, label: c.label, reason: "circuit_open", detail: `Paused after repeated failures; retrying in ${Math.ceil(gate.retryInMs / 1000)}s` };
+      if (connGate.allowed) await opts.breaker.release(keys.connection); // the connection probe went unused
+      const why = gate.reason ? PAUSE_TEXT[gate.reason] : undefined;
+      yield { type: "candidate_skipped", candidateId: c.id, label: c.label, reason: "circuit_open", detail: `${why ?? "Paused after repeated failures"}; retrying in ${WAIT_TEXT(gate.retryInMs)}` };
       trace.push({ candidateId: c.id, attempt: 0, startedAt: now(), durationMs: 0, outcome: "skipped" });
+      // The whole connection is paused: its other models would be too.
+      if (!connGate.allowed && c.group) deadGroups.add(c.group);
       continue;
     }
     const pf = preflight(req, c, count, opts.limitWarnAt);
     if (!pf.fits) {
+      await Promise.all([opts.breaker.release(keys.connection), opts.breaker.release(keys.model)]);
       skippedForContext++;
       yield { type: "candidate_skipped", candidateId: c.id, label: c.label, reason: "context_too_small", detail: `Prompt ≈${pf.promptTokens} tokens leaves ${pf.outputBudget} for the answer (needs ${req.minOutputTokens}) in a ${c.contextWindow}-token window` };
       continue;
@@ -185,7 +210,7 @@ export async function* route(req: RouteRequest, chain: Candidate[], signal: Abor
         }
         // A clean stream with nothing in it is a failed attempt, not an answer.
         if (!streamed) throw new EmptyOutputError(finishReason);
-        await opts.breaker.success(c.id);
+        await Promise.all([opts.breaker.success(keys.model), opts.breaker.success(keys.connection)]);
         trace.push({ candidateId: c.id, attempt, startedAt: started, durationMs: now() - started, outcome: "success" });
         yield { type: "done", candidateId: c.id, label: c.label, lane: c.lane, finishReason, trace,
           usage: usage ?? { inputTokens: pf.promptTokens, outputTokens: Math.round(outChars / 4), source: "estimate" } };
@@ -193,10 +218,23 @@ export async function* route(req: RouteRequest, chain: Candidate[], signal: Abor
       } catch (err) {
         failure = classify(ctl.signal.reason instanceof TimeoutError ? ctl.signal.reason : err, signal);
         trace.push({ candidateId: c.id, attempt, startedAt: started, durationMs: now() - started, outcome: failure.kind, httpStatus: failure.httpStatus });
-        if (failure.kind === "aborted") { yield { type: "cancelled", candidateId: c.id, outputTokensSoFar: Math.round(outChars / 4) }; return; }
+        if (failure.kind === "aborted") {
+          await Promise.all([opts.breaker.release(keys.connection), opts.breaker.release(keys.model)]);
+          yield { type: "cancelled", candidateId: c.id, outputTokensSoFar: Math.round(outChars / 4) };
+          return;
+        }
         opts.onCandidateFailure?.(c, failure);
         if (CONNECTION_WIDE.has(failure.kind) && c.group) deadGroups.add(c.group);
-        if (countsAgainstProvider(failure.kind)) await opts.breaker.failure(c.id);
+        const info = { kind: failure.kind, retryAfterMs: failure.retryAfterMs, daily: failure.daily };
+        if (countsAgainstProvider(failure.kind)) {
+          // Spent credit / rejected key opens the connection's circuit at once; everything else is the model's.
+          const own = CONNECTION_CIRCUIT.has(failure.kind) ? keys.connection : keys.model;
+          const other = own === keys.model ? keys.connection : keys.model;
+          await Promise.all([opts.breaker.failure(own, info), opts.breaker.release(other)]);
+        } else {
+          // A bad request, empty answer or retired model says nothing about the provider's health: free a half-open probe.
+          await Promise.all([opts.breaker.release(keys.connection), opts.breaker.release(keys.model)]);
+        }
         if (!failure.fallbackWorthy) { yield { type: "error", code: "non_retryable", message: failure.message, trace }; return; }
         // Never retry silently after tokens reached the user: move on and say the partial output was dropped.
         if (!failure.retryable || streamed || attempt === retry.maxAttempts) break;

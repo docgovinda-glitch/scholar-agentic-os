@@ -6,6 +6,8 @@
  */
 import { loadUserAiSettings, providersWithStoredKey, readProviderKey, type UserAiSettings } from "../../services/userAiSettings";
 import { assembleKeyring, type KeyringEntry } from "../../platform/router/keyringAssemble";
+import { manualRouting } from "../../platform/router/privacyPolicy";
+import { ROUTING_HEADER, ROUTING_MANUAL } from "../../platform/router/taskAffinity";
 
 export type { KeyringEntry } from "../../platform/router/keyringAssemble";
 /** Models the user picked in AI Access, plus their known limits when the catalog had them. */
@@ -32,3 +34,14 @@ export const encodeKeyring = (entries: KeyringEntry[]): string => {
   bytes.forEach((b) => (bin += String.fromCharCode(b)));
   return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 };
+
+/** Routing choices that travel with the keyring: "Use my order exactly" turns task-aware ordering off on the server. */
+export const routingHeaders = (preferences: Record<string, string> | undefined): Record<string, string> =>
+  manualRouting(preferences) ? { [ROUTING_HEADER]: ROUTING_MANUAL } : {};
+
+/** This device's keyring and the headers that carry it (and the routing choice), from one read of the person's settings. */
+export async function aiRequestParts(): Promise<{ ring: KeyringEntry[]; headers: Record<string, string> }> {
+  const settings = await loadUserAiSettings();
+  const ring = await buildKeyring(settings);
+  return { ring, headers: { ...(ring.length ? { "x-ai-keyring": encodeKeyring(ring) } : {}), ...routingHeaders(settings.preferences) } };
+}

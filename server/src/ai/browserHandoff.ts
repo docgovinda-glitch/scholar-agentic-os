@@ -16,9 +16,32 @@ import type { Completer } from "../../../src/platform/completion.ts";
 import type { RouterEvent } from "../../../src/platform/router/types.ts";
 import { computePromptHash, createChallengeTokenForRequest, verifyLlmChallenge } from "../../utils/llm.ts";
 import { BrowserAiRequiredError, NoClientAiProviderError, LocalModelUnreachableError } from "./aiRouteErrors.ts";
-import { NoAiConnectedError, RouterHandoffError, routedResult, toRouterTask } from "./routerBridge.ts";
+import { NoAiConnectedError, RouterHandoffError, routedResult, toRouterTask, type HandOffSupport } from "./routerBridge.ts";
 
 const browserResults = z.array(z.object({ challengeToken: z.string().max(4_000), llmResult: z.string().max(400_000) })).max(40);
+
+/**
+ * `routedCompletion`'s hand-off support: a prompt for the user's local model goes to the browser (426) and its
+ * answer comes back signed, either as one entry of `browserResults` (several model calls in one request) or as the
+ * single `llmResult` + `challengeToken` pair the default client fallback sends. Only an answer whose challenge
+ * matches this user and exactly this prompt is accepted.
+ */
+export const browserHandOffSupport: HandOffSupport = {
+  answerFor(req, systemPrompt, userPrompt) {
+    const body = (req.body ?? {}) as { browserResults?: unknown; llmResult?: unknown; challengeToken?: unknown };
+    const userId = String((req as Request & { user?: { id?: string } }).user?.id ?? req.headers?.["x-user-id"] ?? "anonymous");
+    const hash = computePromptHash(systemPrompt, userPrompt);
+    const offered: Array<{ token: unknown; text: unknown }> = [];
+    const list = browserResults.safeParse(body.browserResults ?? []);
+    if (list.success) for (const r of list.data) offered.push({ token: r.challengeToken, text: r.llmResult });
+    if (typeof body.llmResult === "string") offered.push({ token: body.challengeToken, text: body.llmResult });
+    for (const o of offered) {
+      if (typeof o.token === "string" && typeof o.text === "string" && o.text && verifyLlmChallenge(o.token, userId, hash)) return o.text;
+    }
+    return undefined;
+  },
+  challengeFor: (req, systemPrompt, userPrompt) => createChallengeTokenForRequest(req, systemPrompt, userPrompt),
+};
 
 export function requestCompleter(req: Request): Completer {
   const parsed = browserResults.safeParse((req.body as { browserResults?: unknown } | undefined)?.browserResults ?? []);
@@ -45,7 +68,7 @@ export function requestCompleter(req: Request): Completer {
           ? {
               onEvent: (ev: RouterEvent) => {
                 if (ev.type === "token") call.onToken?.(ev.text);
-                else if (ev.type === "fallback" && ev.partialOutputDiscarded) call.onReset?.();
+                else if ((ev.type === "fallback" || ev.type === "handoff") && ev.partialOutputDiscarded) call.onReset?.();
               },
             }
           : {}),

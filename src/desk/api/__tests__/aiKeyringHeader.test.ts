@@ -4,10 +4,16 @@ const { fetchMock } = vi.hoisted(() => ({ fetchMock: vi.fn() }));
 vi.mock("../../originalFetch", () => ({ originalFetch: fetchMock }));
 vi.mock("../../../services/supabaseClient", () => ({ isSupabaseConfigured: () => false, getSupabaseClient: () => ({}) }));
 vi.mock("../../../services/useAiConfig", () => ({ getClientAiRuntimeConfig: async () => ({ isConfigured: false }) }));
-vi.mock("../../ai/keyring", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../ai/keyring")>()),
-  buildKeyring: async () => [{ provider: "anthropic", model: "m1", apiKey: "k-test" }],
-}));
+vi.mock("../../ai/keyring", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../../ai/keyring")>();
+  const ring = [{ provider: "anthropic" as const, model: "m1", apiKey: "k-test" }];
+  return {
+    ...original,
+    buildKeyring: async () => ring,
+    // The headers authedFetch attaches: the keyring (and, when the person chose it, the routing choice).
+    aiRequestParts: async () => ({ ring, headers: { "x-ai-keyring": original.encodeKeyring(ring) } }),
+  };
+});
 
 import { authedFetch } from "../client";
 

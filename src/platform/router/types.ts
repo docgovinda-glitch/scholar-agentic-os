@@ -91,6 +91,8 @@ export interface Failure {
   /** Worth trying another candidate (false for e.g. invalid_request or content_filter). */
   fallbackWorthy: boolean;
   retryAfterMs?: number;
+  /** A `rate_limit` whose window is a day (RPD/TPD): it will not clear in a minute, so the circuit stays open much longer. */
+  daily?: boolean;
 }
 
 /** The single event stream the UI renders. Every state change is one event. */
@@ -104,7 +106,8 @@ export type RouterEvent =
   | { type: "metrics"; candidateId: string; ttftMs: number; tokensPerSecond: number; outputTokens: number }
   | { type: "retry"; candidateId: string; attempt: number; maxAttempts: number; waitMs: number; reason: FailureKind; message: string }
   | { type: "fallback"; from: string; fromLabel: string; to: string; toLabel: string; reason: FailureKind; httpStatus?: number; message: string; partialOutputDiscarded: boolean }
-  | { type: "handoff"; to: string; label: string; reason: string }
+  /** The chain continues on the user's device. `partialOutputDiscarded`: the failed candidate had already streamed text, which the consumer must drop (the next model starts over). */
+  | { type: "handoff"; to: string; label: string; reason: string; partialOutputDiscarded?: boolean }
   | { type: "done"; candidateId: string; label: string; lane: Lane; finishReason: string; usage: Usage; trace: AttemptTrace[] }
   | { type: "error"; code: "context_overflow" | "exhausted" | "non_retryable"; message: string; trace: AttemptTrace[] }
   | { type: "cancelled"; candidateId?: string; outputTokensSoFar: number };

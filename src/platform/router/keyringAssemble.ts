@@ -5,10 +5,15 @@
  * vault) build the same keyring from the same inputs: that is what makes AI
  * Access work identically on every device after sign-in.
  *
+ * Privacy settings are applied here too (`privacyPolicy.ts`), so a connection the person has excluded is never
+ * sent to the server by any device.
+ *
  * No model name appears here: a provider with a key but no saved model is
  * included as "auto" and the server picks from the provider's live list.
  */
 import { keyIdsFor, parseKeyId } from "../../config/keySlots";
+import { localRunnerTarget, LOCAL_RUNNER_IDS } from "./localRunners";
+import { cloudAllowed } from "./privacyPolicy";
 import { resolveRouterTarget } from "./providerMap";
 import type { ProviderId } from "./types";
 
@@ -29,9 +34,13 @@ export interface KeyringEntry {
 
 export interface AssembleSettings { provider: string; preferences?: Record<string, string> }
 
-const LOCAL: Record<string, ProviderId> = { ollama: "ollama", lmstudio: "lmstudio" };
-/** The server accepts at most this many connections per request. */
-export const MAX_KEYRING_ENTRIES = 8;
+/**
+ * The server accepts at most this many connections per request: room for a dozen
+ * free-tier providers with their backup keys (`MAX_KEYS_PER_PROVIDER`) and every
+ * local runner. The `x-ai-keyring` header stays well under the server's 32 KB
+ * header limit at this size (about 350 bytes per entry before base64).
+ */
+export const MAX_KEYRING_ENTRIES = 24;
 
 export function cleanModelChoice(rawModel: string): string {
   const stripped = rawModel
@@ -73,7 +82,8 @@ export function assembleKeyring(settings: AssembleSettings, providersWithKey: st
   const entries: KeyringEntry[] = [];
   const seen = new Set<string>();
   for (const id of order) {
-    if (!id || LOCAL[id]) continue;
+    if (!id || LOCAL_RUNNER_IDS.includes(id)) continue;
+    if (!cloudAllowed(id, prefs)) continue; // "Local AI only" and Confidential mode (privacyPolicy.ts)
     const target = resolveRouterTarget(id, endpointOf(id));
     if (!target.ok || seen.has(target.target.via)) continue; // e.g. Cloudflare without its address
     const choice = pick(id);
@@ -96,12 +106,23 @@ export function assembleKeyring(settings: AssembleSettings, providersWithKey: st
     }
     if (added) seen.add(target.target.via);
   }
-  for (const id of Object.keys(LOCAL)) {
+  // Every catalog runner (Ollama, LM Studio, Jan, vLLM, ...) rides along as the offline fallback.
+  const local: KeyringEntry[] = [];
+  for (const id of LOCAL_RUNNER_IDS) {
     const choice = pick(id);
     if (!choice) continue;
     if (id !== settings.provider && !prefs[`${id}Enabled`]) continue;
-    const cleanBase = endpointOf(id);
-    entries.push({ provider: LOCAL[id], model: choice.model, ...(choice.contextWindow ? { contextWindow: choice.contextWindow } : {}), ...(choice.maxOutputTokens ? { maxOutputTokens: choice.maxOutputTokens } : {}), ...(cleanBase ? { baseUrl: cleanBase } : {}) });
+    const target = localRunnerTarget(id, endpointOf(id));
+    if (!target) continue;
+    local.push({
+      provider: target.provider,
+      via: target.via,
+      model: choice.model,
+      baseUrl: target.baseUrl,
+      ...(choice.contextWindow ? { contextWindow: choice.contextWindow } : {}),
+      ...(choice.maxOutputTokens ? { maxOutputTokens: choice.maxOutputTokens } : {}),
+    });
   }
-  return entries.slice(0, MAX_KEYRING_ENTRIES);
+  // A long cloud list gives way before the local fallbacks do: they are what keeps work going when every cloud key is spent.
+  return [...entries.slice(0, Math.max(0, MAX_KEYRING_ENTRIES - local.length)), ...local].slice(0, MAX_KEYRING_ENTRIES);
 }

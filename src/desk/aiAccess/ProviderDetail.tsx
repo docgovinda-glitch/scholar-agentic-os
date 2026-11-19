@@ -36,9 +36,14 @@ export default function ProviderDetail({
   onSetModel,
   onMakeDefault,
   onBack,
+  privateTier = false,
+  onPrivateTierChange,
 }: {
   view: ProviderView;
   spec: CloudProviderSpec;
+  /** The person says this key is on a paid / zero-retention plan, which Confidential mode then accepts. */
+  privateTier?: boolean;
+  onPrivateTierChange?: (value: boolean) => void;
   tier?: ConnectionTier;
   onConnect: (input: { apiKey: string; model: string; baseUrl?: string; makeDefault: boolean; tier?: ConnectionTier }) => Promise<ConnectCloudResult>;
   onDisconnect: () => Promise<void>;
@@ -201,6 +206,8 @@ export default function ProviderDetail({
       </header>
 
       <FactRow facts={facts} tier={tier} connected={view.connected} />
+
+      <DataPolicy spec={spec} privateTier={privateTier} onChange={onPrivateTierChange} />
 
       {view.connected ? (
         <section className="rounded-[var(--radius-md)] border border-[color:var(--state-success)] bg-[color:var(--state-success-subtle)] p-4">
@@ -368,7 +375,7 @@ export default function ProviderDetail({
         </p>
       )}
 
-      {view.connected && <BackupKeys providerId={spec.id} providerName={spec.name} baseUrl={baseUrl.trim() || undefined} />}
+      {view.connected && <BackupKeys providerId={spec.id} providerName={spec.name} baseUrl={baseUrl.trim() || undefined} quotaScopeNote={spec.quotaScopeNote} />}
 
       {view.connected && (
         <div className="flex flex-wrap gap-2 border-t border-[color:var(--border-subtle)] pt-4">
@@ -405,6 +412,27 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
       </div>
       <div className="mt-2 pl-7">{children}</div>
     </li>
+  );
+}
+
+/**
+ * What the provider does with prompts on its free tier, and the person's own word about their key. Confidential mode
+ * (AI Access → Preferences) uses both: it skips providers that may train on prompts unless the key is marked paid.
+ */
+function DataPolicy({ spec, privateTier, onChange }: { spec: CloudProviderSpec; privateTier: boolean; onChange?: (value: boolean) => void }) {
+  const policy = spec.dataPolicy;
+  const trains = policy?.trainsOnFreeTier === "free-tier-trains" || policy?.trainsOnFreeTier === "opt-in-training";
+  return (
+    <section aria-label="Data policy" data-testid="data-policy" className={`rounded-[var(--radius-md)] border p-3 text-xs ${trains ? "border-[color:var(--state-warning)] bg-[color:var(--state-warning-subtle)]" : "border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)]"}`}>
+      <p className="font-semibold text-[color:var(--text-primary)]">{trains ? "Free-tier prompts may be used for training" : policy?.trainsOnFreeTier === "no-training" ? "Not used for training by default" : "Data policy not confirmed"}</p>
+      <p className="mt-0.5 text-[color:var(--text-secondary)]">{policy?.note ?? `We have not confirmed how ${spec.name} handles prompts on its free tier. Check its terms before sending unpublished work.`}</p>
+      {onChange && policy?.trainsOnFreeTier !== "no-training" && (
+        <label className="mt-2 flex items-start gap-2 text-[color:var(--text-secondary)] cursor-pointer">
+          <input type="checkbox" checked={privateTier} onChange={(e) => onChange(e.target.checked)} className="mt-0.5 rounded border-[color:var(--border-control)]" />
+          <span>This key is on a paid or zero-data-retention plan, so Confidential mode may use it.</span>
+        </label>
+      )}
+    </section>
   );
 }
 

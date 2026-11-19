@@ -268,6 +268,8 @@ export function useAiAccess() {
         preferences: {
           ...settings.preferences,
           [`${runnerId}Endpoint`]: endpoint,
+          // A connected runner joins every request's chain as the offline fallback, not only when it is the default.
+          [`${runnerId}Enabled`]: "true",
           ...(model ? { [`${runnerId}Model`]: model } : {}),
         },
       };
@@ -283,6 +285,13 @@ export function useAiAccess() {
   const disconnect = useCallback(
     async (providerId: string) => {
       await removeConnection(providerId);
+      // A disconnected local runner leaves the chain too.
+      if (getLocalRunner(providerId) && settings.preferences[`${providerId}Enabled`]) {
+        const { [`${providerId}Enabled`]: _gone, ...rest } = settings.preferences;
+        const next = { ...settings, preferences: rest };
+        await saveUserAiSettings(next);
+        setSettings(next);
+      }
       // The main key and every backup key.
       for (const keyId of keyIdsFor(providerId)) {
         await removeKeyFromAccount(keyId);
@@ -291,7 +300,7 @@ export function useAiAccess() {
       setKeyed(providersWithStoredKey());
       await refresh();
     },
-    [refresh]
+    [refresh, settings]
   );
 
   const setDefaultProvider = useCallback(

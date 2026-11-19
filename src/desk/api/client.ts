@@ -1,6 +1,6 @@
 import { readSse } from "../../shared/sseReader";
 import { authHeaders } from "./authHeaders";
-import { buildKeyring, encodeKeyring } from "../ai/keyring";
+import { aiRequestParts } from "../ai/keyring";
 import { inspectAiResponse } from "../ai/aiRouteNotices";
 import { liveAiStatus } from "../ai/liveAiStatus";
 import { runAiText } from "../ai/aiRun";
@@ -171,8 +171,8 @@ export async function authedFetch(input: string, init: RequestInit = {}): Promis
   // Every AI connection on this device, in order, so the server can switch to
   // the next one visibly when a provider fails.
   if (routeUsesClientAi(input)) {
-    const ring = await buildKeyring().catch(() => []);
-    if (ring.length) transientAiHeaders["x-ai-keyring"] = encodeKeyring(ring);
+    const parts = await aiRequestParts().catch(() => undefined);
+    if (parts) Object.assign(transientAiHeaders, parts.headers);
   }
 
   const headers = sanitizeHttpHeaderRecord({

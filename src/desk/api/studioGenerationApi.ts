@@ -1,5 +1,4 @@
-import { runAiText } from "../ai/aiRun";
-import { liveAiStatus } from "../ai/liveAiStatus";
+import { postWithBrowserHandOff } from "./browserHandOff";
 import { authedFetch, authedJsonFetch, json, UnauthenticatedError } from "./client";
 import { providersWithStoredKey } from "../../services/userAiSettings";
 import type {
@@ -21,35 +20,9 @@ export class StudioNoAiSourceError extends Error {
   }
 }
 
-/**
- * POSTs an AI feature. When the user's next model is on their own computer the
- * server cannot reach it and answers 426 with the exact prompt; the browser
- * runs it and re-sends the request with the result. A feature with several
- * model calls (coherence passes, review lenses) takes one round trip per call.
- */
+/** POSTs an AI feature, completing the browser hand-off to a local model when the server asks (see `browserHandOff.ts`). */
 async function postAi(url: string, body: Record<string, unknown>): Promise<Response> {
-  const browserResults: Array<{ challengeToken: string; llmResult: string }> = [];
-  for (let round = 0; round < 40; round++) {
-    const res = await authedJsonFetch(url, "POST", { ...body, browserResults }, { skipLlmFallback: true });
-    if (res.status !== 426) return res;
-    const data = (await res.json().catch(() => null)) as { requireFrontendLLM?: boolean; challengeToken?: string; systemPrompt?: string; userPrompt?: string; taskType?: string } | null;
-    if (!data?.requireFrontendLLM || !data.challengeToken) throw new Error("The server asked for a browser AI step it could not describe.");
-    const run = liveAiStatus.begin();
-    let llmResult: string;
-    try {
-      llmResult = await runAiText(
-        { task: "reasoning", messages: [...(data.systemPrompt ? [{ role: "system" as const, content: data.systemPrompt }] : []), { role: "user" as const, content: data.userPrompt ?? "" }] },
-        run.signal,
-        (ev) => run.publish(ev)
-      );
-    } catch (err) {
-      run.end(err);
-      throw err;
-    }
-    run.end();
-    browserResults.push({ challengeToken: data.challengeToken, llmResult });
-  }
-  throw new Error("This step needed more AI calls than expected and was stopped.");
+  return postWithBrowserHandOff(authedJsonFetch, url, body);
 }
 
 /** Reads a JSON answer, turning "no AI connected" into StudioNoAiSourceError so panels can point to AI Access. */

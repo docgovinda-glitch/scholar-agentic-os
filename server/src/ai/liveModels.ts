@@ -7,8 +7,9 @@
  *      remembered briefly so a dead endpoint is not hammered);
  *   2. the model the user saved is kept only while the provider still lists it;
  *      a missing, "auto" or retired choice is replaced by the live recommendation;
- *   3. up to two other good live models of the same connection follow it, so
- *      one retired, rate-limited or empty-answering model never ends the request;
+ *   3. up to two other good live models of the same connection follow it (fewer
+ *      for a large keyring, see `alternatesPerConnection`), so one retired,
+ *      rate-limited or empty-answering model never ends the request;
  *   4. a model the provider says is gone is quarantined for a while, so the next
  *      request skips it instead of failing on it first.
  *
@@ -133,9 +134,37 @@ export async function expandEntry(e: KeyringEntry, task: TaskClass, maxAlternate
   return { entries, notices };
 }
 
+/**
+ * Most candidates one request's chain may hold. Each is a possible round trip, and the router stops starting new
+ * ones after `DEFAULT_MAX_TOTAL_MS` (150 s), so a chain of three models for each of 24 connections could time out
+ * before reaching its last provider. Every connection keeps its primary model; alternates fill what is left.
+ */
+export const MAX_CHAIN_CANDIDATES = 40;
+
+/** Alternates asked for per connection: generous for a short keyring, none for a very large one (primaries first, always). */
+export function alternatesPerConnection(connections: number): number {
+  return connections <= 6 ? 2 : connections <= 12 ? 1 : 0;
+}
+
+/**
+ * Trims expanded connections to `max` candidates in total: every connection's first entry is kept, then alternates
+ * are granted in the person's order until the budget is spent. Order inside and between connections is unchanged.
+ */
+export function fitCandidateBudget(parts: ExpandResult[], max = MAX_CHAIN_CANDIDATES): ExpandResult[] {
+  const primaries = parts.reduce((n, p) => n + Math.min(1, p.entries.length), 0);
+  let spare = Math.max(0, max - primaries);
+  return parts.map((p) => {
+    if (p.entries.length <= 1) return p;
+    const grant = Math.min(p.entries.length - 1, spare);
+    spare -= grant;
+    return { ...p, entries: p.entries.slice(0, 1 + grant) };
+  });
+}
+
 /** Expands a whole keyring, keeping each connection's models together and the user's order. */
 export async function expandKeyring(entries: KeyringEntry[], task: TaskClass): Promise<ExpandResult> {
-  const parts = await Promise.all(entries.map((e) => expandEntry(e, task)));
+  const alternates = alternatesPerConnection(entries.length);
+  const parts = fitCandidateBudget(await Promise.all(entries.map((e) => expandEntry(e, task, alternates))));
   return { entries: parts.flatMap((p) => p.entries), notices: parts.flatMap((p) => p.notices) };
 }
 

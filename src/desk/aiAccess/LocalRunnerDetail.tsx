@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { resolveRunnerEndpoint, type LocalRunnerSpec } from "../../config/localRunnerCatalog";
+import { isRemoteHttpsEndpoint } from "../../platform/router/baseUrl";
 import {
   diagnoseOllamaConnection,
   generateDiagnosticReport,
@@ -52,6 +53,9 @@ export default function LocalRunnerDetail({
   const [copiedReport, setCopiedReport] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<"all" | "local" | "coding">("all");
   const [showDiagnosticsPanel, setShowDiagnosticsPanel] = useState(false);
+  // A public https address (Cloudflare Tunnel to a Kaggle/Colab/Modal GPU, a LiteLLM gateway) is called by Scholar's
+  // server, not by this browser, whose security policy only allows runners on this computer.
+  const remoteEndpoint = isRemoteHttpsEndpoint(resolveRunnerEndpoint(runner, endpoint));
 
   // Filter models based on selection
   const filteredModels = useMemo(() => {
@@ -287,6 +291,12 @@ export default function LocalRunnerDetail({
           <p className="mt-1 text-xs text-[color:var(--text-muted)]">
             Default for {runner.name} is {runner.defaultEndpoint}. Change it only if you started it on a different port.
           </p>
+          {remoteEndpoint && (
+            <p className="mt-1 text-xs text-[color:var(--text-secondary)]" data-testid="remote-runner-note">
+              This is a public https address (for example a Cloudflare Tunnel to a free GPU). Scholar&apos;s server calls it directly, so
+              your browser may not be able to test it. Type the model name below and save. Anyone who has the address can use it, so keep it private.
+            </p>
+          )}
         </Step>
 
         <Step n={4} title="Detect models">
@@ -419,7 +429,7 @@ export default function LocalRunnerDetail({
           <button
             type="button"
             onClick={() => void handleSave()}
-            disabled={saving || reachable !== true}
+            disabled={saving || (reachable !== true && !(remoteEndpoint && model.trim()))}
             className="mt-3 rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-4 py-2 text-sm font-semibold text-[color:var(--text-inverse)] disabled:opacity-60"
           >
             {saving ? "Saving…" : "Save connection"}
