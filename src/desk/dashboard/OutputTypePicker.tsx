@@ -101,7 +101,7 @@ export function ChooseOutputType({
           </select>
 
           {/* Interactive Format Tiles Grid */}
-          <div className="grid w-full grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="grid w-full grid-cols-1 md:grid-cols-3 gap-5 max-w-5xl mx-auto">
             {FORMAT_TILES.map((tile) => {
               const isSelected = selected === tile.id;
               const tileTheme = getFormatTileTheme(tile.id);
