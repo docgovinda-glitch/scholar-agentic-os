@@ -17,6 +17,7 @@ vi.mock("../../utils/llm.ts", () => ({
   callOpenRouterJSON: vi.fn(),
   callOpenRouterText: vi.fn(),
   handOffBeforeStream: vi.fn(async () => false),
+  createChallengeTokenForRequest: vi.fn(() => "challenge-token"),
   getCandidates: () => [],
   buildAuthorizedPolicy: () => ({}),
   resolveRequestAiConfig: () => ({ candidates: [], isClientConfigured: false }),
@@ -26,7 +27,7 @@ import request from "supertest";
 import { app } from "../../../server.ts";
 import { __resetProjectStoreForTests } from "../../../src/app/conductor/projectStore.ts";
 import { getProjectStore } from "../../../src/services/store/projectStore.ts";
-import { callOpenRouterText, handOffBeforeStream } from "../../utils/llm.ts";
+import { callOpenRouterText, createChallengeTokenForRequest, handOffBeforeStream } from "../../utils/llm.ts";
 
 process.env.SUPABASE_URL = "https://test.supabase.co";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "sb_secret_coursework_test";
@@ -129,9 +130,26 @@ describe("Coursework stream-section", () => {
     for (const re of TEMPLATE_MARKERS) expect(res.text).not.toMatch(re);
   });
 
-  it("a late hand-off after the stream opened is a recoverable error event", async () => {
+  it("a late hand-off sends the prompt back so the browser's own model can run it", async () => {
     const id = await createProject();
     handOffToBrowser();
+    const res = await request(app).post(`/api/projects/${id}/assignment/stream-section`).send({ sectionTitle: "Introduction" });
+    expect(res.status).toBe(200);
+    const event = eventsOf(res.text).find((e) => (e as { requireFrontendLLM?: boolean }).requireFrontendLLM);
+    expect(event).toMatchObject({ requireFrontendLLM: true, challengeToken: "challenge-token" });
+    // The prompt the browser has to run is the one the server could not.
+    expect((event as { userPrompt?: string }).userPrompt).toContain("Introduction");
+    // Nothing is written in its place.
+    expect(res.text).not.toContain("fullText");
+    expect(res.text).not.toContain("Offline scaffold");
+  });
+
+  it("a late hand-off whose challenge cannot be signed is a recoverable error event", async () => {
+    const id = await createProject();
+    handOffToBrowser();
+    vi.mocked(createChallengeTokenForRequest).mockImplementationOnce(() => {
+      throw new Error("no signing secret");
+    });
     const res = await request(app).post(`/api/projects/${id}/assignment/stream-section`).send({ sectionTitle: "Introduction" });
     expect(res.status).toBe(200);
     expect(res.text).toContain('"recoverable":true');

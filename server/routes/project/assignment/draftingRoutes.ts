@@ -11,7 +11,7 @@ buildScholarlyVoiceSystemPrompt,
 sanitizeScholarlyText,
 normalizeUnicodeNFC,
 } from "../../../src/utils/scholarlyVoiceGuard.ts";
-import { callOpenRouterText,handOffBeforeStream } from "../../../src/services/scholarBrain.ts";
+import { callOpenRouterText,createChallengeTokenForRequest,handOffBeforeStream } from "../../../src/services/scholarBrain.ts";
 import type { Completer } from "../../../../src/platform/completion.ts";
 import { ensureParagraphBreaks } from "../../../../src/shared/proseParagraphs.ts";
 import { scaffoldReason, streamErrorMessage } from "../../../src/utils/sectionStream.ts";
@@ -75,6 +75,9 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
   // The event stream (shared plumbing: headers, heartbeat, abort on close).
   let sse: SseStream | undefined;
   const aborted = () => sse?.signal.aborted ?? false;
+  // The prompt of the call that could not run on the server, when the chain
+  // fell through to a model only the browser can reach.
+  let handOffCall: { systemPrompt: string; userPrompt: string } | undefined;
   try {
     // Only sources the citation engine can verify (a title, at least one author
     // and a year; see cslEngine.verifyAndConvertToCSL) are offered to the model. Missing metadata is never filled in
@@ -200,18 +203,33 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
     // student's request as asked; a draft the browser's model wrote (hand-off)
     // is used as returned.
     const fromBrowser = Boolean((req.body as { llmResult?: unknown })?.llmResult);
-    const complete: Completer = async (call) => ({
-      text:
-        (await callOpenRouterText(req, res, call.systemPrompt ?? "", call.userPrompt, undefined, "drafting", {
-          onToken: call.onToken,
-          onReset: call.onReset,
-          signal: call.signal,
-        })) ?? "",
-      provider: "router",
-      model: "",
-      inputTokensEstimate: 0,
-      outputTokensEstimate: 0,
-    });
+    let callNo = 0;
+    const complete: Completer = async (call) => {
+      // Only the first call can be handed to the browser: the request is sent
+      // again with its answer, and the drafting loop then makes that one call.
+      const isFirstCall = callNo++ === 0;
+      try {
+        return {
+          text:
+            (await callOpenRouterText(req, res, call.systemPrompt ?? "", call.userPrompt, undefined, "drafting", {
+              onToken: call.onToken,
+              onReset: call.onReset,
+              signal: call.signal,
+            })) ?? "",
+          provider: "router",
+          model: "",
+          inputTokensEstimate: 0,
+          outputTokensEstimate: 0,
+        };
+      } catch (err) {
+        // Which prompt the browser has to run: the hand-off (426) could not be
+        // sent, because the stream is already open.
+        if (isFirstCall && (errorText(err) === "RequireFrontendLLMException" || err instanceof BrowserAiRequiredError)) {
+          handOffCall = { systemPrompt: call.systemPrompt ?? "", userPrompt: call.userPrompt };
+        }
+        throw err;
+      }
+    };
     const { text: loopText } = await scholarBrain.runSectionDraft(complete, {
       systemPrompt,
       userPrompt: prompt,
@@ -253,6 +271,32 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
     const handedOff = errorText(err) === "RequireFrontendLLMException";
     if (handedOff && !res.headersSent) return;
     if (!res.headersSent) return sendAiFailure(res, err, "Section draft");
+    // The cloud models failed and the next model in the chain is the user's own
+    // (Ollama, LM Studio), which this server cannot reach. The stream is open,
+    // so the 426 hand-off could not be sent: the prompt goes back as an event
+    // instead. The browser runs it and re-sends the request with the result,
+    // which `callOpenRouterText` then returns in place of a model call.
+    if ((handedOff || err instanceof BrowserAiRequiredError) && handOffCall && !res.writableEnded) {
+      // Without a signed challenge the browser's answer could not be verified,
+      // so the student gets the plain error below instead of a dead stream.
+      let challengeToken = "";
+      try {
+        challengeToken = createChallengeTokenForRequest(req, handOffCall.systemPrompt, handOffCall.userPrompt);
+      } catch (signErr) {
+        console.error("[stream-section] could not sign the browser hand-off:", errorText(signErr));
+      }
+      if (challengeToken) {
+        sse?.send({
+          requireFrontendLLM: true,
+          challengeToken,
+          systemPrompt: handOffCall.systemPrompt,
+          userPrompt: handOffCall.userPrompt,
+          taskType: "drafting",
+        });
+        sse?.close({ done: true });
+        return;
+      }
+    }
     // The stream is open: every failure becomes an event, never a dropped socket.
     // Configuration errors keep their own message; any other AI failure
     // (credit/quota exhausted on every provider, 5xx, timeout) on a first draft
