@@ -35,7 +35,7 @@ export function askLengthInstruction(length: string): string {
  */
 export const PLATFORM_FACTS = `ABOUT SCHOLAR CORE (answer questions about the platform from these facts only; say so if something is not covered):
 - Scholar Core is an academic research and writing platform. AskScholar (this assistant) answers questions with live search, scholarly sources and citations.
-- Four workspaces: Coursework & Essays (OT-01: extract the brief, understand marks and sub-questions, find sources, draft section by section); Journal Article (OT-10: IMRaD manuscript with literature synthesis and peer-review readiness); Research Proposal (OT-15: question, gap analysis, framework, methodology); Slides & Keynotes (OT-22: outline, design, edit, deliver).
+- Three workspaces: Coursework & Essays (OT-01: extract the brief, understand marks and sub-questions, find sources, draft section by section); Journal Article (OT-10: IMRaD manuscript with literature synthesis and peer-review readiness); Slides & Keynotes (OT-22: outline, design, edit, deliver).
 - Any answer can be turned into a project in a workspace; the conversation, sources and attached documents carry over.
 - Knowledge Vault: the user's private library of sources and documents, used to ground answers.
 - AI Access: the user connects their own provider keys (BYOK) or a local model runner; every workspace and AskScholar use the same connection and model choice. A premium tier is not available yet.

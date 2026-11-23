@@ -26,7 +26,7 @@ A navigational map of the repository: where things live and where to start when 
 | :--- | :--- |
 | `server/routes/index.ts` | Re-exports every `register*Routes` |
 | `server/routes/{health,auth,admin,ai,aiRun,aiAccess,studio,project,search,vault,presentations,supabaseProxy}.ts` | Route modules ([`docs/API.md`](docs/API.md)) |
-| `server/routes/project/` | Per-workflow routers: `agentic/` (journal), `assignment/` (coursework), `thesis.ts`, `proposal.ts`, `presentation.ts`, `presentationCards.ts`, `claims.ts`, `evidence.ts`, `files.ts`, `activity.ts`, `parse.ts`, `mesh.ts`, `journal_compliance.ts`, `submissions.ts`, `core/` (manuscript, gates, export, shared helpers) |
+| `server/routes/project/` | Per-workflow routers: `agentic/` (journal), `assignment/` (coursework), `thesis.ts`, `presentation.ts`, `presentationCards.ts`, `claims.ts`, `evidence.ts`, `files.ts`, `activity.ts`, `parse.ts`, `mesh.ts`, `journal_compliance.ts`, `submissions.ts`, `core/` (manuscript, gates, export, shared helpers) |
 | `server/src/aiEngine/` | `userKeyVault` (a user's saved keys), `rewrapKeys`, `adminUsers`, `userAdmin`, `auditLog`, `opportunityAgent` |
 | `server/src/ai/` | `routerBridge` (request chain), `browserHandoff`, `accountAi`, `liveModels`, `serverLocalAccess`, `aiEndpointGuard`, `aiRouteErrors` |
 | `server/src/services/` | `scholarBrain.ts` (the only AI brain), `sectionDrafter.ts`, `semanticRagEngine.ts`, `prompts/` (all workspace prompt text) |
@@ -40,7 +40,7 @@ A navigational map of the repository: where things live and where to start when 
 | Path | Contents |
 | :--- | :--- |
 | `main.tsx` | SPA entry: `/admin/*` (lazy) and `/*` (`DeskApp`) |
-| `desk/` | UI by feature; `DeskApp.tsx` routes, `DeskShell.tsx` generic shell, `ProjectListScreen.tsx`, workspaces `assignment/`, `thesis/`, `workspace/` (journal studio), `journal/`, `proposal/`, `presentation/`, plus `vault/`, `aiAccess/`, `ai/`, `auth/`, `account/`, `admin/`, `dashboard/`, `setup/`, `regions/`, `api/` (typed client) |
+| `desk/` | UI by feature; `DeskApp.tsx` routes, `DeskShell.tsx` generic shell, `ProjectListScreen.tsx`, workspaces `assignment/`, `thesis/`, `workspace/` (journal studio), `journal/`, `presentation/`, plus `vault/`, `aiAccess/`, `ai/`, `auth/`, `account/`, `admin/`, `dashboard/`, `setup/`, `regions/`, `api/` (typed client) |
 | `app/` | Engines: `atlas` (output-type catalog), `conductor` (project store and gates), `mesh`, `citation`, `manuscript`, `review`, `coherence`, `rubric`, `studio`, `journal`, `anonymization`, `coverLetter`, `export` |
 | `domain/` | Pure models and zod schemas |
 | `features/` | `slides` (Gamma engine, Presentation Studio steps), `coursework` (style engine, legacy components), `drafting`, `sources`, `understand` |

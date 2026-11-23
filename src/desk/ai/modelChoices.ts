@@ -13,7 +13,7 @@ import { authedFetch, json } from "../api/client";
 import { resolveRouterTarget } from "../../platform/router/providerMap";
 import { buildKeyring, encodeKeyring, type KeyringEntry } from "./keyring";
 
-export type WorkspaceId = "ask-scholar" | "coursework" | "journal" | "proposal" | "presentation";
+export type WorkspaceId = "ask-scholar" | "coursework" | "journal" | "presentation";
 
 export interface ProviderModels {
   provider: string;
@@ -26,7 +26,6 @@ const WORKSPACE_NEEDS: Record<WorkspaceId, { tiers: Array<CuratedModel["tier"]>;
   "ask-scholar": { tiers: ["balanced", "fast"], why: "quick, grounded answers in conversation" },
   coursework: { tiers: ["balanced", "flagship"], why: "structured essays with consistent citations" },
   journal: { tiers: ["flagship", "balanced"], why: "long, rigorous manuscript sections" },
-  proposal: { tiers: ["flagship", "balanced"], why: "careful argument across a long document" },
   presentation: { tiers: ["fast", "balanced"], why: "short slide copy generated quickly" },
 };
 

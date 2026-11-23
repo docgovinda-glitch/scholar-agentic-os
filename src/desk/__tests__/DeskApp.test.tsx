@@ -133,7 +133,6 @@ beforeAll(async () => {
     import("../workspace/ResearchWorkspace"),
     import("../assignment/AssignmentWorkspace"),
     import("../thesis/ThesisWorkspace"),
-    import("../proposal/ProposalWorkspace"),
     import("../presentation/PresentationWorkspace"),
     import("../ProjectListScreen"),
     import("../setup/VaultSetupScreen"),

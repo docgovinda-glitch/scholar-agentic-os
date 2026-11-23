@@ -1932,7 +1932,7 @@ export default function ProjectListScreen({
   const handleBootProjectFromResearch = useCallback(
     async (
       researchMessage: WebsiteAssistantMessage,
-      formatOverride?: "OT-01" | "OT-10" | "OT-15" | "OT-07" | "OT-22"
+      formatOverride?: "OT-01" | "OT-10" | "OT-07" | "OT-22"
     ) => {
       const handoff = researchMessage.recommendedWorkspaceHandoff;
       const targetFormatId = formatOverride || handoff?.targetFormatId || "OT-10";

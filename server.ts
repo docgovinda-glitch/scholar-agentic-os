@@ -220,7 +220,7 @@ app.use(["/api/ai/run", "/api/ai/models"], aiAbuseLimit);
 registerAiRunRoutes(app);
 // Every other AI call site runs through the same router (server/src/ai/routerBridge.ts);
 // their JSON responses carry an `aiRoute` summary of which model answered and why.
-app.use(["/api/ai", "/api/projects/:id/agentic", "/api/projects/:id/assignment", "/api/projects/:id/thesis", "/api/projects/:id/proposal", "/api/projects/:id/presentation", "/api/projects/:id/manuscript", "/api/projects/:id/journal-requirements", "/api/projects/:id/cover-letter", "/api/projects/:id/anonymization", "/api/studio/refine", "/api/presentations"], aiRouteDecorator);
+app.use(["/api/ai", "/api/projects/:id/agentic", "/api/projects/:id/assignment", "/api/projects/:id/thesis", "/api/projects/:id/presentation", "/api/projects/:id/manuscript", "/api/projects/:id/journal-requirements", "/api/projects/:id/cover-letter", "/api/projects/:id/anonymization", "/api/studio/refine", "/api/presentations"], aiRouteDecorator);
 registerAIRoutes(app, aiAbuseLimit, citationStyleRegistry);
 registerStudioRoutes(app, studioLimit);
 // Coursework (OT-01) saves are mirrored into normalized per-stage tables.

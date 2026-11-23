@@ -23,7 +23,7 @@ The Atlas catalog (`src/app/atlas/catalogData.ts`, `src/app/atlas/catalog.ts`) d
 | `short_form` | OT-01 Assignment, OT-02 Essay, OT-03 Report, OT-13 Literature Review, OT-04 Abstract, OT-05 Seminar Paper, OT-24 Generic Document |
 | `long_form` | OT-06 Undergraduate Dissertation / Capstone, OT-07 Master's Thesis, OT-08 Doctoral Dissertation, OT-09 Book / Monograph |
 | `publication` | OT-10 Journal Article, OT-11 Conference Paper, OT-12 Review Article, OT-14 Book Chapter |
-| `proposal_funding` | OT-15 Research Proposal, OT-16 Grant Proposal, OT-17 Ethics Application |
+| `proposal_funding` | OT-16 Grant Proposal, OT-17 Ethics Application |
 | `applied_professional` | OT-18 Lab Report, OT-19 Case Study, OT-20 Policy Brief, OT-21 White Paper / Technical Documentation |
 | `presentation` | OT-22 Presentation, OT-23 Poster |
 
@@ -34,11 +34,10 @@ Dedicated workspaces (routing in `DeskApp.tsx`):
 | `OT-01`, `OT-02` | Coursework (`src/desk/assignment/`) |
 | `OT-07` | Thesis (`src/desk/thesis/`) |
 | `OT-10` | Journal research studio (`src/desk/workspace/`) |
-| `OT-15` | Research proposal (`src/desk/proposal/`) |
 | `OT-22` | Presentation Studio (`src/desk/presentation/`) |
 | everything else | Generic shell (`src/desk/DeskShell.tsx`) |
 
-Workspace ids match the catalog: Research Proposal is `OT-15` and the Thesis workspace is `OT-07`. Projects saved earlier under `OT-19` (proposal) or `OT-09` (thesis) are read as `OT-15` / `OT-07` (`src/app/atlas/legacyIds.ts`, applied by the project stores and `DeskApp`), and migration `20261109000000_align_output_type_ids.sql` rewrites the stored rows. Project creation tiles (`src/desk/dashboard/constants.ts`) are Coursework & Essays (`OT-01`), Journal Article (`OT-10`), Research Proposal (`OT-15`) and Slides & Keynotes (`OT-22`); the picker also lists the other catalog types except `OT-07`, which has its own thesis tile.
+Workspace ids match the catalog: the Thesis workspace is `OT-07`. Projects saved earlier under `OT-19` (proposal) or `OT-09` (thesis) are read as `OT-15` / `OT-07` (`src/app/atlas/legacyIds.ts`, applied by the project stores and `DeskApp`), and migration `20261109000000_align_output_type_ids.sql` rewrites the stored rows. Project creation tiles (`src/desk/dashboard/constants.ts`) are Coursework & Essays (`OT-01`), Journal Article (`OT-10`) and Slides & Keynotes (`OT-22`); the picker also lists the other catalog types except `OT-07`, which has its own thesis tile.
 
 ## 3. Capabilities by area
 
@@ -47,8 +46,6 @@ Workspace ids match the catalog: Research Proposal is `OT-15` and the Thesis wor
 **Journal article** (`OT-10`): 25 stages in five phases (Foundation, Evidence, Drafting, Review, Publication; `src/desk/workspace/types.ts`). Gap finding, title selection and lock, Vault and external source approval, evidence extraction and analysis, journal discovery and requirements, drafting, citation audit, originality check, peer-review simulation, revision and rebuttal matrix, final editor, publication readiness, cover letter, anonymization and export.
 
 **Thesis** (`OT-07`): chapter editor, research questions, literature matrix, references, LaTeX and document export, chapter audit and gate status, Viva Voce simulator.
-
-**Proposal** (`OT-15`): narrative section editor, budget editor, aims audit, study-section scorer, export.
 
 **Presentation Studio** (`OT-22`): topic or document to card outline, 8 curated themes, inline editing, presenter, audience Q&A simulator, PowerPoint/PDF/Markdown/JSON export. See [`presentation-studio.md`](presentation-studio.md).
 

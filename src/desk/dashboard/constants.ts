@@ -23,17 +23,6 @@ export const FORMAT_TILES = [
     budget: "IMRaD Architecture · Peer Review · 4,000 – 10,000 words",
   },
   {
-    id: "OT-15",
-    label: "Research Proposal",
-    title: "Research Proposal",
-    guidance: "Guides research question definition, literature gap identification, theoretical frameworks, and methodology design.",
-    specs: "Gap Analysis · Ethics & Methodology · 3,000 – 15,000 words",
-    footer: "Gap Analysis · Ethics & Methodology · 3,000 – 15,000 words",
-    usp: "Literature Gap Analysis · Ethical Frameworks",
-    features: "Gap Analysis · Ethics & Methodology · 3,000 – 15,000 words",
-    budget: "Gap Analysis · Ethics & Methodology · 3,000 – 15,000 words",
-  },
-  {
     id: "OT-22",
     label: "Slides & Keynotes",
     title: "Slides & Keynotes",
@@ -64,14 +53,6 @@ export const STAGE_BREAKDOWNS: Record<string, { phases: string[]; highlights: st
       "Phase III (Stages 15–18): Peer-Reviewed Agentic Drafting",
       "Phase IV (Stages 19–21): Academic Voice & Guideline Fit",
       "Phase V (Stages 22–25): LaTeX/PDF Export & Sign-Off",
-    ],
-  },
-  "OT-15": {
-    highlights: "Competitive grant and doctoral funding proposal generation pipeline.",
-    phases: [
-      "Phase I: Specific Aims & Novelty Justification",
-      "Phase II: Methodological Feasibility & Data Plan",
-      "Phase III: Milestone Timelines & Budget Defense",
     ],
   },
   "OT-22": {
@@ -136,12 +117,6 @@ export function getFormatTileTheme(id: string) {
         badgeBg: "bg-slate-100/90 text-slate-700 dark:bg-white/10 dark:text-slate-300 border border-slate-200/80 dark:border-white/10",
         accentText: "text-slate-700 dark:text-slate-300",
         hoverBorder: "hover:border-slate-300 dark:hover:border-white/25",
-      };
-    case "OT-15":
-      return {
-        badgeBg: "bg-indigo-50/90 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400/90 border border-indigo-100 dark:border-indigo-500/20",
-        accentText: "text-indigo-600 dark:text-indigo-400/90",
-        hoverBorder: "hover:border-indigo-300 dark:hover:border-indigo-500/40",
       };
     case "OT-22":
       return {

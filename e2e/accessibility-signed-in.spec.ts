@@ -14,7 +14,6 @@ const WORKSPACES = [
   { name: "coursework", outputTypeId: "OT-01" },
   { name: "thesis", outputTypeId: "OT-07" },
   { name: "journal", outputTypeId: "OT-10" },
-  { name: "proposal", outputTypeId: "OT-15" },
 ];
 
 async function api(page: Page, method: string, path: string, body?: unknown) {
