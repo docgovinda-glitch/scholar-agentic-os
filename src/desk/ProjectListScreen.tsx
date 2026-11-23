@@ -3071,14 +3071,14 @@ export default function ProjectListScreen({
                 ) : !isAiSidebarOpen ? (
                   <>
                     {resumeTarget && <div className="w-full max-w-xl mx-auto">{resumeChatRow("mb-2")}</div>}
-                    <div className="text-center mb-2 flex flex-col items-center">
-                      <h1 className="text-2xl sm:text-[28px] font-semibold text-neutral-900 dark:text-white tracking-tight leading-tight">
+                    <div className="text-center mb-6 flex flex-col items-center">
+                      <h1 className="text-2xl sm:text-[32px] font-semibold text-neutral-900 dark:text-white tracking-tight leading-tight">
                         Where will your research begin?
                       </h1>
                     </div>
 
                     <div className="w-full">
-                      <div className="grid w-full gap-4 transition-all duration-300 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+                      <div className="grid w-full max-w-5xl mx-auto gap-5 transition-all duration-300 grid-cols-1 md:grid-cols-3">
                         {FORMAT_TILES.map((tile) => {
                           const isBootingThis = creatingFormatId === tile.id;
                           const isOtherBooting = creating && !isBootingThis;
@@ -3523,9 +3523,9 @@ export default function ProjectListScreen({
                       </h1>
                     </div>
 
-                    {/* 4 Cards Grid - Responsive full 4-column layout on sm+ screens */}
+                    {/* 3 workspace cards, centred, one column on phones */}
                     <div className="w-full hidden sm:block">
-                      <div className="grid w-full gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+                      <div className="grid w-full max-w-5xl mx-auto gap-5 grid-cols-1 md:grid-cols-3">
                         {FORMAT_TILES.map((tile) => {
                           const isBootingThis = creatingFormatId === tile.id;
                           const isOtherBooting = creating && !isBootingThis;
