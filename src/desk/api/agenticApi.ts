@@ -473,24 +473,6 @@ export async function downloadRefereeResponseLetterBlob(
   return res.blob();
 }
 
-export interface ProposalCriterionResult {
-  criterion: string;
-  score: number;
-  verdict: string;
-  critique: string;
-  recommendation: string;
-}
-
-export interface StudySectionSimulationResponse {
-  projectId: string;
-  agency: string;
-  mechanism: string;
-  overallImpactScore: string;
-  recommendationForFunding: string;
-  criteria: ProposalCriterionResult[];
-  auditedAt: string;
-}
-
 /** Reads the server's own error message so the user sees why nothing was produced. */
 async function apiError(res: Response, fallback: string): Promise<Error> {
   try {
@@ -500,54 +482,6 @@ async function apiError(res: Response, fallback: string): Promise<Error> {
     // Non-JSON error body.
   }
   return new Error(`${fallback} (HTTP ${res.status}).`);
-}
-
-export interface StudySectionReviewRequest {
-  title: string;
-  agency?: string;
-  mechanism?: string;
-  specificAims: string[];
-  significance?: string;
-  strategy?: string;
-}
-
-export async function simulateStudySectionReview(
-  projectId: string,
-  payload: StudySectionReviewRequest
-): Promise<StudySectionSimulationResponse> {
-  const res = await authedJsonFetch(
-    `/api/projects/${encodeURIComponent(projectId)}/proposal/study-section-simulate`,
-    "POST",
-    payload
-  );
-  if (!res.ok) throw await apiError(res, "The study section review could not be run");
-  const body = (await res.json()) as Omit<StudySectionSimulationResponse, "projectId" | "auditedAt">;
-  return {
-    projectId,
-    agency: body.agency ?? "",
-    mechanism: body.mechanism ?? "",
-    overallImpactScore: body.overallImpactScore,
-    recommendationForFunding: body.recommendationForFunding ?? "",
-    criteria: Array.isArray(body.criteria) ? body.criteria : [],
-    auditedAt: new Date().toISOString(),
-  };
-}
-
-export interface AimsAuditCheckItem {
-  name: string;
-  status: "passed" | "warn" | "fail";
-  detail: string;
-}
-
-export async function auditSpecificAims(projectId: string, aimsText: string): Promise<AimsAuditCheckItem[]> {
-  const res = await authedJsonFetch(
-    `/api/projects/${encodeURIComponent(projectId)}/proposal/aims-audit`,
-    "POST",
-    { aimsText }
-  );
-  if (!res.ok) throw await apiError(res, "The aims audit could not be run");
-  const body = (await res.json()) as { checks?: AimsAuditCheckItem[] };
-  return Array.isArray(body.checks) ? body.checks : [];
 }
 
 export interface VivaQuestionItem {
@@ -623,18 +557,6 @@ export async function draftThesisChapter(projectId: string, payload: ThesisChapt
     wordCount: typeof body.wordCount === "number" ? body.wordCount : 0,
     citedSourcesCount: typeof body.citedSourcesCount === "number" ? body.citedSourcesCount : 0,
   };
-}
-
-/** Drafts one proposal section with the user's AI, grounded in retrieved and Vault sources. */
-export async function draftProposalSection(
-  projectId: string,
-  payload: { sectionTitle: string; targetWords: number; prompt?: string }
-): Promise<{ content: string; bibliography: string }> {
-  const res = await authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/proposal/draft-section`, "POST", payload);
-  if (!res.ok) throw await apiError(res, "The section could not be drafted");
-  const body = (await res.json()) as { content?: unknown; bibliography?: unknown };
-  if (typeof body.content !== "string" || !body.content.trim()) throw new Error("The AI returned an empty section. Nothing was changed.");
-  return { content: body.content, bibliography: typeof body.bibliography === "string" ? body.bibliography : "" };
 }
 
 export interface ThesisChapterAuditResponse {

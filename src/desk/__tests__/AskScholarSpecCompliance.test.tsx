@@ -202,7 +202,7 @@ describe("AskScholar Authoritative Specification Compliance (Sections 2–16)", 
     expect(actionButtons[4]).toHaveTextContent("Store to Knowledge Vault");
     expect(actionButtons[5]).toHaveTextContent("Continue");
 
-    // Section 8 & 11: Continue opens the 4-workspace picker (Assignment, Journal Article, Research Proposal, Presentation)
+    // Section 8 & 11: Continue opens the 3-workspace picker (Assignment, Journal Article, Presentation)
     createProject.mockResolvedValueOnce({ projectId: "proj-seeded-99" });
     saveIntakeAnswers.mockResolvedValueOnce({ success: true });
     fireEvent.click(actionButtons[5]);
@@ -210,12 +210,11 @@ describe("AskScholar Authoritative Specification Compliance (Sections 2–16)", 
     const picker = await screen.findByTestId("continue-workspace-picker");
     expect(within(picker).getByTestId("continue-workspace-OT-01")).toHaveTextContent("Coursework & Essays");
     expect(within(picker).getByTestId("continue-workspace-OT-10")).toHaveTextContent("Journal Article");
-    expect(within(picker).getByTestId("continue-workspace-OT-15")).toHaveTextContent("Research Proposal");
     expect(within(picker).getByTestId("continue-workspace-OT-22")).toHaveTextContent("Slides & Keynotes");
 
-    fireEvent.click(within(picker).getByTestId("continue-workspace-OT-15"));
+    fireEvent.click(within(picker).getByTestId("continue-workspace-OT-22"));
     await waitFor(() => {
-      expect(createProject).toHaveBeenCalledWith("OT-15");
+      expect(createProject).toHaveBeenCalledWith("OT-22");
       expect(onOpen).toHaveBeenCalledWith("proj-seeded-99");
     });
   });

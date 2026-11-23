@@ -8,7 +8,6 @@ import {
   APPLE_STUDIO_STAGES,
   type AppleStudioPhaseId,
 } from "../../components/ui/AppleStudioShell";
-import ProposalWorkspace from "../proposal/ProposalWorkspace";
 import ThesisWorkspace from "../thesis/ThesisWorkspace";
 import assignmentRouter, {
   deriveHeuristicTitle,
@@ -24,7 +23,7 @@ describe("Apple-Grade Studio UX Unification & Sprint 1 Production Polish", () =>
       return new Response(
         JSON.stringify({
           projectId: "proj-empty-1",
-          outputTypeId: "OT-15",
+          outputTypeId: "OT-07",
           version: 1,
           title: "",
           answers: {},
@@ -117,22 +116,7 @@ describe("Apple-Grade Studio UX Unification & Sprint 1 Production Polish", () =>
     });
   });
 
-  describe("2. Zero-Ghost Overhaul for ProposalWorkspace (OT-15) & ThesisWorkspace (OT-07)", () => {
-    it("renders ProposalWorkspace (OT-15) with an empty project and zero occurrences of 'Autonomous Verification' or 'Quantum Cognitive', offering 3 empty aims", () => {
-      const { container } = render(<ProposalWorkspace projectId="proj-empty-proposal" />);
-
-      const htmlText = container.textContent || "";
-      expect(htmlText).not.toMatch(/Autonomous Verification/i);
-      expect(htmlText).not.toMatch(/Quantum Cognitive/i);
-
-      const blueprintBtn = screen.getByTestId("generate-structured-blueprint-btn");
-      expect(blueprintBtn).toHaveTextContent(/Set up 3 aims to fill in/i);
-
-      // Clicking the button sets up three empty aims (no wording written for the applicant)
-      fireEvent.click(blueprintBtn);
-      expect(screen.getByText(/0 of 3 aims written/i)).toBeInTheDocument();
-    });
-
+  describe("2. Zero-Ghost Overhaul for ThesisWorkspace (OT-07)", () => {
     it("renders ThesisWorkspace (OT-07) with an empty project and zero occurrences of 'Quantum Cognitive' or 'Autonomous Verification', offering a 5-chapter structure", () => {
       const { container } = render(<ThesisWorkspace projectId="proj-empty-thesis" />);
 

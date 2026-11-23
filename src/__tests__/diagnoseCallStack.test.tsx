@@ -9,7 +9,7 @@ import { MemoryRouter } from "react-router-dom";
 vi.mock("../desk/api", () => ({
   getProject: vi.fn().mockImplementation((id: string) => Promise.resolve({
     projectId: id,
-    outputTypeId: id.includes("thesis") ? "OT-07" : id.includes("research") ? "OT-10" : id.includes("proposal") ? "OT-15" : id.includes("presentation") ? "OT-22" : "OT-01",
+    outputTypeId: id.includes("thesis") ? "OT-07" : id.includes("research") ? "OT-10" : id.includes("presentation") ? "OT-22" : "OT-01",
     title: "Test Project",
     hasDocument: false,
     answers: {},
@@ -70,7 +70,6 @@ import DeskApp from "../desk/DeskApp";
 import AssignmentWorkspace from "../desk/assignment/AssignmentWorkspace";
 import ResearchWorkspace from "../desk/workspace/ResearchWorkspace";
 import ThesisWorkspace from "../desk/thesis/ThesisWorkspace";
-import ProposalWorkspace from "../desk/proposal/ProposalWorkspace";
 import PresentationWorkspace from "../desk/presentation/PresentationWorkspace";
 import DeskShell from "../desk/DeskShell";
 import ProjectListScreen from "../desk/ProjectListScreen";
@@ -156,14 +155,6 @@ describe("Diagnose Maximum Call Stack Size Exceeded", () => {
     render(
       <ThesisWorkspace
         projectId="proj-thesis-1"
-      />
-    );
-  });
-
-  it("renders ProposalWorkspace directly", () => {
-    render(
-      <ProposalWorkspace
-        projectId="proj-proposal-1"
       />
     );
   });

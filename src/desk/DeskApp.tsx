@@ -30,7 +30,6 @@ const DeskShell = lazy(() => import("./DeskShell"));
 const ResearchWorkspace = lazy(() => import("./workspace/ResearchWorkspace"));
 const AssignmentWorkspace = lazy(() => import("./assignment/AssignmentWorkspace"));
 const ThesisWorkspace = lazy(() => import("./thesis/ThesisWorkspace"));
-const ProposalWorkspace = lazy(() => import("./proposal/ProposalWorkspace"));
 const PresentationWorkspace = lazy(() => import("./presentation/PresentationWorkspace"));
 const ProjectListScreen = lazy(() => import("./ProjectListScreen"));
 const VaultSetupScreen = lazy(() => import("./setup/VaultSetupScreen"));
@@ -330,18 +329,6 @@ function ProjectRoute() {
   if (outputTypeId === "OT-07") {
     return (
       <ThesisWorkspace
-        projectId={targetProjectId}
-        onClose={() => navigate("/projects")}
-        onOpenAccountSettings={() => navigate("/settings", { state: { from: location.pathname } })}
-        onOpenVault={() => navigate("/vault", { state: { from: location.pathname } })}
-        onOpenAiAccess={() => navigate("/ai-access", { state: { from: location.pathname } })}
-      />
-    );
-  }
-
-  if (outputTypeId === "OT-15") {
-    return (
-      <ProposalWorkspace
         projectId={targetProjectId}
         onClose={() => navigate("/projects")}
         onOpenAccountSettings={() => navigate("/settings", { state: { from: location.pathname } })}

@@ -15,7 +15,6 @@
 import * as courseworkPrompts from "./prompts/courseworkPrompts.ts";
 import * as journalPrompts from "./prompts/journalPrompts.ts";
 import * as thesisPrompts from "./prompts/thesisPrompts.ts";
-import * as proposalPrompts from "./prompts/proposalPrompts.ts";
 import * as presentationPrompts from "./prompts/presentationPrompts.ts";
 import { draftSection, priorSectionsContext, researchContextFromAnswers, runSectionDraft } from "./sectionDrafter.ts";
 import { openSse } from "../utils/sse.ts";
@@ -441,9 +440,8 @@ export const scholarBrain = {
   /** Journal (OT-10) prompt text: section drafting, polishing, peer review, rebuttal, copilot. */
   journalPrompts,
 
-  /** Thesis (OT-07), Proposal (OT-15) and Presentation Studio (OT-22) prompt text. */
+  /** Thesis (OT-07) and Presentation Studio (OT-22) prompt text. */
   thesisPrompts,
-  proposalPrompts,
   presentationPrompts,
 
   /**

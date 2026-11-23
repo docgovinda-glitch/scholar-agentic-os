@@ -28,13 +28,6 @@ describe("AskScholar Retrieval-Grounded Architecture & Anti-Hallucination Pipeli
       expect(intent?.wordCountTarget).toBe(5000);
     });
 
-    it("detects Research Proposal (OT-15)", () => {
-      const intent = detectDeliverableIntent("Write a research proposal on carbon capture technologies");
-      expect(intent).not.toBeNull();
-      expect(intent?.targetFormatId).toBe("OT-15");
-      expect(intent?.formatLabel).toBe("Research Proposal Workspace");
-    });
-
     it("detects Doctoral Thesis / Dissertation (OT-07)", () => {
       const intent = detectDeliverableIntent("Draft chapter 2 dissertation literature review on institutional economics");
       expect(intent).not.toBeNull();

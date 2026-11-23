@@ -24,7 +24,6 @@ import { evidenceRouter } from "./project/evidence";
 import { agenticRouter } from "./project/agentic";
 import assignmentRouter from "./project/assignment";
 import thesisRouter from "./project/thesis";
-import proposalRouter from "./project/proposal";
 import presentationRouter from "./project/presentation";
 import { journalComplianceRouter } from "./project/journal_compliance";
 import parseRouter from "./project/parse";
@@ -73,7 +72,6 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
   router.use("/:id/agentic", agenticRouter);
   router.use("/:id/assignment", assignmentRouter);
   router.use("/:id/thesis", thesisRouter);
-  router.use("/:id/proposal", proposalRouter);
   router.use("/:id/presentation", presentationRouter);
   router.use("/:id/parse-file", parseRouter);
   router.use("/:id/compliance", journalComplianceRouter(projectLimit));

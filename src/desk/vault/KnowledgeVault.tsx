@@ -56,7 +56,6 @@ export interface KnowledgeVaultProps {
 export const VAULT_FORMAT_TILES = [
   { id: "OT-10", label: "Journal Article" },
   { id: "OT-01", label: "Assignment" },
-  { id: "OT-15", label: "Research Proposal" },
   { id: "OT-22", label: "Presentation" },
   { id: "OT-20", label: "Thesis / Dissertation" },
 ];
@@ -67,7 +66,6 @@ function FormatIcon({ id, className = "w-4 h-4" }: { id: string; className?: str
       return <BookOpen className={className} />;
     case "OT-10":
       return <FileText className={className} />;
-    case "OT-15":
     case "OT-02":
       return <Sparkles className={className} />;
     case "OT-22":

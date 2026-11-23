@@ -52,7 +52,7 @@ describe("buildWorkspaceHandoff", () => {
   });
 
   it("records image names and says where their analysis is, instead of dropping them silently", () => {
-    const h = buildWorkspaceHandoff({ targetFormatId: "OT-15", messages, answerText: "x", citationStyle: "apa", imageNames: ["chart.png", "chart.png"] });
+    const h = buildWorkspaceHandoff({ targetFormatId: "OT-10", messages, answerText: "x", citationStyle: "apa", imageNames: ["chart.png", "chart.png"] });
     expect(h.intake.ask_images).toEqual([{ name: "chart.png" }]);
     expect(String(h.intake.backgroundNotes)).toContain("chart.png");
   });

@@ -90,7 +90,6 @@ describe("the document-type format selector", () => {
 
     expect(screen.getByRole("heading", { name: "Coursework & Essays" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Journal Article" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Research Proposal" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Slides & Keynotes" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Thesis / Dissertation" })).not.toBeInTheDocument();
   });
@@ -121,7 +120,6 @@ describe("the document-type format selector", () => {
 
     expect(screen.getByRole("heading", { name: "Coursework & Essays" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Journal Article" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Research Proposal" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Slides & Keynotes" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Thesis / Dissertation" })).not.toBeInTheDocument();
   });
@@ -577,10 +575,9 @@ describe("landing workspace hero & academic workspace cards", () => {
     expect(screen.queryByText("What would you like to write today?")).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText("Start a literature review, brainstorm an outline, or drop a syllabus")).not.toBeInTheDocument();
 
-    // 4 Academic Workspace Cards
+    // 3 Academic Workspace Cards
     expect(await screen.findByRole("heading", { name: "Coursework & Essays" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Journal Article" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Research Proposal" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Slides & Keynotes" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Thesis / Dissertation" })).not.toBeInTheDocument();
 
@@ -653,17 +650,6 @@ describe("landing workspace hero & academic workspace cards", () => {
     expect(journalCard.innerHTML).toContain("text-neutral-600");
     expect(journalCard.innerHTML).toContain("dark:text-slate-300");
     expect(journalCard.innerHTML).toContain("dark:bg-white/10");
-
-    const proposalHeading = screen.getByRole("heading", { name: "Research Proposal" });
-    const proposalCard = proposalHeading.closest("button")!;
-    expect(proposalCard.className).toContain("bg-white");
-    expect(proposalCard.className).toContain("dark:bg-ink-750");
-    expect(proposalCard.className).toContain("border-neutral-200/90");
-    expect(proposalCard.className).toContain("dark:border-white/10");
-    expect(proposalHeading.className).toContain("dark:text-white");
-    expect(proposalCard.innerHTML).toContain("text-neutral-600");
-    expect(proposalCard.innerHTML).toContain("dark:text-indigo-400/90");
-    expect(proposalCard.innerHTML).toContain("dark:bg-indigo-500/10");
 
     const presentationHeading = screen.getByRole("heading", { name: "Slides & Keynotes" });
     const presentationCard = presentationHeading.closest("button")!;
@@ -1079,16 +1065,7 @@ describe("distinct academic format USPs & specs", () => {
     expect(screen.getByText("Peer Review")).toBeInTheDocument();
     expect(screen.getByText("4,000 – 10,000 words")).toBeInTheDocument();
 
-    // 3. Research Proposal
-    expect(screen.getByRole("heading", { name: "Research Proposal" })).toBeInTheDocument();
-    expect(
-      screen.getByText(/Guides research question definition, literature gap identification, theoretical frameworks, and methodology design\./i)
-    ).toBeInTheDocument();
-    expect(screen.getByText("Gap Analysis")).toBeInTheDocument();
-    expect(screen.getByText("Ethics & Methodology")).toBeInTheDocument();
-    expect(screen.getByText("3,000 – 15,000 words")).toBeInTheDocument();
-
-    // 4. Slides & Keynotes
+    // 3. Slides & Keynotes
     expect(screen.getByRole("heading", { name: "Slides & Keynotes" })).toBeInTheDocument();
     expect(
       screen.getByText(/Converts academic papers into visual presentation slides with scripted speaker notes and executive takeaways\./i)
@@ -1126,7 +1103,6 @@ describe("distinct academic format USPs & specs", () => {
     const headings = [
       "Coursework & Essays",
       "Journal Article",
-      "Research Proposal",
       "Slides & Keynotes",
     ];
 

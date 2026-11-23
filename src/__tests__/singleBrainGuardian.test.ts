@@ -121,7 +121,7 @@ describe("Single-Brain Architecture lock", () => {
     }
     expect(offenders).toEqual([]);
     const brain = fs.readFileSync(path.join(ROOT, "server/src/services/scholarBrain.ts"), "utf8");
-    for (const name of ["courseworkPrompts", "journalPrompts", "thesisPrompts", "proposalPrompts", "presentationPrompts"]) {
+    for (const name of ["courseworkPrompts", "journalPrompts", "thesisPrompts", "presentationPrompts"]) {
       expect(brain, name).toMatch(new RegExp(`\\b${name},`));
     }
   });

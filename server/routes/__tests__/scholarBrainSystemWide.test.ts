@@ -114,49 +114,6 @@ async function createTestPresentationProject(projectId = "proj-presentation-ot22
   return project.projectId;
 }
 
-async function createTestProposalProject(projectId = "proj-proposal-ot19"): Promise<string> {
-  const store = getProjectStore();
-  const project: ProjectRecord = {
-    projectId,
-    ownerId: TEST_USER_ID,
-    schemaVersion: 1,
-    outputTypeId: "OT-15",
-    answers: {
-      working_title: "Precision Epigenetic Reprogramming in Neurodegenerative Tauopathies",
-      title: "Precision Epigenetic Reprogramming in Neurodegenerative Tauopathies",
-      agency: "NIH",
-      mechanism: "R01",
-      budget: 1850000,
-      specificAims: [
-        "Specific Aim 1: Elucidate the mechanistic impact of CRISPR-dCas9 histone demethylation on MAPT hyperphosphorylation in human iPSC-derived neuronal models.",
-        "Specific Aim 2: Quantify in vivo off-target transcriptional perturbation using high-throughput single-cell multiome sequencing in murine tauopathy cohorts.",
-        "Specific Aim 3: Establish pharmacological delivery parameters for lipid nanoparticle-mediated crossing of the blood-brain barrier with >85% targeting efficiency.",
-      ],
-      significance: "Tauopathies represent an intractable clinical crisis with zero disease-modifying therapies; targeting chromatin architecture offers a transformative therapeutic paradigm.",
-      methodologicalDesign: "Dual-arm randomized prospective evaluation combining microfluidic sorting with spatial transcriptomics.",
-    },
-    evidenceLedger: {
-      sources: [
-        {
-          id: "src_vault_tau",
-          title: "Targeted Epigenetic Demethylation Reverses Pathological Tau Aggregation",
-          authors: ["Chen, L.", "Vance, E."],
-          year: 2022,
-          venue: "Nature Neuroscience",
-          doi: "10.1038/s41593-022-01123-x",
-        },
-      ],
-    },
-    gates: [],
-    manuscriptJob: null,
-    peerReviewHistory: { rounds: [] },
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-  await store.save(project);
-  return project.projectId;
-}
-
 async function createTestThesisProject(projectId = "proj-thesis-ot09"): Promise<string> {
   const store = getProjectStore();
   const project: ProjectRecord = {
@@ -336,7 +293,7 @@ describe("Architectural Unification Step 2: System-Wide scholarBrain Integration
       expect([200, 426]).toContain(res.status);
       const handoff = res.body.recommendedWorkspaceHandoff || res.body.deliverableIntent;
       if (handoff) {
-        expect(["OT-01", "OT-10", "OT-15", "OT-07", "OT-22"]).toContain(handoff.targetFormatId);
+        expect(["OT-01", "OT-10", "OT-07", "OT-22"]).toContain(handoff.targetFormatId);
         expect(handoff.suggestedTitle).toBeDefined();
       }
     });
@@ -425,7 +382,7 @@ describe("Architectural Unification Step 2: System-Wide scholarBrain Integration
     });
   });
 
-  // Arm 3: Research Proposal OT-15
+  // Shared helpers for the AI-mocked arms
   // These routes used to fall back to keyword-heuristic scores and template prose
   // whenever the AI call failed ("mock-provider" always fails), and the old tests
   // asserted that invented output. They now return the AI's own answer or an
@@ -441,78 +398,6 @@ describe("Architectural Unification Step 2: System-Wide scholarBrain Integration
     });
   }
   const aiHeaders = keyringHeader("openai", "mock-model", "test-key");
-
-  describe("Arm 3: Research Proposal OT-15 (/study-section-simulate, /aims-audit & /draft-section)", () => {
-    it("POST /study-section-simulate returns the AI panel's scores for the stored proposal", async () => {
-      const projectId = await createTestProposalProject("proj-proposal-sim-test");
-      const brain = mockBrain({
-        overallImpactScore: "2.4",
-        recommendationForFunding: "Fundable with revision",
-        criteria: [
-          { criterion: "Significance", score: 2, verdict: "Strong", critique: "c1", recommendation: "r1" },
-          { criterion: "Approach", score: 3, verdict: "Good", critique: "c2", recommendation: "r2" },
-          { criterion: "Innovation", verdict: "no score given" },
-        ],
-      });
-
-      const res = await request(app)
-        .post(`/api/projects/${projectId}/proposal/study-section-simulate`)
-        .set(aiHeaders)
-        .send({});
-
-      expect(res.status).toBe(200);
-      expect(res.body.overallImpactScore).toBe("2.4");
-      expect(res.body.agency).toBe("NIH");
-      // The user's stored aims reach the AI; a criterion without a score is dropped, never defaulted.
-      expect(String(brain.mock.calls[0][0].userPrompt)).toContain("CRISPR-dCas9");
-      expect(res.body.criteria.map((c: { criterion: string }) => c.criterion)).toEqual(["Significance", "Approach"]);
-    });
-
-    it("POST /aims-audit returns the AI's checks and never shows an unknown status as a pass", async () => {
-      const projectId = await createTestProposalProject("proj-proposal-aims-test");
-      mockBrain({
-        checks: [
-          { name: "Overarching Hypothesis Stated", status: "passed", detail: "d1" },
-          { name: "Aim Structural Independence", status: "maybe", detail: "d2" },
-        ],
-      });
-
-      const res = await request(app)
-        .post(`/api/projects/${projectId}/proposal/aims-audit`)
-        .set(aiHeaders)
-        .send({
-          aimsText: "Specific Aim 1: Elucidate CRISPR-dCas9 demethylation in iPSC models. Specific Aim 2: Quantify off-target effects. Specific Aim 3: Deliver via lipid nanoparticles.",
-        });
-
-      expect(res.status).toBe(200);
-      expect(res.body.checks).toEqual([
-        { name: "Overarching Hypothesis Stated", status: "passed", detail: "d1" },
-        { name: "Aim Structural Independence", status: "warn", detail: "d2" },
-      ]);
-    });
-
-    it("POST /draft-section returns the AI draft, and a 503 with no text when the AI fails", async () => {
-      const projectId = await createTestProposalProject("proj-proposal-draft-test");
-      mockBrain(undefined, "The significance of this work rests on [CITE:src_vault_1].");
-
-      const ok = await request(app)
-        .post(`/api/projects/${projectId}/proposal/draft-section`)
-        .set(aiHeaders)
-        .send({ sectionTitle: "Significance", targetWords: 350, citationStyle: "apa7", dialect: "en-GB" });
-      expect(ok.status).toBe(200);
-      expect(ok.body.sectionTitle).toBe("Significance");
-      expect(ok.body.content).toContain("significance of this work");
-
-      vi.spyOn(scholarBrain, "complete").mockRejectedValue(new Error("provider 500"));
-      const failed = await request(app)
-        .post(`/api/projects/${projectId}/proposal/draft-section`)
-        .set(aiHeaders)
-        .send({ sectionTitle: "Significance" });
-      expect(failed.status).toBe(503);
-      expect(failed.body.code).toBe("ai_unavailable");
-      expect(failed.body.content).toBeUndefined();
-    });
-  });
 
   // Arm 4: Thesis & Dissertation OT-07/OT-07
   describe("Arm 4: Thesis & Dissertation OT-07/OT-07 (/viva-simulate, /chapter-audit & /draft-chapter)", () => {

@@ -129,7 +129,7 @@ export interface AgenticQueryResponse {
     isSufficientlyBurst: boolean;
   };
   recommendedWorkspaceHandoff?: {
-    targetFormatId: "OT-01" | "OT-10" | "OT-15" | "OT-07" | "OT-22";
+    targetFormatId: "OT-01" | "OT-10" | "OT-07" | "OT-22";
     formatLabel: string;
     topic: string;
     suggestedTitle: string;

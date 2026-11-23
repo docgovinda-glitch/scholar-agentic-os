@@ -106,12 +106,11 @@ Every body is validated with zod (`schemas.ts`); a bad body is a 400 `{ code: "i
 - When no AI provider can answer, AI routes reply **503** `{ code: "ai_unavailable" }` with `Retry-After: 10` (`sendAiFailure`), never 502, so provider outages are not mistaken for gateway failures.
 - Stage agents: `/agent/extract`, `/agent/understand`, `/agent/sources`, `/agent/review`, `/agent/evidence` (excerpts from an uploaded document, kept only when found word for word).
 
-### 5.5 Thesis, proposal, presentation
+### 5.5 Thesis, presentation
 
 | Mount | Endpoints |
 | :--- | :--- |
 | `/thesis` | POST `/viva-simulate`, `/chapter-audit`, `/draft-chapter`; GET `/gate-status` |
-| `/proposal` | POST `/study-section-simulate`, `/aims-audit`, `/draft-section` |
 | `/presentation` | POST `/generate-deck`, `/qa-simulate`; GET, PUT `/deck` |
 
 ## 6. AI

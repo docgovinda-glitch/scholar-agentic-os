@@ -59,7 +59,6 @@ export const DEFAULT_FORMAT_LABELS: Record<string, string> = {
   "OT-06": "Thesis / Dissertation",
   "OT-07": "Thesis / Dissertation",
   "OT-10": "Journal Article",
-  "OT-15": "Research Proposal",
   "OT-20": "Dissertation",
   "OT-22": "Presentation",
 };

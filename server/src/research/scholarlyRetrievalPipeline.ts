@@ -21,7 +21,7 @@ import { CitationFormatterFactory } from "../../../src/citation_compliance/forma
 import type { CanonicalReference } from "../../../src/citation_compliance/model/reference.ts";
 
 export interface DeliverableHandoff {
-  targetFormatId: "OT-01" | "OT-10" | "OT-15" | "OT-07" | "OT-22";
+  targetFormatId: "OT-01" | "OT-10" | "OT-07" | "OT-22";
   formatLabel: string;
   topic: string;
   suggestedTitle: string;
@@ -97,26 +97,7 @@ export function detectDeliverableIntent(prompt: string): DeliverableHandoff | nu
     return raw.slice(0, 120).trim();
   };
 
-  // 1. Research Proposal (OT-15)
-  if (
-    lower.includes("research proposal") ||
-    lower.includes("grant proposal") ||
-    lower.includes("funding proposal") ||
-    lower.includes("specific aims")
-  ) {
-    const topic = extractTopic(p, /(?:research proposal|grant proposal|funding proposal|specific aims)(?:\s+(?:on|about|for))?\s+([^.?!]+)/i) || p;
-    return {
-      targetFormatId: "OT-15",
-      formatLabel: "Research Proposal Workspace",
-      topic: topic || "Investigative Research Proposal",
-      suggestedTitle: `Research Proposal: ${capitalizeTitle(topic || "Scholarly Inquiry")}`,
-      wordCountTarget: wordCountTarget || 3500,
-      citationStyle: "apa",
-      retrievedSources: [],
-    };
-  }
-
-  // 2. Thesis & Dissertation (OT-07)
+  // 1. Thesis & Dissertation (OT-07)
   if (
     /\b(?:thesis|theses|dissertation|viva voce)\b/i.test(lower) ||
     /\bchapter\s+\d+\b/i.test(lower)

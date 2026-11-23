@@ -7,7 +7,7 @@
  * that maps a conversation onto them.
  */
 
-export type WorkspaceFormatId = "OT-01" | "OT-10" | "OT-15" | "OT-07" | "OT-22";
+export type WorkspaceFormatId = "OT-01" | "OT-10" | "OT-07" | "OT-22";
 
 export interface HandoffMessage {
   sender: "user" | "assistant";
@@ -151,7 +151,6 @@ export function buildWorkspaceHandoff(input: HandoffInput): WorkspaceHandoff {
       specific = { topic: question, researchQuestions: question };
       break;
     case "OT-10":
-    case "OT-15":
     case "OT-07":
     default:
       specific = {
