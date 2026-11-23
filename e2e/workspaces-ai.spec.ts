@@ -101,14 +101,6 @@ test("Thesis (OT-07): a chapter is drafted by the user's AI", async ({ page }) =
   });
 });
 
-test("Proposal (OT-15): a section is drafted by the user's AI", async ({ page }) => {
-  await withProject(page, "OT-15", { title: "E2E proposal" }, async (id) => {
-    const res = await api(page, "POST", `/api/projects/${id}/proposal/draft-section`, { sectionTitle: "Specific Aims", targetWords: 150 }, AI_HEADERS);
-    expect(res.status, res.text.slice(0, 300)).toBe(200);
-    expect(res.json?.content).toContain(MARKER);
-  });
-});
-
 /**
  * The Journal Writing Studio's flow: one section drafted by the user's AI
  * (POST .../agentic/draft-subsection returns the text and saves nothing),

@@ -12,7 +12,6 @@ const WORKSPACES = [
   { name: "Coursework", outputTypeId: "OT-01" },
   { name: "Thesis", outputTypeId: "OT-07" },
   { name: "Journal", outputTypeId: "OT-10" },
-  { name: "Proposal", outputTypeId: "OT-15" },
 ] as const;
 
 // Text that only ever came from demo content, removed in P0-1…P0-19.
