@@ -146,5 +146,18 @@ describe("snowballSamplingService", () => {
     expect(graphml).toContain("<graph id=\"CitationGraph\"");
     expect(graphml).toContain("</graphml>");
   });
-});
 
+  it("leaves unknown metadata empty instead of inventing it", () => {
+    const graph = buildInitialCitationGraph([{ title: "A paper the index knows little about" }]);
+    const node = graph.nodes[0];
+    expect(node.citationCount).toBeUndefined();
+    expect(node.authors).toEqual([]);
+    expect(node.year).toBeUndefined();
+    expect(node.journal).toBeUndefined();
+    expect(node.isOpenAccess).toBe(false);
+
+    const bibtex = exportGraphToBibtex(graph);
+    expect(bibtex).not.toMatch(/Scholarly Author|Academic Publication|year = \{20\d\d\}/);
+    expect(bibtex).not.toContain("journal =");
+  });
+});

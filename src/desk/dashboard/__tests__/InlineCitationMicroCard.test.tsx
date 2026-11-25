@@ -42,8 +42,7 @@ describe("InlineCitationBadge & Academic Citation Micro-Card (Phase 2)", () => {
     expect(screen.getByText("Read DOI")).toBeInTheDocument();
   });
 
-  it("triggers onAddToEvidence and onFocusInGraph callbacks on action button clicks", () => {
-    const handleAddToEvidence = vi.fn();
+  it("triggers onFocusInGraph and offers no Evidence Matrix action", () => {
     const handleFocusInGraph = vi.fn();
 
     render(
@@ -51,22 +50,17 @@ describe("InlineCitationBadge & Academic Citation Micro-Card (Phase 2)", () => {
         num={1}
         label="[1]"
         citation={SAMPLE_CITATION}
-        onAddToEvidence={handleAddToEvidence}
         onFocusInGraph={handleFocusInGraph}
       />
     );
 
-    const matrixBtn = screen.getByText("+ Matrix");
-    fireEvent.click(matrixBtn);
-    expect(handleAddToEvidence).toHaveBeenCalledWith(SAMPLE_CITATION);
-
+    expect(screen.queryByText("+ Matrix")).toBeNull();
     const graphBtn = screen.getByText("Graph ↗");
     fireEvent.click(graphBtn);
     expect(handleFocusInGraph).toHaveBeenCalledWith(SAMPLE_CITATION);
   });
 
-  it("renderFormattedGuideText propagates onAddToEvidence and onFocusInGraph to inline citations", () => {
-    const handleAddToEvidence = vi.fn();
+  it("renderFormattedGuideText propagates onFocusInGraph to inline citations", () => {
     const handleFocusInGraph = vi.fn();
 
     render(
@@ -75,16 +69,14 @@ describe("InlineCitationBadge & Academic Citation Micro-Card (Phase 2)", () => {
           "Transformers [1] revolutionized machine learning.",
           [SAMPLE_CITATION],
           "apa",
-          handleAddToEvidence,
           handleFocusInGraph
         )}
       </div>
     );
 
     expect(screen.getByText(/Transformers/i)).toBeInTheDocument();
-    const matrixBtn = screen.getByText("+ Matrix");
-    fireEvent.click(matrixBtn);
-    expect(handleAddToEvidence).toHaveBeenCalledWith(SAMPLE_CITATION);
+    fireEvent.click(screen.getByText("Graph ↗"));
+    expect(handleFocusInGraph).toHaveBeenCalledWith(SAMPLE_CITATION);
   });
 
   it("shows the passage that supports the cited sentence, and says so when none does", () => {

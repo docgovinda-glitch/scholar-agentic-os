@@ -117,54 +117,25 @@ describe("Ask Scholar 2.0 Multi-Layer Integration", () => {
     cleanup();
   });
 
-  it("navigates seamlessly from Ask Scholar response to Literature Discovery (Layer B), Evidence Synthesis (Layer C), and Research Export (Layer D)", async () => {
+  it("opens the citation graph from an answer and offers no Evidence Matrix, synthesis or LaTeX export", async () => {
     openAskScholar();
     await askQuestion("How do transformers compare to DPO in modern alignment pipelines?");
 
-    // 1. Verify assistant response renders
     expect(await screen.findByText(/Transformers/i)).toBeInTheDocument();
 
-    // 2. Verify merged single-row primary tabs appear without duplicate row-2 buttons (Section 13)
-    const matrixTabBtn = await screen.findByRole("button", { name: /Evidence Matrix \(2\)/i });
     const citationGraphTabBtn = await screen.findByRole("button", { name: /^Citation Graph$/i });
-    const exportBtn = await screen.findByRole("button", { name: /^LaTeX$/i });
-
-    expect(matrixTabBtn).toBeInTheDocument();
-    expect(citationGraphTabBtn).toBeInTheDocument();
-    expect(exportBtn).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Evidence Matrix/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^LaTeX$/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /^Discovery$/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /^Evidence Synthesis$/i })).toBeNull();
 
-    // 3. Click Citation Graph tab -> Click Full Discovery Workspace -> Opens Literature Discovery Workspace (Layer B)
     fireEvent.click(citationGraphTabBtn);
     const fullDiscoveryBtn = await screen.findByRole("button", { name: /Full Discovery Workspace/i });
     fireEvent.click(fullDiscoveryBtn);
 
-    expect(await screen.findByText("Literature Discovery Workspace")).toBeInTheDocument();
-    expect(screen.getByText(/Layer B · Citation Graph/i)).toBeInTheDocument();
+    expect(await screen.findByTestId("citation-graph-overlay")).toBeInTheDocument();
+    expect(screen.getByText("Literature Discovery Workspace")).toBeInTheDocument();
     expect(screen.getByText("Snowball Selected Node")).toBeInTheDocument();
-
-    // 4. From Literature Discovery, click "Synthesize Evidence" -> Transitions to Evidence Synthesis (Layer C)
-    const proceedToSynthBtn = screen.getByText(/Synthesize Evidence/i);
-    fireEvent.click(proceedToSynthBtn);
-
-    expect(await screen.findByText("Evidence Synthesis Workspace")).toBeInTheDocument();
-    expect(screen.getByText(/Layer C · Matrix & Forest Plots/i)).toBeInTheDocument();
-
-    // Check forest plot tab inside Evidence Synthesis
-    // These sources state no effect sizes, so pooling is unavailable rather than invented.
-    const forestTab = screen.getByText("Interactive Forest Plot").closest("button")!;
-    expect(forestTab).toBeDisabled();
-    fireEvent.click(forestTab);
-    expect(screen.queryByText(/Meta-Analytic Forest Plot/i)).toBeNull();
-
-    // 5. From Evidence Synthesis, click "Export LaTeX & Overleaf Package" -> Transitions to Layer D
-    const exportPackageBtn = screen.getByText("Export LaTeX & Overleaf Package");
-    fireEvent.click(exportPackageBtn);
-
-    expect(await screen.findByText("Research Export & Publishing Workspace")).toBeInTheDocument();
-    expect(screen.getByText(/Layer D · LaTeX & Overleaf/i)).toBeInTheDocument();
-    expect(screen.getByText("Download Overleaf ZIP")).toBeInTheDocument();
-    expect(screen.getByText("references.bib")).toBeInTheDocument();
+    expect(screen.queryByText(/Synthesize Evidence/i)).toBeNull();
   });
 });

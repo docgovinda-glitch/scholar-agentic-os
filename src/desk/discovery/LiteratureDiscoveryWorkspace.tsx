@@ -9,12 +9,10 @@ import {
   Download,
   BookmarkPlus,
   Check,
-  ArrowRight,
   Layers,
   ExternalLink,
   BookOpen,
   HelpCircle,
-  BarChart3,
   RefreshCw,
   X,
 } from "lucide-react";
@@ -32,45 +30,18 @@ import {
 export interface LiteratureDiscoveryWorkspaceProps {
   projectId?: string;
   seedPapers?: Array<Partial<CitationGraphNode> & { title: string }>;
-  initialQuery?: string;
-  onOpenEvidenceSynthesis?: (papers: CitationGraphNode[]) => void;
   onClose?: () => void;
   onSaveToVault?: (paper: CitationGraphNode) => void;
 }
 
 export default function LiteratureDiscoveryWorkspace({
   seedPapers = [],
-  initialQuery = "",
-  onOpenEvidenceSynthesis,
   onClose,
   onSaveToVault,
 }: LiteratureDiscoveryWorkspaceProps) {
   // Graph state
   const [graphState, setGraphState] = useState<CitationGraphState>(() =>
-    buildInitialCitationGraph(
-      seedPapers.length > 0
-        ? seedPapers
-        : [
-            {
-              title: initialQuery || "Deep Empirical Foundations of Modern Artificial Intelligence Systems",
-              authors: ["Vaswani, A.", "LeCun, Y.", "Bengio, Y."],
-              year: 2021,
-              journal: "Nature Machine Intelligence",
-              citationCount: 420,
-              doi: "10.1038/s42256-021-00389-9",
-              abstract: "A comprehensive investigation into the scaling laws, causal reasoning capabilities, and empirical architectural boundaries of deep representation networks.",
-            },
-            {
-              title: "Causal Inference and Empirical Counterfactual Modeling in Automated Decision Systems",
-              authors: ["Pearl, J.", "Mackenzie, D."],
-              year: 2019,
-              journal: "Communications of the ACM",
-              citationCount: 280,
-              doi: "10.1145/3241036",
-              abstract: "Formal structural equations establishing non-confounded causal DAG estimation across observational cohorts.",
-            },
-          ]
-    )
+    buildInitialCitationGraph(seedPapers)
   );
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -82,7 +53,6 @@ export default function LiteratureDiscoveryWorkspace({
   const [snowballBreadth, setSnowballBreadth] = useState<number>(6);
   const [statusMessage, setStatusMessage] = useState<string>("");
   const [savedNodeIds, setSavedNodeIds] = useState<Set<string>>(new Set());
-  const [selectedPaperIdsForSynthesis, setSelectedPaperIdsForSynthesis] = useState<Set<string>>(new Set());
 
   // Viewport transforms (Zoom & Pan)
   const [zoom, setZoom] = useState(1);
@@ -111,7 +81,7 @@ export default function LiteratureDiscoveryWorkspace({
       if (activeClusterFilter !== "all" && node.clusterId !== activeClusterFilter) {
         return false;
       }
-      if (node.citationCount < minCitations) {
+      if (minCitations > 0 && (node.citationCount ?? 0) < minCitations) {
         return false;
       }
       if (searchQuery.trim()) {
@@ -157,23 +127,11 @@ export default function LiteratureDiscoveryWorkspace({
       setSelectedNodeId(idToExpand);
       setStatusMessage(`Expanded successfully: ${nextState.nodes.length} total papers catalogued.`);
     } catch {
-      setStatusMessage("Snowball sampling encountered a network exception. Fallback synthesized.");
+      setStatusMessage("Could not reach the citation index. The graph is unchanged; try again.");
     } finally {
       setIsExpanding(false);
       setTimeout(() => setStatusMessage(""), 5000);
     }
-  };
-
-  const handleToggleSelectForSynthesis = (nodeId: string) => {
-    setSelectedPaperIdsForSynthesis((prev) => {
-      const next = new Set(prev);
-      if (next.has(nodeId)) {
-        next.delete(nodeId);
-      } else {
-        next.add(nodeId);
-      }
-      return next;
-    });
   };
 
   const handleSaveNode = (node: CitationGraphNode) => {
@@ -207,17 +165,6 @@ export default function LiteratureDiscoveryWorkspace({
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
-  };
-
-  const handleProceedToEvidenceSynthesis = () => {
-    const selectedNodes =
-      selectedPaperIdsForSynthesis.size > 0
-        ? graphState.nodes.filter((n) => selectedPaperIdsForSynthesis.has(n.id))
-        : graphState.nodes.slice(0, 8); // Default to top papers
-
-    if (onOpenEvidenceSynthesis) {
-      onOpenEvidenceSynthesis(selectedNodes);
-    }
   };
 
   // Zoom handlers
@@ -306,22 +253,6 @@ export default function LiteratureDiscoveryWorkspace({
               </button>
             </div>
           </div>
-
-          {/* Proceed to Evidence Synthesis (Layer C) */}
-          <button
-            type="button"
-            onClick={handleProceedToEvidenceSynthesis}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
-            title="Transfer discovered studies to Evidence Synthesis & Forest Plot Engine"
-          >
-            <BarChart3 className="w-3.5 h-3.5" />
-            <span>
-              Synthesize Evidence (
-              {selectedPaperIdsForSynthesis.size > 0 ? selectedPaperIdsForSynthesis.size : graphState.nodes.length}
-              )
-            </span>
-            <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
-          </button>
 
           {onClose && (
             <button
@@ -575,10 +506,9 @@ export default function LiteratureDiscoveryWorkspace({
               {/* Nodes */}
               {filteredNodes.map((node) => {
                 const isSelected = selectedNode?.id === node.id;
-                const isSynthesisSelected = selectedPaperIdsForSynthesis.has(node.id);
 
                 // Radius based on citationCount (between 14 and 32)
-                const baseRadius = Math.min(32, Math.max(14, 14 + Math.log10(node.citationCount + 1) * 6));
+                const baseRadius = Math.min(32, Math.max(14, 14 + Math.log10((node.citationCount ?? 0) + 1) * 6));
 
                 // Node color by type
                 let fillColor = "#38bdf8"; // sky for backward
@@ -624,17 +554,6 @@ export default function LiteratureDiscoveryWorkspace({
                       className="transition-transform duration-200 group-hover:scale-110 shadow-md"
                     />
 
-                    {/* Checkmark or synthesis pin */}
-                    {isSynthesisSelected && (
-                      <circle
-                        cx={baseRadius * 0.7}
-                        cy={-baseRadius * 0.7}
-                        r={7}
-                        className="fill-emerald-600 stroke-white"
-                        strokeWidth={1.5}
-                      />
-                    )}
-
                     {/* Author & Year Label */}
                     <text
                       y={baseRadius + 14}
@@ -650,7 +569,7 @@ export default function LiteratureDiscoveryWorkspace({
                       textAnchor="middle"
                       className="text-[9.5px] font-bold font-mono fill-white pointer-events-none select-none"
                     >
-                      {node.citationCount > 999 ? `${(node.citationCount / 1000).toFixed(0)}k` : node.citationCount}
+                      {node.citationCount === undefined ? "–" : node.citationCount > 999 ? `${(node.citationCount / 1000).toFixed(0)}k` : node.citationCount}
                     </text>
                   </g>
                 );
@@ -691,18 +610,18 @@ export default function LiteratureDiscoveryWorkspace({
               </h2>
 
               <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-                {selectedNode.authors.join(", ")} · {selectedNode.year || "n.d."}
+                {[selectedNode.authors.join(", ") || "Authors not reported", selectedNode.year || "n.d."].join(" · ")}
               </p>
-              <p className="text-[11px] text-neutral-400 italic">
-                {selectedNode.journal || selectedNode.venue || "Academic Publication"}
-              </p>
+              {(selectedNode.journal || selectedNode.venue) && (
+                <p className="text-[11px] text-neutral-400 italic">{selectedNode.journal || selectedNode.venue}</p>
+              )}
             </div>
 
             {/* Metrics Grid */}
             <div className="grid grid-cols-3 gap-2 bg-neutral-50 dark:bg-white/[0.02] p-2.5 rounded-xl border border-neutral-200/80 dark:border-white/5 text-center">
               <div>
                 <div className="text-xs font-bold text-neutral-800 dark:text-neutral-200">
-                  {selectedNode.citationCount.toLocaleString()}
+                  {selectedNode.citationCount === undefined ? "Not reported" : selectedNode.citationCount.toLocaleString()}
                 </div>
                 <div className="text-[9.5px] text-neutral-400">Global Cites</div>
               </div>
@@ -741,29 +660,6 @@ export default function LiteratureDiscoveryWorkspace({
               >
                 <Sparkles className="w-3.5 h-3.5" />
                 <span>Expand Citation Snowball (Depth +1)</span>
-              </button>
-
-              {/* Select for Evidence Synthesis */}
-              <button
-                type="button"
-                onClick={() => handleToggleSelectForSynthesis(selectedNode.id)}
-                className={`w-full py-2 px-3 rounded-lg text-xs font-medium border flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
-                  selectedPaperIdsForSynthesis.has(selectedNode.id)
-                    ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-300"
-                    : "border-neutral-200 dark:border-white/10 hover:bg-neutral-50 dark:hover:bg-white/5 text-neutral-700 dark:text-neutral-300"
-                }`}
-              >
-                {selectedPaperIdsForSynthesis.has(selectedNode.id) ? (
-                  <>
-                    <Check className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Included in Evidence Synthesis</span>
-                  </>
-                ) : (
-                  <>
-                    <BarChart3 className="w-3.5 h-3.5 text-neutral-500" />
-                    <span>Include in Evidence Synthesis</span>
-                  </>
-                )}
               </button>
 
               {/* Save to Knowledge Vault */}

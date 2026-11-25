@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React from "react";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import LiteratureDiscoveryWorkspace from "../discovery/LiteratureDiscoveryWorkspace";
@@ -56,30 +56,20 @@ describe("LiteratureDiscoveryWorkspace", () => {
     expect(screen.getByText(/Training reward models using human preference/i)).toBeInTheDocument();
   });
 
-  it("allows selecting papers for evidence synthesis and calls callback", () => {
-    const onOpenEvidenceSynthesis = vi.fn();
-    render(
-      <LiteratureDiscoveryWorkspace
-        projectId="test-proj-1"
-        seedPapers={sampleSeeds}
-        onOpenEvidenceSynthesis={onOpenEvidenceSynthesis}
-      />
-    );
+  it("offers no evidence-synthesis hand-off and never invents a citation count", () => {
+    const unscored = { title: sampleSeeds[0].title, authors: sampleSeeds[0].authors, year: sampleSeeds[0].year };
+    render(<LiteratureDiscoveryWorkspace projectId="test-proj-1" seedPapers={[unscored]} />);
 
-    // Click "Include in Evidence Synthesis"
-    const includeBtn = screen.getByText("Include in Evidence Synthesis");
-    fireEvent.click(includeBtn);
+    expect(screen.queryByText(/Synthesize Evidence/i)).toBeNull();
+    expect(screen.queryByText(/Include in Evidence Synthesis/i)).toBeNull();
+    // No count from the index: the inspector says so instead of showing a number.
+    expect(screen.getByText("Not reported")).toBeInTheDocument();
+  });
 
-    expect(screen.getByText("Included in Evidence Synthesis")).toBeInTheDocument();
-
-    // Click "Synthesize Evidence"
-    const synthBtn = screen.getByText(/Synthesize Evidence/i);
-    fireEvent.click(synthBtn);
-
-    expect(onOpenEvidenceSynthesis).toHaveBeenCalledTimes(1);
-    expect(onOpenEvidenceSynthesis.mock.calls[0][0][0].title).toBe(
-      "Deep Reinforcement Learning from Human Feedback"
-    );
+  it("starts empty rather than with demo papers when no sources are given", () => {
+    render(<LiteratureDiscoveryWorkspace projectId="test-proj-1" />);
+    expect(screen.queryByText(/Deep Empirical Foundations/i)).toBeNull();
+    expect(screen.queryByText(/Causal Inference and Empirical Counterfactual/i)).toBeNull();
   });
 
   it("filters papers via search query input", () => {

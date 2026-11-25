@@ -1,6 +1,6 @@
 import { claimBefore, findSupportingPassage } from "../../domain/ask/passageMatch";
 import React, { useState, Fragment } from "react";
-import { Copy, Check, Scale, Info, BarChart3, Network, ExternalLink, ChevronRight as ChevronRightIcon } from "lucide-react";
+import { Copy, Check, Scale, Info, Network, ExternalLink, ChevronRight as ChevronRightIcon } from "lucide-react";
 import type { WebsiteAssistantMessage, WebsiteCitationItem } from "./types";
 import {
   formatAskScholarInText,
@@ -213,7 +213,6 @@ export function InlineCitationBadge({
   citation,
   label,
   messageId,
-  onAddToEvidence,
   onFocusInGraph,
   claim,
 }: {
@@ -222,7 +221,6 @@ export function InlineCitationBadge({
   citation?: WebsiteCitationItem;
   label?: string;
   messageId?: string;
-  onAddToEvidence?: (citation: WebsiteCitationItem) => void;
   onFocusInGraph?: (citation: WebsiteCitationItem) => void;
   /** The sentence this citation supports; the hover card shows the passage that backs it. */
   claim?: string;
@@ -396,22 +394,6 @@ export function InlineCitationBadge({
           {/* Micro-Card Action Buttons Row */}
           <span className="flex items-center justify-between pt-2 border-t border-neutral-100 dark:border-white/10 gap-1.5 text-[10px]">
             <span className="flex items-center gap-1">
-              {onAddToEvidence && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onAddToEvidence(citation);
-                  }}
-                  className="px-2 py-0.5 rounded-md font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20 border border-emerald-500/30 transition-colors flex items-center gap-1 cursor-pointer"
-                  title="Extract & add empirical findings to Evidence Matrix"
-                >
-                  <BarChart3 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-                  <span>+ Matrix</span>
-                </button>
-              )}
-
               {onFocusInGraph && (
                 <button
                   type="button"
@@ -549,7 +531,6 @@ export function renderFormattedGuideText(
   text: string,
   citations?: WebsiteAssistantMessage["citations"],
   citationStyle: string = "apa",
-  onAddToEvidence?: (citation: WebsiteCitationItem) => void,
   onFocusInGraph?: (citation: WebsiteCitationItem) => void,
   messageId?: string
 ) {
@@ -602,7 +583,6 @@ export function renderFormattedGuideText(
               url={linkUrl}
               citation={matchedCite}
               messageId={messageId}
-              onAddToEvidence={onAddToEvidence}
               onFocusInGraph={onFocusInGraph}
               claim={claimBefore(cleanStr, match.index)}
             />
@@ -645,8 +625,7 @@ export function renderFormattedGuideText(
                   url={matchedCite?.url}
                   citation={matchedCite}
                   messageId={messageId}
-                  onAddToEvidence={onAddToEvidence}
-                  onFocusInGraph={onFocusInGraph}
+                      onFocusInGraph={onFocusInGraph}
                   claim={claimBefore(cleanStr, mIdx)}
                 />
               );

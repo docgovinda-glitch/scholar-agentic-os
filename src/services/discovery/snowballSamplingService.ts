@@ -25,7 +25,8 @@ export interface CitationGraphNode {
   venue?: string;
   abstract?: string;
   url?: string;
-  citationCount: number;
+  /** Times cited, as the index reports it; undefined when no index gave a count (never guessed). */
+  citationCount?: number;
   isOpenAccess?: boolean;
   openAccessPdfUrl?: string;
 
@@ -111,25 +112,25 @@ export function buildInitialCitationGraph(
 ): CitationGraphState {
   const nodes: CitationGraphNode[] = seedPapers.map((paper, index) => {
     const id = paper.id || (paper.doi ? `doi:${paper.doi}` : `seed-${index}-${normalizeTitle(paper.title).slice(0, 24)}`);
-    const citationCount = paper.citationCount ?? (Math.floor(Math.random() * 80) + 15);
+    const citationCount = paper.citationCount;
     return {
       id,
       doi: paper.doi ? normalizeDoi(paper.doi) || undefined : undefined,
       title: paper.title,
-      authors: Array.isArray(paper.authors) && paper.authors.length > 0 ? paper.authors : ["Scholarly Author"],
-      year: paper.year || new Date().getFullYear() - (index % 4),
-      journal: paper.journal || paper.venue || "Academic Publication",
-      venue: paper.venue || paper.journal || "Academic Publication",
+      authors: Array.isArray(paper.authors) ? paper.authors : [],
+      year: paper.year || undefined,
+      journal: paper.journal || paper.venue || undefined,
+      venue: paper.venue || paper.journal || undefined,
       abstract: paper.abstract || paper.snippet || "",
       url: paper.url,
       citationCount,
-      isOpenAccess: paper.isOpenAccess ?? true,
+      isOpenAccess: paper.isOpenAccess ?? false,
       openAccessPdfUrl: paper.openAccessPdfUrl,
       nodeType: "seed",
       depth: 0,
       inDegree: 0,
       outDegree: 0,
-      isLandmark: citationCount >= 50,
+      isLandmark: (citationCount ?? 0) >= 50,
       stance: paper.stance || "mentioning",
       snippet: paper.snippet,
       isSavedToCollection: Boolean(paper.isSavedToCollection),
@@ -181,7 +182,7 @@ function toGraphNode(
   idx: number
 ): CitationGraphNode {
   const prefix = kind === "discovered_backward" ? "ref" : "fwd";
-  const citations = r.citedByCount ?? 0;
+  const citations = r.citedByCount ?? undefined;
   return {
     id: `${prefix}-${r.id || idx}`,
     doi: r.doi ? normalizeDoi(r.doi) || undefined : undefined,
@@ -199,7 +200,7 @@ function toGraphNode(
     depth: parent.depth + 1,
     inDegree: kind === "discovered_backward" ? 1 : 0,
     outDegree: kind === "discovered_backward" ? 0 : 1,
-    isLandmark: citations >= (kind === "discovered_backward" ? 100 : 80),
+    isLandmark: (citations ?? 0) >= (kind === "discovered_backward" ? 100 : 80),
     // The stance of a citation is not known from the index; it is never guessed.
     stance: "mentioning",
   };
@@ -351,8 +352,8 @@ export function analyzeGraphTopology(
 
   // Identify landmark papers: top in-degree or high citationCount
   const sortedByImpact = [...nodes].sort((a, b) => {
-    const aScore = (inDegreeMap.get(a.id) || 0) * 10 + a.citationCount;
-    const bScore = (inDegreeMap.get(b.id) || 0) * 10 + b.citationCount;
+    const aScore = (inDegreeMap.get(a.id) || 0) * 10 + (a.citationCount ?? 0);
+    const bScore = (inDegreeMap.get(b.id) || 0) * 10 + (b.citationCount ?? 0);
     return bScore - aScore;
   });
 
@@ -370,7 +371,7 @@ export function analyzeGraphTopology(
   const updatedNodes = nodes.map((node, idx) => {
     const inDeg = inDegreeMap.get(node.id) || 0;
     const outDeg = outDegreeMap.get(node.id) || 0;
-    const isLandmark = landmarkIds.includes(node.id) || node.citationCount >= 100;
+    const isLandmark = landmarkIds.includes(node.id) || (node.citationCount ?? 0) >= 100;
 
     // Thematic classification
     const t = (node.title + " " + (node.journal || "") + " " + (node.abstract || "")).toLowerCase();
@@ -574,8 +575,8 @@ export function exportGraphToBibtex(state: CitationGraphState): string {
 
   for (const node of state.nodes) {
     const firstAuthor = (node.authors[0] || "Scholar").split(" ").pop()?.replace(/[^a-zA-Z]/g, "") || "Scholar";
-    const year = node.year || 2023;
-    let baseKey = `${firstAuthor}${year}`;
+    const year = node.year;
+    let baseKey = `${firstAuthor}${year ?? "nd"}`;
     let key = baseKey;
     let counter = 1;
     while (seenKeys.has(key)) {
@@ -586,13 +587,13 @@ export function exportGraphToBibtex(state: CitationGraphState): string {
 
     const authorsBib = node.authors.join(" and ");
     const titleBib = node.title.replace(/[{}]/g, "");
-    const journalBib = node.journal || node.venue || "Academic Publication";
+    const journalBib = node.journal || node.venue;
 
     let entry = `@article{${key},\n`;
     entry += `  author = {${authorsBib}},\n`;
     entry += `  title = {{${titleBib}}},\n`;
-    entry += `  journal = {${journalBib}},\n`;
-    entry += `  year = {${year}},\n`;
+    if (journalBib) entry += `  journal = {${journalBib}},\n`;
+    if (year) entry += `  year = {${year}},\n`;
     if (node.doi) entry += `  doi = {${node.doi}},\n`;
     if (node.url) entry += `  url = {${node.url}},\n`;
     if (node.abstract) entry += `  abstract = {${node.abstract.replace(/\n/g, " ").slice(0, 300)}...}\n`;
@@ -622,7 +623,7 @@ export function exportGraphToGraphML(state: CitationGraphState): string {
     xml += `      <data key="title">${escapeXml(n.title)}</data>\n`;
     xml += `      <data key="authors">${escapeXml(n.authors.join(", "))}</data>\n`;
     xml += `      <data key="year">${n.year || 2020}</data>\n`;
-    xml += `      <data key="citations">${n.citationCount}</data>\n`;
+    xml += `      <data key="citations">${n.citationCount ?? ""}</data>\n`;
     xml += `      <data key="cluster">${escapeXml(n.clusterLabel || "General")}</data>\n`;
     xml += `    </node>\n`;
   }

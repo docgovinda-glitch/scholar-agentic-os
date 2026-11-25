@@ -94,4 +94,4 @@ Four steps (Understand, Design, Edit Slides, Present) and the card engine are do
 
 ## 10. Ask Scholar (`/projects`)
 
-The prompt bar and chat on the projects screen (`src/desk/ProjectListScreen.tsx`) ask `POST /api/ai/agent` for grounded answers with web and scholarly retrieval and citation validation, can run `POST /api/ai/search` or `/api/ai/deep-research`, and can start a project from an answer (formats `OT-01`, `OT-10`, `OT-19`, `OT-09`, `OT-22`).
+The prompt bar and chat on the projects screen (`src/desk/ProjectListScreen.tsx`) ask `POST /api/ai/agent` for grounded answers with web and scholarly retrieval and citation validation, run deep research through the same endpoint, and can start a project from an answer (formats `OT-01`, `OT-10`, `OT-19`, `OT-09`, `OT-22`).

@@ -53,7 +53,7 @@ Workspace ids match the catalog: the Thesis workspace is `OT-07`. Projects saved
 
 **Citation engine** (`src/citation_compliance/`): formatters for APA 7, IEEE, MLA 9, Chicago (author-date and notes), Harvard and Vancouver registered at startup in `server.ts`; `scholarBrain` additionally accepts the `oscola` style key. BibTeX and RIS importers.
 
-**Ask Scholar** (`/projects`): research chat backed by `POST /api/ai/agent` (chat, grounded search and deep research are modes of that one endpoint; `/api/ai/search` is the plain web search).
+**Ask Scholar** (`/projects`): research chat backed by `POST /api/ai/agent` (chat, grounded search and deep research are modes of that one endpoint). Under each answer: the answer, a citation graph of its sources (real OpenAlex metadata only) and a review tab.
 
 **AI Access** (`/ai-access`): Overview, Providers, Subscription and Preferences sections. See [`AI-SYSTEM.md`](AI-SYSTEM.md).
 
