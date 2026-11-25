@@ -6,6 +6,7 @@ import { useAssignmentWorkspace } from "../AssignmentContext";
 import { RubricComplianceCard } from "../components/RubricComplianceCard";
 import { CitationReconciliationCard } from "../components/CitationReconciliationCard";
 import { FlowReconciliationCard } from "../components/FlowReconciliationCard";
+import { FullDraftReview } from "../components/FullDraftReview";
 import {
 exportAssignmentToDocx,
 downloadAssignmentPdf,
@@ -20,6 +21,7 @@ Copy,
 Check,
 RotateCw,
 ArrowLeft,AlertTriangle,LinkIcon,
+ChevronDown,
 Edit2
 } from "lucide-react";
 
@@ -49,6 +51,7 @@ export function AssignmentSubmissionStage({
     setPhase,
     saveAnswers,
     projectId,
+    updateSectionContent,
   } = useAssignmentWorkspace();
 
   const [isExportingDocx, setIsExportingDocx] = useState(false);
@@ -69,6 +72,8 @@ export function AssignmentSubmissionStage({
     project?.answers?.["institution"] || ""
   );
   const [showMetadataForm, setShowMetadataForm] = useState(false);
+  // The per-check telemetry is kept, but out of the way until it is asked for.
+  const [showDetailedChecks, setShowDetailedChecks] = useState(false);
 
   // There is nothing to grade until something is drafted: no audit, no
   // grade band and no readiness score for an empty paper.
@@ -415,21 +420,6 @@ export function AssignmentSubmissionStage({
 
   return (
     <div className="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6 text-[color:var(--text-primary)]">
-      {/* Minimal Step Guidance Banner */}
-      <div className="p-3.5 sm:p-4 rounded-xl bg-[color:var(--surface-inset)]/60 border border-[color:var(--border-subtle)] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-2.5">
-          <div className="w-5 h-5 rounded-full bg-emerald-700 text-white flex items-center justify-center font-mono font-bold text-xs shrink-0">
-            4
-          </div>
-          <p className="text-[color:var(--text-secondary)] text-xs leading-relaxed">
-            Check your draft against the brief, check that every citation matches a source, and download it with a title page and reference list.
-          </p>
-        </div>
-        <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 shrink-0 self-start sm:self-auto">
-          Before you submit
-        </span>
-      </div>
-
       {/* Phase 4 Header / Overview Bar */}
       <div className="rounded-2xl p-6 sm:p-7 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-xs space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[color:var(--border-subtle)] pb-5">
@@ -478,37 +468,31 @@ export function AssignmentSubmissionStage({
             </button>
           </div>
         ) : (
-        /* Status Metrics Ribbon */
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="p-4 rounded-xl bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)] space-y-1">
-            <span className="text-xs text-[color:var(--text-muted)] font-medium">Sections written</span>
-            <div className="text-lg sm:text-xl font-bold text-[color:var(--text-primary)] tabular-nums" data-testid="sections-written">
+        /* The facts, on one line: what is written, what is left to do, how long it is. */
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 rounded-xl bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)]">
+          <div className="flex items-baseline gap-2">
+            <span className="text-xs text-[color:var(--text-muted)]">Sections written</span>
+            <span className="text-sm font-semibold text-[color:var(--text-primary)] tabular-nums" data-testid="sections-written">
               {sectionsWritten} / {activeSections.length}
-            </div>
-            <span className="text-xs text-[color:var(--text-muted)] block">Sections with text in them</span>
+            </span>
           </div>
 
-          <div className="p-4 rounded-xl bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)] space-y-1">
-            <span className="text-xs text-[color:var(--text-muted)] font-medium">To do before submitting</span>
-            <div className="text-lg sm:text-xl font-bold text-[color:var(--text-primary)] tabular-nums" data-testid="todo-count">
+          <div className="flex items-baseline gap-2">
+            <span className="text-xs text-[color:var(--text-muted)]">To do before submitting</span>
+            <span className="text-sm font-semibold text-[color:var(--text-primary)] tabular-nums" data-testid="todo-count">
               {submissionReport ? (toDoCount === 0 ? "Nothing found" : toDoCount) : "Not checked"}
-            </div>
-            <span className="text-xs text-[color:var(--text-muted)] block">From the checks against your brief</span>
+            </span>
           </div>
 
-          <div className="p-4 rounded-xl bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)] space-y-1">
-            <span className="text-xs text-[color:var(--text-muted)] font-medium">
-              Length
+          <div className="flex items-baseline gap-2">
+            <span className="text-xs text-[color:var(--text-muted)]">Length</span>
+            <span className="text-sm font-semibold text-[color:var(--text-primary)] tabular-nums">
+              {currentWordCount.toLocaleString()} / {targetWordCount.toLocaleString()}
             </span>
-            <div className="text-lg sm:text-xl font-bold text-[color:var(--text-primary)] tabular-nums flex items-center gap-2">
-              <span>{currentWordCount.toLocaleString()} / {targetWordCount.toLocaleString()}</span>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${isWordCountCompliant ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-amber-500/10 text-amber-600 dark:text-amber-400"}`}>
-                {Number(wordDiffPercentage) > 0 ? `+${wordDiffPercentage}%` : `${wordDiffPercentage}%`}
-              </span>
-            </div>
-            <span className="text-xs text-[color:var(--text-muted)] block">
-              Against the brief's {targetWordCount.toLocaleString()} words; check your module's rules on length
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${isWordCountCompliant ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-amber-500/10 text-amber-600 dark:text-amber-400"}`}>
+              {Number(wordDiffPercentage) > 0 ? `+${wordDiffPercentage}%` : `${wordDiffPercentage}%`}
             </span>
+            <span className="text-xs text-[color:var(--text-muted)]">against the brief; check your module's rules</span>
           </div>
         </div>
         )}
@@ -525,13 +509,52 @@ export function AssignmentSubmissionStage({
         </div>
       )}
 
-      {/* Full audit, citation coverage and packaging */}
+      {hasDraft && (
         <>
-          {/* Detailed Mode: Full Two-Column Audit Granularity First */}
-          {renderAuditLayout()}
-          {renderCitationCoverage()}
-          {renderPackagingControls()}
+          {/* What the student actually came here to see: the whole paper. */}
+          <FullDraftReview
+            title={assignmentTitle}
+            sections={activeSections}
+            approvedSources={approvedSources}
+            citationStyle={citationStyle}
+            wordCount={currentWordCount}
+            targetWordCount={targetWordCount}
+            onUpdateSection={updateSectionContent}
+          />
+
+          {/* Every per-check number stays available, but folded away: the three
+              audit cards repeat between them what the ribbon already says. */}
+          <div className="rounded-2xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-xs overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowDetailedChecks((v) => !v)}
+              aria-expanded={showDetailedChecks}
+              data-testid="toggle-detailed-checks"
+              className="w-full flex items-center justify-between gap-3 px-5 sm:px-6 py-3.5 text-left cursor-pointer hover:bg-[color:var(--surface-hover)] transition-colors"
+            >
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold text-[color:var(--text-primary)]">Checks in detail</span>
+                <span className="block text-xs text-[color:var(--text-muted)]">
+                  Against your brief, citation by citation, and the links between paragraphs.
+                </span>
+              </span>
+              <ChevronDown className={`w-4 h-4 shrink-0 text-[color:var(--text-muted)] transition-transform ${showDetailedChecks ? "rotate-180" : ""}`} />
+            </button>
+
+            {showDetailedChecks && (
+              <div className="px-5 sm:px-6 pb-6 pt-1 space-y-6 border-t border-[color:var(--border-subtle)]">
+                {renderAuditLayout()}
+                {renderCitationCoverage()}
+              </div>
+            )}
+          </div>
+
         </>
+      )}
+
+      {/* One instance only: rendering it in both branches of `hasDraft` would
+          remount the download buttons the moment a draft appears. */}
+      {renderPackagingControls()}
     </div>
   );
 }
