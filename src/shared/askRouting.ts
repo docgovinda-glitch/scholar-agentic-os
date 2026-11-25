@@ -63,3 +63,18 @@ export function decideAskMode(input: {
   if (q.split(/\s+/).length <= 2 && !q.includes("?")) return "chat";
   return "search";
 }
+
+/**
+ * True when the rules alone cannot tell whether a question needs a search, so the model is asked
+ * (`scholarBrain.askSearchPlan`). Explicit modes, attached material, clear no-search requests
+ * (greetings, own-text edits, code, arithmetic) and time-sensitive questions are decided by the rules.
+ */
+export function askNeedsSearchPlan(input: Parameters<typeof decideAskMode>[0]): boolean {
+  const { requestedMode } = input;
+  if (requestedMode && ["deep-research", "search", "chat", "normal"].includes(requestedMode)) return false;
+  if (input.hasFiles || input.hasImages || input.hasVaultSources) return false;
+  if (decideAskMode(input) !== "search") return false;
+  const q = input.query.trim();
+  if (DEEP_PHRASES.some((p) => q.toLowerCase().includes(p)) || EXPLICIT_SEARCH.test(q)) return false;
+  return !isTimeSensitiveQuery(q);
+}

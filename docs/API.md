@@ -124,6 +124,7 @@ Every body is validated with zod (`schemas.ts`); a bad body is a 400 `{ code: "i
 | GET | `/api/ai/status` | Public | AI availability |
 | POST | `/api/ai/deep-research/plan` | Yes | The model's Deep Research plan for a question (`{ question }` → `{ fromModel, subQuestions }`) |
 | POST | `/api/ai/agent` | Yes | Ask Scholar: chat, grounded search and deep research (`mode`) |
+| POST | `/api/ai/ask/plan` | Yes | Ask Scholar: the model decides whether an unclear question needs a search and writes a standalone query (`{ plan: { search, query } \| null }`; null = use the routing rules) |
 | GET, POST | `/api/ai/threads` | Yes | Ask Scholar threads (held in server memory per user, merged by thread id) |
 | POST | `/api/studio/voice-profile`, `/refine` | Yes | Studio voice and refine (`/refine` runs on the keyring) |
 
