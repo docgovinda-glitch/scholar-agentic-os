@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   detectUserOS,
   detectUserBrowser,
@@ -14,6 +14,10 @@ import {
 } from "../ollamaService";
 
 describe("ollamaService — Architecture, Parsing & Diagnostics", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -148,6 +152,8 @@ describe("ollamaService — Architecture, Parsing & Diagnostics", () => {
       });
 
       globalThis.fetch = mockFetch;
+      // The setup command depends on the detected OS; pin it so CI (Linux) matches a Mac.
+      vi.stubGlobal("navigator", { userAgent: "Macintosh", platform: "MacIntel" });
 
       const localhostDiag = await diagnoseOllamaConnection("http://localhost:11434");
       expect(localhostDiag.ok).toBe(false);
