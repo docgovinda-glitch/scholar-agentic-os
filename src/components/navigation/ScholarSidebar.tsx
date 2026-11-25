@@ -237,7 +237,7 @@ export default function ScholarSidebar({
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full h-full bg-neutral-100 dark:bg-white/5 border border-neutral-200 dark:border-white/10 rounded-full pl-8 pr-9 text-xs focus:outline-none focus:ring-1 focus:ring-neutral-400 dark:focus:ring-white/20 transition-all text-neutral-900 dark:text-neutral-200 placeholder-neutral-500 dark:placeholder-neutral-400"
               />
-              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 px-1 py-0.5 rounded bg-neutral-200/60 dark:bg-white/10 text-[9px] font-mono text-neutral-500 dark:text-neutral-400 pointer-events-none">
+              <span className="hidden sm:inline absolute right-2.5 top-1/2 -translate-y-1/2 px-1 py-0.5 rounded bg-neutral-200/60 dark:bg-white/10 text-[9px] font-mono text-neutral-500 dark:text-neutral-400 pointer-events-none">
                 ⌘K
               </span>
             </div>

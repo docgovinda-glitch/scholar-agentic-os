@@ -137,6 +137,17 @@ describe("phone home: Ask Scholar first", () => {
       expect(onOpen).toHaveBeenCalledWith("p1");
     });
 
+    it("does not repeat the bottom bar's places or the theme switch inside the drawer", () => {
+      renderHome();
+      const drawer = screen.getByLabelText("Workspace navigation", { selector: "aside" });
+      expect(within(drawer).queryByRole("button", { name: "Knowledge Vault" })).toBeNull();
+      expect(within(drawer).queryByRole("button", { name: "Manage AI Access" })).toBeNull();
+      expect(within(drawer).queryByRole("button", { name: "Ask Scholar" })).toBeNull();
+      expect(within(drawer).queryByRole("button", { name: "Toggle theme" })).toBeNull();
+      expect(within(drawer).queryByText("⌘K")).toBeNull();
+      expect(screen.getAllByRole("button", { name: /Switch to (light|dark) mode|Toggle theme/ })).toHaveLength(1);
+    });
+
     it("keeps the header uncluttered: theme switch, no duplicate Ask button", () => {
       renderHome();
       expect(screen.getByRole("button", { name: /Switch to (light|dark) mode/ })).toBeInTheDocument();
