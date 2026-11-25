@@ -198,7 +198,7 @@ export interface ColorBlockedPillar {
   stat?: string;
 }
 
-export type VisualPlanKind = 'diagram' | 'table' | 'grid' | 'image';
+export type VisualPlanKind = 'diagram' | 'table' | 'grid' | 'image' | 'stat' | 'sources';
 
 export interface SlideCard {
   id: string;

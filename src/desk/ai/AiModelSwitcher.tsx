@@ -65,7 +65,7 @@ export function AiModelSwitcher({ workspace, className = "", compact = false }: 
         className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium border border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] cursor-pointer"
       >
         <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${active ? "bg-emerald-500" : "bg-amber-500"}`} aria-hidden="true" />
-        {!compact && <span className="hidden xl:inline max-w-[110px] truncate">{label}</span>}
+        {compact ? <span className="hidden 2xl:inline max-w-[90px] truncate" data-testid="ai-model-short-name">{label}</span> : <span className="hidden xl:inline max-w-[110px] truncate">{label}</span>}
         <ChevronDown className="w-3 h-3" aria-hidden="true" />
       </button>
       {answer && !compact && (

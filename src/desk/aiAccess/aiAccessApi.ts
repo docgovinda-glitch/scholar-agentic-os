@@ -201,7 +201,7 @@ export async function routeDecision(taskType?: RoutingTaskType): Promise<Routing
   const ring = await buildKeyring(settings);
   // The same order the server uses for this kind of task (quick work tries the free workhorses first).
   const ordered = orderChain(
-    ring.map((e) => ({ e, lane: (e.provider === "ollama" || e.provider === "lmstudio" ? "local" : "byok") as "local" | "byok", provider: e.provider, group: e.via ?? e.provider, runsIn: isRemoteHttpsEndpoint(e.baseUrl) ? ("server" as const) : ("browser" as const) })),
+    ring.map((e) => ({ e, lane: (e.provider === "ollama" || e.provider === "lmstudio" ? "local" : "byok") as "local" | "byok", provider: e.provider, model: e.model, group: e.via ?? e.provider, runsIn: isRemoteHttpsEndpoint(e.baseUrl) ? ("server" as const) : ("browser" as const) })),
     taskType === "simple" ? "fast" : "reasoning",
     { strict: manualRouting(settings.preferences) },
   ).map((o) => o.e);

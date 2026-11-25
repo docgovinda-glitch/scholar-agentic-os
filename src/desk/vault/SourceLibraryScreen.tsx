@@ -58,6 +58,7 @@ export default function SourceLibraryScreen({
 }: SourceLibraryScreenProps) {
   const [items, setItems] = useState<VaultItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<MainTab>("sources");
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<"all" | "paper" | "website" | "other">("all");
@@ -98,13 +99,22 @@ export default function SourceLibraryScreen({
   // Load items, projects, and connected accounts
   async function loadLibrary() {
     setLoading(true);
+    setLoadError(null);
     try {
-      const loaded = await listVaultItems(userId);
+      const withTimeout = <T,>(p: Promise<T>): Promise<T> =>
+        Promise.race([
+          p,
+          new Promise<T>((_, reject) =>
+            setTimeout(() => reject(new Error("Loading your sources took too long.")), 15000),
+          ),
+        ]);
+      const loaded = await withTimeout(listVaultItems(userId));
       setItems(loaded);
-      const drives = await getConnectedCloudDrives(userId);
+      const drives = await withTimeout(getConnectedCloudDrives(userId)).catch(() => []);
       setConnectedDrives(drives);
-    } catch {
+    } catch (e) {
       setItems([]);
+      setLoadError(e instanceof Error ? e.message : "Could not load your sources.");
     } finally {
       setLoading(false);
     }
@@ -338,7 +348,7 @@ export default function SourceLibraryScreen({
   }
 
   return (
-    <div className="fixed inset-0 z-40 bg-[color:var(--surface-canvas)] flex flex-col overflow-hidden text-[color:var(--text-primary)]">
+    <div className="relative w-full min-h-[70vh] bg-[color:var(--surface-canvas)] flex flex-col text-[color:var(--text-primary)]">
       {/* ================= MAIN HEADER ================= */}
       <header className="px-6 py-4 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] flex items-center justify-between shadow-xs">
         <div className="flex items-center gap-4">
@@ -838,6 +848,18 @@ export default function SourceLibraryScreen({
             {loading && items.length === 0 ? (
               <div role="status" className="p-12 text-center text-xs text-[color:var(--text-muted)] my-4">
                 Loading your sources…
+              </div>
+            ) : loadError && items.length === 0 ? (
+              <div role="alert" className="p-12 text-center rounded-[var(--radius-xl)] border border-dashed border-[color:var(--border-default)] bg-[color:var(--surface-raised)] flex flex-col items-center gap-3 my-4">
+                <h3 className="text-base font-bold text-[color:var(--text-primary)]">Couldn't load your sources</h3>
+                <p className="text-xs text-[color:var(--text-secondary)] max-w-sm">{loadError}</p>
+                <button
+                  type="button"
+                  onClick={() => void loadLibrary()}
+                  className="mt-2 px-4 py-2 bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded-[var(--radius-md)] text-xs font-bold cursor-pointer"
+                >
+                  Retry
+                </button>
               </div>
             ) : filteredSources.length === 0 ? (
               /* Empty State */

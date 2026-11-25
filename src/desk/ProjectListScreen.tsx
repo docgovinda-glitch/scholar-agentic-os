@@ -34,8 +34,8 @@ import {
   isBlankProject,
   getProjectDisplayName,
   matchesProjectSearch,
-  deduplicateProjectList,
 } from "./projectNaming";
+import { normalizeProjectList } from "./sidebarProjects";
 import { hasVaultPassphraseOnThisDevice, currentUserId } from "../services/userVault";
 import { addVaultItem, setSessionUnlocked, listVaultItems, searchVaultItems, type VaultItem } from "../services/vaultContents";
 import { syncActiveSessionToRegistry } from "../services/auth/multiAccountService";
@@ -643,16 +643,11 @@ export default function ProjectListScreen({
       filtered = projects.filter((p) => matchesProjectSearch(p, searchQuery, projects));
     }
 
-    const uniqueProjects = deduplicateProjectList(filtered, projects, pinnedRecentIds);
-
-    return uniqueProjects.map((p) => {
-      const title = getProjectDisplayName(p, projects);
-      return {
-        id: p.projectId,
-        projectId: p.projectId,
-        title,
-      };
-    });
+    return normalizeProjectList(filtered, {
+      deletedIds: deletedProjectIdsRef.current,
+      pinnedIds: pinnedRecentIds,
+      contextProjects: projects,
+    }).map(({ id, projectId, title }) => ({ id, projectId, title }));
   }, [userEmail, projects, searchQuery, pinnedRecentIds]);
 
   const [activeProviderLabel, setActiveProviderLabel] = useState<string>("Ready");
@@ -2180,10 +2175,27 @@ export default function ProjectListScreen({
     // 3. Instantly filter the project out of the local state
     setProjects((curr) => (curr ? curr.filter((p) => p.projectId !== targetId) : []));
 
+    // Blank rows that share this project's title are hidden clones; delete them too
+    // so the next list load does not show one of them in its place.
+    const target = (previousProjects || []).find((p) => p.projectId === targetId);
+    const hiddenClones =
+      target && isBlankProject(target)
+        ? (previousProjects || []).filter(
+            (p) =>
+              p.projectId !== targetId &&
+              isBlankProject(p) &&
+              p.outputTypeId === target.outputTypeId &&
+              getProjectDisplayName(p, previousProjects || []) ===
+                getProjectDisplayName(target, previousProjects || [])
+          )
+        : [];
+    for (const c of hiddenClones) markProjectAsDeleted(c.projectId);
+
     // 4. Perform backend deletion
     try {
       if (!targetId.startsWith("demo-")) {
         await deleteProject(targetId);
+        for (const c of hiddenClones) await deleteProject(c.projectId).catch(() => undefined);
       }
       // Re-sync project list with server in background, filtering out any deleted IDs
       const res = await listProjects();

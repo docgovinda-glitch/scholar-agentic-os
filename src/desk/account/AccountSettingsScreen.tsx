@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { getSupabaseClient } from "../../services/supabaseClient";
+import { resolveDisplayName } from "../../shared/userIdentity";
 import { getProfile, saveProfileFields, updatePassword, type ProfileFields } from "../../services/supabaseAuthService";
 import { EDUCATION_LEVELS, USER_TYPES } from "../../config/accountSchema";
 import { Field, PhoneField, SelectField } from "../auth/AuthLayout";
@@ -62,9 +64,36 @@ export default function AccountSettingsScreen({
   const [passwordSaved, setPasswordSaved] = useState(false);
 
 
+  const [reloadKey, setReloadKey] = useState(0);
+  const [sessionFallback, setSessionFallback] = useState<{ name: string; email: string } | null>(null);
+
   useEffect(() => {
-    getProfile()
+    let active = true;
+    setLoadError(null);
+    // Show who is signed in straight away from the cached session.
+    try {
+      void getSupabaseClient()
+        .auth.getSession()
+        .then(({ data }) => {
+          const user = data?.session?.user;
+          if (!active || !user) return;
+          const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
+          const raw = meta.full_name ?? meta.name;
+          setSessionFallback({
+            name: (typeof raw === "string" && raw.trim()) || resolveDisplayName({ email: user.email }) || "",
+            email: user.email ?? "",
+          });
+        })
+        .catch(() => {});
+    } catch {
+      /* no session client (tests) */
+    }
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Loading your profile took too long. Check your connection and retry.")), 12000),
+    );
+    Promise.race([getProfile(), timeout])
       .then((result) => {
+        if (!active) return;
         if (result.success) {
           setProfile(result.profile);
           setFullName(result.profile.fullName);
@@ -79,13 +108,17 @@ export default function AccountSettingsScreen({
           setLoadError(result.error);
         }
       })
-      .catch((e) => setLoadError((e as Error).message));
-
-  }, []);
+      .catch((e) => {
+        if (active) setLoadError((e as Error).message);
+      });
+    return () => {
+      active = false;
+    };
+  }, [reloadKey]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") {
+      if (e.key === "Escape" && !e.defaultPrevented) {
         onClose();
       }
     }
@@ -151,7 +184,7 @@ export default function AccountSettingsScreen({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-6 overflow-y-auto animate-in fade-in duration-200"
+      className="fixed inset-0 w-screen h-screen z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-6 overflow-y-auto animate-in fade-in duration-200"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -402,10 +435,28 @@ export default function AccountSettingsScreen({
                   </form>
                 )}
 
+                {!profile && loadError && (
+                  <div className="mt-4 space-y-2 text-sm text-[color:var(--text-secondary)]">
+                    {sessionFallback && (
+                      <p>
+                        Signed in as <strong>{sessionFallback.name || sessionFallback.email}</strong>
+                        {sessionFallback.name && sessionFallback.email ? ` (${sessionFallback.email})` : ""}
+                      </p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setReloadKey((k) => k + 1)}
+                      className="px-3 py-1.5 rounded-[var(--radius-md)] border border-[color:var(--border-default)] text-xs font-semibold cursor-pointer"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                )}
+
                 {!profile && !loadError && (
                   <div className="mt-4 flex items-center gap-2 text-sm text-[color:var(--text-muted)]">
                     <span className="w-3.5 h-3.5 border-2 border-[color:var(--accent)] border-t-transparent rounded-full animate-spin" />
-                    <span>Loading profile…</span>
+                    <span>{sessionFallback ? `Loading profile for ${sessionFallback.name || sessionFallback.email}…` : "Loading profile…"}</span>
                   </div>
                 )}
               </div>

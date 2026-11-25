@@ -57,6 +57,14 @@ export async function json<T = unknown>(res: Response): Promise<T> {
  * Commit an ephemeral in-memory project into permanent PostgreSQL database
  */
 export async function commitProjectToDatabase(projectId: string): Promise<ProjectView> {
+  // Only local drafts are committed. A server project (or a draft that already
+  // has a server row) is returned as it is, never cloned into a second row.
+  const alreadyMigrated = getMigratedDraftRealId(projectId);
+  const fetchServerProject = (id: string) =>
+    authedFetch(`/api/projects/${encodeURIComponent(id)}`).then((r) => json<ProjectView>(r));
+  if (alreadyMigrated) return fetchServerProject(alreadyMigrated);
+  if (!projectId.startsWith("draft-")) return fetchServerProject(projectId);
+
   if (committingProjects.has(projectId)) {
     const existing = getEphemeralProject(projectId);
     if (existing) return existing;
@@ -87,8 +95,8 @@ export async function commitProjectToDatabase(projectId: string): Promise<Projec
       }
     }
 
+    // The draft id stays as an alias of the server project.
     recordDraftMigration(projectId, created.projectId, finalProject);
-    deleteEphemeralProject(projectId);
 
     if (typeof window !== "undefined") {
       if (window.location.pathname.includes(projectId)) {

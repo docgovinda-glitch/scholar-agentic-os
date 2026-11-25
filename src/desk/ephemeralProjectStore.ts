@@ -21,6 +21,15 @@ function getStorageSafe(type: "session" | "local"): Storage | null {
   }
 }
 
+const isDraftId = (id: string) => id.startsWith("draft-");
+
+/** Persisted server ids are never ephemeral; drop any that older builds stored. */
+function purgePersistedKeys(): void {
+  for (const id of Array.from(ephemeralProjects.keys())) {
+    if (!isDraftId(id)) ephemeralProjects.delete(id);
+  }
+}
+
 function loadStores(): void {
   const session = getStorageSafe("session");
   const local = getStorageSafe("local");
@@ -54,6 +63,7 @@ function loadStores(): void {
 
   tryLoad(session);
   tryLoad(local);
+  purgePersistedKeys();
 }
 
 function persistStores(): void {
@@ -82,15 +92,23 @@ loadStores();
 export function isEphemeralProject(projectId: string): boolean {
   if (!projectId) return false;
   loadStores();
-  if (migratedDrafts.has(projectId)) return true;
-  if (projectId.startsWith("draft-")) return true;
-  return ephemeralProjects.has(projectId);
+  // A draft that already has a server row resolves to that row: it is persisted.
+  if (migratedDrafts.has(projectId)) return false;
+  return isDraftId(projectId);
 }
 
+/** Follows draft -> real chains (with cycle detection) to the final id. */
 export function getMigratedDraftRealId(draftId: string): string | null {
   if (!draftId) return null;
   loadStores();
-  return migratedDrafts.get(draftId) || null;
+  const seen = new Set<string>([draftId]);
+  let current = migratedDrafts.get(draftId);
+  if (!current) return null;
+  while (migratedDrafts.has(current) && !seen.has(current)) {
+    seen.add(current);
+    current = migratedDrafts.get(current) as string;
+  }
+  return current;
 }
 
 export function recordDraftMigration(draftId: string, realProjectId: string, project?: ProjectView): void {
@@ -107,9 +125,8 @@ export function recordDraftMigration(draftId: string, realProjectId: string, pro
     isEphemeral: false,
   } as EphemeralProject;
 
-  // Keep both draftId and realProjectId pointing to the project so lookups never fail
-  ephemeralProjects.set(draftId, updatedData);
-  ephemeralProjects.set(realProjectId, updatedData);
+  // Only the draft alias is kept; the real id is a persisted server project.
+  if (draftId !== realProjectId) ephemeralProjects.set(draftId, updatedData);
   persistStores();
 }
 
@@ -118,10 +135,7 @@ export function recoverDraftProject(projectId: string): EphemeralProject | null 
   const direct = ephemeralProjects.get(projectId);
   if (direct) return direct;
 
-  const migratedRealId = migratedDrafts.get(projectId);
-  if (migratedRealId && ephemeralProjects.has(migratedRealId)) {
-    return ephemeralProjects.get(migratedRealId) || null;
-  }
+  const migratedRealId = getMigratedDraftRealId(projectId);
 
   // Attempt local storage deep scan
   const local = getStorageSafe("local");
@@ -146,12 +160,6 @@ export function getEphemeralProject(projectId: string): EphemeralProject | null 
   loadStores();
 
   // If this draft was already migrated to a permanent project, retrieve via realId
-  const migratedRealId = migratedDrafts.get(projectId);
-  if (migratedRealId) {
-    const migrated = ephemeralProjects.get(migratedRealId);
-    if (migrated) return migrated;
-  }
-
   const existing = ephemeralProjects.get(projectId);
   if (existing) return existing;
 
@@ -208,27 +216,28 @@ export function updateEphemeralProject(
   answers: Record<string, any>
 ): EphemeralProject | null {
   loadStores();
-  const effectiveId = migratedDrafts.get(projectId) || projectId;
-  const existing = ephemeralProjects.get(effectiveId) || ephemeralProjects.get(projectId);
+  const existing = ephemeralProjects.get(projectId);
   if (!existing) return null;
 
   const updated: EphemeralProject = {
     ...existing,
     answers: { ...existing.answers, ...answers },
   };
-  ephemeralProjects.set(effectiveId, updated);
-  if (effectiveId !== projectId) {
-    ephemeralProjects.set(projectId, updated);
-  }
+  ephemeralProjects.set(projectId, updated);
   persistStores();
   return updated;
 }
 
 export function deleteEphemeralProject(projectId: string): void {
   loadStores();
-  // Instead of completely throwing away the record if it was migrated, preserve the migration alias
-  if (!migratedDrafts.has(projectId)) {
-    ephemeralProjects.delete(projectId);
+  ephemeralProjects.delete(projectId);
+  // Remove the alias in both directions: the draft id and any draft pointing at this id.
+  migratedDrafts.delete(projectId);
+  for (const [draftId, realId] of Array.from(migratedDrafts.entries())) {
+    if (realId === projectId) {
+      migratedDrafts.delete(draftId);
+      ephemeralProjects.delete(draftId);
+    }
   }
   persistStores();
 }
