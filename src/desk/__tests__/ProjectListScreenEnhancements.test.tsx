@@ -128,7 +128,7 @@ describe("UI/UX Enhancements: Command Palette, Boot Project, Related Inquiries, 
     fireEvent.click(screen.getByRole("button", { name: "Send question" }));
 
     // Wait for assistant response and Related Inquiries
-    expect(await screen.findByText(/Related Inquiries/i)).toBeInTheDocument();
+    expect(await screen.findByText(/^Follow-ups$/i)).toBeInTheDocument();
 
     // Click a related inquiry chip (e.g. What is Knowledge Vault?)
     const inquiryChips = screen.getAllByRole("button", { name: /What is Knowledge Vault\?/i });

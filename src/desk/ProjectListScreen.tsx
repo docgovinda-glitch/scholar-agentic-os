@@ -35,7 +35,6 @@ import {
   getProjectDisplayName,
   matchesProjectSearch,
 } from "./projectNaming";
-import { vaultImportOutcome } from "../domain/vault/importOutcome";
 import { markProjectDeleted, normalizeProjectList, readDeletedProjectIds, unmarkProjectDeleted, withoutDeletedProjects } from "./sidebarProjects";
 import { hasVaultPassphraseOnThisDevice, currentUserId } from "../services/userVault";
 import { addVaultItem, setSessionUnlocked, listVaultItems, searchVaultItems, type VaultItem } from "../services/vaultContents";
@@ -75,14 +74,13 @@ import {
   Sparkles,
   Copy,
   ChevronDown,
-  BookmarkPlus,
   Clock,
-  Network,
 } from "lucide-react";
 import LiteratureDiscoveryWorkspace from "./discovery/LiteratureDiscoveryWorkspace";
 import LiveResearchTrajectoryVisualizer from "./components/LiveResearchTrajectoryVisualizer";
 import { type CitationGraphNode } from "../services/discovery/snowballSamplingService";
 import { AnswerReviewPanel } from "./AnswerReviewPanel";
+import { SourcesPanel } from "./ask/SourcesPanel";
 import { IncompleteAnswerBanner } from "./IncompleteAnswerBanner";
 import { buildAnswerTelemetry } from "../domain/ask/answerTelemetry";
 import { aiRequestParts, requestNextModelOnce } from "./ai/keyring";
@@ -731,8 +729,6 @@ export default function ProjectListScreen({
   // Documents attached anywhere in this conversation: kept for every follow-up and handed to workspaces.
   const [askThreadFiles, setAskThreadFiles] = useState<AskScholarAttachedFile[]>([]);
   const [askThreads, setAskThreads] = useState<AskScholarConversationThread[]>(() => loadLocalAskScholarThreads(userEmail));
-  const [messageActiveTab, setMessageActiveTab] = useState<Record<string, "synthesis" | "graph" | "consensus">>({});
-  const [selectedGraphNodeId, setSelectedGraphNodeId] = useState<string | null>(null);
   const [userVaultItems, setUserVaultItems] = useState<VaultItem[]>([]);
   const [isVaultGroundingActive, setIsVaultGroundingActive] = useState<boolean>(() => {
     try {
@@ -1273,46 +1269,6 @@ export default function ProjectListScreen({
       }
     },
     [userEmail, openAuth, askCitationStyle]
-  );
-
-  const handleImportVaultReferences = useCallback(
-    async (items: CSLItem[]) => {
-      if (items.length === 0) return;
-      try {
-        const uid = (await currentUserId().catch(() => null)) || userEmail || "local-scholar";
-        const hasPass = await hasVaultPassphraseOnThisDevice().catch(() => false);
-        if (!hasPass) {
-          setSessionUnlocked(true);
-        }
-        let saved = 0;
-        for (const csl of items) {
-          const authors = csl.author
-            .map((a) => a.literal || (a.given ? `${a.family}, ${a.given}` : a.family))
-            .filter((name): name is string => Boolean(name));
-          const year = csl.issued["date-parts"]?.[0]?.[0];
-          const ok = await addVaultItem(uid, {
-            title: csl.title,
-            content: `${csl.title}${csl["container-title"] ? ` — ${csl["container-title"]}` : ""}`,
-            sourceType: "reference",
-            externalReference: csl.URL || (csl.DOI ? `https://doi.org/${csl.DOI}` : undefined),
-            authors,
-            year: year ? String(year) : undefined,
-            journal: csl["container-title"] || csl.publisher,
-            tags: ["Ask Scholar Import", "CSL-JSON"],
-            metadata: { cslItem: csl, doi: csl.DOI },
-          })
-            .then(() => true)
-            .catch(() => false);
-          if (ok) saved++;
-        }
-        // Say what actually happened: a failed save is never reported as imported.
-        const outcome = vaultImportOutcome(saved, items.length);
-        showAppToast(outcome.message, outcome.variant, outcome.variant === "success" ? 3500 : 7000);
-      } catch {
-        showAppToast("The references could not be imported into your Knowledge Vault. Try again.", "error", 6000);
-      }
-    },
-    [userEmail]
   );
 
   const handleProposeDeepResearchPlan = useCallback((rawQuery: string) => {
@@ -2240,7 +2196,6 @@ export default function ProjectListScreen({
             settings={askUserSettings}
             direction="up"
             onUpdateSettings={handleAskSettingsUpdate}
-            onImportReferences={handleImportVaultReferences}
           />
         </>
       )}
@@ -3293,7 +3248,6 @@ export default function ProjectListScreen({
                         settings={askUserSettings}
                         direction="down"
                         onUpdateSettings={handleAskSettingsUpdate}
-                        onImportReferences={handleImportVaultReferences}
                       />
                     </>
                   )}
@@ -3555,339 +3509,7 @@ export default function ProjectListScreen({
                             </div>
                           )}
 
-                          {msg.sender === "assistant" && !msg.error && ((msg.citations && msg.citations.length > 0) || (msg.liveSources && msg.liveSources.length > 0)) && (
-                            <div className="mb-3">
-                              {/* Merged Single-Line Non-Wrapping View Switcher (Section 13) */}
-                              {((msg.citations && msg.citations.length > 0) || (msg.liveSources && msg.liveSources.length > 0)) && (
-                                <div
-                                  data-testid="response-primary-tabs"
-                                  className="no-scrollbar flex w-full flex-nowrap items-center gap-4 overflow-x-auto whitespace-nowrap border-b border-neutral-200/70 text-xs dark:border-white/10"
-                                >
-                                  {([
-                                    { id: "synthesis", label: "Answer", title: "Synthesized prose response with inline citations" },
-                                    { id: "graph", label: "Citation Graph", title: "Interactive Citation Graph & Literature Discovery" },
-                                    { id: "consensus", label: "Review", title: "Peer Review & Methodological Rigor Audit" },
-                                  ] as const).map(({ id, label, title }) => {
-                                    const active = (messageActiveTab[msg.id] ?? "synthesis") === id;
-                                    return (
-                                      <button
-                                        key={id}
-                                        type="button"
-                                        aria-pressed={active}
-                                        onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: id }))}
-                                        className={`-mb-px inline-flex shrink-0 cursor-pointer items-center whitespace-nowrap border-b-2 py-1.5 transition-colors ${active
-                                          ? "border-neutral-900 font-semibold text-neutral-900 dark:border-white dark:text-white"
-                                          : "border-transparent text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-                                          }`}
-                                        title={title}
-                                      >
-                                        <span>{label}</span>
-                                      </button>
-                                    );
-                                  })}
-
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {msg.sender === "assistant" && messageActiveTab[msg.id] === "graph" ? (() => {
-                            const graphSources = getNormalizedMsgSources(msg);
-                            if (graphSources.length === 0) {
-                              return (
-                                <div className="py-8 text-center text-xs text-neutral-500 dark:text-neutral-400">
-                                  No cited empirical sources available to construct a citation network.
-                                </div>
-                              );
-                            }
-
-                            const selectedNode = selectedGraphNodeId
-                              ? graphSources.find((s) => (s.url || s.title) === selectedGraphNodeId) || graphSources[0]
-                              : graphSources[0];
-
-                            const width = 640;
-                            const height = 360;
-                            const centerX = width / 2;
-                            const centerY = height / 2;
-                            const radius = Math.min(centerX - 80, centerY - 50);
-
-                            const nodePositions = graphSources.map((src, i) => {
-                              const angle = -Math.PI / 2 + (2 * Math.PI * i) / graphSources.length;
-                              const x = centerX + radius * Math.cos(angle);
-                              const y = centerY + radius * Math.sin(angle);
-                              const key = src.url || src.title || `source-${i}`;
-                              return { src, index: i, x, y, key };
-                            });
-
-                            return (
-                              <div className="space-y-3 pt-1">
-                                <div className="flex items-center justify-between gap-2 flex-wrap text-xs">
-                                  <div className="flex items-center gap-2">
-                                    <div className="flex items-center gap-1.5 font-semibold text-neutral-800 dark:text-neutral-200">
-                                      <Network className="w-3.5 h-3.5 text-indigo-500" />
-                                      <span>Interactive Citation Network ({graphSources.length} Nodes)</span>
-                                    </div>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleOpenLiteratureDiscovery(toCitationGraphSeeds(graphSources))}
-                                      className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-indigo-600 hover:bg-indigo-500 text-white flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
-                                      title="Open Full Literature Discovery Workspace with Recursive Snowball Sampling"
-                                    >
-                                      <Network className="w-2.5 h-2.5" />
-                                      <span>Full Discovery Workspace</span>
-                                    </button>
-                                  </div>
-                                  <div className="flex items-center gap-2 text-[10.5px]">
-                                    <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
-                                      <span className="w-2 h-0.5 bg-emerald-500 inline-block rounded" /> Supporting
-                                    </span>
-                                    <span className="inline-flex items-center gap-1 text-rose-600 dark:text-rose-400 font-medium">
-                                      <span className="w-2 h-0.5 bg-rose-500 inline-block rounded" /> Refuting
-                                    </span>
-                                    <span className="inline-flex items-center gap-1 text-sky-600 dark:text-sky-400 font-medium">
-                                      <span className="w-2 h-0.5 bg-sky-400 inline-block rounded" /> Mentioning
-                                    </span>
-                                  </div>
-                                </div>
-
-                                <div className="relative rounded-2xl border border-neutral-200/80 dark:border-white/10 bg-neutral-50/70 dark:bg-white/[0.02] p-2 overflow-hidden">
-                                  <svg
-                                    viewBox={`0 0 ${width} ${height}`}
-                                    className="w-full h-auto max-h-[380px] select-none"
-                                  >
-                                    {/* Concentric guide rings */}
-                                    <circle cx={centerX} cy={centerY} r={radius * 0.55} className="stroke-neutral-200/60 dark:stroke-white/5 fill-none" strokeDasharray="3 3" />
-                                    <circle cx={centerX} cy={centerY} r={radius} className="stroke-neutral-200/60 dark:stroke-white/5 fill-none" strokeDasharray="3 3" />
-
-                                    {/* Cross edges between nearby sources */}
-                                    {nodePositions.map((node, i) => {
-                                      const nextNode = nodePositions[(i + 1) % nodePositions.length];
-                                      if (nodePositions.length <= 1) return null;
-                                      return (
-                                        <line
-                                          key={`cross-${i}`}
-                                          x1={node.x}
-                                          y1={node.y}
-                                          x2={nextNode.x}
-                                          y2={nextNode.y}
-                                          className="stroke-neutral-300/40 dark:stroke-white/10"
-                                          strokeWidth={1}
-                                          strokeDasharray="2 4"
-                                        />
-                                      );
-                                    })}
-
-                                    {/* Edges from center Hub to nodes */}
-                                    {nodePositions.map((node) => {
-                                      const isSelected = (selectedNode.url || selectedNode.title) === node.key;
-                                      const strokeColor =
-                                        node.src.stance === "contradicting"
-                                          ? "rgba(244, 63, 94, 0.75)"
-                                          : node.src.stance === "supporting"
-                                            ? "rgba(16, 185, 129, 0.75)"
-                                            : "rgba(56, 189, 248, 0.65)";
-                                      const strokeWidth = isSelected ? 2.5 : 1.5;
-
-                                      return (
-                                        <line
-                                          key={`edge-${node.key}`}
-                                          x1={centerX}
-                                          y1={centerY}
-                                          x2={node.x}
-                                          y2={node.y}
-                                          stroke={strokeColor}
-                                          strokeWidth={strokeWidth}
-                                          strokeDasharray={node.src.stance === "contradicting" ? "4 3" : undefined}
-                                          className="transition-all duration-300"
-                                        />
-                                      );
-                                    })}
-
-                                    {/* Center Hub Node */}
-                                    <g className="cursor-default">
-                                      <circle
-                                        cx={centerX}
-                                        cy={centerY}
-                                        r={32}
-                                        className="fill-sky-50 dark:fill-sky-950/80 stroke-sky-400 dark:stroke-sky-500"
-                                        strokeWidth={2}
-                                      />
-                                      <text
-                                        x={centerX}
-                                        y={centerY - 4}
-                                        textAnchor="middle"
-                                        className="fill-sky-900 dark:fill-sky-200 text-[10px] font-bold select-none pointer-events-none"
-                                      >
-                                        Inquiry
-                                      </text>
-                                      <text
-                                        x={centerX}
-                                        y={centerY + 9}
-                                        textAnchor="middle"
-                                        className="fill-sky-600 dark:fill-sky-400 text-[8.5px] font-medium select-none pointer-events-none"
-                                      >
-                                        Core Thesis
-                                      </text>
-                                    </g>
-
-                                    {/* Peripheral Paper Nodes */}
-                                    {nodePositions.map((node) => {
-                                      const isSelected = (selectedNode.url || selectedNode.title) === node.key;
-                                      const fillColor =
-                                        node.src.stance === "contradicting"
-                                          ? "fill-rose-500/20 stroke-rose-500"
-                                          : node.src.stance === "supporting"
-                                            ? "fill-emerald-500/20 stroke-emerald-500"
-                                            : "fill-sky-500/20 stroke-sky-400";
-
-                                      return (
-                                        <g
-                                          key={`node-${node.key}`}
-                                          onClick={() => setSelectedGraphNodeId(node.key)}
-                                          className="cursor-pointer group"
-                                        >
-                                          {isSelected && (
-                                            <circle
-                                              cx={node.x}
-                                              cy={node.y}
-                                              r={24}
-                                              className="stroke-amber-400 fill-amber-400/10 animate-pulse"
-                                              strokeWidth={1.5}
-                                            />
-                                          )}
-                                          <circle
-                                            cx={node.x}
-                                            cy={node.y}
-                                            r={18}
-                                            className={`${fillColor} transition-transform duration-200 group-hover:scale-110`}
-                                            strokeWidth={isSelected ? 2.5 : 1.5}
-                                          />
-                                          <text
-                                            x={node.x}
-                                            y={node.y + 4}
-                                            textAnchor="middle"
-                                            className="fill-neutral-900 dark:fill-white text-[9.5px] font-bold select-none pointer-events-none font-mono"
-                                          >
-                                            [{node.index + 1}]
-                                          </text>
-                                          <text
-                                            x={node.x}
-                                            y={node.y + (node.y > centerY ? 28 : -22)}
-                                            textAnchor="middle"
-                                            className="fill-neutral-700 dark:fill-neutral-300 text-[9px] font-medium select-none pointer-events-none"
-                                          >
-                                            {Array.isArray(node.src.authors) && node.src.authors.length > 0
-                                              ? `${node.src.authors[0].split(" ").pop()}${node.src.year ? ` (${node.src.year})` : ""}`
-                                              : `Source [${node.index + 1}]`}
-                                          </text>
-                                        </g>
-                                      );
-                                    })}
-                                  </svg>
-
-                                  {/* Selected Paper Details Card */}
-                                  {selectedNode && (
-                                    <div className="mt-2 p-3 rounded-xl bg-white dark:bg-neutral-800/90 border border-neutral-200/80 dark:border-white/10 shadow-2xs space-y-2">
-                                      <div className="flex items-start justify-between gap-2">
-                                        <div className="space-y-0.5">
-                                          <div className="flex items-center gap-2 flex-wrap">
-                                            <span className="text-[10px] font-mono font-bold text-neutral-400">
-                                              Source #{graphSources.findIndex((s) => (s.url || s.title) === (selectedNode.url || selectedNode.title)) + 1}
-                                            </span>
-                                            {selectedNode.stance === "contradicting" ? (
-                                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-300/50">
-                                                Refuting / Contradicting
-                                              </span>
-                                            ) : selectedNode.stance === "supporting" ? (
-                                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-300/50">
-                                                Supporting Evidence
-                                              </span>
-                                            ) : (
-                                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-white/10">
-                                                Mentioning / Context
-                                              </span>
-                                            )}
-                                            <span className="text-[10px] text-neutral-400">
-                                              {Array.isArray(selectedNode.authors) && selectedNode.authors.length > 0 ? selectedNode.authors.join(", ") : (selectedNode.venue || "Source")}{selectedNode.year ? ` · ${selectedNode.year}` : ""}
-                                            </span>
-                                          </div>
-                                          <div className="font-semibold text-xs text-neutral-900 dark:text-neutral-100 leading-snug">
-                                            {selectedNode.url ? (
-                                              <a href={selectedNode.url} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
-                                                {selectedNode.title || "Untitled Paper"} ↗
-                                              </a>
-                                            ) : (
-                                              selectedNode.title || "Untitled Paper"
-                                            )}
-                                          </div>
-                                        </div>
-                                        <div className="flex items-center gap-1.5 shrink-0">
-                                          {selectedNode.url && (
-                                            <button
-                                              type="button"
-                                              disabled={Boolean(savedVaultSourceUrls[selectedNode.url || selectedNode.title || ""])}
-                                              onClick={() => handleSaveSourceToVault({
-                                                title: selectedNode.title,
-                                                url: selectedNode.url,
-                                                snippet: selectedNode.snippet,
-                                                authors: Array.isArray(selectedNode.authors) ? selectedNode.authors : undefined,
-                                                year: selectedNode.year,
-                                                venue: selectedNode.venue,
-                                              })}
-                                              className="px-2 py-1 rounded-md text-[10.5px] border border-neutral-200 dark:border-white/10 hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-300 flex items-center gap-1 cursor-pointer transition-colors"
-                                            >
-                                              <BookmarkPlus className="w-3 h-3 text-sky-500" />
-                                              <span>Save</span>
-                                            </button>
-                                          )}
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              const promptText = `Inquire deeper into: "${selectedNode.title || "this source"}" (${selectedNode.year || "recent"}). What specific empirical methodologies, causal limitations, and findings did the authors report?`;
-                                              setGuideInput(promptText);
-                                              guideInputRef.current?.focus();
-                                            }}
-                                            className="px-2 py-1 rounded-md text-[10.5px] font-medium bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-300/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 flex items-center gap-1 cursor-pointer transition-colors"
-                                            title="Prompt AskScholar to conduct a deep critical inquiry into this specific source"
-                                          >
-                                            <Sparkles className="w-3 h-3 text-indigo-500" />
-                                            <span>Deep Inquiry</span>
-                                          </button>
-                                        </div>
-                                      </div>
-                                      {selectedNode.snippet && (
-                                        <p className="text-[11px] text-neutral-600 dark:text-neutral-300 italic bg-neutral-50 dark:bg-neutral-900/40 p-2 rounded-lg border border-neutral-200/50 dark:border-white/5">
-                                          "{selectedNode.snippet}"
-                                        </p>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })() : msg.sender === "assistant" && messageActiveTab[msg.id] === "consensus" ? (() => {
-                            const msgIdx = guideMessages.findIndex((m) => m.id === msg.id);
-                            const precedingUserText =
-                              guideMessages.slice(0, msgIdx < 0 ? guideMessages.length : msgIdx).filter((m) => m.sender === "user").slice(-1)[0]?.text || "";
-                            const toTelemetry = (list: NormalizedCitationSource[]) =>
-                              list.map((c) => ({ title: c.title, snippet: c.snippet, venue: c.venue }));
-                            const liveWithFullText = (msg.liveSources || []).map((l) => ({
-                              title: l.title,
-                              snippet: l.snippet,
-                              venue: l.venue || l.journal,
-                              fullText: Boolean(l.openAccessUrl),
-                            }));
-                            const citedList = getNormalizedMsgSources(msg);
-                            return (
-                              <AnswerReviewPanel
-                                prompt={precedingUserText}
-                                answerText={msg.text || ""}
-                                retrieved={liveWithFullText.length > 0 ? liveWithFullText : toTelemetry(citedList)}
-                                cited={toTelemetry(citedList)}
-                                audit={msg.peerReviewAudit}
-                              />
-                            );
-                          })() : msg.sender === "assistant" ? (
+                          {msg.sender === "assistant" ? (
                             <div className="space-y-3">
                               <div>
                                 {renderFormattedGuideText(
@@ -3989,42 +3611,67 @@ export default function ProjectListScreen({
                             />
                           )}
 
-                          {/* Retrieved Live Sources Drawer */}
-                          {msg.liveSources && msg.liveSources.length > 0 && !(msg.citations && msg.citations.length > 0) && (
-                            <LiveSourcesDrawer
-                              sources={msg.liveSources}
-                              searchedAt={msg.searchedAt}
-                              initialExpanded={msg.liveSources.length <= 3}
-                              onSaveToVault={handleSaveSourceToVault}
-                              savedUrls={savedVaultSourceUrls}
-                            />
-                          )}
                           {msg.liveSources && msg.liveSources.length === 0 && (
                             <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-400" data-testid="no-live-sources">
                               No recent sources were found for this question, so this answer is from the AI's general knowledge. Check it before you rely on it.
                             </p>
                           )}
 
-                          {/* Separated Reference List & Source Transparency Panel (Sections 5, 6, 10, 14) */}
+                          {/* One Sources panel: references, sources found but not cited, excluded sources, answer checks, citation graph */}
                           {msg.sender === "assistant" &&
                             !msg.error &&
                             ((msg.citations && msg.citations.length > 0) ||
                               (msg.liveSources && msg.liveSources.length > 0) ||
-                              (msg.excludedSources && msg.excludedSources.length > 0)) && (
-                              <SourceTransparencyPanel
-                                messageId={msg.id}
-                                citations={
-                                  msg.citations && msg.citations.length > 0
-                                    ? msg.citations
-                                    : liveSourcesAsCitations(msg.liveSources) || []
-                                }
-                                excludedSources={msg.excludedSources}
-                                citationStyle={askCitationStyle}
-                                searchedCount={msg.searchedCount}
-                                readCount={msg.readCount}
-                                citedCount={msg.citedCount}
-                              />
-                            )}
+                              (msg.excludedSources && msg.excludedSources.length > 0)) &&
+                            (() => {
+                              const hasCitations = Boolean(msg.citations && msg.citations.length > 0);
+                              const panelCitations = hasCitations ? msg.citations! : liveSourcesAsCitations(msg.liveSources) || [];
+                              const normalized = getNormalizedMsgSources(msg);
+                              const msgIdx = guideMessages.findIndex((m) => m.id === msg.id);
+                              const askedText =
+                                guideMessages.slice(0, msgIdx < 0 ? guideMessages.length : msgIdx).filter((m) => m.sender === "user").slice(-1)[0]?.text || "";
+                              const toTelemetry = (list: NormalizedCitationSource[]) =>
+                                list.map((c) => ({ title: c.title, snippet: c.snippet, venue: c.venue }));
+                              const retrieved = (msg.liveSources || []).map((l) => ({
+                                title: l.title,
+                                snippet: l.snippet,
+                                venue: l.venue || l.journal,
+                                fullText: Boolean(l.openAccessUrl),
+                              }));
+                              return (
+                                <SourcesPanel
+                                  citedCount={msg.citedCount ?? (hasCitations ? msg.citations!.length : 0)}
+                                  foundCount={msg.searchedCount ?? Math.max(msg.liveSources?.length ?? 0, panelCitations.length)}
+                                  onOpenGraph={normalized.length > 0 ? () => handleOpenLiteratureDiscovery(toCitationGraphSeeds(normalized)) : undefined}
+                                >
+                                  <SourceTransparencyPanel
+                                    messageId={msg.id}
+                                    citations={panelCitations}
+                                    excludedSources={msg.excludedSources}
+                                    citationStyle={askCitationStyle}
+                                    searchedCount={msg.searchedCount}
+                                    readCount={msg.readCount}
+                                    citedCount={msg.citedCount}
+                                  />
+                                  {!hasCitations && msg.liveSources && msg.liveSources.length > 0 && (
+                                    <LiveSourcesDrawer
+                                      sources={msg.liveSources}
+                                      searchedAt={msg.searchedAt}
+                                      initialExpanded={msg.liveSources.length <= 3}
+                                      onSaveToVault={handleSaveSourceToVault}
+                                      savedUrls={savedVaultSourceUrls}
+                                    />
+                                  )}
+                                  <AnswerReviewPanel
+                                    prompt={askedText}
+                                    answerText={msg.text || ""}
+                                    retrieved={retrieved.length > 0 ? retrieved : toTelemetry(normalized)}
+                                    cited={toTelemetry(normalized)}
+                                    audit={msg.peerReviewAudit}
+                                  />
+                                </SourcesPanel>
+                              );
+                            })()}
 
                           {/* Recommended Workspace Handoff Callout when explicitly recommended by server */}
                           {msg.sender === "assistant" && !msg.error && msg.recommendedWorkspaceHandoff && (
@@ -4141,9 +3788,9 @@ export default function ProjectListScreen({
                           {/* Related questions: plain tappable lines, no boxes */}
                           {msg.sender === "assistant" && !msg.error && msg.followUps && msg.followUps.length > 0 && (
                             <div className="mt-4">
-                              <p className="mb-1 px-1 text-xs font-medium text-neutral-500 dark:text-neutral-400">Related Inquiries</p>
+                              <p className="mb-1 px-1 text-xs font-medium text-neutral-500 dark:text-neutral-400">Follow-ups</p>
                               <ul className="divide-y divide-neutral-200/70 dark:divide-white/10">
-                                {msg.followUps.map((fu, fuIdx) => (
+                                {msg.followUps.slice(0, 3).map((fu, fuIdx) => (
                                   <li key={fuIdx}>
                                     <button
                                       type="button"
@@ -4280,7 +3927,6 @@ export default function ProjectListScreen({
                               settings={askUserSettings}
                               direction="up"
                               onUpdateSettings={handleAskSettingsUpdate}
-                              onImportReferences={handleImportVaultReferences}
                             />
                           </>
                         )}

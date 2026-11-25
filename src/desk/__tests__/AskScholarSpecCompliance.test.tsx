@@ -158,10 +158,11 @@ describe("AskScholar Authoritative Specification Compliance (Sections 2–16)", 
     // Section 10: KaTeX display math renders cleanly
     expect(screen.getByTestId("katex-display-math")).toBeInTheDocument();
 
-    // Section 13: Primary response tabs are on one non-wrapping line without duplicate Discovery / Evidence Synthesis buttons
-    const primaryTabs = screen.getByTestId("response-primary-tabs");
-    expect(primaryTabs.className).toContain("flex-nowrap");
-    expect(primaryTabs.className).toContain("whitespace-nowrap");
+    // Section 13: no tab bar above the answer; sources, checks and the citation graph sit in one Sources panel
+    expect(screen.queryByTestId("response-primary-tabs")).toBeNull();
+    const sourcesPanel = screen.getByTestId("answer-sources-panel");
+    expect(within(sourcesPanel).getByText("Sources")).toBeInTheDocument();
+    expect(within(sourcesPanel).getByRole("button", { name: /Open citation graph/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Discovery$/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /^Evidence Synthesis$/i })).toBeNull();
 
@@ -219,7 +220,7 @@ describe("AskScholar Authoritative Specification Compliance (Sections 2–16)", 
     });
   });
 
-  it("Section 12 & 15: supports Deep Research editable plan proposal state machine and AskScholar preferences + BibTeX/RIS/DOI import", async () => {
+  it("Section 12 & 15: supports Deep Research editable plan proposal state machine and AskScholar preferences", async () => {
     openAskScholar();
 
     // Section 15: Open Preferences popover
@@ -232,24 +233,15 @@ describe("AskScholar Authoritative Specification Compliance (Sections 2–16)", 
     // Change answer length preference to "detailed"
     fireEvent.click(within(popover).getByTestId("pref-length-detailed"));
 
-    // Import BibTeX reference into Knowledge Vault
-    const importInput = within(popover).getByLabelText(/Import References to Vault/i);
-    fireEvent.change(importInput, {
-      target: {
-        value: `@article{vaswani2017attention,\n  author = {Vaswani, Ashish and Shazeer, Noam},\n  title = {Attention Is All You Need},\n  journal = {NeurIPS},\n  year = {2017},\n  doi = {10.48550/arXiv.1706.03762}\n}`,
-      },
-    });
-    fireEvent.click(within(popover).getByTestId("import-references-btn"));
-    expect(await within(popover).findByText(/Imported 1 reference/i)).toBeInTheDocument();
+    // Reference import lives in the Knowledge Vault's Add Source dialog, not in Ask preferences
+    expect(within(popover).queryByLabelText(/Import References to Vault/i)).toBeNull();
 
     // Close preferences
     fireEvent.click(within(popover).getByRole("button", { name: /Close preferences/i }));
 
-    // Section 12: Switch to Deep Research mode via "+" action menu and click "Propose Plan"
-    const plusMenuBtns = screen.getAllByRole("button", { name: "Add files and more" });
-    fireEvent.click(plusMenuBtns[plusMenuBtns.length - 1]);
-    const deepResearchMenuItem = await screen.findByRole("menuitem", { name: /Deep research/i });
-    fireEvent.click(deepResearchMenuItem);
+    // Section 12: Switch to Deep Research with the one mode toggle and click "Propose Plan"
+    const modeGroups = screen.getAllByRole("group", { name: /Answer mode/i });
+    fireEvent.click(within(modeGroups[modeGroups.length - 1]).getByRole("button", { name: "Deep Research" }));
 
     const boxes = screen
       .getAllByRole("textbox")
