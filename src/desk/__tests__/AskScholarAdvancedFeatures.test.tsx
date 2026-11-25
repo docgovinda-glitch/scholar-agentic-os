@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import React from "react";
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, cleanup, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { MemoryRouter } from "react-router-dom";
 
@@ -139,49 +139,35 @@ describe("Ask Scholar Advanced Features: Scite Stance, Citation Graph, and Peer 
     cleanup();
   });
 
-  it("renders 3 view tabs and no Evidence Matrix", async () => {
+  it("shows the answer with one Sources panel instead of view tabs", async () => {
     open();
     await ask("How does RL perform in financial markets?");
 
-    expect(await screen.findByRole("button", { name: /^Answer/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Citation Graph/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Review$/i })).toBeInTheDocument();
+    const panel = await screen.findByTestId("answer-sources-panel");
+    expect(within(panel).getByText("Sources")).toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: /Open citation graph/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Review$/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /Evidence Matrix/i })).toBeNull();
   });
 
-  it("renders Interactive Citation Network and selects paper node with Deep Inquiry action", async () => {
+  it("opens the citation graph full-screen from the Sources panel", async () => {
     open();
     await ask("How does RL perform in financial markets?");
 
-    const graphTabBtn = await screen.findByRole("button", { name: /Citation Graph/i });
-    fireEvent.click(graphTabBtn);
-
-    await waitFor(() => {
-      expect(screen.getByText(/Interactive Citation Network/i)).toBeInTheDocument();
-    });
-
-    // Deep Inquiry button is rendered in the selected paper card
-    const deepInquiryBtn = await screen.findByRole("button", { name: /Deep Inquiry/i });
-    expect(deepInquiryBtn).toBeInTheDocument();
-
-    fireEvent.click(deepInquiryBtn);
-
-    // Verify input box received the inquiry prompt
-    const box = screen.getByLabelText("Ask Scholar question input") as HTMLTextAreaElement;
-    expect(box.value).toContain("Inquire deeper into:");
+    const panel = await screen.findByTestId("answer-sources-panel");
+    fireEvent.click(within(panel).getByRole("button", { name: /Open citation graph/i }));
+    expect(await screen.findByTestId("citation-graph-overlay")).toBeInTheDocument();
   });
 
-  it("renders a model-verified Peer Reviewer 2 stress-test with critiques and no invented score", async () => {
+  it("puts the model-verified Peer Reviewer 2 stress-test inside the Sources panel, with no invented score", async () => {
     open();
     await ask("How does RL perform in financial markets?");
 
-    const peerReviewTabBtn = await screen.findByRole("button", { name: /^Review$/i });
-    fireEvent.click(peerReviewTabBtn);
-
+    const panel = await screen.findByTestId("answer-sources-panel");
     await waitFor(() => {
-      expect(screen.getByText(/Peer Reviewer 2 stress-test \(model-verified\)/i)).toBeInTheDocument();
-      expect(screen.getByText(/Simulated Backtesting vs. Live Slippage/i)).toBeInTheDocument();
-      expect(screen.getByText(/^MEDIUM$/i)).toBeInTheDocument();
+      expect(within(panel).getByText(/Peer Reviewer 2 stress-test \(model-verified\)/i)).toBeInTheDocument();
+      expect(within(panel).getByText(/Simulated Backtesting vs. Live Slippage/i)).toBeInTheDocument();
+      expect(within(panel).getByText(/^MEDIUM$/i)).toBeInTheDocument();
       expect(screen.queryByText(/\/100/)).toBeNull();
     });
   });

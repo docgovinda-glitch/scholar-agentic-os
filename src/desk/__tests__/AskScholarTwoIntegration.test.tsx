@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { MemoryRouter } from "react-router-dom";
 
@@ -117,21 +117,19 @@ describe("Ask Scholar 2.0 Multi-Layer Integration", () => {
     cleanup();
   });
 
-  it("opens the citation graph from an answer and offers no Evidence Matrix, synthesis or LaTeX export", async () => {
+  it("opens the citation graph from the answer's Sources panel and offers no Evidence Matrix, synthesis or LaTeX export", async () => {
     openAskScholar();
     await askQuestion("How do transformers compare to DPO in modern alignment pipelines?");
 
     expect(await screen.findByText(/Transformers/i)).toBeInTheDocument();
 
-    const citationGraphTabBtn = await screen.findByRole("button", { name: /^Citation Graph$/i });
+    const sourcesPanel = await screen.findByTestId("answer-sources-panel");
+    expect(screen.queryByTestId("response-primary-tabs")).toBeNull();
     expect(screen.queryByRole("button", { name: /Evidence Matrix/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /^LaTeX$/i })).toBeNull();
-    expect(screen.queryByRole("button", { name: /^Discovery$/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /^Evidence Synthesis$/i })).toBeNull();
 
-    fireEvent.click(citationGraphTabBtn);
-    const fullDiscoveryBtn = await screen.findByRole("button", { name: /Full Discovery Workspace/i });
-    fireEvent.click(fullDiscoveryBtn);
+    fireEvent.click(within(sourcesPanel).getByRole("button", { name: /Open citation graph/i }));
 
     expect(await screen.findByTestId("citation-graph-overlay")).toBeInTheDocument();
     expect(screen.getByText("Literature Discovery Workspace")).toBeInTheDocument();

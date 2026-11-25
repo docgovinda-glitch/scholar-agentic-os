@@ -205,7 +205,7 @@ export function AskPromptBox({
 
       <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 pt-1.5">
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-          <PromptBarActionMenu currentMode={mode} onSelectMode={onModeChange} onAttachFiles={onAttachFiles} />
+          <PromptBarActionMenu onAttachFiles={onAttachFiles} />
           {children}
         </div>
 

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { Settings2, Upload, Check, X } from "lucide-react";
+import { Settings2, X } from "lucide-react";
 import {
   DISCIPLINE_PROFILES,
   loadAskScholarSettings,
@@ -9,24 +9,18 @@ import {
   type AnswerLengthPreference,
   type AskScholarUserSettings,
 } from "../../config/askScholarConfig";
-import {
-  parseReferenceImportText,
-  type CSLItem,
-} from "../scholarCitationEngine";
 import { PHONE_SHEET_CLASSES, useIsPhoneSheet } from "./usePhoneSheet";
 
 export interface AskScholarSettingsPopoverProps {
   /** Controlled use: the parent owns and saves the settings. Omit to let the popover keep its own. */
   settings?: AskScholarUserSettings;
   onUpdateSettings?: (partial: Partial<AskScholarUserSettings>) => void;
-  onImportReferences?: (items: CSLItem[], rawDois?: string[]) => void | Promise<unknown>;
   direction?: "up" | "down";
 }
 
 export function AskScholarSettingsPopover({
   settings: externalSettings,
   onUpdateSettings,
-  onImportReferences,
   direction = "up",
 }: AskScholarSettingsPopoverProps) {
   const [open, setOpen] = useState(false);
@@ -34,8 +28,6 @@ export function AskScholarSettingsPopover({
     loadAskScholarSettings()
   );
   const settings = externalSettings || internalSettings;
-  const [importText, setImportText] = useState("");
-  const [importFeedback, setImportFeedback] = useState<string | null>(null);
   const popRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const phone = useIsPhoneSheet();
@@ -61,22 +53,6 @@ export function AskScholarSettingsPopover({
       return;
     }
     setInternalSettings(saveAskScholarSettings({ [key]: value }));
-  };
-
-  const handleImport = () => {
-    const parsed = parseReferenceImportText(importText);
-    if (parsed.imported.length === 0 && parsed.doisToResolve.length === 0) {
-      setImportFeedback("No valid BibTeX, RIS, or DOI entries detected.");
-      return;
-    }
-    void onImportReferences?.(parsed.imported, parsed.doisToResolve);
-    setImportFeedback(
-      `Imported ${parsed.imported.length} reference(s)${
-        parsed.doisToResolve.length > 0 ? ` and ${parsed.doisToResolve.length} DOI(s)` : ""
-      } to Knowledge Vault.`
-    );
-    setImportText("");
-    setTimeout(() => setImportFeedback(null), 4000);
   };
 
   const panel = (
@@ -149,35 +125,6 @@ export function AskScholarSettingsPopover({
         </div>
       </div>
 
-      {/* 5. Knowledge Vault Reference Import (BibTeX, RIS, DOI List — Section 9) */}
-      <div className="pt-2 border-t border-neutral-200/70 dark:border-white/10 space-y-1.5">
-        <label htmlFor="vault-ref-import" className="block text-[11px] font-semibold text-neutral-600 dark:text-neutral-300">
-          Import References to Vault (BibTeX, RIS, or DOIs)
-        </label>
-        <textarea
-          id="vault-ref-import"
-          rows={3}
-          value={importText}
-          onChange={(e) => setImportText(e.target.value)}
-          placeholder="Paste BibTeX (@article{...}), RIS (TY  - JOUR...), or a list of DOIs (10.1038/...)"
-          className="w-full p-2 rounded-lg text-[11px] font-mono bg-neutral-50 dark:bg-ink-900 border border-neutral-200 dark:border-white/15 text-neutral-900 dark:text-neutral-100"
-        />
-        <button
-          type="button"
-          data-testid="import-references-btn"
-          onClick={handleImport}
-          className="w-full inline-flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold bg-neutral-900 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200 transition-colors cursor-pointer"
-        >
-          <Upload className="w-3.5 h-3.5" />
-          <span>Import to Knowledge Vault</span>
-        </button>
-        {importFeedback && (
-          <p className="text-[11px] text-emerald-700 dark:text-emerald-300 flex items-center gap-1 font-medium">
-            <Check className="w-3 h-3 shrink-0" />
-            <span>{importFeedback}</span>
-          </p>
-        )}
-      </div>
     </div>
   );
 
@@ -186,10 +133,10 @@ export function AskScholarSettingsPopover({
       <button
         type="button"
         data-testid="ask-scholar-settings-btn"
-        aria-label="AskScholar preferences and reference import"
+        aria-label="AskScholar preferences"
         onClick={() => setOpen((v) => !v)}
         className="inline-flex min-h-10 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-xs font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-500 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white sm:min-h-8 min-w-10 sm:min-w-8"
-        title="Research preferences: discipline, answer length and reference import"
+        title="Research preferences: discipline and answer length"
       >
         <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
         <span className="hidden sm:inline">Preferences</span>

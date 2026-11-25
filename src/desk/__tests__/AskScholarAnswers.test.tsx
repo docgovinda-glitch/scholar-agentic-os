@@ -88,7 +88,7 @@ describe("Ask Scholar answers you can follow, and failures you can act on", () =
     expect(screen.getByRole("button", { name: "Connect an AI" })).toBeInTheDocument();
     expect(screen.getAllByText("Social media and polarization: a review").length).toBeGreaterThan(0);
     expect(screen.queryByText(/\d+ words/)).toBeNull();
-    expect(screen.queryByText(/Related Inquiries/i)).toBeNull();
+    expect(screen.queryByText(/^Follow-ups$/i)).toBeNull();
   });
 
   it("offers Try again when the AI fails for another reason, and asks again", async () => {

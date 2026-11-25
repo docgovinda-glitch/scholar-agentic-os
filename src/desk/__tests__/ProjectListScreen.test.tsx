@@ -1127,8 +1127,8 @@ describe("distinct academic format USPs & specs", () => {
     // No duplicate "Ask & Actions" box
     expect(screen.queryByText("Ask & Actions")).not.toBeInTheDocument();
 
-    // '+' trigger button & file input
-    const uploadBtn = screen.getByRole("button", { name: /Add files and more/i });
+    // '+' attaches files only; the answer mode lives in the Quick Scholar | Deep Research toggle
+    const uploadBtn = screen.getByRole("button", { name: /Attach files and photos/i });
     expect(uploadBtn).toBeInTheDocument();
     const fileInput = screen.getByLabelText("File upload") as HTMLInputElement;
     expect(fileInput).toBeInTheDocument();
@@ -1137,25 +1137,18 @@ describe("distinct academic format USPs & specs", () => {
     // Tooltip relative positioning
     const plusTooltip = uploadBtn.parentElement?.querySelector("span");
     expect(plusTooltip?.className).toContain("bottom-full");
-    expect(plusTooltip?.className).toContain("mb-2");
 
-    // Popover menu interaction & mode toggles (Web search mode is removed per Section 2)
+    // No second mode menu behind '+'
     fireEvent.click(uploadBtn);
-    expect(screen.getByRole("menu", { name: /Prompt options menu/i })).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: /Add files & photos/i })).toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: /Web search/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: /Deep research/i })).toBeInTheDocument();
+    expect(screen.queryByRole("menu", { name: /Prompt options menu/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /Deep research/i })).not.toBeInTheDocument();
 
-    // Select Deep Research mode
-    fireEvent.click(screen.getByRole("menuitem", { name: /Deep research/i }));
-    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
-    expect(screen.getAllByText("Deep Research").length).toBeGreaterThan(0);
-
-    // Reset mode via × button on chip
-    const resetChipBtn = screen.getByRole("button", { name: /Reset mode/i });
-    expect(resetChipBtn).toBeInTheDocument();
-    fireEvent.click(resetChipBtn);
-    expect(screen.queryByRole("button", { name: /Reset mode/i })).not.toBeInTheDocument();
+    // Mode switch: the one toggle
+    const modeGroup = screen.getAllByRole("group", { name: /Answer mode/i })[0];
+    fireEvent.click(within(modeGroup).getByRole("button", { name: "Deep Research" }));
+    expect(within(modeGroup).getByRole("button", { name: "Deep Research" })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(within(modeGroup).getByRole("button", { name: "Quick Scholar" }));
+    expect(within(modeGroup).getByRole("button", { name: "Quick Scholar" })).toHaveAttribute("aria-pressed", "true");
 
     // Simulate file attachment
     const testFile = new File(["syllabus content"], "syllabus_brief.pdf", { type: "application/pdf" });
