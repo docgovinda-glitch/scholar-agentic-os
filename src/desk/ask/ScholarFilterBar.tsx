@@ -12,7 +12,7 @@ interface ScholarFilterBarProps {
 const SCOPES: Array<{ id: SourceScope; label: string }> = [
   { id: "peer_reviewed", label: "Peer-reviewed only" },
   { id: "full_text_oa", label: "Full-text OA" },
-  { id: "vault_only", label: "Knowledge Vault only" },
+  { id: "vault_only", label: "Vault only" },
 ];
 
 const chip = (on: boolean) =>
