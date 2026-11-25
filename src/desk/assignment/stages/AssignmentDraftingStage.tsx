@@ -17,6 +17,7 @@ streamSectionGeneration,
 type InternalSectionPlan,
 } from "../services/invisibleChunkerService";
 import { previewDraftText } from "../services/draftPreview";
+import { requestOutlineFocus } from "../services/outlineGate";
 import { trimToLastSentence } from "../../../domain/assignment/draftPartials";
 import { buildEvidencePack,serializeEvidencePackForPrompt } from "../services/evidencePackService";
 import { buildContextContinuity,updateContextContinuityAfterSection } from "../services/contextContinuityService";
@@ -437,7 +438,11 @@ export function AssignmentDraftingStage({
           </p>
           <button
             type="button"
-            onClick={() => setPhase("understand")}
+            onClick={() => {
+              // Understand then points at the outline step that is missing.
+              requestOutlineFocus(projectId);
+              setPhase("understand");
+            }}
             className="mt-2 px-4 py-2 rounded-xl text-xs font-semibold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 cursor-pointer"
           >
             Go to Understand

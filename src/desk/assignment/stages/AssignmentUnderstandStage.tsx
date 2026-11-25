@@ -37,6 +37,8 @@ import DynamicStructurePlanner from "../components/DynamicStructurePlanner";
 import { TONE_SUGGESTION_CHIPS } from "../components/WritingStyleSelector";
 import { autoBalanceStructure } from "../services/outlineEditing";
 import { generateDynamicAssignmentStructure } from "../services/dynamicStructure";
+import { buildDefaultAcademicOutline } from "../services/defaultAcademicOutline";
+import { consumeOutlineFocus } from "../services/outlineGate";
 import { briefSubQuestions } from "../services/briefSemantics";
 import { isDeepEqual } from "../../../utils/briefExtractor";
 import { validateBriefFile } from "../../../services/documentParser";
@@ -65,6 +67,7 @@ export default function AssignmentUnderstandStage({
   onProceed,
 }: AssignmentUnderstandStageProps = {}) {
   const {
+    projectId,
     project,
     question,
     academicLevel,
@@ -644,6 +647,38 @@ export default function AssignmentUnderstandStage({
     handleStructureChange(starter);
   };
 
+  // Insert the standard five-section academic outline (the student's own, not AI).
+  const handleInsertDefaultOutline = () => {
+    setOutlineActionError(null);
+    handleStructureChange(buildDefaultAcademicOutline(localWordCount), { balance: false });
+  };
+
+  // Sent here from Drafting because no outline is approved: say what is missing and bring it into view.
+  const [outlineGateNotice, setOutlineGateNotice] = useState(false);
+  const [outlineOpen, setOutlineOpen] = useState(false);
+  const approvalRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (projectId && consumeOutlineFocus(projectId)) setOutlineGateNotice(true);
+  }, [projectId]);
+  const outlineApproved = Boolean(localStructure.isConfirmed);
+  const buildTimedOut = build.state.status === "error" && Boolean(build.state.timedOut);
+  const buildFailed = build.state.status === "error" || build.state.status === "interrupted";
+  const needsOutlineRecovery = !hasOutline(localStructure) && !buildRunning && (buildTimedOut || buildFailed);
+  // The outline area is open whenever there is something to act on there.
+  const forceOutlineOpen = !hasOutline(localStructure) || Boolean(outlineActionError) || (outlineGateNotice && !outlineApproved);
+  useEffect(() => {
+    if (forceOutlineOpen) setOutlineOpen(true);
+  }, [forceOutlineOpen]);
+  useEffect(() => {
+    if (!outlineGateNotice || understandStep !== "outline_review") return;
+    const el = approvalRef.current;
+    el?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+    el?.focus?.({ preventScroll: true });
+  }, [outlineGateNotice, understandStep]);
+  useEffect(() => {
+    if (outlineApproved) setOutlineGateNotice(false);
+  }, [outlineApproved]);
+
   const handleProceedToSources = async () => {
     if (!canProceedToSources) return;
     const trimmed = cleanAnswerString(localQuestion);
@@ -836,6 +871,19 @@ export default function AssignmentUnderstandStage({
       <span className="sr-only" aria-hidden="true">Understand Your Brief</span>
       <span className="sr-only" aria-hidden="true">Coursework &amp; Essay</span>
 
+      {outlineGateNotice && !outlineApproved && (
+        <div role="status" data-testid="outline-gate-notice" className="rounded-xl border border-[color:var(--border-default)] bg-[color:var(--surface-inset)] px-4 py-3 text-xs text-[color:var(--text-primary)]">
+          <p className="font-semibold">Please approve your outline below to begin drafting.</p>
+          <p className="mt-0.5 text-[color:var(--text-muted)]">
+            {understandStep === "brief_input"
+              ? "Add your brief and save it first; your outline is written from it. Then approve the outline."
+              : hasOutline(localStructure)
+                ? "Check the sections and word budgets, then choose “Approve outline & continue to Sources”."
+                : "There is no outline yet. Write it with AI, or insert a standard outline, then approve it."}
+          </p>
+        </div>
+      )}
+
       {understandStep === "brief_input" ? (
         /* Unified Assignment Setup Box (Fallback Intake Mode) */
         <div className="bg-[color:var(--surface-raised)] rounded-2xl border border-[color:var(--border-subtle)] p-5 sm:p-7 shadow-xs space-y-5">
@@ -888,7 +936,28 @@ export default function AssignmentUnderstandStage({
           <UnderstandAngleAndVoice activeThesis={activeThesis} coreTopic={coreTopic} dispatchToneAssistantSuggestions={dispatchToneAssistantSuggestions} handleToneChange={handleToneChange} localStyle={localStyle} localTone={localTone} saveAnswers={saveAnswers} setActiveThesis={setActiveThesis} setLocalStyle={setLocalStyle} setWritingStyle={setWritingStyle} thesisStances={thesisStances} thesisSource={thesisSource} thesisPending={buildRunning && thesisSource !== "ai" ? "Your AI is proposing working theses…" : null} onRefineThesis={refineThesis} toneSectionRef={toneSectionRef} />
 
             {/* Collapsed-by-default Fine-Tune Accordion */}
-            <details className="rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]/50 group">
+            {needsOutlineRecovery && (
+              <div role="alert" data-testid="outline-recovery" className="rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--state-danger-subtle)] px-4 py-3 text-xs text-[color:var(--state-danger)] space-y-2">
+                <p className="font-semibold">
+                  {buildTimedOut
+                    ? build.state.error || "Outline generation took longer than expected."
+                    : build.state.status === "interrupted"
+                      ? "Reading your brief was interrupted before it finished."
+                      : build.state.error}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={() => void build.run({ force: true })} className="px-3 py-1.5 rounded-full border border-current font-medium cursor-pointer">
+                    Retry with AI
+                  </button>
+                  <button type="button" onClick={handleInsertDefaultOutline} className="px-3 py-1.5 rounded-full border border-current font-medium cursor-pointer">
+                    Insert Default Academic Outline
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Collapsed-by-default Fine-Tune Accordion (open when there is no outline or something to act on) */}
+            <details open={outlineOpen} onToggle={(e) => setOutlineOpen(e.currentTarget.open)} className="rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]/50 group">
               <summary className="p-3.5 flex items-center justify-between cursor-pointer list-none select-none hover:bg-[color:var(--surface-hover)] transition-colors rounded-xl">
                 <div className="flex items-center gap-2">
                   <ChevronDown className="w-4 h-4 text-[color:var(--text-muted)] group-open:rotate-180 transition-transform" />
@@ -901,7 +970,7 @@ export default function AssignmentUnderstandStage({
                 </span>
               </summary>
               <div className="p-4 pt-1 border-t border-[color:var(--border-subtle)]">
-                {(outlineActionError || (build.state.status === "error" && build.state.error) || build.state.status === "interrupted") && (
+                {(outlineActionError || (!needsOutlineRecovery && ((build.state.status === "error" && build.state.error) || build.state.status === "interrupted"))) && (
                   <div role="alert" className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--state-danger-subtle)] px-3 py-2 text-xs text-[color:var(--state-danger)]">
                     <span>
                       {outlineActionError ||
@@ -939,7 +1008,12 @@ export default function AssignmentUnderstandStage({
           {/* ========================================================
               BOTTOM NAVIGATION BAR & PHASE 3 CONNECTION
              ======================================================== */}
-          <div className="p-4 sm:p-5 rounded-2xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div
+            ref={approvalRef}
+            tabIndex={-1}
+            data-testid="outline-approval"
+            className={`p-4 sm:p-5 rounded-2xl border bg-[color:var(--surface-raised)] shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3 focus:outline-none ${outlineGateNotice && !outlineApproved ? "border-[color:var(--accent-solid)] ring-2 ring-[color:var(--accent-solid)]/30" : "border-[color:var(--border-subtle)]"}`}
+          >
             <div>
               <button
                 type="button"
