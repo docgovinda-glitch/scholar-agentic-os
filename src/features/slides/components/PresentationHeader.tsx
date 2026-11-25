@@ -156,7 +156,7 @@ export default function PresentationHeader({
             aria-label="Simulate Audience Q&A"
           >
             <MessagesSquare className="w-3.5 h-3.5" />
-            <span className="hidden 2xl:inline">Q&amp;A</span>
+            <span className="hidden lg:inline whitespace-nowrap">Rehearse Q&amp;A</span>
           </button>
         )}
         <button
@@ -169,7 +169,7 @@ export default function PresentationHeader({
           aria-label="Toggle Ask Scholar"
         >
           <Lightbulb className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
-          <span className="hidden 2xl:inline whitespace-nowrap">Ask Scholar</span>
+          <span className="hidden lg:inline whitespace-nowrap">Ask Scholar</span>
         </button>
         {currentStep === 'delivery' && onStartPresentation && (
           <button

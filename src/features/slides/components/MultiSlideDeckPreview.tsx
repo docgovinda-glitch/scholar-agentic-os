@@ -163,28 +163,19 @@ export default function MultiSlideDeckPreview({
                     backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)',
                   }}
                 >
-                  {/* Classical Gold / Heraldic Header */}
                   <div className="flex items-center justify-between border-b pb-1" style={{ borderColor: `${theme.accent}30` }}>
-                    <div className="flex items-center gap-1.5 text-[7px] font-serif tracking-wider font-bold" style={{ color: theme.accent }}>
+                    <div className="flex items-center gap-1.5 text-[7px] font-serif tracking-wider font-bold uppercase" style={{ color: theme.accent }}>
                       <span>❦</span>
-                      <span>FACULTAS SCIENTIARUM</span>
-                      <span>·</span>
-                      <span>DISSERTATIO INAUGURALIS</span>
+                      <span>Academic presentation</span>
                     </div>
-                    <span className="text-[6.5px] font-mono opacity-50">EST. MDCCXXIV</span>
+                    <span className="text-[6.5px] font-mono opacity-50">{theme.name}</span>
                   </div>
-                  {/* Academic Title & Subtitle */}
                   <h3 className="text-xs sm:text-sm font-black font-serif tracking-tight leading-snug line-clamp-2">
                     {deckTitle || theme.name}
                   </h3>
-                  <p className="text-[7.5px] sm:text-[8px] font-serif italic opacity-75 line-clamp-1">
-                    An Empirical Examination of Sovereign Architecture &amp; Consensus Bounds
-                  </p>
-                  {/* Academic Meta & Committee Footnote */}
-                  <div className="flex items-center justify-between pt-1 border-t border-black/5 dark:border-white/5 text-[6.5px] font-mono opacity-60">
-                    <span>OXFORD &amp; CAMBRIDGE PEER REVIEW</span>
-                    <span>DOI: —</span>
-                  </div>
+                  {theme.tagline && (
+                    <p className="text-[7.5px] sm:text-[8px] font-serif italic opacity-75 line-clamp-1">{theme.tagline}</p>
+                  )}
                 </div>
               ) : theme.category === 'apple-keynote' ? (
                 /* CATEGORY 2: APPLE KEYNOTE & MODERN TECH (Cupertino, Linear, Stripe) */

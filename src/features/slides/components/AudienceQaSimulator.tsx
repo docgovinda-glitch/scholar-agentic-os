@@ -32,6 +32,15 @@ export interface AudienceQaSimulatorProps {
   className?: string;
 }
 
+const PLACEHOLDER_MARK = 'to fill this card';
+
+/** True when the deck is empty or still mostly the unedited template text. */
+export function isPlaceholderDeck(deck: SlideDeck): boolean {
+  if (!deck.slides.length) return true;
+  const filler = deck.slides.filter((s) => JSON.stringify(s).includes(PLACEHOLDER_MARK)).length;
+  return filler * 2 >= deck.slides.length;
+}
+
 export default function AudienceQaSimulator({
   projectId,
   deck,
@@ -72,7 +81,10 @@ export default function AudienceQaSimulator({
     setExpandedRebuttals((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const placeholderDeck = isPlaceholderDeck(deck);
+
   const handleSimulate = async () => {
+    if (placeholderDeck) return;
     setIsLoading(true);
     setError(null);
     try {
@@ -234,10 +246,15 @@ export default function AudienceQaSimulator({
 
           {/* Trigger Button */}
           <div>
+            {placeholderDeck && (
+              <p role="status" data-testid="qa-placeholder-warning" className="mb-2 text-xs text-amber-700 dark:text-amber-300">
+                Add slide content or generate an outline first for tailored Q&amp;A questions.
+              </p>
+            )}
             <button
               type="button"
               onClick={handleSimulate}
-              disabled={isLoading}
+              disabled={isLoading || placeholderDeck}
               data-testid="run-qa-simulation-btn"
               className="w-full h-8.5 rounded-xl px-4 bg-purple-600 text-white hover:bg-purple-700 active:scale-[0.99] font-bold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-xs flex items-center justify-center gap-2 cursor-pointer"
             >

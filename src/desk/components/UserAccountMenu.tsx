@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { getSupabaseClient } from "../../services/supabaseClient";
+import { resolveDisplayName } from "../../shared/userIdentity";
 import { getProfile } from "../../services/supabaseAuthService";
 import {
   getSavedAccounts,
@@ -106,7 +107,7 @@ export default function UserAccountMenu({
   }
 
   const otherAccounts = savedAccounts.filter((a) => a.email !== userEmail);
-  const displayName = fullName || (username ? `@${username}` : (userEmail ? userEmail.split("@")[0] : "Researcher"));
+  const displayName = resolveDisplayName({ fullName, email: userEmail }) ?? (username ? `@${username}` : "Researcher");
   const secondaryIdentifier = userEmail || (username ? `@${username}` : "Scholar Profile");
   const initial = (fullName ? fullName.charAt(0) : (userEmail ? userEmail.charAt(0) : "U")).toUpperCase();
 

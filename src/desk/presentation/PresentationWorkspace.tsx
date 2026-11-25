@@ -1,3 +1,4 @@
+import { useDisplayName } from '../useDisplayIdentity';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import type { SlideDeck, PresentationStudioStep } from '../../features/slides';
 import {
@@ -17,6 +18,7 @@ import { normalizeDeck } from '../../features/slides/gamma/content';
 import ScholarSidebar, { type ScholarSidebarProject } from '../../components/navigation/ScholarSidebar';
 import { useDeskSession } from '../useDeskSession';
 import { listProjects } from '../api/projectsApi';
+import { normalizeProjectList } from '../sidebarProjects';
 import GammaPlayer from '../../features/slides/gamma/GammaPlayer';
 import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 
@@ -52,34 +54,48 @@ export default function PresentationWorkspace({
   );
   // The sidebar shows the signed-in user's own projects and email, nothing else.
   const session = useDeskSession();
+  const sessionName = session.status === 'signed-in' ? session.name ?? null : null;
   const sessionEmail =
     session.status === 'signed-in' || session.status === 'email-verified' ? session.email : null;
+  const displayName = useDisplayName(sessionName, sessionEmail);
   const signedIn = session.status === 'signed-in' || session.status === 'email-verified';
   const [sidebarProjects, setSidebarProjects] = useState<ScholarSidebarProject[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(true);
   useEffect(() => {
+    if (session.status === 'loading') {
+      // Still resolving who is signed in: keep the loading state, never "No projects yet".
+      setProjectsLoading(true);
+      return;
+    }
     if (!signedIn) {
       setSidebarProjects([]);
+      setProjectsLoading(false);
       return;
     }
     let cancelled = false;
+    setProjectsLoading(true);
     listProjects()
       .then(({ items }) => {
         if (cancelled) return;
+        // Same list as the projects screen: deduplicated, named alike, deleted ids hidden.
         setSidebarProjects(
-          items.map((p) => ({
-            id: p.projectId,
-            title: p.title || p.answers?.title || 'Untitled project',
-            type: p.outputTypeId === 'OT-22' ? 'presentation' : 'document',
+          normalizeProjectList(items).map((row) => ({
+            id: row.id,
+            title: row.title,
+            type: row.project.outputTypeId === 'OT-22' ? 'presentation' : 'document',
           }))
         );
       })
       .catch(() => {
         if (!cancelled) setSidebarProjects([]);
+      })
+      .finally(() => {
+        if (!cancelled) setProjectsLoading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [signedIn]);
+  }, [signedIn, session.status]);
   const [showLivePlayer, setShowLivePlayer] = useState(false);
   const [playerStartIndex, setPlayerStartIndex] = useState(0);
   const [autosaveStatus, setAutosaveStatus] = useState<'saved' | 'saving' | 'idle' | 'error' | 'signed-out'>('saved');
@@ -403,7 +419,8 @@ export default function PresentationWorkspace({
         onOpenAiAccess={onOpenAiAccess}
         onOpenAskScholar={() => setIsAskScholarOpen((prev) => !prev)}
         projects={sidebarProjects}
-        userName={sessionEmail ? sessionEmail.split('@')[0] : undefined}
+        projectsLoading={session.status === 'loading' || projectsLoading}
+        userName={displayName}
         userEmail={sessionEmail ?? undefined}
       />
 
@@ -412,7 +429,7 @@ export default function PresentationWorkspace({
         {/* Single studio header: back, title, steps, save state, assistants */}
         <PresentationHeader
           title={deck.title}
-          onTitleChange={(newTitle) => handleUpdateDeck({ ...deck, title: newTitle })}
+          onTitleChange={(newTitle) => handleUpdateDeck({ ...deck, title: newTitle, topic: newTitle })}
           currentStep={currentStep}
           onStepChange={(step) => setCurrentStep(step)}
           autosaveStatus={autosaveStatus}

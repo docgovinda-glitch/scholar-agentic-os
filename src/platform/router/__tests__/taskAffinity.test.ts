@@ -78,3 +78,22 @@ describe("Confidential mode and Local AI only", () => {
     for (const p of CLOUD_PROVIDERS) if ("dataPolicy" in p && p.dataPolicy) expect(p.dataPolicy.note.length).toBeGreaterThan(20);
   });
 });
+
+import { isUndersizedForProse } from "../taskAffinity";
+describe("undersized local models", () => {
+  it("flags tiny and code-only ids, not capable ones", () => {
+    expect(isUndersizedForProse("qwen2.5-coder:1.5b")).toBe(true);
+    expect(isUndersizedForProse("llama3.2:3b")).toBe(true);
+    expect(isUndersizedForProse("llama3.1:8b")).toBe(false);
+    expect(isUndersizedForProse("qwen2.5:14b")).toBe(false);
+    expect(isUndersizedForProse(undefined)).toBe(false);
+  });
+  it("moves them behind capable local models for heavy tasks unless strict", () => {
+    const c = [
+      { lane: "local" as const, provider: "ollama", runsIn: "server" as const, model: "qwen2.5-coder:1.5b" },
+      { lane: "local" as const, provider: "lmstudio", runsIn: "server" as const, model: "llama3.1:8b" },
+    ];
+    expect(orderChain(c, "reasoning").map((x) => x.model)).toEqual(["llama3.1:8b", "qwen2.5-coder:1.5b"]);
+    expect(orderChain(c, "reasoning", { strict: true }).map((x) => x.model)[0]).toBe("qwen2.5-coder:1.5b");
+  });
+});

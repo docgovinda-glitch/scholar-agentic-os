@@ -27,6 +27,7 @@ vi.mock("../../aiAccess/aiAccessApi", () => ({
 }));
 
 vi.mock("../../../services/supabaseClient", () => ({
+  isSupabaseConfigured: () => true,
   getSupabaseClient: () => ({
     auth: { getSession: async () => ({ data: { session: { user: { email: "ada@example.com", user_metadata: { full_name: "Ada Lovelace" } } } } }) },
   }),

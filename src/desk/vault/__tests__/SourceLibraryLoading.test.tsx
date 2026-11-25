@@ -42,11 +42,11 @@ describe("Source Library loading", () => {
   it("turns a stalled load into an error with Retry, then recovers", async () => {
     listVaultItems.mockReturnValueOnce(new Promise(() => {}));
     render(<SourceLibraryScreen {...props} />);
-    expect(screen.getByText(/Loading your sources/)).toBeInTheDocument();
+    expect(screen.getByText(/Loading your sources…/)).toBeInTheDocument();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(15_100);
     });
-    expect(screen.queryByText(/Loading your sources/)).toBeNull();
+    expect(screen.queryByText(/Loading your sources…/)).toBeNull();
     expect(screen.getByRole("alert")).toHaveTextContent(/took too long/i);
 
     listVaultItems.mockResolvedValueOnce([]);

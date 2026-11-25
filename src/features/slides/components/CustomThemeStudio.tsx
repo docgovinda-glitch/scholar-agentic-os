@@ -11,7 +11,6 @@ import {
   CheckCircle2,
   AlertTriangle,
   FileUp,
-  FileText,
   Wand2,
   RefreshCw,
   ArrowRight,
@@ -31,7 +30,6 @@ import {
   saveCustomThemeToStorage,
   generateThemeFromPrompt,
 } from '../services/themeExtractorService';
-import { createBlankSheetDeck } from '../services/blankSheetService';
 import { recreateDeckFromFile, type RecreatedDeckResult } from '../services/deckRecreatorService';
 import MultiSlideDeckPreview from './MultiSlideDeckPreview';
 
@@ -229,16 +227,6 @@ export default function CustomThemeStudio({
     showToast(`✓ Applied "${theme.name}" to your deck`);
   };
 
-  // Blank Sheet action: resets to pure minimal slate for freeform design in Step 03 Studio Canvas
-  const handleStartBlankSheet = (targetMode: 'light' | 'dark' = mode) => {
-    const blankDeck = createBlankSheetDeck(deck, targetMode);
-    onUpdateDeck(blankDeck);
-    showToast('✓ Blank canvas ready! Proceeding to Studio where you can design freely.');
-    if (onProceedToStudio) {
-      onProceedToStudio();
-    }
-  };
-
   // Presentation Deck File Recreator (.pptx, .ppt, .pdf, .html, slide images)
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -422,18 +410,6 @@ export default function CustomThemeStudio({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Start from Blank Sheet CTA */}
-          <button
-            type="button"
-            onClick={() => handleStartBlankSheet('light')}
-            data-testid="blank-sheet-btn"
-            className="px-3.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 hover:bg-amber-500/20 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-            title="Wipe away templates and start on an empty canvas to design yourself"
-          >
-            <FileText className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-            <span>🎨 Start from Blank Sheet</span>
-          </button>
-
           <button
             type="button"
             onClick={handleSaveToStorage}
@@ -572,25 +548,6 @@ export default function CustomThemeStudio({
         {/* Left Column: Design Controls (6 Cols) */}
         <div className="lg:col-span-6 space-y-5 bg-white dark:bg-[#1C1C1E] p-5 rounded-2xl border border-neutral-200/80 dark:border-white/10 shadow-xs">
           
-          {/* FEATURE 2: Blank Sheet Quick Card (Design by Yourself) */}
-          <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-white/10 flex items-center justify-between gap-3">
-            <div>
-              <span className="text-xs font-bold text-neutral-900 dark:text-white block">
-                Want to design by yourself from scratch?
-              </span>
-              <span className="text-[11px] text-neutral-500 dark:text-neutral-400 block mt-0.5">
-                Get a clean blank canvas with zero rigid constraints to design freely in the studio.
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => handleStartBlankSheet('light')}
-              className="px-3 py-1.5 rounded-lg bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 text-xs font-bold hover:opacity-90 transition-opacity cursor-pointer shrink-0 shadow-xs"
-            >
-              Start Blank Sheet
-            </button>
-          </div>
-
           {/* FEATURE 3: AI Prompt Aesthetic Styler (No hex code typing required!) */}
           <div className="space-y-2">
             <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider block">
@@ -924,14 +881,6 @@ export default function CustomThemeStudio({
               <Sparkles className="w-4 h-4 text-amber-300" />
               Apply Custom Theme to Deck
             </button>
-            <button
-              type="button"
-              onClick={() => handleApplyToDeck()}
-              className="w-full py-2.5 rounded-xl border border-neutral-200 dark:border-white/10 text-neutral-800 dark:text-neutral-200 font-semibold text-xs hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer flex items-center justify-center gap-2"
-            >
-              <Check className="w-3.5 h-3.5" />
-              Apply Custom Theme to Presentation Deck
-            </button>
           </div>
         </div>
 
@@ -962,7 +911,7 @@ export default function CustomThemeStudio({
                 fontFamily,
                 visualMotif,
               }}
-              deckTitle={deck.title || 'Strategic Architecture & Transformation'}
+              deckTitle={deck.title && !/^untitled(\s+(project|presentation))?(\s+\d+)?$/i.test(deck.title.trim()) ? deck.title : 'Your presentation title'}
               showControls={true}
               showExpandButton={false}
             />

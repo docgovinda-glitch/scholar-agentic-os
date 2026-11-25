@@ -12,7 +12,7 @@ import { getSupabaseClient, isSupabaseConfigured } from "../services/supabaseCli
 export type SessionState =
   | { status: "loading" }
   | { status: "signed-out" }
-  | { status: "signed-in"; userId: string; email: string | null }
+  | { status: "signed-in"; userId: string; email: string | null; name?: string | null }
   /**
    * A recovery link was just followed. Distinct from "signed-out" so
    * DeskAuthGate can send AuthFlow straight to the set-new-password screen
@@ -91,10 +91,13 @@ export function useDeskSession(): SessionState {
     // until the user acknowledges the verification or signs out.
     let emailVerified = isEmailVerificationUrl();
 
-    function resolve(session: { user?: { id: string; email?: string | null } | null } | null | undefined) {
+    function resolve(session: { user?: { id: string; email?: string | null; user_metadata?: Record<string, unknown> | null } | null } | null | undefined) {
       if (!active) return;
       if (recovering) return setState({ status: "recovery" });
       const user = session?.user;
+      const meta = user?.user_metadata;
+      const rawName = meta?.full_name ?? meta?.name ?? meta?.display_name;
+      const name = typeof rawName === "string" && rawName.trim() ? rawName.trim() : null;
       if (!user) return setState({ status: "signed-out" });
       if (emailVerified) {
         return setState({
@@ -106,11 +109,11 @@ export function useDeskSession(): SessionState {
             // eventual token refresh) resolves straight to "signed-in"
             // instead of re-triggering the confirmation screen.
             emailVerified = false;
-            if (active) setState({ status: "signed-in", userId: user.id, email: user.email ?? null });
+            if (active) setState({ status: "signed-in", userId: user.id, email: user.email ?? null, name });
           },
         });
       }
-      setState({ status: "signed-in", userId: user.id, email: user.email ?? null });
+      setState({ status: "signed-in", userId: user.id, email: user.email ?? null, name });
     }
 
     // Resolve the current session once on mount...

@@ -337,6 +337,31 @@ Multi-agent verification delivers 100% citation accuracy across 5,000 tested ref
     expect(screen.queryByText(/Aaditya|aaditya@scholar\.io/)).not.toBeInTheDocument();
   });
 
+  it("sidebar shows the same deduplicated project list as the projects screen and hides deleted ids", async () => {
+    sessionMock.value = { status: "signed-in", userId: "u-1", email: "researcher@uni.example" };
+    sessionStorage.setItem("scholar_deleted_project_ids", JSON.stringify(["p-gone"]));
+    listProjectsMock.mockResolvedValue({
+      items: [
+        { projectId: "p-1", outputTypeId: "OT-10", answers: { title: "Wetland paper" }, hasDocument: true },
+        { projectId: "p-2", outputTypeId: "OT-10", answers: { title: "Wetland paper" }, hasDocument: true },
+        { projectId: "p-gone", outputTypeId: "OT-10", answers: { title: "Deleted paper" }, hasDocument: true },
+      ],
+    });
+    render(<PresentationWorkspace projectId="proj-pres-dedupe" />);
+
+    expect(await screen.findByText("Wetland paper")).toBeInTheDocument();
+    expect(screen.getAllByText("Wetland paper")).toHaveLength(1);
+    expect(screen.queryByText("Deleted paper")).not.toBeInTheDocument();
+    sessionStorage.removeItem("scholar_deleted_project_ids");
+  });
+
+  it("does not flash 'No projects yet' while the session is still loading", () => {
+    sessionMock.value = { status: "loading" };
+    render(<PresentationWorkspace projectId="proj-pres-loading" />);
+    expect(screen.queryByText("No projects yet")).not.toBeInTheDocument();
+    expect(screen.getByText("Loading projects…")).toBeInTheDocument();
+  });
+
   it("integrates ScholarSidebar with active Presentation Studio pill and collapsible toggle", () => {
     render(<PresentationWorkspace projectId="proj-pres-sidebar" />);
 
