@@ -53,57 +53,9 @@ export default function EvidenceSynthesisWorkspace({
     if (seedPapers && seedPapers.length > 0) {
       return seedPapers.map((p, idx) => extractEvidenceFromPaper(p, idx, framework.id));
     }
-    // Default empirical sample items
-    return [
-      extractEvidenceFromPaper(
-        {
-          id: "p1",
-          title: "Direct Preference Optimization: Language Models are Secretly Reward Models",
-          authors: ["Rafailov, R.", "Sharma, A.", "Mitchell, E."],
-          year: 2023,
-          journal: "NeurIPS",
-          doi: "10.48550/arXiv.2305.18290",
-          abstract: "In this randomized controlled benchmark of 1,200 trials, the algorithm showed SMD = 0.54 (95% CI [0.38, 0.70], p < 0.001) over PPO baseline.",
-        },
-        0
-      ),
-      extractEvidenceFromPaper(
-        {
-          id: "p2",
-          title: "Empirical Scaling Laws for Reward Model Over-Optimization in LLMs",
-          authors: ["Gao, L.", "Schulman, J.", "Hilton, J."],
-          year: 2023,
-          journal: "ICLR",
-          doi: "10.48550/arXiv.2210.10760",
-          abstract: "Evaluation across 800 cohort iterations demonstrated an effect size of SMD = 0.46 (95% CI [0.28, 0.64], p < 0.001) in generalizable alignment.",
-        },
-        1
-      ),
-      extractEvidenceFromPaper(
-        {
-          id: "p3",
-          title: "Constitutional AI: Harmlessness from AI Feedback",
-          authors: ["Bai, Y.", "Kadavath, S.", "Kundu, S."],
-          year: 2022,
-          journal: "arXiv",
-          doi: "10.48550/arXiv.2212.08073",
-          abstract: "Controlled trial across multi-turn dialogs found an observed standardized mean difference of SMD = 0.62 (95% CI [0.42, 0.82], p < 0.001).",
-        },
-        2
-      ),
-      extractEvidenceFromPaper(
-        {
-          id: "p4",
-          title: "Training Language Models to Follow Instructions with Human Feedback",
-          authors: ["Ouyang, L.", "Wu, J.", "Jiang, X."],
-          year: 2022,
-          journal: "NeurIPS",
-          doi: "10.48550/arXiv.2203.02155",
-          abstract: "In blind human preference trials with 2,400 prompt evaluations, win rates favored instruct models with SMD = 0.58 (95% CI [0.44, 0.72], p < 0.001).",
-        },
-        3
-      ),
-    ];
+    // No papers yet: an empty matrix. Never sample rows with made-up effect sizes
+    // (earlier builds attributed invented SMDs and p-values to real papers here).
+    return [];
   });
 
   const [activeTab, setActiveTab] = useState<"matrix" | "forest">("matrix");
@@ -357,6 +309,15 @@ export default function EvidenceSynthesisWorkspace({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-200/70 dark:divide-white/5">
+                  {filteredItems.length === 0 && (
+                    <tr data-testid="evidence-matrix-empty">
+                      <td colSpan={isClinical ? 10 : 5 + framework.columns.length} className="py-10 px-4 text-center text-xs text-neutral-500 dark:text-neutral-400">
+                        {matrixItems.length === 0
+                          ? "No papers in the matrix yet. Add papers from Literature Discovery to extract their evidence."
+                          : "No papers match these filters."}
+                      </td>
+                    </tr>
+                  )}
                   {filteredItems.map((item, idx) => {
                     const rawAuthor = item.authors[0] || "Author";
                     const surname = rawAuthor.includes(",") ? rawAuthor.split(",")[0].trim() : rawAuthor.split(" ").pop()?.trim() || "Author";

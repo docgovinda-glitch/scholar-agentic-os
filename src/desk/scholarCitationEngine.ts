@@ -10,6 +10,7 @@
  */
 
 import type { ReferenceAuthor, ReferenceKind } from "../citation_compliance/model/reference";
+import { venueOrEmpty } from "../shared/retrieval/venue";
 import {
   verifyAndConvertToCSL,
   verifyAndDeduplicateSources,
@@ -257,8 +258,9 @@ export function citationItemToCSL(item: WebsiteCitationItem, index = 0): CSLItem
       year: item.year,
       publishedDate: item.publishedDate,
       publicationDate: item.publicationDate,
-      venue: item.venue || item.source,
-      journal: item.journal,
+      // `source` is often the search service ("crossref"); it is a venue only when it is not.
+      venue: venueOrEmpty(item.venue, item.source) || undefined,
+      journal: venueOrEmpty(item.journal) || undefined,
       volume: item.volume,
       issue: item.issue,
       pages: item.pages,

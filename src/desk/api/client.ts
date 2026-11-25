@@ -42,7 +42,8 @@ export {
   recoverDraftProject,
 };
 
-const committingProjects = new Set<string>();
+/** Drafts being committed, by draft id: concurrent callers share one POST, so a draft never becomes two rows. */
+const committingProjects = new Map<string, Promise<ProjectView>>();
 
 export async function json<T = unknown>(res: Response): Promise<T> {
   if (res.status === 401) throw new UnauthenticatedError();
@@ -65,19 +66,15 @@ export async function commitProjectToDatabase(projectId: string): Promise<Projec
   if (alreadyMigrated) return fetchServerProject(alreadyMigrated);
   if (!projectId.startsWith("draft-")) return fetchServerProject(projectId);
 
-  if (committingProjects.has(projectId)) {
-    const existing = getEphemeralProject(projectId);
-    if (existing) return existing;
-    throw new Error(`Project ${projectId} is already in the process of committing`);
-  }
+  const inFlight = committingProjects.get(projectId);
+  if (inFlight) return inFlight;
 
   const ephemeral = getEphemeralProject(projectId);
   if (!ephemeral) {
     throw new Error(`Cannot commit ephemeral project ${projectId}: not found in ephemeral store`);
   }
 
-  committingProjects.add(projectId);
-  try {
+  const commit = (async () => {
     const created = await authedJsonFetch("/api/projects", "POST", { outputTypeId: ephemeral.outputTypeId }).then((r) =>
       json<ProjectView>(r)
     );
@@ -111,9 +108,11 @@ export async function commitProjectToDatabase(projectId: string): Promise<Projec
     }
 
     return finalProject;
-  } finally {
+  })().finally(() => {
     committingProjects.delete(projectId);
-  }
+  });
+  committingProjects.set(projectId, commit);
+  return commit;
 }
 
 
@@ -163,7 +162,8 @@ export async function authedFetch(input: string, init: RequestInit = {}): Promis
     const migratedId = getMigratedDraftRealId(draftId);
     if (migratedId) {
       input = input.replace(draftId, migratedId);
-    } else if (isEphemeralProject(draftId) && !committingProjects.has(draftId)) {
+    } else if (isEphemeralProject(draftId)) {
+      // Joins an in-flight commit of the same draft instead of starting another.
       try {
         const committed = await commitProjectToDatabase(draftId);
         input = input.replace(draftId, committed.projectId);

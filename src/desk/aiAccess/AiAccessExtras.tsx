@@ -3,6 +3,10 @@ import { ExternalLink, Loader2, RefreshCw } from "lucide-react";
 import { getCloudProvider } from "../../config/providerCatalog";
 import { getLocalRunner } from "../../config/localRunnerCatalog";
 import { routeDecision, type RoutingDecision, type RoutingTaskType } from "./aiAccessApi";
+import { withTimeout } from "../../shared/withTimeout";
+
+/** A routing check reads only local settings and keys; one that has not settled by now is reported, not waited on. */
+const ROUTING_CHECK_TIMEOUT_MS = 8000;
 
 /** A provider id as the person knows it. */
 export function providerLabel(id: string): string {
@@ -30,7 +34,7 @@ export function LiveRouting({ refreshKey, privacy }: { refreshKey: string; priva
     setLoading(true);
     Promise.all(
       TASKS.map((t) =>
-        routeDecision(t.type)
+        withTimeout(routeDecision(t.type), ROUTING_CHECK_TIMEOUT_MS, "Routing could not be checked in time. Use the refresh button to try again.")
           .then((d) => [t.type, d] as const)
           .catch((e: unknown) => [t.type, { error: e instanceof Error ? e.message : "Routing could not be checked." }] as const)
       )

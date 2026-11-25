@@ -13,7 +13,6 @@ import {
   deleteCachedProject,
   removePendingMutationsForProject,
 } from "../../services/offline/indexedDbStorage";
-import { getSupabaseClient, isSupabaseConfigured } from "../../services/supabaseClient";
 import type {
   Author,
   CanonicalDocument,
@@ -100,16 +99,9 @@ export async function deleteProject(projectId: string): Promise<{ success: boole
     return { success: true, id: projectId };
   }
 
-  if (isSupabaseConfigured()) {
-    const supabase = getSupabaseClient();
-    if (supabase) {
-      const { error } = await supabase.from("projects").delete().eq("project_id", realId);
-      if (error) {
-        throw new Error(`Could not delete the project: ${error.message}`);
-      }
-    }
-  }
-
+  // The server deletes the row (owner-checked, service role, and it fails when no row
+  // was removed). No browser-side table delete: public.projects has no client SELECT
+  // policy, so a direct delete from here always matched 0 rows and reported success.
   const res = await authedFetch(`/api/projects/${encodeURIComponent(realId)}`, { method: "DELETE" });
   // 404 means it is already gone.
   if (!res.ok && res.status !== 404) {

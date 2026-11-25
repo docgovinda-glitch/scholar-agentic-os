@@ -196,9 +196,27 @@ export type RoutingDecision = { ok: true; choice: RoutingChoice; fallbacks: Rout
  * own keyring (the same list sent with every AI request, in the same order:
  * own keys, then the local model). Nothing is executed.
  */
+let routingContextInFlight: Promise<{ settings: Awaited<ReturnType<typeof loadUserAiSettings>>; ring: Awaited<ReturnType<typeof buildKeyring>> }> | null = null;
+
+/**
+ * Settings + keyring for a routing preview. Concurrent previews (the Overview
+ * checks four task types at once) share one read instead of racing four
+ * auth/settings round trips and key decryptions against each other.
+ */
+function loadRoutingContext() {
+  if (!routingContextInFlight) {
+    routingContextInFlight = (async () => {
+      const settings = await loadUserAiSettings();
+      return { settings, ring: await buildKeyring(settings) };
+    })().finally(() => {
+      routingContextInFlight = null;
+    });
+  }
+  return routingContextInFlight;
+}
+
 export async function routeDecision(taskType?: RoutingTaskType): Promise<RoutingDecision> {
-  const settings = await loadUserAiSettings();
-  const ring = await buildKeyring(settings);
+  const { settings, ring } = await loadRoutingContext();
   // The same order the server uses for this kind of task (quick work tries the free workhorses first).
   const ordered = orderChain(
     ring.map((e) => ({ e, lane: (e.provider === "ollama" || e.provider === "lmstudio" ? "local" : "byok") as "local" | "byok", provider: e.provider, model: e.model, group: e.via ?? e.provider, runsIn: isRemoteHttpsEndpoint(e.baseUrl) ? ("server" as const) : ("browser" as const) })),

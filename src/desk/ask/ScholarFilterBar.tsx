@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SlidersHorizontal } from "lucide-react";
 import { DEFAULT_SCHOLAR_FILTERS, type ScholarFilters, type SourceScope } from "../../domain/ask/scholarFilters";
 import type { PromptMode } from "../PromptBarActionMenu";
 
@@ -27,6 +28,10 @@ export function ScholarFilterBar({ mode, onModeChange, filters, onFiltersChange 
   const deep = mode === "deep_research";
   const [customOpen, setCustomOpen] = useState(filters.yearPreset === "custom");
   const set = (patch: Partial<ScholarFilters>) => onFiltersChange({ ...filters, ...patch });
+  // On phones the six filter chips would wrap over several rows; they sit behind one
+  // "Filters" toggle there (and stay inline from 640px up).
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const activeFilterCount = (filters.yearPreset !== "any" ? 1 : 0) + filters.scopes.length;
   const toggleScope = (id: SourceScope) =>
     set({ scopes: filters.scopes.includes(id) ? filters.scopes.filter((s) => s !== id) : [...filters.scopes, id] });
 
@@ -54,7 +59,20 @@ export function ScholarFilterBar({ mode, onModeChange, filters, onFiltersChange 
         })}
       </div>
 
-      <span className="mx-0.5 h-4 w-px bg-neutral-200 dark:bg-white/10" aria-hidden="true" />
+      <button
+        type="button"
+        data-testid="scholar-filters-toggle"
+        aria-expanded={mobileFiltersOpen}
+        aria-controls="scholar-filter-options"
+        onClick={() => setMobileFiltersOpen((v) => !v)}
+        className={`${chip(mobileFiltersOpen || activeFilterCount > 0)} inline-flex items-center gap-1 sm:hidden`}
+      >
+        <SlidersHorizontal className="h-3 w-3" aria-hidden="true" />
+        Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+      </button>
+
+      <div id="scholar-filter-options" data-testid="scholar-filter-options" className={`${mobileFiltersOpen ? "flex w-full flex-wrap items-center gap-1.5" : "hidden"} sm:contents`}>
+      <span className="mx-0.5 hidden h-4 w-px bg-neutral-200 sm:inline-block dark:bg-white/10" aria-hidden="true" />
 
       {(["any", "2020-2026"] as const).map((preset) => (
         <button key={preset} type="button" aria-pressed={filters.yearPreset === preset} className={chip(filters.yearPreset === preset)} onClick={() => { setCustomOpen(false); set({ yearPreset: preset }); }}>
@@ -72,7 +90,7 @@ export function ScholarFilterBar({ mode, onModeChange, filters, onFiltersChange 
         </span>
       )}
 
-      <span className="mx-0.5 h-4 w-px bg-neutral-200 dark:bg-white/10" aria-hidden="true" />
+      <span className="mx-0.5 hidden h-4 w-px bg-neutral-200 sm:inline-block dark:bg-white/10" aria-hidden="true" />
 
       {SCOPES.map((s) => (
         <button key={s.id} type="button" aria-pressed={filters.scopes.includes(s.id)} className={chip(filters.scopes.includes(s.id))} onClick={() => toggleScope(s.id)}>
@@ -84,6 +102,7 @@ export function ScholarFilterBar({ mode, onModeChange, filters, onFiltersChange 
           Clear
         </button>
       )}
+      </div>
     </div>
   );
 }

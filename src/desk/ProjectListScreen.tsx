@@ -35,7 +35,7 @@ import {
   getProjectDisplayName,
   matchesProjectSearch,
 } from "./projectNaming";
-import { normalizeProjectList } from "./sidebarProjects";
+import { markProjectDeleted, normalizeProjectList, readDeletedProjectIds, unmarkProjectDeleted, withoutDeletedProjects } from "./sidebarProjects";
 import { hasVaultPassphraseOnThisDevice, currentUserId } from "../services/userVault";
 import { addVaultItem, setSessionUnlocked, listVaultItems, searchVaultItems, type VaultItem } from "../services/vaultContents";
 import { syncActiveSessionToRegistry } from "../services/auth/multiAccountService";
@@ -156,6 +156,7 @@ import {
   type WebsiteCitationItem,
   type DashboardView,
   FORMAT_TILES,
+  isCreatableFormat,
   STAGE_BREAKDOWNS,
   WEBSITE_ASSISTANT_FAQS,
   getFormatTileTheme,
@@ -277,41 +278,18 @@ export default function ProjectListScreen({
   // A failed list load is shown as an error, never as "no projects" (B7).
   const [projectsLoadError, setProjectsLoadError] = useState<string | null>(null);
   const [projectsLoadNeedsSignIn, setProjectsLoadNeedsSignIn] = useState(false);
-  const deletedProjectIdsRef = useRef<Set<string>>(new Set());
-
-  // Initialize from sessionStorage to prevent zombie project resurrection across fast reloads/nav
-  useEffect(() => {
-    try {
-      const stored = sessionStorage.getItem("scholar_deleted_project_ids");
-      if (stored) {
-        const arr = JSON.parse(stored);
-        if (Array.isArray(arr)) {
-          arr.forEach((id) => deletedProjectIdsRef.current.add(id));
-        }
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
+  // Ids deleted in this tab (shared with every other project list through sidebarProjects),
+  // so a fast reload or navigation cannot resurrect a deleted project.
+  const deletedProjectIdsRef = useRef<Set<string>>(readDeletedProjectIds());
 
   const markProjectAsDeleted = useCallback((id: string) => {
-    deletedProjectIdsRef.current.add(id);
-    try {
-      const arr = Array.from(deletedProjectIdsRef.current);
-      sessionStorage.setItem("scholar_deleted_project_ids", JSON.stringify(arr));
-    } catch {
-      // ignore
-    }
+    markProjectDeleted(id);
+    deletedProjectIdsRef.current = readDeletedProjectIds();
   }, []);
 
   const unmarkProjectAsDeleted = useCallback((id: string) => {
-    deletedProjectIdsRef.current.delete(id);
-    try {
-      const arr = Array.from(deletedProjectIdsRef.current);
-      sessionStorage.setItem("scholar_deleted_project_ids", JSON.stringify(arr));
-    } catch {
-      // ignore
-    }
+    unmarkProjectDeleted(id);
+    deletedProjectIdsRef.current = readDeletedProjectIds();
   }, []);
 
   const isCreatingRef = useRef(false);
@@ -683,14 +661,7 @@ export default function ProjectListScreen({
     }
     listProjects()
       .then((r) => {
-        const deleted = deletedProjectIdsRef.current;
-        const seen = new Set<string>();
-        const uniqueItems = (r.items || []).filter((p) => {
-          if (!p?.projectId || seen.has(p.projectId)) return false;
-          seen.add(p.projectId);
-          return !deleted.has(p.projectId);
-        });
-        setProjects(uniqueItems);
+        setProjects(withoutDeletedProjects(r.items || [], deletedProjectIdsRef.current));
       })
       .catch((e: unknown) => {
         // Keep whatever is already listed; say why the refresh failed. (Matched by name: the
@@ -2086,9 +2057,18 @@ export default function ProjectListScreen({
 
   const handledNewFormatRef = useRef<string | null>(null);
 
+  const [formatNotice, setFormatNotice] = useState<string | null>(null);
+
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const newFormat = params.get("newFormat");
+    if (newFormat && !isCreatableFormat(newFormat)) {
+      // A retired or unknown format (e.g. the old Research Proposal, OT-15): never start
+      // a project in it; land on /projects and say why.
+      setFormatNotice("That project type is no longer available. Start a new project in one of the formats below.");
+      navigate("/projects", { replace: true });
+      return;
+    }
     if (newFormat && userEmail && !creating && handledNewFormatRef.current !== newFormat) {
       handledNewFormatRef.current = newFormat;
       handleCreate(newFormat);
@@ -2267,15 +2247,8 @@ export default function ProjectListScreen({
       }
       // Re-sync project list with server in background, filtering out any deleted IDs
       const res = await listProjects();
-      const deleted = deletedProjectIdsRef.current;
-      const seen = new Set<string>();
-      setProjects(
-        res.items.filter((p) => {
-          if (!p?.projectId || seen.has(p.projectId)) return false;
-          seen.add(p.projectId);
-          return !deleted.has(p.projectId);
-        })
-      );
+      // listProjects already returns one row per id.
+      setProjects(withoutDeletedProjects(res.items, deletedProjectIdsRef.current));
     } catch (e) {
       console.error("Failed to delete project:", e);
       // Rollback on failure
@@ -2974,6 +2947,15 @@ export default function ProjectListScreen({
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                       </svg>
+                    </button>
+                  </div>
+                )}
+
+                {formatNotice && (
+                  <div role="status" data-testid="format-retired-notice" className="w-full rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-4 py-3 text-xs text-[color:var(--text-primary)] flex items-center justify-between gap-3">
+                    <span>{formatNotice}</span>
+                    <button type="button" onClick={() => setFormatNotice(null)} className="shrink-0 font-semibold underline cursor-pointer">
+                      Dismiss
                     </button>
                   </div>
                 )}

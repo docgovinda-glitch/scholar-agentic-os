@@ -22,3 +22,22 @@ describe("ScholarFilterBar", () => {
     expect(onFilters).toHaveBeenLastCalledWith({ yearPreset: "any", scopes: ["peer_reviewed"] });
   });
 });
+
+describe("ScholarFilterBar — phone layout", () => {
+  it("puts the year and scope chips behind a Filters toggle (hidden until opened below 640px)", () => {
+    render(<ScholarFilterBar mode="auto" onModeChange={() => undefined} filters={DEFAULT_SCHOLAR_FILTERS} onFiltersChange={() => undefined} />);
+    const toggle = screen.getByTestId("scholar-filters-toggle");
+    const options = screen.getByTestId("scholar-filter-options");
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(options.className).toMatch(/(^|\s)hidden(\s|$)/);
+    expect(options.className).toContain("sm:contents");
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByTestId("scholar-filter-options").className).not.toMatch(/(^|\s)hidden(\s|$)/);
+  });
+
+  it("shows how many filters are on", () => {
+    render(<ScholarFilterBar mode="auto" onModeChange={() => undefined} filters={{ ...DEFAULT_SCHOLAR_FILTERS, yearPreset: "2020-2026", scopes: ["peer_reviewed"] }} onFiltersChange={() => undefined} />);
+    expect(screen.getByTestId("scholar-filters-toggle")).toHaveTextContent("Filters (2)");
+  });
+});

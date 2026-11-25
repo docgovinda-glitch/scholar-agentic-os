@@ -358,16 +358,16 @@ export default function Step01Understand({ projectId, deck, onUpdateDeck, onNext
           }}
         />
 
-        <div className="flex flex-wrap items-end gap-3 pt-1">
-          <div className="space-y-1">
-            <label htmlFor="slide-count" className="text-xs font-semibold">Slide count</label>
+        <div className="grid grid-cols-2 gap-3 pt-1 sm:flex sm:flex-wrap sm:items-end">
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <label htmlFor="slide-count" className="block text-xs font-semibold">Slide count</label>
             <div className="relative">
               <select
                 id="slide-count"
                 aria-label="Slide Count"
                 value={slideCount}
                 onChange={(e) => setSlideCount(Number(e.target.value))}
-                className="h-9 w-36 appearance-none rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#2C2C2E] px-3 pr-8 text-xs font-medium cursor-pointer"
+                className="h-9 w-full sm:w-36 appearance-none rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#2C2C2E] px-3 pr-8 text-xs font-medium cursor-pointer"
               >
                 {SLIDE_COUNT_OPTIONS.map((n) => (
                   <option key={n} value={n}>{n} slides</option>
@@ -376,8 +376,8 @@ export default function Step01Understand({ projectId, deck, onUpdateDeck, onNext
               <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-400" />
             </div>
           </div>
-          <div className="space-y-1">
-            <label htmlFor="talk-duration" className="text-xs font-semibold">Talk duration</label>
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <label htmlFor="talk-duration" className="block text-xs font-semibold">Talk duration</label>
             <select
               id="talk-duration"
               value={duration}
@@ -386,20 +386,20 @@ export default function Step01Understand({ projectId, deck, onUpdateDeck, onNext
                 setDuration(minutes);
                 onUpdateDeck({ ...deck, talkMinutes: minutes });
               }}
-              className="h-9 w-28 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#2C2C2E] px-3 text-xs font-medium cursor-pointer"
+              className="h-9 w-full sm:w-28 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#2C2C2E] px-3 text-xs font-medium cursor-pointer"
             >
               {TALK_DURATION_OPTIONS.map((n) => (
                 <option key={n} value={n}>{n} min</option>
               ))}
             </select>
           </div>
-          <div className="space-y-1">
-            <label htmlFor="talk-context" className="text-xs font-semibold">Presentation context</label>
+          <div className="col-span-2 flex min-w-0 flex-col gap-1.5 sm:col-span-1">
+            <label htmlFor="talk-context" className="block text-xs font-semibold">Presentation context</label>
             <select
               id="talk-context"
               value={context}
               onChange={(e) => setContext(e.target.value)}
-              className="h-9 w-44 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#2C2C2E] px-3 text-xs font-medium cursor-pointer"
+              className="h-9 w-full sm:w-auto sm:min-w-[11rem] rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#2C2C2E] px-3 text-xs font-medium cursor-pointer"
             >
               {PRESENTATION_CONTEXTS.map((c) => (
                 <option key={c} value={c}>{c}</option>
@@ -410,7 +410,7 @@ export default function Step01Understand({ projectId, deck, onUpdateDeck, onNext
             type="button"
             onClick={() => void requestOutline()}
             disabled={busy || (!topic.trim() && !rawText.trim())}
-            className="h-9 rounded-xl px-4 bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 text-xs font-semibold inline-flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            className="col-span-2 h-9 justify-center rounded-xl px-4 bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 text-xs font-semibold inline-flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
           >
             {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 text-amber-400" />}
             {busy ? 'Working…' : hasOutline ? 'Rebuild outline' : 'Generate outline'}

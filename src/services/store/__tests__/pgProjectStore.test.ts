@@ -503,3 +503,22 @@ describe("services/store: pgProjectStore", () => {
     expect(db.calls[0].text).not.toMatch(/metadata/);
   });
 });
+
+describe("pgProjectStore.delete", () => {
+  it("throws when the delete removed no row but the row still exists", async () => {
+    const db: PgQueryable = {
+      async query(text: string) {
+        if (text.startsWith("delete")) return { rows: [] };
+        return { rows: [{ "?column?": 1 }] };
+      },
+    };
+    await expect(createPgProjectStore(db).delete("proj-1")).rejects.toThrow(/not deleted/);
+  });
+
+  it("succeeds when a row was returned, and when the row was already gone", async () => {
+    const removed: PgQueryable = { async query(text: string) { return { rows: text.startsWith("delete") ? [{ project_id: "proj-1" }] : [] }; } };
+    await expect(createPgProjectStore(removed).delete("proj-1")).resolves.toBeUndefined();
+    const gone: PgQueryable = { async query() { return { rows: [] }; } };
+    await expect(createPgProjectStore(gone).delete("proj-1")).resolves.toBeUndefined();
+  });
+});

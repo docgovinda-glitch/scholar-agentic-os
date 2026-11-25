@@ -481,3 +481,27 @@ describe("restProjectStore: patchAnswers", () => {
     await expect(s.patchAnswers!("proj-abc", { a: 1 })).rejects.toThrow(/500/);
   });
 });
+
+describe("restProjectStore.delete", () => {
+  it("asks PostgREST for the deleted rows and succeeds when one was removed", async () => {
+    const { impl, calls } = fakeFetch(() => ({ body: [{ project_id: "proj-1" }] }));
+    const store = createRestProjectStore({ supabaseUrl: URL_BASE, serviceRoleKey: KEY, fetchImpl: impl });
+    await store.delete("proj-1");
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe("DELETE");
+    expect(calls[0].headers.Prefer).toBe("return=representation");
+  });
+
+  it("throws when no row was removed but the project is still there (never a silent 0-row delete)", async () => {
+    const row = { project_id: "proj-1", owner_id: OWNER, output_type_id: "OT-01", answers: {} };
+    const { impl } = fakeFetch((c) => (c.method === "DELETE" ? { body: [] } : { body: [row] }));
+    const store = createRestProjectStore({ supabaseUrl: URL_BASE, serviceRoleKey: KEY, fetchImpl: impl });
+    await expect(store.delete("proj-1")).rejects.toThrow(/not deleted/);
+  });
+
+  it("treats an already-missing row as deleted", async () => {
+    const { impl } = fakeFetch(() => ({ body: [] }));
+    const store = createRestProjectStore({ supabaseUrl: URL_BASE, serviceRoleKey: KEY, fetchImpl: impl });
+    await expect(store.delete("proj-gone")).resolves.toBeUndefined();
+  });
+});

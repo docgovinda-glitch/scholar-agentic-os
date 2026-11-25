@@ -23,10 +23,18 @@ function getStorageSafe(type: "session" | "local"): Storage | null {
 
 const isDraftId = (id: string) => id.startsWith("draft-");
 
-/** Persisted server ids are never ephemeral; drop any that older builds stored. */
+/**
+ * Persisted server ids are never ephemeral; drop any that older builds stored.
+ * Only a draft id may be an alias: a `proj-* -> proj-*` entry (written by an
+ * older build that "migrated" an already-persisted project into a clone) and a
+ * self-mapping are removed, so a persisted id always resolves to itself.
+ */
 function purgePersistedKeys(): void {
   for (const id of Array.from(ephemeralProjects.keys())) {
     if (!isDraftId(id)) ephemeralProjects.delete(id);
+  }
+  for (const [from, to] of Array.from(migratedDrafts.entries())) {
+    if (!isDraftId(from) || !to || from === to) migratedDrafts.delete(from);
   }
 }
 
@@ -112,7 +120,8 @@ export function getMigratedDraftRealId(draftId: string): string | null {
 }
 
 export function recordDraftMigration(draftId: string, realProjectId: string, project?: ProjectView): void {
-  if (!draftId || !realProjectId) return;
+  // Only a local draft can be migrated; a persisted id never becomes an alias of another row.
+  if (!draftId || !realProjectId || !isDraftId(draftId) || draftId === realProjectId) return;
   loadStores();
   migratedDrafts.set(draftId, realProjectId);
 
@@ -145,7 +154,8 @@ export function recoverDraftProject(projectId: string): EphemeralProject | null 
       if (raw) {
         const items: EphemeralProject[] = JSON.parse(raw);
         const found = items.find((it) => it.projectId === projectId || it.projectId === migratedRealId);
-        if (found) {
+        // Only a draft id is kept in the ephemeral store; a persisted id is read from the server.
+        if (found && isDraftId(projectId)) {
           ephemeralProjects.set(projectId, found);
           return found;
         }

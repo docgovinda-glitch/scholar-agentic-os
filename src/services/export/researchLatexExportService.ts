@@ -400,7 +400,7 @@ Table~\\ref{tab:statistical_results} presents the quantitative synthesis under t
 `;
 
   if (meta.isPoolable) {
-    tex += `Overall statistical pooling across $k = ${meta.totalStudies}$ empirical studies ($N = ${meta.totalSampleSize.toLocaleString()}$) yielded a summary effect estimate of $\\hat{\\theta} = ${meta.pooledEffect}$ (95\\% CI [${meta.ciLower}, ${meta.ciUpper}], $Z = ${meta.zValue}$, $p < 0.001$). 
+    tex += `Overall statistical pooling across $k = ${meta.totalStudies}$ empirical studies ($N = ${meta.totalSampleSize.toLocaleString()}$) yielded a summary effect estimate of $\\hat{\\theta} = ${meta.pooledEffect}$ (95\\% CI [${meta.ciLower}, ${meta.ciUpper}], $Z = ${meta.zValue}$, $p ${meta.pValue < 0.001 ? "< 0.001" : `= ${meta.pValue}`}$). 
 
 Between-study heterogeneity was observed at $I^2 = ${meta.iSquared}\\%$ (Cochrane's $Q = ${meta.cochranesQ}$, $df = ${meta.degreesOfFreedom}$, $p = ${meta.qPValue < 0.001 ? "<0.001" : meta.qPValue}$), categorized as \\textbf{${meta.heterogeneityLevel}} heterogeneity.\n`;
   } else {
@@ -410,31 +410,24 @@ Between-study heterogeneity was observed at $I^2 = ${meta.iSquared}\\%$ (Cochran
   return tex;
 }
 
-function generateDiscussionTex(data: ResearchProjectExportData): string {
+function generateDiscussionTex(_data: ResearchProjectExportData): string {
+  // The export states only what the matrix and pooling computed. Interpretation is the
+  // author's: no canned claims ("the evidence confirms ...", invented citation-network gaps).
   return `\\section{Discussion}
 \\label{sec:discussion}
 
-\\subsection{Theoretical Implications}
-The synthesized empirical evidence confirms that the hypothesized mechanisms exert statistically meaningful effects across varied experimental conditions. The alignment between theoretical predictions and observed effect sizes demonstrates robust construct validity.
-
-\\subsection{Methodological Limitations and Heterogeneity}
-Several methodological considerations moderate these conclusions:
-\\begin{itemize}
-    \\item \\textbf{Sample Characteristics:} Baseline cohorts frequently index on specific sub-populations, necessitating cautious extrapolation to unmeasured institutional environments.
-    \\item \\textbf{Observational Confounding:} In observational cohorts, unobserved latent variables may account for a portion of the estimated variance.
-    \\item \\textbf{Publication Dynamics:} As with all literature synthesis, potential selective reporting of statistically significant outcomes must be considered.
-\\end{itemize}
-
-\\subsection{Research Gaps Identified from Citation Topology}
-Topological analysis of the citation network revealed sparse inter-cluster linkages between foundational theoretical literature and recent empirical trials. This presents an immediate research opportunity to design targeted preregistered trials directly bridging these disparate scholarly bodies.
+% Write the interpretation of the findings above: what they mean for the research
+% question, how heterogeneity and study design limit them, and which gaps remain.
+\\textit{[Discussion to be written by the author.]}
 `;
 }
 
-function generateConclusionTex(data: ResearchProjectExportData): string {
+function generateConclusionTex(_data: ResearchProjectExportData): string {
   return `\\section{Conclusion}
 \\label{sec:conclusion}
 
-This research paper conducted an end-to-end systematic inquiry, combining automated literature discovery, recursive snowball sampling, structured evidence extraction, and statistical meta-analysis. The findings synthesize empirical benchmarks and illuminate key topological research gaps. Future work should focus on longitudinal replications and harmonized metric reporting standards.
+% Summarise the answer to the research question in the author's own words.
+\\textit{[Conclusion to be written by the author.]}
 `;
 }
 

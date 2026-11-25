@@ -244,7 +244,11 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
     },
 
     async delete(projectId: string): Promise<void> {
-      await db.query(`delete from public.projects where project_id = $1`, [projectId]);
+      const result = await db.query(`delete from public.projects where project_id = $1 returning project_id`, [projectId]);
+      if (result.rows.length === 0) {
+        const still = await db.query(`select 1 from public.projects where project_id = $1`, [projectId]);
+        if (still.rows.length > 0) throw new Error(`Project ${projectId} was not deleted: the database removed no row.`);
+      }
     },
   };
 }

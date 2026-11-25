@@ -132,3 +132,15 @@ export function getFormatTileTheme(id: string) {
       };
   }
 }
+
+/**
+ * Formats a new project can be started in: the three tiles plus Master's Thesis
+ * (reached from hand-offs). Anything else in a `?newFormat=` link (the retired
+ * Research Proposal OT-15, old ids) goes back to /projects with a notice instead
+ * of booting the generic shell.
+ */
+export const CREATABLE_FORMAT_IDS = ["OT-01", "OT-10", "OT-07", "OT-22"] as const;
+
+export function isCreatableFormat(id: string | null | undefined): boolean {
+  return !!id && (CREATABLE_FORMAT_IDS as readonly string[]).includes(id.toUpperCase());
+}
