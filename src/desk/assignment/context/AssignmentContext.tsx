@@ -52,7 +52,10 @@ import { stripCircularReferences } from "../../../utils/briefExtractor";
 import type { CourseworkExecutionMode } from "../../../features/coursework/types/orchestrator";
 import { safeParseAnswerField } from "../../../shared/projectStateSchema";
 import { useCourseworkAgent,type CourseworkAgent } from "./useCourseworkAgent";
-import { useBriefBuild, type BriefBuild } from "./useBriefBuild";
+import { useBriefBuild, OUTLINE_TIMEOUT_MESSAGE, type BriefBuild } from "./useBriefBuild";
+
+/** A single outline rewrite waits this long for the model before offering a way out. */
+const OUTLINE_REWRITE_TIMEOUT_MS = 60_000;
 import { buildAssignmentProjectState,computePhaseStatuses } from "./assignmentState";
 import { readInternalSections,readRubricCriteria,readStructure,readSectionBudgets,readApprovedSourceIds,readWritingStyle } from "./answerReaders";
 
@@ -949,16 +952,24 @@ export function AssignmentProvider({
         // so the revision can keep them.
         const current = latestSections();
         await saveAnswers({ assignment_internal_sections: current, assignment_outline: current });
-        const res = await authedJsonFetch(`/api/projects/${activeProjectId}/assignment/outline`, "POST", instruction ? { instruction } : {}, { skipLlmFallback: true });
-        const body = await res.json().catch(() => null);
-        if (!res.ok || !body?.structure?.headings?.length) {
-          return { ok: false, error: body?.error || `The outline could not be written (${res.status}).` };
+        // A stalled model must not hold the page: stop waiting after a while.
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), OUTLINE_REWRITE_TIMEOUT_MS);
+        try {
+          const res = await authedJsonFetch(`/api/projects/${activeProjectId}/assignment/outline`, "POST", instruction ? { instruction } : {}, { skipLlmFallback: true, signal: controller.signal });
+          const body = await res.json().catch(() => null);
+          if (!res.ok || !body?.structure?.headings?.length) {
+            return { ok: false, error: body?.error || `The outline could not be written (${res.status}).` };
+          }
+          const next = body.structure as AssignmentStructure;
+          await setStructure(next);
+          if (next.targetWordCount && next.targetWordCount !== targetWordCount) await saveAnswers({ targetWordCount: next.targetWordCount });
+          return { ok: true, structure: next };
+        } finally {
+          clearTimeout(timer);
         }
-        const next = body.structure as AssignmentStructure;
-        await setStructure(next);
-        if (next.targetWordCount && next.targetWordCount !== targetWordCount) await saveAnswers({ targetWordCount: next.targetWordCount });
-        return { ok: true, structure: next };
       } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") return { ok: false, error: OUTLINE_TIMEOUT_MESSAGE };
         return { ok: false, error: e instanceof Error ? e.message : "The outline could not be written." };
       }
     },

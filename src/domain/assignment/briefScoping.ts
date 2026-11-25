@@ -82,7 +82,7 @@ const DISCIPLINE_WORDS: Array<[DisciplineId, RegExp]> = [
   ["stem", /\b(experiment|hypothesis|engineering|algorithm|physics|chemistry|biology|mathematic\w*|computer science|software|data set|dataset|laboratory|lab report|quantum|statistical model|simulation)\b/i],
   ["education", /\b(teaching|pedagog\w+|classroom|curriculum|learners?|reflective (practice|account)|placement|lesson plan)\b/i],
   ["humanities", /\b(history|historical|literature|novel|poem|poetry|philosoph\w+|ethics|theolog\w+|art history|film|music|text|author's|renaissance|medieval)\b/i],
-  ["social_sciences", /\b(politic\w*|policy|sociolog\w+|psycholog\w+|international relations|governance|democracy|society|social|gender|migration|geopolitic\w*|anthropolog\w+)\b/i],
+  ["social_sciences", /\b(politic\w*|policy|sociolog\w+|psycholog\w+|international relations|governance|democracy|society|social|gender|migration|geopolitic\w*|anthropolog\w+|multilateral\w*|foreign policy|regional security|diplomacy|diplomatic|sovereignty|treat(y|ies)|bilateral\w*|SAARC|BIMSTEC)\b/i],
 ];
 
 const TYPE_WORDS: Array<[AssignmentTypeId, RegExp]> = [

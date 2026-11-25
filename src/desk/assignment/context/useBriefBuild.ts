@@ -20,7 +20,15 @@ export interface BriefBuildState {
   status: "idle" | "running" | "done" | "error" | "interrupted";
   steps: Record<BuildStepId, BuildStepState>;
   error?: string;
+  /** The build stopped because the stream went quiet for too long (not a server-reported failure). */
+  timedOut?: boolean;
 }
+
+/** How long the stream may stay silent before the build is stopped and a way out is offered. */
+export const OUTLINE_STALL_MS = 25_000;
+/** Reading a long brief is allowed longer before its first event. */
+export const EXTRACT_STALL_MS = 60_000;
+export const OUTLINE_TIMEOUT_MESSAGE = "Outline generation took longer than expected.";
 export interface BriefBuild {
   state: BriefBuildState;
   /** Runs the build; resolves with how it ended. `onExtracted` runs once the brief has been read and saved. */
@@ -71,11 +79,28 @@ export function useBriefBuild(d: Deps): BriefBuild {
     if (inFlight.current) return "busy";
     inFlight.current = true;
     let steps = { ...IDLE_STEPS };
-    const show = (status: BriefBuildState["status"], error?: string) => setLive({ status, steps, ...(error ? { error } : {}) });
+    const show = (status: BriefBuildState["status"], error?: string, timedOut?: boolean) =>
+      setLive({ status, steps, ...(error ? { error } : {}), ...(timedOut ? { timedOut } : {}) });
+    // Stall guard: any event re-arms it; silence past the limit aborts the request
+    // (the server then stops its model call) so the page never waits forever.
+    const controller = new AbortController();
+    let timedOut = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const arm = (ms: number) => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+      }, ms);
+    };
     show("running");
     try {
       await depsRef.current.flushSaves();
-      const res = await authedJsonFetch(`/api/projects/${depsRef.current.projectId}/assignment/build`, "POST", opts.force ? { force: true } : {}, { skipLlmFallback: true });
+      arm(EXTRACT_STALL_MS);
+      const res = await authedJsonFetch(`/api/projects/${depsRef.current.projectId}/assignment/build`, "POST", opts.force ? { force: true } : {}, {
+        skipLlmFallback: true,
+        signal: controller.signal,
+      });
       if (!res.ok || !res.body) {
         const data = (await res.json().catch(() => null)) as { error?: string } | null;
         show("error", data?.error || `Your brief could not be read (${res.status}).`);
@@ -85,6 +110,7 @@ export function useBriefBuild(d: Deps): BriefBuild {
       const result: { outcome: "done" | "error"; failure: string } = { outcome: "error", failure: "" };
       await readEvents(res.body, async (e) => {
         if (e.step && e.status) {
+          arm(e.step === "understand" && e.status === "running" ? OUTLINE_STALL_MS : EXTRACT_STALL_MS);
           steps = { ...steps, [e.step]: { status: e.status, message: e.message } };
           show("running");
           if (e.step === "extract" && e.status === "done") {
@@ -99,13 +125,22 @@ export function useBriefBuild(d: Deps): BriefBuild {
         if (e.done) result.outcome = "done";
       });
       await depsRef.current.reload();
+      if (timedOut && result.outcome !== "done") {
+        show("error", OUTLINE_TIMEOUT_MESSAGE, true);
+        return "error";
+      }
       if (result.outcome === "done") show("done");
       else show("error", result.failure || "The build stopped before it finished. Try again.");
       return result.outcome;
     } catch (err) {
+      if (timedOut) {
+        show("error", OUTLINE_TIMEOUT_MESSAGE, true);
+        return "error";
+      }
       show("error", err instanceof TypeError ? "Could not reach the server. Check your connection and try again." : err instanceof Error ? err.message : String(err));
       return "error";
     } finally {
+      if (timer) clearTimeout(timer);
       inFlight.current = false;
     }
   }, []);
