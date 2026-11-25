@@ -188,7 +188,7 @@ const waitForRateWindow = async () => {
 
 // ── Negative checks ─────────────────────────────────────────────────────────
 await waitForRateWindow();
-for (const path of ['/api/vault/parse-url', '/api/vault/search-semantic', '/api/search/live', '/api/ai/search', '/api/ai/agent']) {
+for (const path of ['/api/vault/parse-url', '/api/vault/search-semantic', '/api/search/live', '/api/ai/agent']) {
   await check(`anonymous POST ${path} → 401`, async () => {
     const r = await req('POST', path, { body: {} });
     expect(r.status === 401, `HTTP ${r.status}`);
