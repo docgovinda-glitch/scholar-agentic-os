@@ -17,6 +17,23 @@ import { executeWebSearch, sanitizeUntrustedExternalText, type SearchResultItem 
 import { retrieveSources, retrievedToSearchItem } from "../retrieval/retrievalService.ts";
 import { validateAndRefineCitations } from "./citationValidator.ts";
 import { chunkAndRerankEvidence } from "../services/semanticRagEngine.ts";
+import { excerpt } from "../../../src/shared/askBudget.ts";
+
+/** Sources that go into the report call, and the excerpt each carries (the report was the largest prompt). */
+export const DEEP_REPORT_MAX_SOURCES = 40;
+export const DEEP_REPORT_EXCERPT_CHARS = 600;
+
+const reportRank = (c: SearchResultItem): number =>
+  (c.sourceType === "vault" ? 3 : 0) + (c.sourceType === "scholarly" || c.sourceType === "official" ? 2 : 0) + (c.isPrimary ? 1 : 0) + ((c.snippet || "").length >= 200 ? 1 : 0);
+
+/** The best DEEP_REPORT_MAX_SOURCES sources (Vault, then scholarly/official, then primary, then those with text), excerpts cut. */
+export function selectReportSources(all: SearchResultItem[]): SearchResultItem[] {
+  return all
+    .map((c, i) => ({ c, i }))
+    .sort((a, b) => reportRank(b.c) - reportRank(a.c) || a.i - b.i)
+    .slice(0, DEEP_REPORT_MAX_SOURCES)
+    .map(({ c }) => ({ ...c, snippet: excerpt(c.snippet, DEEP_REPORT_EXCERPT_CHARS) }));
+}
 
 export interface ResearchPlanSubQuestion {
   question: string;
@@ -25,6 +42,8 @@ export interface ResearchPlanSubQuestion {
 }
 
 export interface ResearchPlan {
+  /** True when the model wrote this plan; false/absent for the built-in fallback or a user-approved plan. */
+  fromModel?: boolean;
   topic: string;
   scope?: string;
   objectives: string[];
@@ -186,6 +205,7 @@ Provide 3 to 4 focused subQuestions that cover foundational history/theory, prim
         });
 
       return {
+        fromModel: true,
         topic: parsed.topic || topic,
         scope: parsed.scope || `Multi-dimensional investigation of ${topic}`,
         objectives: Array.isArray(parsed.objectives) && parsed.objectives.length > 0
@@ -625,6 +645,11 @@ export async function executeDeepResearch(
   // ── STAGE 6: REPORT GENERATION ──
   const s6Start = Date.now();
   onProgress?.("Stage 6/7: Synthesizing structured Deep Research report with verified inline citations...");
+
+  // Report budget: only the best sources, with short excerpts, go into the report call; the numbering
+  // below and the returned citations both use this list, so [n] still maps 1-to-1.
+  const reportSources = selectReportSources(allCitations);
+  allCitations.splice(0, allCitations.length, ...reportSources);
 
   // Build numbered global source registry for the synthesis prompt so [1], [2] map 1-to-1 to allCitations
   const urlToGlobalIndex = new Map<string, number>();

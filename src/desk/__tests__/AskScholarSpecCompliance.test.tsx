@@ -19,6 +19,7 @@ vi.mock("../api", () => ({
   deleteProject: vi.fn(),
   saveIntakeAnswers: (...a: unknown[]) => saveIntakeAnswers(...a),
   executeAgenticLLM: vi.fn().mockRejectedValue(new Error("fallback to server")),
+  fetchDeepResearchPlan: vi.fn().mockResolvedValue({ fromModel: false, subQuestions: [] }),
   executeAgenticQuery: (...a: unknown[]) => executeAgenticQuery(...a),
   getAiOperationalStatus: (...a: unknown[]) => getAiOperationalStatus(...a),
   parseFileForAgent: vi.fn(),

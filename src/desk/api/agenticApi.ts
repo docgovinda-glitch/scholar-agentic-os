@@ -633,3 +633,18 @@ export async function auditThesisChapters(
   };
 }
 
+
+/** The model's own Deep Research plan for a question; `fromModel: false` when no model could write one. */
+export async function fetchDeepResearchPlan(question: string): Promise<{ fromModel: boolean; subQuestions: string[] }> {
+  try {
+    const res = await authedJsonFetch("/api/ai/deep-research/plan", "POST", { question }, { skipLlmFallback: true });
+    if (!res.ok) return { fromModel: false, subQuestions: [] };
+    const data = (await res.json()) as { fromModel?: unknown; subQuestions?: unknown };
+    const subQuestions = Array.isArray(data.subQuestions)
+      ? data.subQuestions.filter((q): q is string => typeof q === "string" && q.trim().length > 0).slice(0, 6)
+      : [];
+    return { fromModel: data.fromModel === true && subQuestions.length > 0, subQuestions };
+  } catch {
+    return { fromModel: false, subQuestions: [] };
+  }
+}

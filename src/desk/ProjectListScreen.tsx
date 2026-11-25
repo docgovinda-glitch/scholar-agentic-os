@@ -8,6 +8,7 @@ import {
   saveIntakeAnswers,
   executeAgenticLLM,
   executeAgenticQuery,
+  fetchDeepResearchPlan,
   getAiOperationalStatus,
   parseFileForAgent,
   type AiOperationalStatus,
@@ -1292,6 +1293,7 @@ export default function ProjectListScreen({
       deepResearchState: {
         phase: "plan_proposed",
         subQuestions,
+        planSource: "loading",
       },
     };
     planMsg.deepResearchState = { ...planMsg.deepResearchState!, previewStatus: "loading", previewSources: [] };
@@ -1301,6 +1303,18 @@ export default function ProjectListScreen({
       setGuideMessages((prev) =>
         prev.map((m) => (m.id === planMsg.id && m.deepResearchState ? { ...m, deepResearchState: { ...m.deepResearchState, ...patch } } : m))
       );
+    // The model's own plan replaces the starter plan, unless the researcher has already edited it.
+    void fetchDeepResearchPlan(query).then((aiPlan) =>
+      setGuideMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== planMsg.id || !m.deepResearchState || m.deepResearchState.phase !== "plan_proposed") return m;
+          const untouched = m.deepResearchState.subQuestions.join("\n") === subQuestions.join("\n");
+          return aiPlan.fromModel && untouched
+            ? { ...m, deepResearchState: { ...m.deepResearchState, subQuestions: aiPlan.subQuestions, planSource: "ai" } }
+            : { ...m, deepResearchState: { ...m.deepResearchState, planSource: untouched ? "starter" : "edited" } };
+        })
+      )
+    );
     // A preview of likely sources, so the researcher can pin or exclude before the run.
     void executeLiveSearch(query, { discipline: askUserSettings.preferredDiscipline, filters: askFilters, limit: 12 })
       .then((found) =>
@@ -3522,6 +3536,8 @@ export default function ProjectListScreen({
                           {/* Deep Research Explicit State Machine (Section 12) */}
                           {msg.deepResearchState && (
                             <DeepResearchWorkflowCard
+                              key={`${msg.id}-${msg.deepResearchState.planSource ?? "plan"}`}
+                              planSource={msg.deepResearchState.planSource}
                               phase={msg.deepResearchState.phase}
                               subQuestions={msg.deepResearchState.subQuestions}
                               previewSources={msg.deepResearchState.previewSources}

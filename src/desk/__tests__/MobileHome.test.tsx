@@ -16,6 +16,7 @@ vi.mock("../api", () => ({
   deleteProject: vi.fn(),
   saveIntakeAnswers: vi.fn(),
   executeAgenticLLM: vi.fn(),
+  fetchDeepResearchPlan: vi.fn().mockResolvedValue({ fromModel: false, subQuestions: [] }),
   executeAgenticQuery: vi.fn(),
   getAiOperationalStatus: vi.fn().mockResolvedValue({ connected: true, statusText: "Ready", provider: "gemini", providers: [{ id: "gemini", name: "Google Gemini" }] }),
   parseFileForAgent: vi.fn(),
