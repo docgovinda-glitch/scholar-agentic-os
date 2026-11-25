@@ -257,9 +257,16 @@ export function createRestProjectStore(config: RestStoreConfig): ProjectStore {
     },
 
     async delete(projectId: string): Promise<void> {
-      await request(`${base}?project_id=eq.${encodeURIComponent(projectId)}`, {
+      const deleted = await request(`${base}?project_id=eq.${encodeURIComponent(projectId)}&select=project_id`, {
         method: "DELETE",
+        headers: { Prefer: "return=representation" },
       });
+      // A delete that matched no row while the row is still there (a key without
+      // the service role, an RLS policy) must fail, not report success and let the
+      // project come back on the next list.
+      if (Array.isArray(deleted) && deleted.length === 0 && (await store.get(projectId))) {
+        throw new Error(`Project ${projectId} was not deleted: the database removed no row.`);
+      }
     },
   };
   return store;

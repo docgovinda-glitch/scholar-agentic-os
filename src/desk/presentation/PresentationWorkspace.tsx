@@ -21,6 +21,8 @@ import { listProjects } from '../api/projectsApi';
 import { normalizeProjectList } from '../sidebarProjects';
 import GammaPlayer from '../../features/slides/gamma/GammaPlayer';
 import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
+import { isUntitledDeckTitle, UNTITLED_PRESENTATION } from '../../shared/presentationBrief';
+import { showAppToast } from '../../components/ui/FeedbackSystem';
 
 export type { PresentationStudioStep } from '../../features/slides';
 
@@ -125,7 +127,7 @@ export default function PresentationWorkspace({
     // Default: Clean empty presentation with zero pre-filled mock slides
     return {
       id: `deck-${Date.now()}`,
-      title: 'Untitled Presentation',
+      title: UNTITLED_PRESENTATION,
       topic: '',
       sourceModule: 'presentation-studio',
       framework: 'Standard-Narrative',
@@ -197,9 +199,9 @@ export default function PresentationWorkspace({
           setDeck(normalizeDeck(savedDeck));
         } else if (!savedDeck && !initialDeck && initialCourseworkText === undefined) {
           // Initialize cleanly from project's existing research metadata
-          const projTitle = a['title'] || project.title || 'Untitled Presentation';
+          const projTitle = a['title'] || project.title || UNTITLED_PRESENTATION;
           setDeck((prev) => {
-            if (prev && (prev.slides.length > 0 || (prev.outline && prev.outline.length > 0) || (prev.title && prev.title !== 'Untitled Presentation'))) return prev;
+            if (prev && (prev.slides.length > 0 || (prev.outline && prev.outline.length > 0) || !isUntitledDeckTitle(prev.title))) return prev;
             return {
               id: `deck-${projectId}`,
               title: projTitle,
@@ -309,7 +311,9 @@ export default function PresentationWorkspace({
   const handleSaveQaQuestions = useCallback(
     (newQuestions: AudienceQaQuestion[]) => {
       setSavedQaQuestions(newQuestions);
-      saveIntakeAnswers(projectId, { presentationQaHistory: newQuestions }).catch(() => {});
+      saveIntakeAnswers(projectId, { presentationQaHistory: newQuestions }).catch(() =>
+        showAppToast("Your rehearsal questions could not be saved. They stay on this screen; try again before leaving.", "warning", 7000)
+      );
     },
     [projectId]
   );

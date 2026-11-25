@@ -213,11 +213,14 @@ export default function ProjectVaultPanel({
       if (quote && ledger?.sources) {
         const createdSource = ledger.sources.find((s: any) => s.vaultItemId === item.id);
         if (createdSource) {
-          await extractEvidenceQuote(projectId, createdSource.id, quote).catch(() => {});
+          await extractEvidenceQuote(projectId, createdSource.id, quote).catch(() =>
+            showAppToast("The source was added, but its key quote could not be extracted. Add the quote by hand if you need it.", "warning", 6000)
+          );
         }
       }
     } catch (err) {
       console.error(err);
+      showAppToast(`Could not add this item to the project's evidence: ${err instanceof Error ? err.message : "try again"}.`, "error", 6000);
     } finally {
       setAddingEvidenceId(null);
     }

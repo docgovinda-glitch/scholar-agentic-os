@@ -35,7 +35,8 @@ import {
   getProjectDisplayName,
   matchesProjectSearch,
 } from "./projectNaming";
-import { normalizeProjectList } from "./sidebarProjects";
+import { vaultImportOutcome } from "../domain/vault/importOutcome";
+import { markProjectDeleted, normalizeProjectList, readDeletedProjectIds, unmarkProjectDeleted, withoutDeletedProjects } from "./sidebarProjects";
 import { hasVaultPassphraseOnThisDevice, currentUserId } from "../services/userVault";
 import { addVaultItem, setSessionUnlocked, listVaultItems, searchVaultItems, type VaultItem } from "../services/vaultContents";
 import { syncActiveSessionToRegistry } from "../services/auth/multiAccountService";
@@ -156,6 +157,7 @@ import {
   type WebsiteCitationItem,
   type DashboardView,
   FORMAT_TILES,
+  isCreatableFormat,
   STAGE_BREAKDOWNS,
   WEBSITE_ASSISTANT_FAQS,
   getFormatTileTheme,
@@ -277,41 +279,18 @@ export default function ProjectListScreen({
   // A failed list load is shown as an error, never as "no projects" (B7).
   const [projectsLoadError, setProjectsLoadError] = useState<string | null>(null);
   const [projectsLoadNeedsSignIn, setProjectsLoadNeedsSignIn] = useState(false);
-  const deletedProjectIdsRef = useRef<Set<string>>(new Set());
-
-  // Initialize from sessionStorage to prevent zombie project resurrection across fast reloads/nav
-  useEffect(() => {
-    try {
-      const stored = sessionStorage.getItem("scholar_deleted_project_ids");
-      if (stored) {
-        const arr = JSON.parse(stored);
-        if (Array.isArray(arr)) {
-          arr.forEach((id) => deletedProjectIdsRef.current.add(id));
-        }
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
+  // Ids deleted in this tab (shared with every other project list through sidebarProjects),
+  // so a fast reload or navigation cannot resurrect a deleted project.
+  const deletedProjectIdsRef = useRef<Set<string>>(readDeletedProjectIds());
 
   const markProjectAsDeleted = useCallback((id: string) => {
-    deletedProjectIdsRef.current.add(id);
-    try {
-      const arr = Array.from(deletedProjectIdsRef.current);
-      sessionStorage.setItem("scholar_deleted_project_ids", JSON.stringify(arr));
-    } catch {
-      // ignore
-    }
+    markProjectDeleted(id);
+    deletedProjectIdsRef.current = readDeletedProjectIds();
   }, []);
 
   const unmarkProjectAsDeleted = useCallback((id: string) => {
-    deletedProjectIdsRef.current.delete(id);
-    try {
-      const arr = Array.from(deletedProjectIdsRef.current);
-      sessionStorage.setItem("scholar_deleted_project_ids", JSON.stringify(arr));
-    } catch {
-      // ignore
-    }
+    unmarkProjectDeleted(id);
+    deletedProjectIdsRef.current = readDeletedProjectIds();
   }, []);
 
   const isCreatingRef = useRef(false);
@@ -683,14 +662,7 @@ export default function ProjectListScreen({
     }
     listProjects()
       .then((r) => {
-        const deleted = deletedProjectIdsRef.current;
-        const seen = new Set<string>();
-        const uniqueItems = (r.items || []).filter((p) => {
-          if (!p?.projectId || seen.has(p.projectId)) return false;
-          seen.add(p.projectId);
-          return !deleted.has(p.projectId);
-        });
-        setProjects(uniqueItems);
+        setProjects(withoutDeletedProjects(r.items || [], deletedProjectIdsRef.current));
       })
       .catch((e: unknown) => {
         // Keep whatever is already listed; say why the refresh failed. (Matched by name: the
@@ -742,15 +714,6 @@ export default function ProjectListScreen({
     };
   }, [choosing, types]);
 
-  const typeMap = useMemo(() => {
-    const map = new Map<string, OutputTypeSummary>();
-    if (types) {
-      for (const t of types) {
-        map.set(t.id, t);
-      }
-    }
-    return map;
-  }, [types]);
 
   // Main Dashboard Prompt Bar State
   const [mainPromptInput, setMainPromptInput] = useState("");
@@ -1442,12 +1405,13 @@ export default function ProjectListScreen({
         if (!hasPass) {
           setSessionUnlocked(true);
         }
+        let saved = 0;
         for (const csl of items) {
           const authors = csl.author
             .map((a) => a.literal || (a.given ? `${a.family}, ${a.given}` : a.family))
             .filter((name): name is string => Boolean(name));
           const year = csl.issued["date-parts"]?.[0]?.[0];
-          await addVaultItem(uid, {
+          const ok = await addVaultItem(uid, {
             title: csl.title,
             content: `${csl.title}${csl["container-title"] ? ` — ${csl["container-title"]}` : ""}`,
             sourceType: "reference",
@@ -1457,15 +1421,16 @@ export default function ProjectListScreen({
             journal: csl["container-title"] || csl.publisher,
             tags: ["Ask Scholar Import", "CSL-JSON"],
             metadata: { cslItem: csl, doi: csl.DOI },
-          }).catch(() => { });
+          })
+            .then(() => true)
+            .catch(() => false);
+          if (ok) saved++;
         }
-        showAppToast(
-          `Imported ${items.length} verified reference${items.length === 1 ? "" : "s"} into Knowledge Vault.`,
-          "success",
-          3500
-        );
+        // Say what actually happened: a failed save is never reported as imported.
+        const outcome = vaultImportOutcome(saved, items.length);
+        showAppToast(outcome.message, outcome.variant, outcome.variant === "success" ? 3500 : 7000);
       } catch {
-        showAppToast(`Imported ${items.length} reference${items.length === 1 ? "" : "s"}.`, "success", 3000);
+        showAppToast("The references could not be imported into your Knowledge Vault. Try again.", "error", 6000);
       }
     },
     [userEmail]
@@ -2086,9 +2051,18 @@ export default function ProjectListScreen({
 
   const handledNewFormatRef = useRef<string | null>(null);
 
+  const [formatNotice, setFormatNotice] = useState<string | null>(null);
+
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const newFormat = params.get("newFormat");
+    if (newFormat && !isCreatableFormat(newFormat)) {
+      // A retired or unknown format (e.g. the old Research Proposal, OT-15): never start
+      // a project in it; land on /projects and say why.
+      setFormatNotice("That project type is no longer available. Start a new project in one of the formats below.");
+      navigate("/projects", { replace: true });
+      return;
+    }
     if (newFormat && userEmail && !creating && handledNewFormatRef.current !== newFormat) {
       handledNewFormatRef.current = newFormat;
       handleCreate(newFormat);
@@ -2134,7 +2108,7 @@ export default function ProjectListScreen({
         navigator.clipboard
           .writeText(shareUrl)
           .then(() => showAppToast("Project link copied to clipboard.", "success"))
-          .catch(() => { });
+          .catch(() => showAppToast(`Could not copy the link. Copy it yourself: ${shareUrl}`, "warning", 8000));
       }
     } else if (action === "pin") {
       setPinnedRecentIds((prev) =>
@@ -2267,15 +2241,8 @@ export default function ProjectListScreen({
       }
       // Re-sync project list with server in background, filtering out any deleted IDs
       const res = await listProjects();
-      const deleted = deletedProjectIdsRef.current;
-      const seen = new Set<string>();
-      setProjects(
-        res.items.filter((p) => {
-          if (!p?.projectId || seen.has(p.projectId)) return false;
-          seen.add(p.projectId);
-          return !deleted.has(p.projectId);
-        })
-      );
+      // listProjects already returns one row per id.
+      setProjects(withoutDeletedProjects(res.items, deletedProjectIdsRef.current));
     } catch (e) {
       console.error("Failed to delete project:", e);
       // Rollback on failure
@@ -2298,17 +2265,7 @@ export default function ProjectListScreen({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [projectToDelete]);
 
-  function getProjectTitle(p: ProjectView | null): string {
-    if (!p) return "Project";
-    return (
-      p.answers?.title?.trim() ||
-      p.answers?.research_question?.trim() ||
-      p.answers?.topic?.trim() ||
-      typeMap.get(p.outputTypeId)?.label ||
-      p.outputTypeId ||
-      "Project"
-    );
-  }
+
 
 
   // "Resume chat": the conversation in progress, or after a reload the most recent saved one.
@@ -2974,6 +2931,15 @@ export default function ProjectListScreen({
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                       </svg>
+                    </button>
+                  </div>
+                )}
+
+                {formatNotice && (
+                  <div role="status" data-testid="format-retired-notice" className="w-full rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-4 py-3 text-xs text-[color:var(--text-primary)] flex items-center justify-between gap-3">
+                    <span>{formatNotice}</span>
+                    <button type="button" onClick={() => setFormatNotice(null)} className="shrink-0 font-semibold underline cursor-pointer">
+                      Dismiss
                     </button>
                   </div>
                 )}
@@ -4731,7 +4697,7 @@ export default function ProjectListScreen({
 
             {/* Sub-label */}
             <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed mb-7 font-normal font-sans">
-              Are you sure you want to delete <span className="font-semibold text-neutral-900 dark:text-neutral-100">"{getProjectTitle(projectToDelete)}"</span>? All associated notes, drafts, and evidence will be permanently removed. This action cannot be undone.
+              Are you sure you want to delete <span className="font-semibold text-neutral-900 dark:text-neutral-100">"{getProjectDisplayName(projectToDelete, projects || [])}"</span>? All associated notes, drafts, and evidence will be permanently removed. This action cannot be undone.
             </p>
 
             {/* Action Buttons */}

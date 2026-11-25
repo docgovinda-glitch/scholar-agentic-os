@@ -2,6 +2,7 @@ import { readSse } from "../../shared/sseReader";
 import { authHeaders } from "./authHeaders";
 import { aiRequestParts } from "../ai/keyring";
 import { inspectAiResponse } from "../ai/aiRouteNotices";
+import { inspectAiFailure } from "../ai/aiUnavailableNotice";
 import { liveAiStatus } from "../ai/liveAiStatus";
 import { runAiText } from "../ai/aiRun";
 import type { TaskClass } from "../../platform/router/types";
@@ -42,7 +43,8 @@ export {
   recoverDraftProject,
 };
 
-const committingProjects = new Set<string>();
+/** Drafts being committed, by draft id: concurrent callers share one POST, so a draft never becomes two rows. */
+const committingProjects = new Map<string, Promise<ProjectView>>();
 
 export async function json<T = unknown>(res: Response): Promise<T> {
   if (res.status === 401) throw new UnauthenticatedError();
@@ -65,19 +67,15 @@ export async function commitProjectToDatabase(projectId: string): Promise<Projec
   if (alreadyMigrated) return fetchServerProject(alreadyMigrated);
   if (!projectId.startsWith("draft-")) return fetchServerProject(projectId);
 
-  if (committingProjects.has(projectId)) {
-    const existing = getEphemeralProject(projectId);
-    if (existing) return existing;
-    throw new Error(`Project ${projectId} is already in the process of committing`);
-  }
+  const inFlight = committingProjects.get(projectId);
+  if (inFlight) return inFlight;
 
   const ephemeral = getEphemeralProject(projectId);
   if (!ephemeral) {
     throw new Error(`Cannot commit ephemeral project ${projectId}: not found in ephemeral store`);
   }
 
-  committingProjects.add(projectId);
-  try {
+  const commit = (async () => {
     const created = await authedJsonFetch("/api/projects", "POST", { outputTypeId: ephemeral.outputTypeId }).then((r) =>
       json<ProjectView>(r)
     );
@@ -111,9 +109,11 @@ export async function commitProjectToDatabase(projectId: string): Promise<Projec
     }
 
     return finalProject;
-  } finally {
+  })().finally(() => {
     committingProjects.delete(projectId);
-  }
+  });
+  committingProjects.set(projectId, commit);
+  return commit;
 }
 
 
@@ -163,7 +163,8 @@ export async function authedFetch(input: string, init: RequestInit = {}): Promis
     const migratedId = getMigratedDraftRealId(draftId);
     if (migratedId) {
       input = input.replace(draftId, migratedId);
-    } else if (isEphemeralProject(draftId) && !committingProjects.has(draftId)) {
+    } else if (isEphemeralProject(draftId)) {
+      // Joins an in-flight commit of the same draft instead of starting another.
       try {
         const committed = await commitProjectToDatabase(draftId);
         input = input.replace(draftId, committed.projectId);
@@ -188,9 +189,49 @@ export async function authedFetch(input: string, init: RequestInit = {}): Promis
     ...(init.headers as Record<string, string> | undefined),
     ...(await authHeaders()),
   });
-  const res = await originalFetch(input, { ...init, headers });
-  if (routeUsesClientAi(input)) inspectAiResponse(res);
+  const res = await fetchWithResponseDeadline(input, { ...init, headers }, routeUsesClientAi(input) ? AI_RESPONSE_DEADLINE_MS : API_RESPONSE_DEADLINE_MS);
+  if (routeUsesClientAi(input)) {
+    inspectAiResponse(res);
+    inspectAiFailure(res);
+  }
   return res;
+}
+
+/** How long a request may wait for the server to answer (headers), when its caller set no signal. */
+export const API_RESPONSE_DEADLINE_MS = 90_000;
+/** AI routes wait on a model before answering; still bounded, so nothing spins forever. */
+export const AI_RESPONSE_DEADLINE_MS = 10 * 60_000;
+
+/** Thrown when the server did not answer within the deadline. */
+export class RequestTimeoutError extends Error {
+  constructor(ms: number) {
+    super(`The server did not answer within ${Math.round(ms / 1000)} seconds, so the request was stopped. Check your connection and try again.`);
+    this.name = "RequestTimeoutError";
+  }
+}
+
+/**
+ * A caller's own signal always wins (Stop buttons, unmounts). Without one, the
+ * request is aborted if no response arrives in time. Only the wait for the
+ * response is bounded: once headers arrive the timer is cleared, so a long SSE
+ * stream that keeps sending is never cut off.
+ */
+async function fetchWithResponseDeadline(input: string, init: RequestInit, deadlineMs: number): Promise<Response> {
+  if (init.signal) return originalFetch(input, init);
+  const controller = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, deadlineMs);
+  try {
+    return await originalFetch(input, { ...init, signal: controller.signal });
+  } catch (err) {
+    if (timedOut) throw new RequestTimeoutError(deadlineMs);
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function authedJsonFetch(

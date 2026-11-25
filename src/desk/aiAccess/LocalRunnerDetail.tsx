@@ -182,13 +182,13 @@ export default function LocalRunnerDetail({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="min-w-0 max-w-full space-y-5">
       <button type="button" onClick={onBack} className="text-sm font-medium text-[color:var(--accent-solid)] hover:underline">
         ← Back
       </button>
 
-      <header className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
           <span aria-hidden className="text-2xl leading-none">
             {runner.icon}
           </span>
@@ -209,7 +209,7 @@ export default function LocalRunnerDetail({
           type="button"
           onClick={() => void handleProbe()}
           disabled={probing}
-          className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] px-3 py-1.5 text-xs font-medium text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] disabled:opacity-60 flex items-center gap-1.5"
+          className="shrink-0 rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] px-3 py-1.5 text-xs font-medium text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] disabled:opacity-60 flex items-center gap-1.5"
         >
           <span className={probing ? "animate-spin" : ""}>🔄</span>
           <span>{probing ? "Checking…" : "Test connection"}</span>
@@ -268,7 +268,7 @@ export default function LocalRunnerDetail({
             <p className="text-sm text-[color:var(--text-secondary)]">{runner.corsGuidance}</p>
 
             {originSetupCommand && originSetupOs && (
-              <div className="rounded-lg bg-neutral-900 text-neutral-100 p-3 text-xs font-mono relative group">
+              <div className="min-w-0 max-w-full rounded-lg bg-neutral-900 text-neutral-100 p-3 text-xs font-mono relative group">
                 <div className="flex items-center justify-between mb-1 text-[10px] text-neutral-400">
                   <span className="uppercase font-bold">{originSetupOs} Command</span>
                   <button
@@ -279,7 +279,7 @@ export default function LocalRunnerDetail({
                     {copiedCmd ? "✓ Copied!" : "📋 Copy Command"}
                   </button>
                 </div>
-                <div className="overflow-x-auto whitespace-pre pr-12 text-emerald-400">
+                <div className="max-w-full overflow-x-auto whitespace-pre-wrap break-all text-emerald-400">
                   {originSetupCommand}
                 </div>
               </div>
@@ -531,14 +531,14 @@ export default function LocalRunnerDetail({
 
 function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
   return (
-    <li className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-4">
+    <li className="min-w-0 rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-3 sm:p-4">
       <div className="flex items-baseline gap-2">
         <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[color:var(--accent-subtle)] text-xs font-semibold text-[color:var(--text-primary)]">
           {n}
         </span>
         <h3 className="text-sm font-semibold text-[color:var(--text-primary)]">{title}</h3>
       </div>
-      <div className="mt-2 pl-7">{children}</div>
+      <div className="mt-2 min-w-0 pl-0 sm:pl-7">{children}</div>
     </li>
   );
 }

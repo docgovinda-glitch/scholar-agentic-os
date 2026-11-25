@@ -39,6 +39,7 @@ import {
   getFormatLabel,
   deduplicateProjectList,
 } from "../projectNaming";
+import { markProjectDeleted, unmarkProjectDeleted, withoutDeletedProjects } from "../sidebarProjects";
 import SourceLibraryScreen from "./SourceLibraryScreen";
 import SettingsView from "./SettingsView";
 import { getConnectedCloudDrives, type CloudDriveAccount } from "../../services/vault/cloudDriveService";
@@ -131,23 +132,8 @@ export default function KnowledgeVault({
         listProjects(),
         listOutputTypes().catch(() => ({ items: [] as OutputTypeSummary[] })),
       ]);
-      let items = projRes?.items || [];
-      try {
-        const stored = sessionStorage.getItem("scholar_deleted_project_ids");
-        if (stored) {
-          const deleted = new Set(JSON.parse(stored));
-          items = items.filter((p) => !deleted.has(p.projectId));
-        }
-      } catch {
-        // ignore
-      }
-      const seen = new Set<string>();
-      items = items.filter((p) => {
-        if (!p?.projectId || seen.has(p.projectId)) return false;
-        seen.add(p.projectId);
-        return true;
-      });
-      setProjects(items);
+      // listProjects already returns one row per id.
+      setProjects(withoutDeletedProjects(projRes?.items || []));
       setTypes(typeRes?.items || []);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to load projects";
@@ -260,34 +246,9 @@ export default function KnowledgeVault({
     const targetProject = projectToDelete;
     const previousProjects = projects;
 
-    const markDeleted = (id: string) => {
-      try {
-        const stored = sessionStorage.getItem("scholar_deleted_project_ids");
-        const list = stored ? JSON.parse(stored) : [];
-        if (!list.includes(id)) {
-          list.push(id);
-          sessionStorage.setItem("scholar_deleted_project_ids", JSON.stringify(list));
-        }
-      } catch {
-        // ignore
-      }
-    };
-
-    const unmarkDeleted = (id: string) => {
-      try {
-        const stored = sessionStorage.getItem("scholar_deleted_project_ids");
-        if (stored) {
-          const list = JSON.parse(stored).filter((item: string) => item !== id);
-          sessionStorage.setItem("scholar_deleted_project_ids", JSON.stringify(list));
-        }
-      } catch {
-        // ignore
-      }
-    };
-
     setIsDeleting(true);
     setProjectToDelete(null);
-    markDeleted(targetProject.projectId);
+    markProjectDeleted(targetProject.projectId);
     setProjects((prev) => (prev ? prev.filter((p) => p.projectId !== targetProject.projectId) : []));
 
     try {
@@ -297,7 +258,7 @@ export default function KnowledgeVault({
     } catch (err: unknown) {
       console.error("Failed to delete project:", err);
       // Rollback on failure
-      unmarkDeleted(targetProject.projectId);
+      unmarkProjectDeleted(targetProject.projectId);
       setProjects(previousProjects);
       const msg = err instanceof Error ? err.message : "Failed to delete project";
       showAppToast(`Could not delete project: ${msg}`, "error");
@@ -993,7 +954,7 @@ export default function KnowledgeVault({
             onRefreshDrives={() => {
               getConnectedCloudDrives(userId)
                 .then(setConnectedDrives)
-                .catch(() => {});
+                .catch(() => showAppToast("Could not refresh your connected drives. Try again.", "warning", 5000));
             }}
             onResetVault={onResetVault}
           />
@@ -1013,7 +974,7 @@ export default function KnowledgeVault({
               Delete Project
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 leading-relaxed">
-              Are you sure you want to delete <strong className="text-gray-900 dark:text-gray-200 font-semibold">"{projectToDelete.answers?.title || "Untitled Project"}"</strong>? This action cannot be undone and will permanently remove all draft chapters and evidence matrices.
+              Are you sure you want to delete <strong className="text-gray-900 dark:text-gray-200 font-semibold">"{getProjectDisplayName(projectToDelete, projects || [])}"</strong>? This action cannot be undone and will permanently remove all draft chapters and evidence matrices.
             </p>
             <div className="flex items-center justify-end gap-3 mt-6">
               <button

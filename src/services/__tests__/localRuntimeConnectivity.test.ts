@@ -53,6 +53,23 @@ describe("checkLocalRuntimeConnectivity — reachable", () => {
   });
 });
 
+describe("checkLocalRuntimeConnectivity — LNA hint fallback", () => {
+  it("retries once without targetAddressSpace when the hinted loopback fetch rejects", async () => {
+    const fetchImpl = vi.fn(async (_url: string, init?: RequestInit) => {
+      if ((init as Record<string, unknown>)?.targetAddressSpace) throw new TypeError("Failed to fetch");
+      return jsonResponse({ models: [{ name: "llama3.1:8b" }] });
+    }) as unknown as typeof fetch;
+
+    const result = await checkLocalRuntimeConnectivity(ollama, undefined, fetchImpl);
+
+    expect(result.diagnosis).toBe("reachable");
+    expect(result.models).toEqual(["llama3.1:8b"]);
+    const calls = (fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls;
+    expect(calls).toHaveLength(2);
+    expect((calls[1][1] as Record<string, unknown>).targetAddressSpace).toBeUndefined();
+  });
+});
+
 describe("checkLocalRuntimeConnectivity — reachable-but-blocked", () => {
   it("reports reachable-but-blocked when the primary probe fails but the no-cors probe succeeds", async () => {
     const fetchImpl = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));

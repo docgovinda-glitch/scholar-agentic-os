@@ -68,19 +68,25 @@ export function getFormatLabel(outputTypeId?: string): string {
   return DEFAULT_FORMAT_LABELS[outputTypeId] || outputTypeId;
 }
 
+/** The first non-empty trimmed string among a project's answer keys, in order. */
+function firstAnswer(p: ProjectTitleItem, keys: readonly string[]): string {
+  const answers = (p.answers || {}) as Record<string, unknown>;
+  for (const k of keys) {
+    const v = answers[k];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return "";
+}
+
+const TITLE_KEYS = ["title", "working_title", "assignment_title"] as const;
+const TOPIC_KEYS = ["researchQuestion", "research_question", "topic", "research_topic"] as const;
+
 /**
  * Extracts the user-visible title from any project representation.
  */
 export function getProjectTitle(p: ProjectTitleItem | null | undefined): string {
   if (!p) return "";
-  const raw =
-    p.title?.trim() ||
-    (typeof p.answers?.title === "string" ? p.answers.title.trim() : "") ||
-    (typeof (p.answers as any)?.working_title === "string" ? (p.answers as any).working_title.trim() : "") ||
-    (typeof (p.answers as any)?.assignment_title === "string" ? (p.answers as any).assignment_title.trim() : "") ||
-    (typeof p.document?.title === "string" ? p.document.title.trim() : "") ||
-    "";
-  return raw;
+  return p.title?.trim() || firstAnswer(p, TITLE_KEYS) || (typeof p.document?.title === "string" ? p.document.title.trim() : "");
 }
 
 /**
@@ -96,18 +102,8 @@ export function getProjectDisplayName(
 ): string {
   if (!p) return "Untitled Project";
 
-  // Check explicit title sources
-  const titleCandidate =
-    p.title?.trim() ||
-    (typeof p.answers?.title === "string" ? p.answers.title.trim() : "") ||
-    (typeof (p.answers as any)?.working_title === "string" ? (p.answers as any).working_title.trim() : "") ||
-    (typeof (p.answers as any)?.assignment_title === "string" ? (p.answers as any).assignment_title.trim() : "") ||
-    (typeof p.document?.title === "string" ? p.document.title.trim() : "") ||
-    (typeof (p.answers as any)?.researchQuestion === "string" ? (p.answers as any).researchQuestion.trim() : "") ||
-    (typeof (p.answers as any)?.research_question === "string" ? (p.answers as any).research_question.trim() : "") ||
-    (typeof (p.answers as any)?.topic === "string" ? (p.answers as any).topic.trim() : "") ||
-    (typeof (p.answers as any)?.research_topic === "string" ? (p.answers as any).research_topic.trim() : "") ||
-    "";
+  // Check explicit title sources, then the question/topic the project is about
+  const titleCandidate = getProjectTitle(p) || firstAnswer(p, TOPIC_KEYS);
 
   const formatLabel = getFormatLabel(p.outputTypeId);
   const normalizedCandidate = titleCandidate.toLowerCase();
@@ -134,11 +130,7 @@ export function getProjectDisplayName(
   // Disambiguate among multiple projects sharing this format when untitled
   const currentId = getProjectId(p);
   const sameFormatUntitled = existingProjects.filter((item) => {
-    const raw =
-      item.title?.trim() ||
-      (typeof item.answers?.title === "string" ? item.answers.title.trim() : "") ||
-      (typeof (item.answers as any)?.working_title === "string" ? (item.answers as any).working_title.trim() : "") ||
-      (typeof (item.answers as any)?.assignment_title === "string" ? (item.answers as any).assignment_title.trim() : "");
+    const raw = item.title?.trim() || firstAnswer(item, TITLE_KEYS);
     const rawLower = raw.toLowerCase();
     const matchesFormat = (item.outputTypeId || "") === (p.outputTypeId || "");
     const isUntitle =

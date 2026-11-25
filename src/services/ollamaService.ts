@@ -8,6 +8,8 @@
  * and Chrome Local Network Access (LNA) standards.
  */
 
+import { fetchLocalRunner } from "./localNetworkFetch";
+
 export interface OllamaModelDetails {
   parent_model?: string;
   format?: string;
@@ -234,33 +236,6 @@ export function normalizeOllamaEndpoint(endpoint?: string): string {
   return clean.replace(/\/+$/, "");
 }
 
-/** Classify endpoint address space for Chromium Local Network Access prompts. */
-function getTargetAddressSpace(endpoint: string): "local" | "private" {
-  try {
-    const host = new URL(endpoint).hostname;
-    if (host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "[::1]") {
-      return "local";
-    }
-  } catch {
-    return "local";
-  }
-  return "private";
-}
-
-/** Test endpoint connectivity with standard timeout */
-async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 2500): Promise<Response> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, {
-      ...options,
-      signal: controller.signal,
-    });
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
 /**
  * Probes Ollama reachability using no-cors mode to distinguish whether the process is listening
  * on the port even when CORS or Chrome LNA blocks the regular JSON read.
@@ -317,10 +292,11 @@ export async function diagnoseOllamaConnection(customEndpoint?: string): Promise
   for (const ep of candidateEndpoints) {
     try {
       const epStart = Date.now();
-      const requestInit = { method: "GET", targetAddressSpace: getTargetAddressSpace(ep) } as RequestInit;
-      // Try /api/version first
+      const requestInit: RequestInit = { method: "GET" };
+      // Try /api/version first. fetchLocalRunner sends the LNA hint and, when a
+      // Chromium/Opera build rejects a loopback fetch carrying it, retries once without.
       try {
-        const verRes = await fetchWithTimeout(`${ep}/api/version`, requestInit);
+        const verRes = await fetchLocalRunner(`${ep}/api/version`, requestInit);
         if (verRes.ok) {
           const verData = await verRes.json().catch(() => ({}));
           version = verData.version || null;
@@ -328,7 +304,7 @@ export async function diagnoseOllamaConnection(customEndpoint?: string): Promise
       } catch (_) {}
 
       // Try /api/tags
-      const tagsRes = await fetchWithTimeout(`${ep}/api/tags`, requestInit);
+      const tagsRes = await fetchLocalRunner(`${ep}/api/tags`, requestInit);
       if (tagsRes.ok) {
         const data = await tagsRes.json();
         models = parseOllamaModels(data);

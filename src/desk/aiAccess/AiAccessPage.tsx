@@ -16,6 +16,8 @@ import { ConfidentialExclusions, FreeTierRecipes, GrantsPanel } from "./AiAccess
 import { CONFIDENTIAL_PREF, privateTierPref, ROUTING_PREF } from "../../platform/router/privacyPolicy";
 import LocalRunnerDetail from "./LocalRunnerDetail";
 import ManualHardwareForm from "./ManualHardwareForm";
+import { fetchLocalRunner } from "../../services/localNetworkFetch";
+import { DEFAULT_OLLAMA_ENDPOINT, FALLBACK_OLLAMA_ENDPOINT } from "../../services/ollamaService";
 import { useAiAccess } from "./useAiAccess";
 import OnboardingProgress from "../setup/OnboardingProgress";
 import {
@@ -207,14 +209,14 @@ export default function AiAccessPage({
           {/* Unified slide-over modal for provider connection workflow */}
           {openProvider && (
             <div
-              className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs transition-opacity"
+              className="fixed inset-0 z-50 flex justify-end overflow-hidden bg-black/40 backdrop-blur-xs transition-opacity"
               role="dialog"
               aria-modal="true"
               aria-label="Provider setup"
               onClick={() => setOpenProvider(null)}
             >
               <div
-                className="relative h-full w-full max-w-2xl overflow-y-auto border-l border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] p-6 shadow-2xl"
+                className="relative h-full w-full min-w-0 max-w-full sm:max-w-2xl overflow-y-auto overflow-x-hidden overscroll-contain border-l border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:p-6 shadow-2xl break-words"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="flex items-center justify-between pb-3 mb-4 border-b border-[color:var(--border-subtle)]">
@@ -575,15 +577,19 @@ function ProvidersSection({
     void loadHardwareProfile().then(setHardware);
     let cancelled = false;
     async function checkLocal() {
-      try {
-        const res = await fetch("http://127.0.0.1:11434/api/tags", { signal: AbortSignal.timeout(1500) });
-        if (res.ok && !cancelled) {
+      // The same loopback candidates and LNA fallback the Ollama diagnosis uses, so the
+      // banner and "Test connection" never disagree about whether Ollama is there.
+      for (const endpoint of [FALLBACK_OLLAMA_ENDPOINT, DEFAULT_OLLAMA_ENDPOINT]) {
+        try {
+          const res = await fetchLocalRunner(`${endpoint}/api/tags`, {}, 1500);
+          if (!res.ok) continue;
           const data = await res.json();
           const count = Array.isArray(data?.models) ? data.models.length : 0;
-          setLocalDetected({ runnerId: "ollama", name: "Ollama", modelCount: count });
+          if (!cancelled) setLocalDetected({ runnerId: "ollama", name: "Ollama", modelCount: count });
+          return;
+        } catch {
+          /* Not active locally or CORS-restricted; try the next address. */
         }
-      } catch {
-        /* Not active locally or CORS-restricted */
       }
     }
     void checkLocal();
@@ -612,22 +618,26 @@ function ProvidersSection({
 
       {/* Auto-detected Local Runner Banner */}
       {localDetected && (
-        <div className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs text-emerald-800 dark:text-emerald-300 shadow-sm">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-            <div className="truncate">
+        <button
+          type="button"
+          onClick={() => onOpen(localDetected.runnerId)}
+          aria-label={`${localDetected.name} is running on this device. Configure local AI`}
+          className="group w-full text-left flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/15 p-3.5 text-xs text-emerald-800 dark:text-emerald-300 shadow-sm cursor-pointer transition-colors focus-visible:outline-2 focus-visible:outline-emerald-600"
+        >
+          <span className="flex items-center gap-2.5 min-w-0 flex-1">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" aria-hidden="true" />
+            <span className="min-w-0">
               <span className="font-bold">{localDetected.name} is running on this device!</span>
               <span className="ml-1.5 opacity-80">({localDetected.modelCount} local model{localDetected.modelCount === 1 ? "" : "s"} ready)</span>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => onOpen(localDetected.runnerId)}
-            className="px-3 py-1.5 rounded-[var(--radius-sm)] bg-emerald-600 hover:bg-emerald-700 text-white font-semibold transition-colors cursor-pointer shrink-0"
+            </span>
+          </span>
+          <span
+            aria-hidden="true"
+            className="px-3 py-1.5 rounded-[var(--radius-sm)] bg-emerald-600 group-hover:bg-emerald-700 text-white font-semibold transition-colors shrink-0"
           >
             Configure Local AI →
-          </button>
-        </div>
+          </span>
+        </button>
       )}
 
       {/* Filter and Search Bar */}

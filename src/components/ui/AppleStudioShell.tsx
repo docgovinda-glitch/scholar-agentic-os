@@ -142,10 +142,12 @@ export function AppleStudioHeader({
       role="toolbar"
       aria-label="Studio Workspace Chrome"
       data-testid="apple-studio-header"
-      className="apple-glass-header h-14 px-4 flex items-center justify-between gap-3 shrink-0 z-30 select-none"
+      // Below 640px the bar is two rows: Back, title and controls on top, the five
+      // mode tabs on their own full-width row, so nothing is pushed off-screen.
+      className="apple-glass-header px-3 sm:px-4 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2 sm:py-0 sm:h-14 flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-3 gap-y-2 shrink-0 z-30 select-none"
     >
       {/* Left Zone: Back to Desk + Deliverable Type Badge + Inline Editable Project Title */}
-      <div className="flex items-center gap-2.5 min-w-0 flex-1 max-w-[32%] overflow-hidden">
+      <div className="flex items-center gap-2.5 min-w-[2rem] flex-1 sm:max-w-[32%] overflow-hidden">
         {onBack && (
           <button
             type="button"
@@ -204,7 +206,7 @@ export function AppleStudioHeader({
             }}
             data-testid="studio-project-title"
             title={onProjectTitleChange ? `${projectTitle} (Click to rename)` : projectTitle}
-            className={`group hidden sm:flex items-center gap-1.5 min-w-0 text-left px-1.5 py-1 rounded-md transition-colors ${
+            className={`group flex items-center gap-1.5 min-w-0 text-left px-1.5 py-1 rounded-md transition-colors ${
               onProjectTitleChange ? "hover:bg-surface-hover cursor-pointer" : "cursor-default"
             }`}
           >
@@ -224,7 +226,7 @@ export function AppleStudioHeader({
         role="tablist"
         aria-label="Studio cognitive stages"
         data-testid="apple-studio-stage-pills"
-        className="apple-segmented-pill min-w-0 shrink md:shrink-0 overflow-x-auto max-w-full"
+        className="apple-segmented-pill order-last basis-full sm:order-none sm:basis-auto min-w-0 shrink md:shrink-0 overflow-x-auto max-w-full"
       >
         {APPLE_STUDIO_STAGES.map((stage) => {
           const Icon = PHASE_ICONS[stage.id];
@@ -245,7 +247,7 @@ export function AppleStudioHeader({
                 if (!isLocked) onPhaseSelect(stage.id);
               }}
               title={`${stage.number}. ${stage.label} — ${subtitle}${isLocked ? " (Complete prior stage first)" : ""}`}
-              className={`relative flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-lg text-xs font-semibold tracking-tight transition-all duration-200 ease-out cursor-pointer ${
+              className={`relative flex flex-1 sm:flex-none justify-center items-center gap-1.5 px-2.5 sm:px-3 py-2 sm:py-1 rounded-lg text-xs font-semibold tracking-tight transition-all duration-200 ease-out cursor-pointer ${
                 isActive
                   ? "bg-surface text-primary shadow-xs border border-border/80"
                   : isLocked

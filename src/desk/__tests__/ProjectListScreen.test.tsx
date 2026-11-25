@@ -1316,3 +1316,19 @@ describe("project list load failure (B7)", () => {
     expect(screen.queryByRole("button", { name: /^Sign in$/ })).toBeNull();
   });
 });
+
+describe("retired formats in a ?newFormat= link", () => {
+  it("does not create an OT-15 project; it lands on /projects with a notice", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    listOutputTypes.mockResolvedValue({ items: TYPES });
+    render(
+      <FeedbackProvider>
+        <MemoryRouter initialEntries={["/projects?newFormat=OT-15"]}>
+          <ProjectListScreen userEmail="a@b.c" onOpen={() => {}} />
+        </MemoryRouter>
+      </FeedbackProvider>
+    );
+    expect(await screen.findByTestId("format-retired-notice")).toHaveTextContent(/no longer available/i);
+    expect(createProject).not.toHaveBeenCalled();
+  });
+});

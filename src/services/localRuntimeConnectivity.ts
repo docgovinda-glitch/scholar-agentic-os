@@ -1,5 +1,6 @@
 import { runnerHealthUrl, type LocalRunnerSpec } from "../config/localRunnerCatalog";
 import { probeRunner } from "./localRunnerProbe";
+import { getTargetAddressSpace } from "./localNetworkFetch";
 
 /** A no-cors request tells "blocked by the browser" (the server answered) from "nothing there". */
 async function probeReachability(url: string, timeoutMs = 3000): Promise<"cors_blocked" | "unreachable"> {
@@ -25,15 +26,6 @@ const OPEN_VERIFICATION_ITEMS = [
   "Whether this runtime's default configuration sends Access-Control-Allow-Private-Network: true on its CORS preflight response — required by Chrome 142+'s Local Network Access in addition to Access-Control-Allow-Origin, and not something this sandbox can test against a real runtime.",
   "The actual Local Network Access permission-prompt experience for a real visitor on the production origin — this can only be observed in a real Chrome 142+ session, not simulated here.",
 ];
-
-function isLoopbackEndpoint(url: string): boolean {
-  try {
-    const host = new URL(url).hostname;
-    return host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "[::1]";
-  } catch {
-    return true;
-  }
-}
 
 function isChromiumUserAgent(): boolean {
   const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
@@ -67,9 +59,12 @@ export async function checkLocalRuntimeConnectivity(
   fetchImpl: typeof fetch = fetch
 ): Promise<ConnectivityResult> {
   const healthUrl = runnerHealthUrl(runner, endpointOverride);
-  const addressSpace = isLoopbackEndpoint(healthUrl) ? "local" : "private";
+  const addressSpace = getTargetAddressSpace(healthUrl);
 
-  const primary = await probeRunner(runner, endpointOverride, fetchImpl, { targetAddressSpace: addressSpace });
+  let primary = await probeRunner(runner, endpointOverride, fetchImpl, { targetAddressSpace: addressSpace });
+  // Some Chromium/Opera builds reject a loopback fetch that carries the LNA hint
+  // before sending it; the same request without the hint can succeed.
+  if (!primary.reachable) primary = await probeRunner(runner, endpointOverride, fetchImpl);
   if (primary.reachable) {
     return { diagnosis: "reachable", models: primary.models, guidance: guidanceFor(runner, "reachable"), requiresRealMachineVerification: [] };
   }

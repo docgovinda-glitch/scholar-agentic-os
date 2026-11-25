@@ -27,7 +27,7 @@ export function LiveAiStatusDock() {
 
   return (
     <div
-      className="fixed bottom-20 left-4 z-40 w-[min(26rem,calc(100vw-2rem))] rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-3 shadow-lg"
+      className="fixed bottom-[calc(env(safe-area-inset-bottom)+5rem)] left-4 z-40 w-[min(26rem,calc(100vw-2rem))] rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-3 shadow-lg"
       aria-label="AI step status"
     >
       <div className="flex items-start gap-2">

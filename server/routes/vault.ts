@@ -367,7 +367,8 @@ router.post("/lookup-doi", async (req: Request, res: Response) => {
     const canonicalReference: CanonicalReference = {
       kind: "JournalArticle",
       title,
-      source: journal || "Crossref",
+      // The container is the journal; never the lookup service's name ("Crossref" is not a venue).
+      source: journal,
       authors: authors.map((name, idx) => {
         const parts = name.split(" ");
         return {
@@ -670,7 +671,8 @@ router.post("/mendeley/sync", async (req: Request, res: Response) => {
         const canonicalReference: CanonicalReference = {
           kind: itemType === "book" ? "Book" : itemType === "phdthesis" ? "Thesis" : "JournalArticle",
           title,
-          source: journal || "BibTeX",
+          // Never the import format's name ("BibTeX" is not a venue).
+          source: journal,
           authors: authors.map((name, idx) => {
             const parts = name.split(",");
             if (parts.length > 1) {

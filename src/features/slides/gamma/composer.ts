@@ -12,7 +12,7 @@
  *   is clearly an instruction to the author, not a claim.
  */
 import { stripCourseCodes } from '../../../utils/briefExtractor';
-import { cleanBriefText, deriveDocumentTitle } from '../../../shared/presentationBrief';
+import { cleanBriefText, deriveDocumentTitle, UNTITLED_PRESENTATION } from '../../../shared/presentationBrief';
 import type { CardContent, CardItem, CardStat, GammaLayout, NarrativeFramework, SlideCard, SlideDeck } from '../types/slides';
 import { getCardContent, inferLayout, resolveLayout, writeCardContent } from './content';
 import { DEFAULT_DECK_THEME_ID } from './theme';
@@ -376,7 +376,7 @@ export function composeDeckFromOutline(
   opts: ComposeOptions & { title: string }
 ): SlideDeck {
   const framework = opts.framework || 'Standard-Narrative';
-  const title = clean(stripCourseCodes(opts.title)) || 'Untitled presentation';
+  const title = clean(stripCourseCodes(opts.title)) || UNTITLED_PRESENTATION;
   const slides = outline.map((card, i) => {
     const mapped = VISUAL_TYPE_LAYOUT[card.visualType || ''] ?? (i === 0 ? 'title' : 'bento');
     // Exactly three points read best as three equal cards; other counts keep the bento grid.
@@ -414,7 +414,7 @@ export function composeDeckFromText(rawText: string, opts: ComposeOptions = {}):
   const text = cleanBriefText(rawText);
   const { title: mdTitle, intro, sections } = parseSections(text);
   const derived = !opts.title && !mdTitle && !opts.topic ? deriveDocumentTitle(text) : '';
-  const title = clean(stripCourseCodes(opts.title || mdTitle || opts.topic || derived || (sections[0]?.heading ?? '') || 'Untitled presentation'));
+  const title = clean(stripCourseCodes(opts.title || mdTitle || opts.topic || derived || (sections[0]?.heading ?? '') || UNTITLED_PRESENTATION));
   const max = Math.max(2, Math.min(15, opts.slideCount ?? 8));
 
   const cards = sections.slice(0, max - 1).map(sectionToCard);
@@ -617,7 +617,7 @@ export interface TalkPlan {
  */
 export function composeDeckFromPlan(plan: TalkPlan): SlideDeck {
   const framework = plan.framework || 'Standard-Narrative';
-  const title = clean(stripCourseCodes(plan.title || '')) || 'Untitled presentation';
+  const title = clean(stripCourseCodes(plan.title || '')) || UNTITLED_PRESENTATION;
   const key = clean(plan.keyMessage || '');
   const points = (plan.points || []).map(clean).filter(Boolean);
   const count = Math.max(3, Math.min(15, plan.slideCount ?? (plan.talkMinutes ? slidesForMinutes(plan.talkMinutes) : 6)));

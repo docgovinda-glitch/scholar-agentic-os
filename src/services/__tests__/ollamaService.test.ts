@@ -143,6 +143,55 @@ describe("ollamaService — Architecture, Parsing & Diagnostics", () => {
       expect((mockFetch.mock.calls[0]?.[1] as Record<string, unknown>)?.targetAddressSpace).toBe("local");
     });
 
+    it("retries a loopback fetch without targetAddressSpace when the hinted fetch rejects (Chromium/Opera LNA)", async () => {
+      const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+        if ((init as Record<string, unknown> | undefined)?.targetAddressSpace) {
+          return Promise.reject(new TypeError("Failed to fetch"));
+        }
+        if (url.endsWith("/api/version")) return Promise.resolve({ ok: true, json: async () => ({ version: "0.40.0" }) });
+        if (url.endsWith("/api/tags")) {
+          return Promise.resolve({ ok: true, json: async () => ({ models: [{ name: "llama3.1:8b", size: 4e9, digest: "d" }] }) });
+        }
+        return Promise.reject(new Error("unhandled url"));
+      });
+      globalThis.fetch = mockFetch;
+
+      const diag = await diagnoseOllamaConnection("http://localhost:11434");
+      expect(diag.ok).toBe(true);
+      expect(diag.activeEndpoint).toBe("http://localhost:11434");
+      expect(diag.version).toBe("0.40.0");
+      // The no-cors process probe is never reached.
+      expect(mockFetch.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.mode === "no-cors")).toBe(false);
+      const tagCalls = mockFetch.mock.calls.filter(([url]) => String(url).endsWith("/api/tags"));
+      expect((tagCalls[0][1] as Record<string, unknown>).targetAddressSpace).toBe("local");
+      expect((tagCalls[1][1] as Record<string, unknown>).targetAddressSpace).toBeUndefined();
+    });
+
+    it("falls through to 127.0.0.1 when localhost fails both with and without the hint", async () => {
+      const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+        if (init?.mode === "no-cors") return Promise.reject(new TypeError("Failed to fetch"));
+        if (url.startsWith("http://localhost")) return Promise.reject(new TypeError("Failed to fetch"));
+        if (url.endsWith("/api/tags")) return Promise.resolve({ ok: true, json: async () => ({ models: [] }) });
+        return Promise.resolve({ ok: false, json: async () => ({}) });
+      });
+      globalThis.fetch = mockFetch;
+
+      const diag = await diagnoseOllamaConnection("http://localhost:11434");
+      expect(diag.ok).toBe(true);
+      expect(diag.errorKind).toBe("NO_MODELS_INSTALLED");
+      expect(diag.activeEndpoint).toBe("http://127.0.0.1:11434");
+      expect(diag.testedEndpoints).toEqual(["http://localhost:11434", "http://127.0.0.1:11434"]);
+    });
+
+    it("reports OLLAMA_NOT_RUNNING when every candidate fails with and without the hint and nothing listens", async () => {
+      const mockFetch = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
+      globalThis.fetch = mockFetch;
+
+      const diag = await diagnoseOllamaConnection("http://localhost:11434");
+      expect(diag.ok).toBe(false);
+      expect(diag.errorKind).toBe("OLLAMA_NOT_RUNNING");
+    });
+
     it("uses private targetAddressSpace for LAN endpoints and classifies CORS_MISCONFIGURED across fallback candidates", async () => {
       const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
         if (init?.mode === "no-cors" && url.startsWith("http://127.0.0.1:11434")) {

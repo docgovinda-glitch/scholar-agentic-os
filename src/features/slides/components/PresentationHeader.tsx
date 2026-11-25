@@ -68,11 +68,13 @@ export default function PresentationHeader({
 
   return (
     <header
-      className={`h-14 shrink-0 z-30 border-b border-neutral-900/[0.06] dark:border-white/[0.07] bg-[#F8F7F4]/85 dark:bg-[#171717]/85 backdrop-blur-xl px-3 sm:px-5 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 ${className}`}
+      className={`shrink-0 z-30 border-b border-neutral-900/[0.06] dark:border-white/[0.07] bg-[#F8F7F4]/85 dark:bg-[#171717]/85 backdrop-blur-xl px-3 sm:px-5 pt-[env(safe-area-inset-top)] py-1.5 sm:py-0 sm:h-14 grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1.5 ${className}`}
       data-testid="presentation-header"
     >
-      {/* Left: navigation + title */}
-      <div className="flex items-center gap-1.5 min-w-0">
+      {/* Left: navigation + title. Below 640px the header is two rows: this and the
+          controls on top, the step switcher on its own full-width row, so the model
+          switcher can never sit on top of a step button. */}
+      <div className="flex items-center gap-1.5 min-w-0 order-1 sm:order-none">
         {isSidebarCollapsed && onToggleSidebar && (
           <button
             type="button"
@@ -104,7 +106,7 @@ export default function PresentationHeader({
       </div>
 
       {/* Centre: four-step switcher */}
-      <nav aria-label="Presentation Studio Workflow" className="flex items-center gap-0.5 p-1 rounded-full bg-neutral-900/[0.05] dark:bg-white/[0.06]">
+      <nav aria-label="Presentation Studio Workflow" data-testid="presentation-steps" className="order-3 col-span-2 sm:order-none sm:col-span-1 flex items-center gap-0.5 p-1 rounded-full bg-neutral-900/[0.05] dark:bg-white/[0.06] min-w-0">
         {PRESENTATION_STEPS.map((step) => {
           const isCurrent =
             currentStep === step.id ||
@@ -117,21 +119,22 @@ export default function PresentationHeader({
               onClick={() => onStepChange(step.id)}
               aria-label={step.label}
               aria-current={isCurrent ? 'step' : undefined}
-              className={`h-7 px-3 rounded-full text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 transition-all cursor-pointer ${
+              data-compact="true"
+              className={`h-9 sm:h-7 flex-1 sm:flex-none justify-center px-2 sm:px-3 rounded-full text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 transition-all cursor-pointer ${
                 isCurrent
                   ? 'bg-white text-neutral-900 shadow-[0_1px_2px_rgba(23,23,23,0.08)] dark:bg-[#2A2A2A] dark:text-white'
                   : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
               }`}
             >
               <span className={`tabular-nums text-[10px] ${isCurrent ? 'text-neutral-400 dark:text-neutral-500' : 'opacity-60'}`}>{step.number}</span>
-              <span className="hidden md:inline">{step.name}</span>
+              <span className="max-[379px]:hidden sm:hidden md:inline">{step.name}</span>
             </button>
           );
         })}
       </nav>
 
       {/* Right: status + assistants */}
-      <div className="flex items-center justify-end gap-1.5 min-w-0">
+      <div className="flex items-center justify-end gap-1.5 min-w-0 order-2 sm:order-none">
         {!hideAutosaveBadge && (
           // The badge sets its own display (inline-flex), which overrode `hidden`
           // and overlapped the step switcher on small screens; hide via a wrapper.
