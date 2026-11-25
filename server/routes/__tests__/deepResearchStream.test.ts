@@ -65,7 +65,7 @@ describe("Deep Research stream", () => {
         mode: "deep-research",
         excludedSources: [{ title: " Offensive Realism Revisited ", doi: "10.1017/b2" }, { nothing: true }, "junk", null],
       });
-    const options = executeDeepResearch.mock.calls[0][7] as { excludedSources: unknown[] };
+    const options = executeDeepResearch.mock.calls.at(-1)![7] as { excludedSources: unknown[] };
     expect(options.excludedSources).toEqual([{ title: "Offensive Realism Revisited", doi: "10.1017/b2", url: undefined }]);
   });
 });
