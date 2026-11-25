@@ -1,3 +1,4 @@
+import type { PreviewSource } from "../../domain/ask/sourceSelection";
 import type { LiveSearchResult } from "../../services/liveSearchService";
 import type { ResearchStageTelemetry } from "../api/types";
 import type { CSLItem, ExcludedSourceRecord } from "../../citation_compliance/cslEngine";
@@ -56,6 +57,9 @@ export interface WebsiteAssistantMessage {
       | "synthesizing"
       | "report_ready";
     subQuestions: string[];
+    /** Sources found for the plan; the researcher pins or excludes them before the run. */
+    previewSources?: PreviewSource[];
+    previewStatus?: "loading" | "ready" | "failed";
     searchedCount?: number;
     readCount?: number;
     citedCount?: number;

@@ -1,3 +1,4 @@
+import { claimBefore, findSupportingPassage } from "../../domain/ask/passageMatch";
 import React, { useState, Fragment } from "react";
 import { Copy, Check, Scale, Info, BarChart3, Network, ExternalLink, ChevronRight as ChevronRightIcon } from "lucide-react";
 import type { WebsiteAssistantMessage, WebsiteCitationItem } from "./types";
@@ -191,6 +192,21 @@ export function scrollToReferenceEntry(num: string | number, messageId?: string)
   }
 }
 
+/** Marks the words of a passage that the claim shares. */
+function highlightMatched(passage: string, matched: string[]): React.ReactNode[] {
+  if (matched.length === 0) return [passage];
+  const re = new RegExp(`\\b(${matched.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})\\b`, "gi");
+  return passage.split(re).map((part, i) =>
+    i % 2 === 1 ? (
+      <mark key={i} className="bg-emerald-200/70 dark:bg-emerald-700/40 text-inherit rounded-sm px-0.5">
+        {part}
+      </mark>
+    ) : (
+      part
+    )
+  );
+}
+
 export function InlineCitationBadge({
   num,
   url,
@@ -199,6 +215,7 @@ export function InlineCitationBadge({
   messageId,
   onAddToEvidence,
   onFocusInGraph,
+  claim,
 }: {
   num: string | number;
   url?: string;
@@ -207,6 +224,8 @@ export function InlineCitationBadge({
   messageId?: string;
   onAddToEvidence?: (citation: WebsiteCitationItem) => void;
   onFocusInGraph?: (citation: WebsiteCitationItem) => void;
+  /** The sentence this citation supports; the hover card shows the passage that backs it. */
+  claim?: string;
 }) {
   const doiStr = (citation as Record<string, unknown> | undefined)?.doi as string | undefined;
   const targetUrl =
@@ -260,6 +279,7 @@ export function InlineCitationBadge({
     citation?.sourceType === "scholarly";
 
   const snippet = citation?.evidenceSnippet || citation?.snippet || citation?.mainFinding;
+  const supporting = claim && snippet ? findSupportingPassage(claim, snippet) : null;
 
   return (
     <span className="relative group/cite inline align-baseline mx-0.5">
@@ -350,9 +370,26 @@ export function InlineCitationBadge({
           )}
 
           {/* Empirical Snippet / Excerpt */}
-          {snippet && (
-            <span className="block text-[10px] text-neutral-600 dark:text-neutral-400 line-clamp-2 leading-relaxed mb-2.5 italic bg-neutral-50 dark:bg-neutral-800/60 p-1.5 rounded-lg border border-neutral-100 dark:border-white/5">
-              "{snippet}"
+          {snippet && supporting && (
+            <span data-testid="citation-supporting-passage" className="block mb-2.5">
+              <span className="block text-[9.5px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 mb-0.5">
+                Supporting passage
+              </span>
+              <span className="block text-[10px] text-neutral-700 dark:text-neutral-300 leading-relaxed italic bg-emerald-50/70 dark:bg-emerald-950/20 p-1.5 rounded-lg border border-emerald-100 dark:border-emerald-900/40">
+                "{highlightMatched(supporting.passage, supporting.matched)}"
+              </span>
+            </span>
+          )}
+          {snippet && !supporting && (
+            <span className="block mb-2.5">
+              {claim && (
+                <span data-testid="citation-no-passage" className="block text-[9.5px] text-amber-700 dark:text-amber-400 mb-0.5">
+                  No sentence in the retrieved text clearly matches this claim. Excerpt:
+                </span>
+              )}
+              <span className="block text-[10px] text-neutral-600 dark:text-neutral-400 line-clamp-2 leading-relaxed italic bg-neutral-50 dark:bg-neutral-800/60 p-1.5 rounded-lg border border-neutral-100 dark:border-white/5">
+                "{snippet}"
+              </span>
             </span>
           )}
 
@@ -567,6 +604,7 @@ export function renderFormattedGuideText(
               messageId={messageId}
               onAddToEvidence={onAddToEvidence}
               onFocusInGraph={onFocusInGraph}
+              claim={claimBefore(cleanStr, match.index)}
             />
           );
         } else {
@@ -609,6 +647,7 @@ export function renderFormattedGuideText(
                   messageId={messageId}
                   onAddToEvidence={onAddToEvidence}
                   onFocusInGraph={onFocusInGraph}
+                  claim={claimBefore(cleanStr, mIdx)}
                 />
               );
             })}
