@@ -146,9 +146,7 @@ describe("UI/UX Enhancements: Command Palette, Boot Project, Related Inquiries, 
     const onOpen = vi.fn();
     createProject.mockResolvedValueOnce({ projectId: "proj-booted-404" });
     saveIntakeAnswers.mockResolvedValueOnce({ success: true });
-    executeAgenticLLM.mockResolvedValueOnce(
-      "Comprehensive synthesis on CRISPR off-target cleavage mechanics."
-    );
+    executeAgenticQuery.mockResolvedValueOnce({ ok: true, text: "Comprehensive synthesis on CRISPR off-target cleavage mechanics.", mode: "chat" });
 
     renderScreen(<ProjectListScreen onOpen={onOpen} userEmail="scholar@research.edu" />);
 
@@ -183,9 +181,7 @@ describe("UI/UX Enhancements: Command Palette, Boot Project, Related Inquiries, 
   });
 
   it("renders Ask Scholar as full-screen chat box on landing page and completely hides the three cards once user starts chatting", async () => {
-    executeAgenticLLM.mockResolvedValueOnce(
-      "Comprehensive research synthesis on molecular dynamics."
-    );
+    executeAgenticQuery.mockResolvedValueOnce({ ok: true, text: "Comprehensive research synthesis on molecular dynamics.", mode: "chat" });
 
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
