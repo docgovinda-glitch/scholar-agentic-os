@@ -44,7 +44,7 @@ Names the code reads, grouped by purpose. "Server" variables are read by `server
 | `VITE_SUPABASE_URL` | Both | Supabase project URL (client config, and the server's Data API and proxy target). Falls back to `SUPABASE_URL` on the server |
 | `VITE_SUPABASE_ANON_KEY` | Client | Public anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server | Service-role key for the Data API, token verification and admin. Never expose it to the browser |
-| `DATABASE_URL` | Server | Optional direct Postgres connection (fallback store; used by some scripts) |
+| `DATABASE_URL` | Server | Optional direct Postgres connection (fallback store; used by some scripts). Uses TLS verified against Supabase's root CA, except when the URL's hostname is `localhost`, `127.0.0.1` or `::1` (`postgresSslFor` in `src/services/store/pgProjectStore.ts`) |
 | `SUPABASE_URL`, `SUPABASE_TARGET_URL` | Server | Alternate names for the upstream used by auth and the proxy |
 | `SUPABASE_JWT_SECRET` | Server | Optional local HS256 JWT validation |
 | `SUPABASE_DB_URL`, `SUPABASE_ANON_KEY` | Scripts | Used by `scripts/` helpers |
