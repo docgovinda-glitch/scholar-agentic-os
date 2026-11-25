@@ -171,6 +171,17 @@ describe("Local runner configuration", () => {
     fireEvent.click(advancedToggle);
     expect(screen.getByPlaceholderText(/Exact model name/i)).toBeInTheDocument();
   });
+
+  it("shows the Ollama origin setup command upfront in Step 2 before testing connection", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Providers" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Local Runners" }));
+    fireEvent.click(await screen.findByText("Ollama"));
+
+    expect(await screen.findByRole("button", { name: /Copy Command/i })).toBeInTheDocument();
+    expect(screen.getByText(/^(macos|linux|windows|unknown) Command$/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/OLLAMA_ORIGINS=/).length).toBeGreaterThanOrEqual(2);
+  });
 });
 
 describe("Per-provider configuration", () => {

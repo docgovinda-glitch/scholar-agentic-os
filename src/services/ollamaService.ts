@@ -131,7 +131,9 @@ export function getCurrentAppOrigin(): string {
 export function getOllamaOriginSetupCommand(os: "macos" | "windows" | "linux" | "unknown", origin: string): string {
   switch (os) {
     case "macos":
-      return `launchctl setenv OLLAMA_ORIGINS "${origin}" && pkill ollama || true && open -a Ollama`;
+      // `-ix` matches both the GUI wrapper (`Ollama`) and `ollama serve` (`ollama`),
+      // and waiting before `open -a Ollama` avoids racing LaunchServices against shutdown.
+      return `launchctl setenv OLLAMA_ORIGINS "${origin}" && (pkill -ix ollama || true) && sleep 2 && open -a Ollama`;
     case "linux":
       return `systemctl --user set-environment OLLAMA_ORIGINS="${origin}" && systemctl --user restart ollama || OLLAMA_ORIGINS="${origin}" ollama serve`;
     case "windows":
@@ -232,6 +234,19 @@ export function normalizeOllamaEndpoint(endpoint?: string): string {
   return clean.replace(/\/+$/, "");
 }
 
+/** Classify endpoint address space for Chromium Local Network Access prompts. */
+function getTargetAddressSpace(endpoint: string): "local" | "private" {
+  try {
+    const host = new URL(endpoint).hostname;
+    if (host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "[::1]") {
+      return "local";
+    }
+  } catch {
+    return "local";
+  }
+  return "private";
+}
+
 /** Test endpoint connectivity with standard timeout */
 async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 2500): Promise<Response> {
   const controller = new AbortController();
@@ -302,9 +317,10 @@ export async function diagnoseOllamaConnection(customEndpoint?: string): Promise
   for (const ep of candidateEndpoints) {
     try {
       const epStart = Date.now();
+      const requestInit = { method: "GET", targetAddressSpace: getTargetAddressSpace(ep) } as RequestInit;
       // Try /api/version first
       try {
-        const verRes = await fetchWithTimeout(`${ep}/api/version`, { method: "GET" });
+        const verRes = await fetchWithTimeout(`${ep}/api/version`, requestInit);
         if (verRes.ok) {
           const verData = await verRes.json().catch(() => ({}));
           version = verData.version || null;
@@ -312,7 +328,7 @@ export async function diagnoseOllamaConnection(customEndpoint?: string): Promise
       } catch (_) {}
 
       // Try /api/tags
-      const tagsRes = await fetchWithTimeout(`${ep}/api/tags`, { method: "GET" });
+      const tagsRes = await fetchWithTimeout(`${ep}/api/tags`, requestInit);
       if (tagsRes.ok) {
         const data = await tagsRes.json();
         models = parseOllamaModels(data);
@@ -362,29 +378,35 @@ export async function diagnoseOllamaConnection(customEndpoint?: string): Promise
     };
   }
 
-  // Step 2: If direct fetch failed, probe whether process is alive via no-cors
-  const isProcessAlive = await probeOllamaProcessListening(baseEndpoint);
+  // Step 2: If direct fetch failed, probe whether process is alive via no-cors across candidates
+  let aliveEndpoint: string | null = null;
+  for (const ep of candidateEndpoints) {
+    if (await probeOllamaProcessListening(ep)) {
+      aliveEndpoint = ep;
+      break;
+    }
+  }
 
-  if (isProcessAlive) {
+  if (aliveEndpoint) {
     // Process is listening on the port, so the blockage is CORS or Browser Local Network Access
     const checks: OllamaDiagnosticCheck[] = [
-      { id: "server", label: "Ollama server active", status: "pass", detail: `Process listening on ${baseEndpoint}` },
+      { id: "server", label: "Ollama server active", status: "pass", detail: `Process listening on ${aliveEndpoint}` },
       { id: "origin", label: "CORS origin permission", status: "fail", detail: `Needs OLLAMA_ORIGINS="${currentOrigin}"` },
-      { id: "api", label: "Browser access permission", status: "warning", detail: "Check Chrome address bar for Local Network permission" },
+      { id: "api", label: "Browser access permission", status: "warning", detail: "Check address bar for Local Network permission" },
       { id: "models", label: "Model detection", status: "pending", detail: "Waiting for origin permission" },
     ];
 
     const actionableSteps = [
       `1. Set the allowed origin on your ${os === "macos" ? "Mac" : "computer"}:`,
       `   ${originCommand}`,
-      `2. If Chrome shows a permission popup asking to "access devices on your local network", click Allow.`,
+      `2. If your browser shows a permission popup asking to access your local network, click Allow.`,
       `3. Click "Test connection" again.`,
     ];
 
     return {
       ok: false,
       errorKind: "CORS_MISCONFIGURED",
-      activeEndpoint: baseEndpoint,
+      activeEndpoint: aliveEndpoint,
       testedEndpoints: candidateEndpoints,
       version: null,
       models: [],
@@ -395,7 +417,7 @@ export async function diagnoseOllamaConnection(customEndpoint?: string): Promise
       browserVersion,
       currentOrigin,
       requiredOriginCommand: originCommand,
-      guidance: `Ollama is running on your computer, but your browser is blocking requests from ${currentOrigin}. Configure OLLAMA_ORIGINS and restart Ollama.`,
+      guidance: `Ollama is running on your computer, but your browser is blocking requests from ${currentOrigin}. Run the command in Step 2 to set OLLAMA_ORIGINS and fully restart Ollama, and click Allow if your browser prompts for Local Network Access.`,
       actionableSteps,
       latencyMs: Date.now() - startTime,
     };
