@@ -8,7 +8,8 @@
  * the slide in the browser and the slide in PowerPoint match.
  */
 import type { CardContent, CardItem, GammaLayout } from '../types/slides';
-import { accentTint, mixHex, type DeckFont, type DeckTheme } from './theme';
+import { accentTint, deckShape, mixHex, type DeckFont, type DeckTheme } from './theme';
+import type { ShadowStyle } from '../../../domain/presentation/slideSchema';
 import { reflowContent } from './content';
 import { measureWidth, setMeasureTarget, type MeasureTarget } from './measure';
 
@@ -37,6 +38,8 @@ export interface TextEl {
   letterSpacing?: number;
   uppercase?: boolean;
   italic?: boolean;
+  /** Text was cut at the canvas edge (content far over budget). */
+  clipped?: boolean;
 }
 
 export interface RectEl {
@@ -49,6 +52,8 @@ export interface RectEl {
   radius: number;
   stroke?: string;
   strokeWidth?: number;
+  /** Raised-card shadow from the theme's shape tokens. */
+  shadow?: ShadowStyle;
 }
 
 export interface EllipseEl {
@@ -83,12 +88,29 @@ export interface ImageEl {
   radius: number;
 }
 
-export type CardElement = TextEl | RectEl | EllipseEl | LineEl | ImageEl;
+/** A Lucide icon, by name (resolved with a fallback at draw time). */
+export interface IconEl {
+  kind: 'icon';
+  x: number;
+  y: number;
+  size: number;
+  name: string;
+  color: string;
+  strokeWidth: number;
+}
+
+export type CardElement = TextEl | RectEl | EllipseEl | LineEl | ImageEl | IconEl;
 
 export interface CardGeometry {
   layout: GammaLayout;
   background: string;
   elements: CardElement[];
+  /**
+   * True when the card holds more text than the layout can show even at its
+   * smallest type sizes. Nothing leaves the 16:9 frame (see containToCanvas);
+   * the editor offers to condense the text or switch layout instead.
+   */
+  overflow: boolean;
 }
 
 /* ------------------------------------------------------------------------ */
@@ -133,8 +155,24 @@ interface FitOptions {
   letterSpacing?: number;
 }
 
+/**
+ * Density factor for the current layout pass. buildGeometry lays a card out
+ * at 1, and again at smaller factors only if something would leave the frame;
+ * every fitted size (and the fixed sizes some layouts use) scales with it.
+ */
+let density = 1;
+/** Absolute type floor, reached only on the densest pass. */
+const MIN_TYPE = 11;
+
+/** Size scaled by the current density, never below the type floor. */
+function dz(size: number): number {
+  return Math.max(MIN_TYPE, Math.round(size * density));
+}
+
 /** Largest size (step 2) whose wrapped text fits the line and height budget. */
-export function fitText(text: string, width: number, opts: FitOptions): { size: number; height: number; lines: number } {
+export function fitText(text: string, width: number, rawOpts: FitOptions): { size: number; height: number; lines: number } {
+  const max = dz(rawOpts.max);
+  const opts = { ...rawOpts, max, min: Math.min(max, dz(rawOpts.min)) };
   for (let size = opts.max; size >= opts.min; size -= 2) {
     const lines = wrapLines(text, width, size, opts.font, opts.weight, opts.uppercase, opts.letterSpacing);
     const height = Math.ceil(lines * size * opts.lineHeight);
@@ -161,8 +199,47 @@ function text(ctx: Ctx, el: Omit<TextEl, 'kind'>): TextEl {
   return t;
 }
 
-function rect(ctx: Ctx, el: Omit<RectEl, 'kind'>) {
-  ctx.els.push({ kind: 'rect', ...el });
+/**
+ * Rectangles pick up the theme's shape tokens: card-sized corners (12 px and
+ * up) scale with the theme radius, hairline outlines follow its border width,
+ * and raised card surfaces carry its shadow. Pass `pill` to keep the radius.
+ */
+function rect(ctx: Ctx, el: Omit<RectEl, 'kind'> & { pill?: boolean }) {
+  const { pill, ...rest } = el;
+  const shape = deckShape(ctx.theme);
+  const out: RectEl = { kind: 'rect', ...rest };
+  if (!pill && out.radius >= 12) out.radius = Math.round((out.radius * shape.radius) / 24);
+  if (out.stroke === ctx.theme.border && shape.borderWidth === 0) {
+    delete out.stroke;
+    delete out.strokeWidth;
+  }
+  if (shape.shadow !== 'none' && out.fill === ctx.theme.surface && out.w >= 120 && out.h >= 80) out.shadow = shape.shadow;
+  ctx.els.push(out);
+}
+
+function icon(ctx: Ctx, el: Omit<IconEl, 'kind'>) {
+  ctx.els.push({ kind: 'icon', ...el });
+}
+
+/** Ink for accent-coloured text: the accent unless it is the text colour itself. */
+function signal(theme: DeckTheme): string {
+  return theme.accent === theme.text ? theme.muted : theme.accent;
+}
+
+/** Rounded pill with a short uppercase label. Returns its width. */
+function pillLabel(ctx: Ctx, o: { x: number; y: number; text: string; path?: string; fill: string; ink: string; align?: 'left' | 'center' }): number {
+  const { theme } = ctx;
+  const size = 13;
+  const spacing = 1.4;
+  const w = Math.min(520, Math.ceil(measureWidth(o.text, size, theme.bodyFont, 700, spacing, true)) + 32);
+  const h = 32;
+  const x = o.align === 'center' ? o.x - w / 2 : o.x;
+  rect(ctx, { x, y: o.y, w, h, fill: o.fill, radius: h / 2, pill: true });
+  text(ctx, {
+    x: x + 16, y: o.y, w: w - 32, h, text: o.text, path: o.path, size, weight: 700, color: o.ink, font: theme.bodyFont,
+    align: 'center', valign: 'middle', lineHeight: 1.2, letterSpacing: spacing, uppercase: true,
+  });
+  return w;
 }
 
 function ellipse(ctx: Ctx, el: Omit<EllipseEl, 'kind'>) {
@@ -203,10 +280,10 @@ function header(ctx: Ctx, c: CardContent, o: HeaderOpts): number {
     y += 34;
   }
   const hf = fitText(c.headline, o.w, {
-    max: o.headlineMax, min: o.headlineMin, maxLines: o.headlineLines, lineHeight: 1.1, font: theme.headingFont, weight: 700, letterSpacing: -0.5,
+    max: o.headlineMax, min: o.headlineMin, maxLines: o.headlineLines, lineHeight: 1.1, font: theme.headingFont, weight: deckShape(theme).headingWeight, letterSpacing: -0.5,
   });
   text(ctx, {
-    x: o.x, y, w: o.w, h: hf.height, text: c.headline, path: 'headline', size: hf.size, weight: 700, color: theme.text,
+    x: o.x, y, w: o.w, h: hf.height, text: c.headline, path: 'headline', size: hf.size, weight: deckShape(theme).headingWeight, color: theme.text,
     font: theme.headingFont, align, valign: 'top', lineHeight: 1.1, letterSpacing: -0.5,
   });
   y += hf.height;
@@ -240,7 +317,10 @@ function cellText(
 ) {
   const { theme } = ctx;
   let y = box.y;
-  if (opts.index) {
+  if (opts.index && item.icon) {
+    icon(ctx, { x: box.x, y: y - 2, size: 24, name: item.icon, color: opts.indexInk ?? opts.muted, strokeWidth: 2 });
+    y += 34;
+  } else if (opts.index) {
     text(ctx, {
       x: box.x, y, w: box.w, h: 20, text: opts.index, size: 14, weight: 700, color: opts.indexInk ?? opts.muted,
       font: theme.bodyFont, align: 'left', valign: 'top', lineHeight: 1.3, letterSpacing: 1.2,
@@ -281,21 +361,21 @@ function layoutTitle(ctx: Ctx, c: CardContent) {
   const textW = 620;
 
   // Measure the stack so it sits optically centred.
-  const hf = fitText(c.headline, textW, { max: 66, min: 40, maxLines: 4, lineHeight: 1.05, font: theme.headingFont, weight: 700, letterSpacing: -1.4 });
+  const weight = deckShape(theme).headingWeight;
+  const hf = fitText(c.headline, textW, { max: 66, min: 40, maxLines: 4, lineHeight: 1.05, font: theme.headingFont, weight, letterSpacing: -1.4 });
   const lf = c.lede ? fitText(c.lede, textW - 40, { max: 22, min: 17, maxLines: 3, lineHeight: 1.45, font: theme.bodyFont, weight: 400 }) : null;
-  const stackH = (c.eyebrow ? 40 : 0) + hf.height + (lf ? 24 + lf.height : 0);
+  const stackH = (c.eyebrow ? 56 : 0) + hf.height + (lf ? 24 + lf.height : 0);
   let y = Math.max(TOP + 20, Math.round((CANVAS_H - stackH) / 2) - 10);
 
-  rect(ctx, { x: PAD_X, y: y - 36, w: 44, h: 5, fill: theme.accent, radius: 3 });
   if (c.eyebrow) {
-    text(ctx, {
-      x: PAD_X, y, w: textW, h: 22, text: c.eyebrow, path: 'eyebrow', size: 14, weight: 700, color: theme.muted,
-      font: theme.bodyFont, align: 'left', valign: 'top', lineHeight: 1.4, letterSpacing: 1.8, uppercase: true,
-    });
-    y += 40;
+    // Metadata pill (course, venue, date…) above the headline.
+    pillLabel(ctx, { x: PAD_X, y, text: c.eyebrow, path: 'eyebrow', fill: accentTint(theme, theme.mode === 'dark' ? 0.22 : 0.12), ink: theme.accent === theme.text ? theme.text : theme.accent });
+    y += 56;
+  } else {
+    rect(ctx, { x: PAD_X, y: y - 36, w: 44, h: 5, fill: theme.accent, radius: 3 });
   }
   text(ctx, {
-    x: PAD_X, y, w: textW, h: hf.height, text: c.headline, path: 'headline', size: hf.size, weight: 700, color: theme.text,
+    x: PAD_X, y, w: textW, h: hf.height, text: c.headline, path: 'headline', size: hf.size, weight, color: theme.text,
     font: theme.headingFont, align: 'left', valign: 'top', lineHeight: 1.05, letterSpacing: -1.4,
   });
   y += hf.height;
@@ -343,7 +423,8 @@ function layoutStatement(ctx: Ctx, c: CardContent, n?: number) {
   const { theme } = ctx;
   const w = 960;
   const x = (CANVAS_W - w) / 2;
-  const hf = fitText(c.headline, w, { max: 60, min: 34, maxLines: 4, lineHeight: 1.1, font: theme.headingFont, weight: 700, letterSpacing: -1 });
+  const weight = deckShape(theme).headingWeight;
+  const hf = fitText(c.headline, w, { max: 60, min: 34, maxLines: 4, lineHeight: 1.1, font: theme.headingFont, weight, letterSpacing: -1 });
   const lf = c.lede ? fitText(c.lede, w - 120, { max: 22, min: 17, maxLines: 3, lineHeight: 1.5, font: theme.bodyFont, weight: 400 }) : null;
   const stackH = 44 + (c.eyebrow ? 36 : 0) + hf.height + (lf ? 26 + lf.height : 0);
   let y = Math.round((CANVAS_H - stackH) / 2);
@@ -357,7 +438,7 @@ function layoutStatement(ctx: Ctx, c: CardContent, n?: number) {
     y += 36;
   }
   text(ctx, {
-    x, y, w, h: hf.height, text: c.headline, path: 'headline', size: hf.size, weight: 700, color: theme.text,
+    x, y, w, h: hf.height, text: c.headline, path: 'headline', size: hf.size, weight, color: theme.text,
     font: theme.headingFont, align: 'center', valign: 'top', lineHeight: 1.1, letterSpacing: -1,
   });
   y += hf.height;
@@ -396,12 +477,12 @@ function layoutList(ctx: Ctx, c: CardContent, n?: number) {
   }
 
   // Pick a scale where every row fits.
-  const scales = [1, 0.9, 0.8, 0.72];
+  const scales = [1, 0.9, 0.8, 0.72, 0.64];
   let rows: Array<{ th: number; bh: number; ts: number; bs: number }> = [];
-  const gap = 22;
+  const gap = items.length > 4 ? 16 : 22;
   for (const s of scales) {
-    const ts = Math.round(23 * s);
-    const bs = Math.max(13, Math.round(16.5 * s));
+    const ts = dz(23 * s);
+    const bs = Math.max(MIN_TYPE, dz(16.5 * s));
     rows = items.map((it) => ({
       ts,
       bs,
@@ -523,6 +604,17 @@ function layoutBento(ctx: Ctx, c: CardContent, n?: number) {
   pageNumber(ctx, n);
 }
 
+const TREND_ICON = { up: 'trending-up', down: 'trending-down', neutral: 'minus' } as const;
+
+/** Small direction pill for a KPI (an arrow only; never a made-up delta). */
+function trendPill(ctx: Ctx, x: number, y: number, trend: keyof typeof TREND_ICON, onAccent: boolean) {
+  const { theme } = ctx;
+  const fill = onAccent ? mixHex(theme.accent, theme.onAccent, 0.18) : accentTint(theme, theme.mode === 'dark' ? 0.22 : 0.12);
+  const ink = onAccent ? theme.onAccent : signal(theme);
+  rect(ctx, { x, y, w: 44, h: 28, fill, radius: 14, pill: true });
+  icon(ctx, { x: x + 13, y: y + 5, size: 18, name: TREND_ICON[trend], color: ink, strokeWidth: 2.25 });
+}
+
 function layoutStats(ctx: Ctx, c: CardContent, n?: number) {
   const { theme } = ctx;
   const stats = c.stats.slice(0, 4);
@@ -544,6 +636,7 @@ function layoutStats(ctx: Ctx, c: CardContent, n?: number) {
       x: PAD_X + 48, y: top + (h - vf.height) / 2 - 6, w: half - 96, h: vf.height + 10, text: st.value, path: 'stats.0.value', size: vf.size,
       weight: 700, color: theme.accent, font: theme.headingFont, align: 'left', valign: 'top', lineHeight: 1, letterSpacing: -2,
     });
+    if (st.trend) trendPill(ctx, PAD_X + 48, top + 36, st.trend, false);
     line(ctx, { x1: PAD_X + half, y1: top + 48, x2: PAD_X + half, y2: top + h - 48, color: theme.border, width: 1 });
     const rx = PAD_X + half + 48;
     const rw = half - 96;
@@ -573,7 +666,8 @@ function layoutStats(ctx: Ctx, c: CardContent, n?: number) {
     const valueInk = hero ? theme.onAccent : theme.accent;
     const pad = 32;
     const iw = w - pad * 2;
-    const vf = fitText(s.value, iw, { max: k === 1 ? 120 : k === 2 ? 96 : k === 3 ? 76 : 60, min: 32, maxLines: 1, lineHeight: 1, font: theme.headingFont, weight: 700 });
+    if (s.trend) trendPill(ctx, x + w - pad - 44, top + pad - 6, s.trend, hero);
+    const vf = fitText(s.value, s.trend ? iw - 52 : iw, { max: k === 1 ? 120 : k === 2 ? 96 : k === 3 ? 76 : 60, min: 32, maxLines: 1, lineHeight: 1, font: theme.headingFont, weight: 700 });
     let y = top + pad;
     text(ctx, {
       x: x + pad, y, w: iw, h: vf.height + 6, text: s.value, path: `stats.${i}.value`, size: vf.size, weight: 700, color: valueInk,
@@ -674,14 +768,16 @@ function layoutComparison(ctx: Ctx, c: CardContent, n?: number) {
   // One shared type size for both columns: the largest that fits both.
   const titleH = (col: { title: string }) =>
     col.title ? fitText(col.title, iw, { max: 28, min: 18, maxLines: 2, lineHeight: 1.2, font: theme.headingFont, weight: 700 }) : null;
+  const gapFor = (size: number) => (size >= 17 ? 18 : 10);
   const pointsH = (pts: string[], size: number) =>
-    pts.reduce((a, p) => a + Math.ceil(wrapLines(p, iw - 28, size, theme.bodyFont, 400) * size * 1.42) + 18, 0) - (pts.length ? 18 : 0);
+    pts.reduce((a, p) => a + Math.ceil(wrapLines(p, iw - 28, size, theme.bodyFont, 400) * size * 1.42) + gapFor(size), 0) - (pts.length ? gapFor(size) : 0);
   const colH = (ci: number, size: number) => {
     const t = titleH(cols[ci]);
     return (t ? t.height + 26 : 0) + pointsH(cols[ci].points.slice(0, 6), size);
   };
-  let size = 22;
-  while (size > 13 && Math.max(colH(0, size), colH(1, size)) > avail - pad * 2) size -= 1;
+  let size = dz(22);
+  const floor = Math.min(size, dz(13));
+  while (size > floor && Math.max(colH(0, size), colH(1, size)) > avail - pad * 2) size -= 1;
   const h = Math.min(avail, Math.max(300, Math.max(colH(0, size), colH(1, size)) + pad * 2 + 24));
   const cardTop = top + Math.round((avail - h) / 2);
 
@@ -706,7 +802,7 @@ function layoutComparison(ctx: Ctx, c: CardContent, n?: number) {
         x: x + pad + 28, y, w: iw - 28, h: ph, text: p, path: `columns.${ci}.points.${pi}`, size, weight: 400,
         color: ink, font: theme.bodyFont, align: 'left', valign: 'top', lineHeight: 1.42,
       });
-      y += ph + 18;
+      y += ph + gapFor(size);
     });
   });
 
@@ -812,32 +908,280 @@ function layoutSplit(ctx: Ctx, c: CardContent, n?: number) {
   // Measure first so the whole column centres vertically.
   const probe: Ctx = { theme, els: [] };
   let y = header(probe, c, { x, y: 0, w, headlineMax: 42, headlineMin: 28, headlineLines: 4, ledeLines: 3 });
-  const rowH = items.map((it) => {
-    const th = Math.ceil(wrapLines(it.title, w - 28, 19, theme.headingFont, 600) * 19 * 1.3);
-    const bh = it.body ? 6 + Math.ceil(wrapLines(it.body, w - 28, 15, theme.bodyFont, 400) * 15 * 1.45) : 0;
-    return th + bh;
-  });
-  const listH = items.length ? 36 + rowH.reduce((a, b) => a + b, 0) + 18 * (items.length - 1) : 0;
+  // Largest scale at which the header and every row fit between the margins.
+  let ts = dz(19);
+  let bs = dz(15);
+  let rowGap = 18;
+  let rowH: number[] = [];
+  for (const scale of [1, 0.9, 0.8, 0.72, 0.64]) {
+    ts = dz(19 * scale);
+    bs = Math.max(MIN_TYPE, dz(15 * scale));
+    rowGap = Math.round(18 * Math.max(0.6, scale));
+    rowH = items.map((it) => {
+      const th = Math.ceil(wrapLines(it.title, w - 28, ts, theme.headingFont, 600) * ts * 1.3);
+      const bh = it.body ? 6 + Math.ceil(wrapLines(it.body, w - 28, bs, theme.bodyFont, 400) * bs * 1.45) : 0;
+      return th + bh;
+    });
+    const total = y + (items.length ? 36 + rowH.reduce((a, b) => a + b, 0) + rowGap * (items.length - 1) : 0);
+    if (total <= CANVAS_H - TOP * 2) break;
+  }
+  const listH = items.length ? 36 + rowH.reduce((a, b) => a + b, 0) + rowGap * (items.length - 1) : 0;
   const offset = Math.max(TOP, Math.round((CANVAS_H - (y + listH)) / 2));
   for (const el of probe.els) if (el.kind === 'text') el.y += offset;
   ctx.els.push(...probe.els);
   y += offset + 36;
 
   items.forEach((it, i) => {
-    rect(ctx, { x, y: y + 6, w: 10, h: 10, fill: theme.accent, radius: 3 });
-    const th = Math.ceil(wrapLines(it.title, w - 28, 19, theme.headingFont, 600) * 19 * 1.3);
+    rect(ctx, { x, y: y + ts * 0.3, w: 10, h: 10, fill: theme.accent, radius: 3 });
+    const th = Math.ceil(wrapLines(it.title, w - 28, ts, theme.headingFont, 600) * ts * 1.3);
     text(ctx, {
-      x: x + 28, y, w: w - 28, h: th, text: it.title, path: `items.${i}.title`, size: 19, weight: 600, color: theme.text,
+      x: x + 28, y, w: w - 28, h: th, text: it.title, path: `items.${i}.title`, size: ts, weight: 600, color: theme.text,
       font: theme.headingFont, align: 'left', valign: 'top', lineHeight: 1.3,
     });
     if (it.body) {
       text(ctx, {
-        x: x + 28, y: y + th + 6, w: w - 28, h: rowH[i] - th - 6, text: it.body, path: `items.${i}.body`, size: 15, weight: 400,
+        x: x + 28, y: y + th + 6, w: w - 28, h: rowH[i] - th - 6, text: it.body, path: `items.${i}.body`, size: bs, weight: 400,
         color: theme.muted, font: theme.bodyFont, align: 'left', valign: 'top', lineHeight: 1.45,
       });
     }
-    y += rowH[i] + 18;
+    y += rowH[i] + rowGap;
   });
+  pageNumber(ctx, n);
+}
+
+/** Equal cards with an icon (or number) badge: 3 columns, or a 2 × 2 grid. */
+function layoutGrid(ctx: Ctx, c: CardContent, n: number | undefined, kind: 'grid3' | 'grid4') {
+  const { theme } = ctx;
+  const items = c.items.slice(0, kind === 'grid3' ? 3 : 4);
+  const top = header(ctx, c, { x: PAD_X, y: TOP, w: CANVAS_W - PAD_X * 2, headlineMax: 44, headlineMin: 30, headlineLines: 2, ledeLines: 2 }) + 36;
+  const k = items.length;
+  if (!k) {
+    pageNumber(ctx, n);
+    return;
+  }
+  const gap = 20;
+  const gw = CANVAS_W - PAD_X * 2;
+  const gh = BOTTOM - top;
+  const cols = kind === 'grid3' ? k : Math.min(2, k);
+  const rows = Math.ceil(k / cols);
+  const w = (gw - gap * (cols - 1)) / cols;
+  const maxH = (gh - gap * (rows - 1)) / rows;
+  const pad = rows > 1 ? 26 : 32;
+  const badge = rows > 1 ? 44 : 52;
+  const inline = rows > 1;
+  const tint = accentTint(theme, theme.mode === 'dark' ? 0.22 : 0.12);
+  const boxFor = (x: number, y: number, cw: number, ch: number) =>
+    inline
+      ? { x: x + pad + badge + 20, y: y + pad, w: cw - pad * 2 - badge - 20, h: ch - pad * 2 }
+      : { x: x + pad, y: y + pad + badge + 24, w: cw - pad * 2, h: ch - pad * 2 - badge - 24 };
+  // Cards are as tall as their tallest text (with a floor), not the whole slide.
+  const used = items.map((it, i) => {
+    const span = kind === 'grid4' && i === k - 1 && k % 2 === 1 && cols === 2;
+    const box = boxFor(0, 0, span ? gw : w, maxH);
+    const probe: Ctx = { theme, els: [] };
+    const textH = cellText(probe, it, 'probe', box, { titleMax: inline ? 24 : 26, titleMin: 15, ink: theme.text, muted: theme.muted });
+    return inline ? Math.max(badge, textH) + pad * 2 : badge + 24 + textH + pad * 2;
+  });
+  const h = Math.min(maxH, Math.max(inline ? 150 : 260, ...used) + 8);
+  const blockTop = top + Math.max(0, Math.round((gh - (h * rows + gap * (rows - 1))) / 2));
+
+  items.forEach((it, i) => {
+    const row = Math.floor(i / cols);
+    const col = i % cols;
+    // An odd last card in a 2 × 2 grid spans the full row.
+    const span = kind === 'grid4' && i === k - 1 && k % 2 === 1 && cols === 2;
+    const x = PAD_X + col * (w + gap);
+    const y = blockTop + row * (h + gap);
+    const cw = span ? gw : w;
+    rect(ctx, { x, y, w: cw, h, fill: theme.surface, radius: 24, stroke: theme.border, strokeWidth: 1 });
+
+    // Side-by-side badge and text in short 2 × 2 cells; stacked otherwise.
+    rect(ctx, { x: x + pad, y: y + pad, w: badge, h: badge, fill: tint, radius: 12 });
+    if (it.icon) {
+      const s = Math.round(badge * 0.5);
+      icon(ctx, { x: x + pad + (badge - s) / 2, y: y + pad + (badge - s) / 2, size: s, name: it.icon, color: signal(theme), strokeWidth: 2 });
+    } else {
+      text(ctx, {
+        x: x + pad, y: y + pad, w: badge, h: badge, text: String(i + 1).padStart(2, '0'), size: 16, weight: 700, color: signal(theme),
+        font: theme.bodyFont, align: 'center', valign: 'middle', lineHeight: 1, letterSpacing: 0.5,
+      });
+    }
+    cellText(ctx, it, `items.${i}`, boxFor(x, y, cw, h), { titleMax: inline ? 24 : 26, titleMin: 15, ink: theme.text, muted: theme.muted });
+  });
+  pageNumber(ctx, n);
+}
+
+/** Stacked tiers, narrow at the top; each tier's detail sits on its row. */
+function layoutPyramid(ctx: Ctx, c: CardContent, n?: number) {
+  const { theme } = ctx;
+  const items = c.items.slice(0, 5);
+  const top = header(ctx, c, { x: PAD_X, y: TOP, w: CANVAS_W - PAD_X * 2, headlineMax: 44, headlineMin: 30, headlineLines: 2, ledeLines: 2 }) + 32;
+  const k = items.length;
+  if (!k) {
+    pageNumber(ctx, n);
+    return;
+  }
+  const withDetail = items.some((it) => it.body);
+  const regionW = withDetail ? 560 : 820;
+  const regionX = withDetail ? PAD_X : (CANVAS_W - regionW) / 2;
+  const gap = 10;
+  const tierH = Math.min(96, (BOTTOM - top - gap * (k - 1)) / k);
+  const blockH = tierH * k + gap * (k - 1);
+  const y0 = top + Math.max(0, Math.round((BOTTOM - top - blockH) / 2));
+  const minW = regionW * 0.38;
+  const detailX = PAD_X + regionW + 48;
+  const detailW = CANVAS_W - PAD_X - detailX;
+
+  items.forEach((it, i) => {
+    const tw = k === 1 ? regionW : minW + ((regionW - minW) * i) / (k - 1);
+    const x = regionX + (regionW - tw) / 2;
+    const y = y0 + i * (tierH + gap);
+    const apex = i === 0;
+    const fill = apex ? theme.accent : accentTint(theme, Math.max(0.06, (theme.mode === 'dark' ? 0.3 : 0.22) - i * 0.05));
+    rect(ctx, { x, y, w: tw, h: tierH, fill, radius: 14 });
+    const tf = fitText(it.title, tw - 32, { max: 22, min: 13, maxLines: 2, lineHeight: 1.2, font: theme.headingFont, weight: 600, maxHeight: tierH - 12 });
+    text(ctx, {
+      x: x + 16, y, w: tw - 32, h: tierH, text: it.title, path: `items.${i}.title`, size: tf.size, weight: 600,
+      color: apex ? theme.onAccent : theme.text, font: theme.headingFont, align: 'center', valign: 'middle', lineHeight: 1.2,
+    });
+    if (withDetail && it.body) {
+      text(ctx, {
+        x: detailX, y, w: 40, h: tierH, text: String(i + 1).padStart(2, '0'), size: 14, weight: 700, color: signal(theme),
+        font: theme.bodyFont, align: 'left', valign: 'middle', lineHeight: 1.2, letterSpacing: 1,
+      });
+      const bf = fitText(it.body, detailW - 48, { max: 17, min: 12, maxLines: 4, lineHeight: 1.4, font: theme.bodyFont, weight: 400, maxHeight: tierH });
+      text(ctx, {
+        x: detailX + 48, y, w: detailW - 48, h: tierH, text: it.body, path: `items.${i}.body`, size: bf.size, weight: 400,
+        color: theme.muted, font: theme.bodyFont, align: 'left', valign: 'middle', lineHeight: 1.4,
+      });
+    }
+  });
+  pageNumber(ctx, n);
+}
+
+/** Pain points on a quiet card, the fix on an accent card, an arrow between. */
+function layoutProblemSolution(ctx: Ctx, c: CardContent, n?: number) {
+  const { theme } = ctx;
+  const cols = c.columns ?? [{ title: '', points: [] }, { title: '', points: [] }];
+  const top = header(ctx, c, { x: PAD_X, y: TOP, w: CANVAS_W - PAD_X * 2, headlineMax: 44, headlineMin: 30, headlineLines: 2, ledeLines: 2 }) + 36;
+  const gap = 72;
+  const w = (CANVAS_W - PAD_X * 2 - gap) / 2;
+  const pad = 36;
+  const iw = w - pad * 2;
+  const avail = BOTTOM - top;
+  let h = avail;
+  const labels = ['Problem', 'Solution'];
+
+  // One shared point size for both cards: the largest that fits both.
+  const pointsH = (pts: string[], size: number) =>
+    pts.reduce((a, p) => a + Math.ceil(wrapLines(p, iw - 36, size, theme.bodyFont, 400) * size * 1.42) + 16, 0) - (pts.length ? 16 : 0);
+  const titleSpace = 32 + 22 + 30;
+  let size = dz(21);
+  const floor = Math.min(size, dz(13));
+  while (size > floor && Math.max(pointsH(cols[0].points.slice(0, 5), size), pointsH(cols[1].points.slice(0, 5), size)) > h - pad * 2 - titleSpace) size -= 1;
+  // Cards hug their content (with a floor) and sit centred under the header.
+  h = Math.min(avail, Math.max(260, Math.max(pointsH(cols[0].points.slice(0, 5), size), pointsH(cols[1].points.slice(0, 5), size)) + pad * 2 + titleSpace + 8));
+  const cardTop = top + Math.round((avail - h) / 2);
+
+  cols.forEach((col, ci) => {
+    const fix = ci === 1;
+    const x = PAD_X + ci * (w + gap);
+    const fill = fix ? theme.accent : theme.surfaceAlt;
+    const ink = fix ? theme.onAccent : theme.text;
+    const muted = fix ? mutedOn(theme, theme.accent) : theme.muted;
+    rect(ctx, { x, y: cardTop, w, h, fill, radius: 26 });
+    let y = cardTop + pad;
+    const heading = col.title || labels[ci];
+    const tf = fitText(heading, iw, { max: 26, min: 18, maxLines: 1, lineHeight: 1.2, font: theme.headingFont, weight: 700 });
+    text(ctx, {
+      x: x + pad, y, w: iw, h: tf.height, text: heading, path: `columns.${ci}.title`, size: tf.size, weight: 700, color: ink,
+      font: theme.headingFont, align: 'left', valign: 'top', lineHeight: 1.2,
+    });
+    y += Math.max(32, tf.height) + 22;
+    col.points.slice(0, 5).forEach((p, pi) => {
+      const ph = Math.ceil(wrapLines(p, iw - 36, size, theme.bodyFont, 400) * size * 1.42);
+      icon(ctx, { x: x + pad, y: y + size * 0.2, size: Math.round(size * 0.95), name: fix ? 'check' : 'x', color: fix ? ink : muted, strokeWidth: 2.5 });
+      text(ctx, {
+        x: x + pad + 36, y, w: iw - 36, h: ph, text: p, path: `columns.${ci}.points.${pi}`, size, weight: 400, color: ink,
+        font: theme.bodyFont, align: 'left', valign: 'top', lineHeight: 1.42,
+      });
+      y += ph + 16;
+    });
+  });
+
+  // Arrow badge in the gutter.
+  const bx = PAD_X + w + gap / 2 - 26;
+  const by = cardTop + h / 2 - 26;
+  ellipse(ctx, { x: bx, y: by, w: 52, h: 52, fill: theme.bg, stroke: theme.border, strokeWidth: 1 });
+  icon(ctx, { x: bx + 15, y: by + 15, size: 22, name: 'arrow-right', color: theme.text, strokeWidth: 2.25 });
+  pageNumber(ctx, n);
+}
+
+/** Numbered action pills and a closing synthesis line. */
+function layoutTakeaways(ctx: Ctx, c: CardContent, n?: number) {
+  const { theme } = ctx;
+  const items = c.items.slice(0, 5);
+  const top = header(ctx, c, { x: PAD_X, y: TOP, w: CANVAS_W - PAD_X * 2, headlineMax: 44, headlineMin: 30, headlineLines: 2, ledeLines: 1 }) + 32;
+  const hasTakeaway = !!c.takeaway;
+  const bottom = hasTakeaway ? 556 : BOTTOM;
+  const k = items.length;
+  const gw = CANVAS_W - PAD_X * 2;
+  const numW = 40;
+  const textX = 28 + numW + 24;
+  const anyBody = items.some((it) => it.body);
+  const titleW = anyBody ? 300 : gw - textX - 28;
+  const bodyX = textX + titleW + 28;
+  const bodyW = gw - bodyX - 28;
+  const gap = 12;
+
+  if (k) {
+    // Largest type scale at which every row fits the space.
+    let ts = 20;
+    let bs = 16;
+    let rowsH: number[] = [];
+    for (const scale of [1, 0.9, 0.8, 0.7]) {
+      ts = dz(20 * scale);
+      bs = Math.max(MIN_TYPE, dz(16 * scale));
+      rowsH = items.map((it) => {
+        const th = wrapLines(it.title, titleW, ts, theme.headingFont, 600) * ts * 1.25;
+        const bh = it.body ? wrapLines(it.body, bodyW, bs, theme.bodyFont, 400) * bs * 1.4 : 0;
+        return Math.max(Math.round(56 * density), Math.ceil(Math.max(th, bh)) + Math.round(28 * density));
+      });
+      if (rowsH.reduce((a, b) => a + b, 0) + gap * (k - 1) <= bottom - top) break;
+    }
+    const total = rowsH.reduce((a, b) => a + b, 0) + gap * (k - 1);
+    let y = top + Math.max(0, Math.round((bottom - top - total) / 2));
+    items.forEach((it, i) => {
+      const h = rowsH[i];
+      rect(ctx, { x: PAD_X, y, w: gw, h, fill: theme.surface, radius: Math.min(28, h / 2), stroke: theme.border, strokeWidth: 1 });
+      ellipse(ctx, { x: PAD_X + 28, y: y + (h - numW) / 2, w: numW, h: numW, fill: theme.accent });
+      text(ctx, {
+        x: PAD_X + 28, y: y + (h - numW) / 2, w: numW, h: numW, text: String(i + 1), size: 16, weight: 700, color: theme.onAccent,
+        font: theme.bodyFont, align: 'center', valign: 'middle', lineHeight: 1,
+      });
+      text(ctx, {
+        x: PAD_X + textX, y, w: titleW, h, text: it.title, path: `items.${i}.title`, size: ts, weight: 600, color: theme.text,
+        font: theme.headingFont, align: 'left', valign: 'middle', lineHeight: 1.25,
+      });
+      if (it.body) {
+        text(ctx, {
+          x: PAD_X + bodyX, y, w: bodyW, h, text: it.body, path: `items.${i}.body`, size: bs, weight: 400, color: theme.muted,
+          font: theme.bodyFont, align: 'left', valign: 'middle', lineHeight: 1.4,
+        });
+      }
+      y += h + gap;
+    });
+  }
+
+  if (hasTakeaway) {
+    const y = 580;
+    rect(ctx, { x: PAD_X, y, w: gw, h: 72, fill: theme.accent, radius: 20 });
+    const tf = fitText(c.takeaway as string, gw - 96, { max: 20, min: 14, maxLines: 2, lineHeight: 1.3, font: theme.bodyFont, weight: 600, maxHeight: 56 });
+    text(ctx, {
+      x: PAD_X + 48, y, w: gw - 96, h: 72, text: c.takeaway as string, path: 'takeaway', size: tf.size, weight: 600,
+      color: theme.onAccent, font: theme.bodyFont, align: 'left', valign: 'middle', lineHeight: 1.3,
+    });
+  }
   pageNumber(ctx, n);
 }
 
@@ -860,9 +1204,36 @@ export function computeCardGeometry(
   }
 }
 
+const DENSITY_STEPS = [1, 0.9, 0.8, 0.7];
+
+/** True when any element would leave the 16:9 frame. */
+function exceedsCanvas(els: CardElement[]): boolean {
+  return els.some((el) => {
+    if (el.kind === 'line') return false;
+    const w = el.kind === 'icon' ? el.size : el.w;
+    const h = el.kind === 'icon' ? el.size : el.h;
+    return el.y + h > CANVAS_H + 0.5 || el.x + w > CANVAS_W + 0.5;
+  });
+}
+
 function buildGeometry(content: CardContent, layout: GammaLayout, theme: DeckTheme, slideNumber?: number): CardGeometry {
   const c = reflowContent(content, layout);
-  const ctx: Ctx = { theme, els: [] };
+  let ctx: Ctx = { theme, els: [] };
+  try {
+    for (const step of DENSITY_STEPS) {
+      density = step;
+      ctx = { theme, els: [] };
+      drawLayout(ctx, c, layout, slideNumber);
+      if (!exceedsCanvas(ctx.els)) break;
+    }
+  } finally {
+    density = 1;
+  }
+  const overflow = containToCanvas(ctx.els);
+  return { layout, background: theme.bg, elements: ctx.els, overflow };
+}
+
+function drawLayout(ctx: Ctx, c: CardContent, layout: GammaLayout, slideNumber?: number) {
   switch (layout) {
     case 'title':
       layoutTitle(ctx, c);
@@ -891,10 +1262,50 @@ function buildGeometry(content: CardContent, layout: GammaLayout, theme: DeckThe
     case 'split':
       layoutSplit(ctx, c, slideNumber);
       break;
+    case 'grid3':
+    case 'grid4':
+      layoutGrid(ctx, c, slideNumber, layout);
+      break;
+    case 'pyramid':
+      layoutPyramid(ctx, c, slideNumber);
+      break;
+    case 'problem-solution':
+      layoutProblemSolution(ctx, c, slideNumber);
+      break;
+    case 'takeaways':
+      layoutTakeaways(ctx, c, slideNumber);
+      break;
     case 'list':
     default:
       layoutList(ctx, c, slideNumber);
       break;
   }
-  return { layout, background: theme.bg, elements: ctx.els };
+}
+
+const SAFE = 4;
+
+/**
+ * Last-line safeguard: every layout already fits text by stepping its type
+ * down, and copy within the schema budgets always fits. Text far past those
+ * budgets (e.g. a pasted paragraph) is cut at the canvas edge here so the
+ * slide never breaks its frame; returns whether anything was cut.
+ */
+function containToCanvas(els: CardElement[]): boolean {
+  let over = false;
+  for (let i = els.length - 1; i >= 0; i--) {
+    const el = els[i];
+    if (el.kind === 'line') continue;
+    const w = el.kind === 'icon' ? el.size : el.w;
+    const h = el.kind === 'icon' ? el.size : el.h;
+    if (el.y + h <= CANVAS_H + 0.5 && el.x + w <= CANVAS_W + 0.5) continue;
+    over = true;
+    if (el.kind === 'icon' || el.y >= CANVAS_H - SAFE - 8 || el.x >= CANVAS_W - SAFE - 8) {
+      els.splice(i, 1);
+      continue;
+    }
+    el.w = Math.min(el.w, CANVAS_W - SAFE - el.x);
+    el.h = Math.min(el.h, CANVAS_H - SAFE - el.y);
+    if (el.kind === 'text') el.clipped = true;
+  }
+  return over;
 }

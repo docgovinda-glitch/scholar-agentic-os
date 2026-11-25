@@ -46,13 +46,13 @@ describe("typed blocks", () => {
 });
 
 describe("layout switcher and add menu", () => {
-  it("shows the seven named layouts and switches in one click", () => {
+  it("shows every layout and switches in one click", () => {
     const onChange = vi.fn();
     render(<SlideLayoutSwitcher layout="title" onChange={onChange} />);
     expect(LAYOUT_SWITCHER.map((l) => l.label)).toEqual([
-      "Hero / Title", "2-Column Comparison", "3-Card Feature Grid", "Process / Stepper Flow", "Split Visual + Key Insights", "Comparison Table", "Summary & Takeaways",
+      "Title", "Bento", "3 columns", "2 × 2 grid", "Text + visual", "Big numbers", "Timeline", "Table", "Quote", "Pyramid", "Problem → fix", "Takeaways", "Two sides", "Key points", "Statement",
     ]);
-    fireEvent.click(screen.getByRole("radio", { name: /Comparison Table/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /^Table$/ }));
     expect(onChange).toHaveBeenCalledWith("table");
   });
 

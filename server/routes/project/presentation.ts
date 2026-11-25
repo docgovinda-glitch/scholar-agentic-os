@@ -33,6 +33,7 @@ import {
   PresentationDeckRow,
 } from "../presentations.ts";
 import { parseGammaCard, GAMMA_LAYOUT_IDS, type GammaCardPayload } from "./presentationCards.ts";
+import { copyLimitsPromptGuide, layoutPromptGuide } from "../../../src/domain/presentation/slideSchema.ts";
 
 const router = Router({ mergeParams: true });
 
@@ -501,7 +502,12 @@ router.post(
     // Any connection counts, including a local model only the browser can reach (426 hand-off).
     if ((await requestKeyring(req as never)).length > 0) {
       try {
-        const systemPrompt = scholarBrain.presentationPrompts.deckSystemPrompt({ requestedSlides, layoutIds: GAMMA_LAYOUT_IDS.join('" | "') });
+        const systemPrompt = scholarBrain.presentationPrompts.deckSystemPrompt({
+          requestedSlides,
+          layoutIds: GAMMA_LAYOUT_IDS.join('" | "'),
+          layoutGuide: layoutPromptGuide(),
+          copyLimits: copyLimitsPromptGuide(),
+        });
 
         const evidenceSummary = evidence.map((e) => `${e.citationToken}: ${e.title} (${e.year || "n.d."})`).join("; ");
 

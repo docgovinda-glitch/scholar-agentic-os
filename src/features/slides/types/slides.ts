@@ -5,6 +5,7 @@
  */
 
 import type { SlideThemeId, CustomTheme } from './themes';
+import type { SlideLayoutId, StatTrend } from '../../../domain/presentation/slideSchema';
 
 export type SlideBlockType =
   | 'action-header'
@@ -17,28 +18,23 @@ export type SlideBlockType =
 /**
  * Gamma-style card layouts rendered by src/features/slides/gamma. The same
  * content reflows into any of them, on the web canvas and in .pptx export.
+ * The list lives in src/domain/presentation/slideSchema.ts (shared with the server).
  */
-export type GammaLayout =
-  | 'title'
-  | 'bento'
-  | 'stats'
-  | 'timeline'
-  | 'comparison'
-  | 'list'
-  | 'quote'
-  | 'split'
-  | 'statement'
-  | 'table';
+export type GammaLayout = SlideLayoutId;
 
 export interface CardItem {
   title: string;
   body?: string;
+  /** Lucide icon name (see SLIDE_ICON_NAMES); unknown names render a fallback. */
+  icon?: string;
 }
 
 export interface CardStat {
   value: string;
   label: string;
   detail?: string;
+  /** Direction stated in the source; drawn as a small pill, never a number. */
+  trend?: StatTrend;
 }
 
 export interface CardColumn {

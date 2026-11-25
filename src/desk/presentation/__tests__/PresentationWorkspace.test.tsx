@@ -120,13 +120,13 @@ describe("PresentationWorkspace", () => {
     expect(card()).toHaveAttribute("data-layout", "title");
 
     // Layout switching keeps the content and changes the composition.
-    fireEvent.click(screen.getByRole("radio", { name: /3-Card Feature Grid/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /^Bento$/ }));
     expect(card()).toHaveAttribute("data-layout", "bento");
 
-    fireEvent.click(screen.getByRole("radio", { name: /Split Visual \+ Key Insights/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /^Text \+ visual$/ }));
     expect(card()).toHaveAttribute("data-layout", "split");
 
-    fireEvent.click(screen.getByRole("radio", { name: /2-Column Comparison/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /^Two sides$/ }));
     expect(card()).toHaveAttribute("data-layout", "comparison");
     expect(card()).toHaveTextContent("vs");
 
