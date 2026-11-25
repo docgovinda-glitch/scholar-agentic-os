@@ -139,22 +139,14 @@ describe("Ask Scholar Advanced Features: Scite Stance, Citation Graph, and Peer 
     cleanup();
   });
 
-  it("renders 4 view tabs and switches to Evidence Matrix with Scite-grade stance badges", async () => {
+  it("renders 3 view tabs and no Evidence Matrix", async () => {
     open();
     await ask("How does RL perform in financial markets?");
 
-    const matrixTabBtn = await screen.findByRole("button", { name: /Evidence Matrix/i });
-    expect(screen.getByRole("button", { name: /^Answer/i })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /^Answer/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Citation Graph/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Review$/i })).toBeInTheDocument();
-
-    // Switch to Evidence Matrix tab
-    fireEvent.click(matrixTabBtn);
-
-    await waitFor(() => {
-      expect(screen.getByText(/Supporting/i)).toBeInTheDocument();
-      expect(screen.getByText(/Refuting/i)).toBeInTheDocument();
-    });
+    expect(screen.queryByRole("button", { name: /Evidence Matrix/i })).toBeNull();
   });
 
   it("renders Interactive Citation Network and selects paper node with Deep Inquiry action", async () => {

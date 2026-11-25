@@ -134,20 +134,6 @@ export const LiveResearchTrajectoryVisualizer: React.FC<LiveResearchTrajectoryVi
     }
   }, [isLive, activeStage, currentStep, totalSteps, activeStepIndex]);
 
-  // Progressive simulated timer to step forward smoothly when server is processing
-  useEffect(() => {
-    if (!isLive || activeStage?.stageNumber) return;
-
-    const stepInterval = isDeepResearch ? 3500 : 2500;
-    const maxProgressionIndex = currentStep === "writing" ? totalSteps - 1 : totalSteps - 2;
-
-    const timer = setTimeout(() => {
-      setActiveStepIndex((prev) => (prev < maxProgressionIndex ? prev + 1 : prev));
-    }, stepInterval);
-
-    return () => clearTimeout(timer);
-  }, [isLive, activeStepIndex, currentStep, isDeepResearch, totalSteps, activeStage?.stageNumber]);
-
   const currentStepData = pipelineSteps[activeStepIndex] || pipelineSteps[0];
   const progressPercent = Math.min(100, Math.round(((activeStepIndex + 1) / totalSteps) * 100));
 

@@ -93,7 +93,7 @@ Model names are never listed in code: they come live from the provider (`GET /ap
 
 ## 7. Search and research
 
-- `POST /api/ai/search` (web search, `server/src/research/webSearchEngine.ts`) and `POST /api/ai/agent` (Ask Scholar: chat, grounded answer with retrieval, citation validation and lock, and deep research through `deepResearchEngine.ts`, chosen by `mode`) use `scholarBrain` through the router chain.
+- `POST /api/ai/agent` (Ask Scholar: chat, grounded answer with retrieval, citation validation and lock, and deep research through `deepResearchEngine.ts`, chosen by `mode`) uses `scholarBrain` through the router chain.
 - Scholarly retrieval: `server/src/research/scholarlyRetrievalPipeline.ts`, `server/src/retrieval/retrievalService.ts`, `server/src/discovery/` (`discovery.ts`, `blueprintScout.ts`), and the client-side `src/services/liveSearchService.ts`. Coursework source discovery runs in the browser through `src/desk/assignment/services/realScholarlyDiscoveryService.ts` (OpenAlex, Crossref, Semantic Scholar, DOAJ, DataCite, arXiv with `Promise.allSettled` and timeouts).
 - Optional keys: `TAVILY_API_KEY`, `SERPER_API_KEY`, `BRAVE_SEARCH_API_KEY`, `OPENALEX_API_KEY`, `OPENALEX_MAILTO`. The `search-proxy` Edge Function restricts Tavily to basic and advanced search.
 

@@ -3,7 +3,7 @@ import { routeUsesClientAi } from "../client";
 
 describe("routeUsesClientAi: the user's AI key is sent only to AI routes", () => {
   it.each([
-    "/api/ai/search",
+    "/api/ai/agent",
     "/api/ai",
     "/api/projects/p1/agentic/draft-subsection",
     "/api/projects/p1/agentic/literature",

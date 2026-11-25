@@ -9,8 +9,6 @@ import {
   Sun,
   Plus,
   ArrowRight,
-  Globe,
-  Compass,
   X,
 } from "lucide-react";
 import type { ProjectView } from "../types";
@@ -24,7 +22,7 @@ export interface CommandPaletteProps {
   onCreateProject: (outputTypeId: string) => void;
   onOpenVault: () => void;
   onOpenAiAccess: () => void;
-  onOpenAskScholar: (initialQuery?: string, mode?: "search" | "deep-research") => void;
+  onOpenAskScholar: () => void;
   theme: "light" | "dark";
   onToggleTheme: () => void;
 }
@@ -78,55 +76,13 @@ export function CommandPalette({
     const q = query.trim().toLowerCase();
     const list: Array<{
       id: string;
-      category: "Projects" | "Workspaces" | "Research" | "Actions";
+      category: "Projects" | "Workspaces" | "Actions";
       title: string;
       subtitle?: string;
       icon: React.ReactNode;
       badge?: string;
       action: () => void;
     }> = [];
-
-    // 1. Dynamic Research Actions (when typing a custom query)
-    if (q) {
-      list.push({
-        id: "deep-research-query",
-        category: "Research",
-        title: `Deep Research: "${query}"`,
-        subtitle: "Multi-stage scholarly investigation & citation cross-checking",
-        icon: <Compass className="w-4 h-4 text-purple-500" />,
-        badge: "Deep Research",
-        action: () => {
-          onClose();
-          onOpenAskScholar(query, "deep-research");
-        },
-      });
-
-      list.push({
-        id: "search-query",
-        category: "Research",
-        title: `Live Search: "${query}"`,
-        subtitle: "Real-time multi-source web retrieval & verification",
-        icon: <Globe className="w-4 h-4 text-blue-500" />,
-        badge: "Search",
-        action: () => {
-          onClose();
-          onOpenAskScholar(query, "search");
-        },
-      });
-
-      list.push({
-        id: "ask-scholar-query",
-        category: "Research",
-        title: `Ask Copilot: "${query}"`,
-        subtitle: "Inquire with Scholar Core Socratic Assistant",
-        icon: <MessageSquare className="w-4 h-4 text-sky-500" />,
-        badge: "Copilot",
-        action: () => {
-          onClose();
-          onOpenAskScholar(query);
-        },
-      });
-    }
 
     // 2. Filter Matching Projects
     const formatLabels: Record<string, string> = {

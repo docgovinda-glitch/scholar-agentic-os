@@ -304,27 +304,6 @@ export function registerAIRoutes(
   }
 
   /**
-   * POST /api/ai/search
-   * Dedicated Web Search endpoint.
-   */
-  router.post("/search", requireAuth, async (req: Request, res: Response) => {
-    try {
-      const { query, maxResults = 5 } = req.body || {};
-      if (!query || typeof query !== "string") {
-        return res.status(400).json({ error: "Missing required query string" });
-      }
-
-      const [webResults, scholarEvidence] = await Promise.all([
-        executeWebSearch(query, { maxResults: Number(maxResults) || 5, fetchFullContent: true }),
-        scholarBrain.retrieveEvidence({ query, maxResults: Number(maxResults) || 5 }).catch(() => []),
-      ]);
-      res.json({ ok: true, ...webResults, evidence: scholarEvidence });
-    } catch (err) {
-      res.status(500).json({ error: `Web search failed: ${err instanceof Error ? err.message : String(err)}` });
-    }
-  });
-
-  /**
    * POST /api/ai/agent
    * Primary unified research agent endpoint:
    * Handles text, files, images, web search, deep research, conversation context, and failover.
