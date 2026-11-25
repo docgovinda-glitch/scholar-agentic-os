@@ -243,6 +243,7 @@ export {
   signLlmChallenge,
   computePromptHash,
   readVerifiedBrowserResult,
+  createChallengeTokenForRequest,
 };
 
 async function runGatewayCall<T>(kind: string, taskType: string | undefined, fn: () => Promise<T>): Promise<T> {
@@ -472,6 +473,7 @@ export const scholarBrain = {
   signLlmChallenge: (...args: Parameters<typeof signLlmChallenge>) => signLlmChallenge(...args),
   computePromptHash: (...args: Parameters<typeof computePromptHash>) => computePromptHash(...args),
   readVerifiedBrowserResult: (...args: Parameters<typeof readVerifiedBrowserResult>) => readVerifiedBrowserResult(...args),
+  createChallengeTokenForRequest: (...args: Parameters<typeof createChallengeTokenForRequest>) => createChallengeTokenForRequest(...args),
   getArchetypeModelWeights,
   /**
    * 1. Unified Client-Owned AI Execution

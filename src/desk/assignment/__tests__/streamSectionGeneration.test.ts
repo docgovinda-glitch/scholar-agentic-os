@@ -6,7 +6,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const authedJsonFetch = vi.fn();
-vi.mock("../../api/client", () => ({ authedJsonFetch: (...args: unknown[]) => authedJsonFetch(...args) }));
+const executeAgenticLLM = vi.fn();
+vi.mock("../../api/client", () => ({
+  authedJsonFetch: (...args: unknown[]) => authedJsonFetch(...args),
+  executeAgenticLLM: (...args: unknown[]) => executeAgenticLLM(...args),
+}));
 
 import { partialTextOf, SectionDraftStoppedError, streamSectionGeneration, type InternalSectionPlan } from "../services/invisibleChunkerService";
 
@@ -38,6 +42,16 @@ function openStream(lines: string[], signal: AbortSignal): Response {
 
 beforeEach(() => {
   authedJsonFetch.mockReset();
+  executeAgenticLLM.mockReset();
+});
+
+/** The server asking the browser to run this prompt on the user's own model. */
+const handOffEvent = JSON.stringify({
+  requireFrontendLLM: true,
+  challengeToken: "token-1",
+  systemPrompt: "You are a writer.",
+  userPrompt: "Write the introduction.",
+  taskType: "drafting",
 });
 
 describe("streamSectionGeneration", () => {
@@ -106,6 +120,35 @@ describe("streamSectionGeneration", () => {
     expect(err.message).toMatch(/stopped before it finished/);
     expect(partialTextOf(err)).toBe("Teams decide ");
     expect(authedJsonFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("a mid-stream hand-off runs the prompt on the user's own model and sends the answer back", async () => {
+    authedJsonFetch
+      .mockResolvedValueOnce(sse([handOffEvent, "[DONE]"]))
+      .mockResolvedValueOnce(sse([JSON.stringify({ fullText: "Teams decide together." }), "[DONE]"]));
+    executeAgenticLLM.mockImplementation(async (_s: string, _u: string, _t: string, onChunk: (c: string) => void) => {
+      onChunk("Teams decide");
+      return "Teams decide";
+    });
+
+    const { promise, onChunk, onComplete } = run();
+    await expect(promise).resolves.toBe("Teams decide together.");
+
+    // The prompt the server could not run went to the user's model as sent.
+    expect(executeAgenticLLM).toHaveBeenCalledWith("You are a writer.", "Write the introduction.", "reasoning", expect.any(Function), undefined);
+    // Its answer came back with the signed challenge, so the server can verify it.
+    expect(authedJsonFetch.mock.calls[1][2]).toMatchObject({ llmResult: "Teams decide", challengeToken: "token-1" });
+    // The local model's tokens were shown while it wrote.
+    expect(onChunk).toHaveBeenCalledWith("Teams decide", "Teams decide");
+    expect(onComplete).toHaveBeenCalledWith("Teams decide together.", { scaffold: false });
+  });
+
+  it("a hand-off the browser cannot answer is an error, not stand-in prose", async () => {
+    authedJsonFetch.mockResolvedValue(sse([handOffEvent, "[DONE]"]));
+    executeAgenticLLM.mockRejectedValue(new Error("Ollama is not reachable."));
+    const { promise, onComplete } = run();
+    await expect(promise).rejects.toThrow("Ollama is not reachable.");
+    expect(onComplete).not.toHaveBeenCalled();
   });
 
   it("Resume sends the text to continue from", async () => {

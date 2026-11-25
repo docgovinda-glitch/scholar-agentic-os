@@ -65,6 +65,13 @@ export interface StreamSectionOptions {
   continueFrom?: string;
 }
 
+/** A prompt the server could not run, to be run on the user's own model. */
+interface HandOff {
+  challengeToken: string;
+  systemPrompt: string;
+  userPrompt: string;
+}
+
 /** Text that had arrived before a draft stopped or failed ("" when none). */
 export function partialTextOf(err: unknown): string {
   const t = (err as { partialText?: unknown } | null)?.partialText;
@@ -81,9 +88,13 @@ export class SectionDraftStoppedError extends Error {
 
 /**
  * Drafts one section with the user's own AI. The server either streams the
- * AI's text, or (when the AI runs in the browser) hands the prompt back via
- * a 426, which `authedJsonFetch` runs and retries. Nothing is ever written
- * here without the AI: on failure the caller gets an error, not filler (P0-20).
+ * AI's text, or (when the AI runs in the browser) hands the prompt back: as a
+ * 426 before the stream opens, which `authedJsonFetch` runs and retries, or as
+ * a `requireFrontendLLM` event once it is open (the cloud models failed and the
+ * next model in the chain is the user's own). Both are run here on the user's
+ * model and sent back, so the section is finished from that answer. Nothing is
+ * ever written here without the AI: on failure the caller gets an error, not
+ * filler (P0-20).
  */
 export async function streamSectionGeneration(options: StreamSectionOptions): Promise<string> {
   const {
@@ -113,7 +124,8 @@ export async function streamSectionGeneration(options: StreamSectionOptions): Pr
 
   // Text shown so far, kept for a stop or a dropped connection.
   let shownSoFar = "";
-  const attempt = async (): Promise<{ finalText: string; scaffold: boolean }> => {
+  const attempt = async (browser?: { llmResult: string; challengeToken: string }): Promise<{ finalText: string; scaffold: boolean; handOff?: HandOff }> => {
+    let handOff: HandOff | undefined;
     const { authedJsonFetch } = await import("../../api/client");
     const response = await authedJsonFetch(`/api/projects/${projectId}/assignment/stream-section`, "POST", {
       sectionId: section.id,
@@ -142,6 +154,7 @@ export async function streamSectionGeneration(options: StreamSectionOptions): Pr
       existingContent: section.draftContent,
       evidencePackPrompt,
       ...(continueFrom ? { continueFrom } : {}),
+      ...(browser ?? {}),
     }, { signal });
 
     if (!response.ok || !response.body) {
@@ -163,7 +176,10 @@ export async function streamSectionGeneration(options: StreamSectionOptions): Pr
     try {
       await readSse(response.body, (m) => {
         if (!m.json || !m.data || typeof m.data !== "object") return;
-        const parsed = m.data as { chunk?: string; replace?: string; fullText?: string; error?: string; recoverable?: boolean; fallback?: { reason?: string } };
+        const parsed = m.data as { chunk?: string; replace?: string; fullText?: string; error?: string; recoverable?: boolean; fallback?: { reason?: string }; requireFrontendLLM?: boolean; challengeToken?: string; systemPrompt?: string; userPrompt?: string };
+        if (parsed.requireFrontendLLM && parsed.challengeToken) {
+          handOff = { challengeToken: parsed.challengeToken, systemPrompt: parsed.systemPrompt ?? "", userPrompt: parsed.userPrompt ?? "" };
+        }
         if (parsed.error) streamError = parsed.error;
         if (parsed.fallback) {
           scaffold = true;
@@ -190,6 +206,10 @@ export async function streamSectionGeneration(options: StreamSectionOptions): Pr
       throw readErr;
     }
 
+    // The server needs this prompt run on the user's own model: the caller runs
+    // it and attempts again with the answer. Nothing is shown as a failure.
+    if (handOff && !finalFromServer) return { finalText: "", scaffold: false, handOff };
+
     // A failure event (or a stream that ended without its final text) never
     // overwrites the section with a partial answer.
     if (streamError && !finalFromServer) throw new Error(streamError);
@@ -201,7 +221,7 @@ export async function streamSectionGeneration(options: StreamSectionOptions): Pr
   };
 
   try {
-    let result: { finalText: string; scaffold: boolean };
+    let result: { finalText: string; scaffold: boolean; handOff?: HandOff };
     try {
       result = await attempt();
     } catch (first) {
@@ -210,6 +230,30 @@ export async function streamSectionGeneration(options: StreamSectionOptions): Pr
       // retried once; after text arrived, the student decides (Resume / Try again).
       if (!(first instanceof TypeError) || shownSoFar) throw first;
       result = await attempt();
+    }
+
+    // The section has to be written by the model on the user's own computer:
+    // it runs here, streaming into the page, and the server finishes the
+    // section from that answer (citations, budget, paragraphs) on one more
+    // request. The server verifies the signed challenge, so the answer is only
+    // accepted for exactly this prompt.
+    if (result.handOff) {
+      const { executeAgenticLLM } = await import("../../api/client");
+      const handOff = result.handOff;
+      let local = "";
+      const llmResult = await executeAgenticLLM(
+        handOff.systemPrompt,
+        handOff.userPrompt,
+        "reasoning",
+        (chunk) => {
+          local += chunk;
+          shownSoFar = local;
+          onChunk(chunk, local);
+        },
+        signal
+      );
+      result = await attempt({ llmResult, challengeToken: handOff.challengeToken });
+      if (result.handOff) throw new Error("The section could not be drafted on your own AI model. Check AI Access and try again.");
     }
     onComplete(result.finalText, { scaffold: result.scaffold });
     return result.finalText;
