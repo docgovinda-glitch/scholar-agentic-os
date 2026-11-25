@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, FileText, Loader2, Sparkles, Trash2, Upload } from 'lucide-react';
 import type { SlideDeck } from '../types/slides';
 import { composeDeckFromOutline } from '../gamma/composer';
@@ -6,7 +6,7 @@ import { DEFAULT_DECK_THEME_ID } from '../gamma/theme';
 import { normalizeDeck } from '../gamma/content';
 import { authedJsonFetch } from '../../../desk/api';
 import { stripCourseCodes } from '../../../utils/briefExtractor';
-import { buildOutlineFromBrief, cleanBriefText, deriveDocumentTitle, type OutlineCard } from '../../../shared/presentationBrief';
+import { buildOutlineFromBrief, cleanBriefText, deriveDocumentTitle, newOutlineId, type OutlineCard } from '../../../shared/presentationBrief';
 import OutlineBuilder from './OutlineBuilder';
 
 export interface Step01UnderstandProps {
@@ -17,6 +17,10 @@ export interface Step01UnderstandProps {
 }
 
 export const SLIDE_COUNT_OPTIONS = [6, 8, 10, 12, 15] as const;
+export const TALK_DURATION_OPTIONS = [10, 15, 20, 30] as const;
+export const PRESENTATION_CONTEXTS = ['Conference Paper', 'University Lecture', 'Thesis Defense', 'Policy Briefing'] as const;
+/** How long the AI may take before the presenter is offered an instant outline. */
+export const OUTLINE_TIMEOUT_MS = 20_000;
 
 /** Speaking time per slide, rounded to 15 seconds, as m:ss. */
 export function perSlideTime(minutes: number, slides: number): string {
@@ -39,7 +43,56 @@ export default function Step01Understand({ projectId, deck, onUpdateDeck, onNext
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [timedOut, setTimedOut] = useState(false);
+  const [duration, setDuration] = useState<number>(deck.talkMinutes && deck.talkMinutes > 0 ? deck.talkMinutes : 15);
+  const [context, setContext] = useState<string>(PRESENTATION_CONTEXTS[0]);
   const fileRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const topicRef = useRef<HTMLTextAreaElement>(null);
+
+  // The topic box grows with what is pasted (abstracts, talk briefs).
+  useEffect(() => {
+    const el = topicRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
+  }, [topic, inputMode]);
+  useEffect(() => () => abortRef.current?.abort(), []);
+
+  const onTopicChange = (value: string) => {
+    setTopic(value);
+    // The deck carries the topic from the first keystroke, so later steps never show "Untitled".
+    const clean = value.trim();
+    if (clean && !deck.outline?.length && !deck.slides.length) onUpdateDeck({ ...deck, title: clean.split('\n')[0].slice(0, 120), topic: clean });
+  };
+
+  const cancelOutline = () => {
+    abortRef.current?.abort();
+  };
+
+  /** Instant outline from the brief's own words, no AI. */
+  const buildInstantOutline = () => {
+    const material = cleanBriefText(rawText);
+    const topicNow = stripCourseCodes(topic).trim();
+    if (!material.trim() && !topicNow) {
+      setError('Add a topic or upload a document first.');
+      return;
+    }
+    const local = buildOutlineFromBrief(material || topicNow, slideCount, topicNow || undefined);
+    setTimedOut(false);
+    setError(null);
+    setNotice('Built instantly from your own text, no AI. Edit any card, or use "Rebuild outline" later to have your AI write it.');
+    setTopic(local.title);
+    persistOutline(local.slides, local.title);
+  };
+
+  const writeManually = () => {
+    const title = stripCourseCodes(topic).trim() || deck.title;
+    setTimedOut(false);
+    setError(null);
+    setNotice('Started an empty outline. Add your own cards below.');
+    persistOutline([{ id: newOutlineId(), title: title || 'Title', visualType: 'Title Hero', bullets: [] }], title);
+  };
 
   const persistOutline = (next: OutlineCard[], title = deck.title) => {
     setCards(next);
@@ -57,8 +110,17 @@ export default function Step01Understand({ projectId, deck, onUpdateDeck, onNext
     setBusy(true);
     setError(null);
     setNotice(null);
+    setTimedOut(false);
+    const controller = new AbortController();
+    abortRef.current = controller;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let expired = false;
     try {
       if (projectId) {
+        timer = setTimeout(() => {
+          expired = true;
+          controller.abort();
+        }, OUTLINE_TIMEOUT_MS);
         const res = await authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/presentation/outline`, 'POST', {
           rawText: material || undefined,
           topic: topicNow || undefined,
@@ -66,7 +128,7 @@ export default function Step01Understand({ projectId, deck, onUpdateDeck, onNext
           slideCount,
           instruction: opts.instruction,
           current: opts.instruction ? cards.map((c) => ({ title: c.title, bullets: c.bullets })) : undefined,
-        });
+        }, { signal: controller.signal });
         if (res.ok) {
           const data = (await res.json()) as { title?: string; slides?: OutlineCard[]; generatedBy?: string };
           if (Array.isArray(data.slides) && data.slides.length) {
@@ -89,8 +151,19 @@ export default function Step01Understand({ projectId, deck, onUpdateDeck, onNext
       setTopic(local.title);
       persistOutline(local.slides, local.title);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not build the outline.');
+      if (controller.signal.aborted) {
+        setTimedOut(true);
+        setNotice(
+          expired
+            ? 'Your AI is taking too long (likely out of quota or running slowly on your device). Build an instant outline from your text, or write it yourself.'
+            : 'Stopped. Build an instant outline from your text, or write it yourself.'
+        );
+      } else {
+        setError(e instanceof Error ? e.message : 'Could not build the outline.');
+      }
     } finally {
+      if (timer) clearTimeout(timer);
+      abortRef.current = null;
       setBusy(false);
     }
   };
@@ -230,12 +303,14 @@ export default function Step01Understand({ projectId, deck, onUpdateDeck, onNext
         {inputMode === 'topic' ? (
           <div className="space-y-1.5">
             <label htmlFor="presentation-topic" className="text-xs font-semibold">Presentation topic</label>
-            <input
+            <textarea
               id="presentation-topic"
+              ref={topicRef}
+              rows={2}
               value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-              placeholder="e.g. Branches of quantum computing"
-              className="w-full h-10 rounded-xl border border-neutral-200 dark:border-white/10 bg-transparent px-3 text-sm"
+              onChange={(e) => onTopicChange(e.target.value)}
+              placeholder="e.g. Branches of quantum computing, or paste your abstract or talk brief"
+              className="w-full min-h-[3.5rem] max-h-60 resize-none rounded-xl border border-neutral-200 dark:border-white/10 bg-transparent px-3 py-2 text-sm leading-relaxed"
             />
           </div>
         ) : fileName ? (
@@ -301,6 +376,36 @@ export default function Step01Understand({ projectId, deck, onUpdateDeck, onNext
               <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-400" />
             </div>
           </div>
+          <div className="space-y-1">
+            <label htmlFor="talk-duration" className="text-xs font-semibold">Talk duration</label>
+            <select
+              id="talk-duration"
+              value={duration}
+              onChange={(e) => {
+                const minutes = Number(e.target.value);
+                setDuration(minutes);
+                onUpdateDeck({ ...deck, talkMinutes: minutes });
+              }}
+              className="h-9 w-28 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#2C2C2E] px-3 text-xs font-medium cursor-pointer"
+            >
+              {TALK_DURATION_OPTIONS.map((n) => (
+                <option key={n} value={n}>{n} min</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label htmlFor="talk-context" className="text-xs font-semibold">Presentation context</label>
+            <select
+              id="talk-context"
+              value={context}
+              onChange={(e) => setContext(e.target.value)}
+              className="h-9 w-44 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#2C2C2E] px-3 text-xs font-medium cursor-pointer"
+            >
+              {PRESENTATION_CONTEXTS.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
           <button
             type="button"
             onClick={() => void requestOutline()}
@@ -310,6 +415,36 @@ export default function Step01Understand({ projectId, deck, onUpdateDeck, onNext
             {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 text-amber-400" />}
             {busy ? 'Working…' : hasOutline ? 'Rebuild outline' : 'Generate outline'}
           </button>
+          {busy && abortRef.current && (
+            <button
+              type="button"
+              onClick={cancelOutline}
+              className="h-9 rounded-xl px-3 border border-neutral-200 dark:border-white/15 text-xs font-semibold cursor-pointer hover:bg-neutral-100 dark:hover:bg-white/5"
+            >
+              Cancel
+            </button>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          {timedOut && (
+            <button
+              type="button"
+              onClick={buildInstantOutline}
+              className="h-8 rounded-xl px-3 bg-amber-500/15 text-amber-800 dark:text-amber-300 font-semibold cursor-pointer"
+            >
+              Build Instant Structured Outline
+            </button>
+          )}
+          {!hasOutline && !busy && (
+            <button type="button" onClick={writeManually} className="h-8 rounded-xl px-3 border border-neutral-200 dark:border-white/15 font-medium cursor-pointer hover:bg-neutral-100 dark:hover:bg-white/5">
+              Write outline manually
+            </button>
+          )}
+          {!busy && (
+            <button type="button" onClick={() => setInputMode('upload')} className="h-8 rounded-xl px-3 text-neutral-600 dark:text-neutral-400 underline-offset-2 hover:underline cursor-pointer">
+              Import from a document instead
+            </button>
+          )}
         </div>
         {error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">{error}</p>}
         {notice && <p role="status" className="text-xs text-neutral-600 dark:text-neutral-400">{notice}</p>}
@@ -335,6 +470,7 @@ export default function Step01Understand({ projectId, deck, onUpdateDeck, onNext
             onChange={(next) => persistOutline(next)}
             onRegenerate={(instruction) => void requestOutline({ instruction })}
             busy={busy}
+            perSlideTime={perSlideTime(duration, cards.length)}
           />
           <div className="flex justify-end">
             <button

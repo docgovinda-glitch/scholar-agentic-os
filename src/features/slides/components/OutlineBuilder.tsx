@@ -7,6 +7,8 @@ export interface OutlineBuilderProps {
   onChange: (cards: OutlineCard[]) => void;
   onRegenerate: (instruction?: string) => void;
   busy?: boolean;
+  /** Speaking time per slide (m:ss), shown on each card when a talk length is set. */
+  perSlideTime?: string;
 }
 
 const badge: Record<string, string> = {
@@ -20,7 +22,7 @@ const badge: Record<string, string> = {
 };
 
 /** Gamma-style card-by-card outline: edit titles and bullets, reorder, add, delete. */
-export default function OutlineBuilder({ cards, onChange, onRegenerate, busy = false }: OutlineBuilderProps) {
+export default function OutlineBuilder({ cards, onChange, onRegenerate, busy = false, perSlideTime }: OutlineBuilderProps) {
   const [instruction, setInstruction] = React.useState('');
   const update = (id: string, patch: Partial<OutlineCard>) => onChange(cards.map((c) => (c.id === id ? { ...c, ...patch } : c)));
   const move = (i: number, d: -1 | 1) => {
@@ -35,7 +37,7 @@ export default function OutlineBuilder({ cards, onChange, onRegenerate, busy = f
   return (
     <section aria-label="Slide outline" data-testid="outline-builder" className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">Outline · {cards.length} slides</h2>
+        <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">Outline · {cards.length} slides{perSlideTime ? ` · about ${perSlideTime} per slide` : ''}</h2>
         <form
           className="flex items-center gap-2"
           onSubmit={(e) => {

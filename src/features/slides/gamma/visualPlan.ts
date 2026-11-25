@@ -9,6 +9,8 @@ export const VISUAL_OPTIONS: Array<{ kind: VisualPlanKind; label: string; layout
   { kind: 'diagram', label: 'Smart Diagram', layout: 'timeline', hint: 'Steps or components as a flow' },
   { kind: 'table', label: 'Comparison Table', layout: 'table', hint: 'Rows compared across two columns' },
   { kind: 'grid', label: 'Multi-Card Grid', layout: 'bento', hint: 'Parallel ideas as tiles' },
+  { kind: 'stat', label: 'Key Stat', layout: 'stats', hint: 'One headline figure, only if your text gives it' },
+  { kind: 'sources', label: 'Citation List', layout: 'list', hint: 'References as a list' },
   { kind: 'image', label: 'Custom Image', layout: 'split', hint: 'Your own image or graphic' },
 ];
 
@@ -32,6 +34,12 @@ export function recommendVisual(slide: SlideCard, outlineVisualType?: string): V
       break;
   }
   const hay = `${slide.actionHeadline} ${slide.summary ?? ''}`.toLowerCase();
+  const head = slide.actionHeadline.toLowerCase();
+  // The slide's own role decides first, so a deck does not get one visual on every card.
+  if (/\b(sources?|references?|bibliography|citations?|further reading)\b/.test(head)) return 'sources';
+  if (/\b(method|methods|methodology|approach|design|procedure|how we|pipeline|workflow|process)\b/.test(head)) return 'diagram';
+  if (/\b(findings?|results?|evidence|data|outcomes?|analysis)\b/.test(head)) return 'table';
+  if (/\b(gap|problem|challenge|motivation|why|context|background)\b/.test(head)) return 'stat';
   if (/\b(vs\.?|versus|compar|trade-?off)/.test(hay)) return 'table';
   if (/\b(process|steps?|pipeline|workflow|architecture|stages?|timeline)\b/.test(hay)) return 'diagram';
   return slide.order === 1 ? null : 'grid';
