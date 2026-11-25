@@ -152,9 +152,11 @@ describe("Ask Scholar 2.0 Multi-Layer Integration", () => {
     expect(screen.getByText(/Layer C · Matrix & Forest Plots/i)).toBeInTheDocument();
 
     // Check forest plot tab inside Evidence Synthesis
-    const forestTab = screen.getByText("Interactive Forest Plot");
+    // These sources state no effect sizes, so pooling is unavailable rather than invented.
+    const forestTab = screen.getByText("Interactive Forest Plot").closest("button")!;
+    expect(forestTab).toBeDisabled();
     fireEvent.click(forestTab);
-    expect(screen.getByText(/Meta-Analytic Forest Plot/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Meta-Analytic Forest Plot/i)).toBeNull();
 
     // 5. From Evidence Synthesis, click "Export LaTeX & Overleaf Package" -> Transitions to Layer D
     const exportPackageBtn = screen.getByText("Export LaTeX & Overleaf Package");

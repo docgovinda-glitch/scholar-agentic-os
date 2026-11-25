@@ -281,6 +281,8 @@ export interface DeepResearchExecutionOptions {
   preRetrievedSources?: SearchResultItem[];
   forceBrowserHandOff?: boolean;
   verifyAndReadBrowserResult?: (systemPrompt: string, userPrompt: string) => string | null;
+  /** Called with everything Stages 1-5 found, before synthesis starts, so a failed synthesis never loses the sources. */
+  onSourcesRetrieved?: (citations: SearchResultItem[], stages: ResearchStageTelemetry[]) => void;
 }
 
 export class DeepResearchBrowserHandOffError extends Error {
@@ -612,6 +614,8 @@ export async function executeDeepResearch(
   };
   stages.push(s5Telemetry);
   onProgress?.(s5Telemetry.detail, s5Telemetry);
+
+  options?.onSourcesRetrieved?.([...allCitations], [...stages]);
 
   // ── STAGE 6: REPORT GENERATION ──
   const s6Start = Date.now();

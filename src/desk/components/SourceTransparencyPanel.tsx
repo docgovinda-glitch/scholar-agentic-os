@@ -31,6 +31,7 @@ export function SourceTransparencyPanel({
   const bibEntries = formatAskScholarBibliography(citations, citationStyle);
   const heading = getReferenceListHeading(citationStyle);
 
+  const fullTextCount = citations.filter((c) => Boolean(c.openAccessUrl)).length;
   const effectiveCited = citedCount ?? bibEntries.length;
   const effectiveRead = Math.max(readCount ?? citations.length, effectiveCited);
   const effectiveSearched = Math.max(
@@ -105,6 +106,7 @@ export function SourceTransparencyPanel({
             <h3 className="text-[13px] font-semibold text-neutral-900 dark:text-neutral-100">{heading}</h3>
             <span data-testid="search-read-cited-banner" className="text-[11px] text-neutral-500 dark:text-neutral-400">
               Searched {effectiveSearched} · Read {effectiveRead} · Cited {effectiveCited}.
+              {" "}Full text ({fullTextCount}) · Abstract only ({citations.length - fullTextCount}).
             </span>
           </div>
 

@@ -478,6 +478,7 @@ export function registerAIRoutes(
             {
               approvedSubQuestions,
               preRetrievedSources: normalizedPreRetrieved,
+              onSourcesRetrieved: sse ? (citations, stages) => sse.send({ type: "sources", citations, stages }) : undefined,
               forceBrowserHandOff: !hasBrowserResult && where !== "server",
               verifyAndReadBrowserResult: hasBrowserResult
                 ? (sys, usr) => readVerifiedBrowserResult(req, sys, usr)

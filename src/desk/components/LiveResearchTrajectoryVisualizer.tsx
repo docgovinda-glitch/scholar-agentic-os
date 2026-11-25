@@ -1,3 +1,5 @@
+import { classifyResearchPrompt } from "../../config/askScholarConfig";
+import { frameworkForDiscipline } from "../../domain/ask/evidenceFramework";
 import React, { useState, useEffect } from "react";
 import {
   Compass,
@@ -42,8 +44,8 @@ export const RESEARCH_PIPELINE_STEPS: ResearchStageStep[] = [
   },
   {
     id: "extraction",
-    label: "Empirical Evidence & PICO Extraction",
-    detail: "Parsing effect sizes (SMD, OR, RR), sample sizes (N), and confidence intervals",
+    label: "Evidence & Method Extraction",
+    detail: "Reading each source's design, method, findings and limitations as its field defines them",
     icon: BarChart3,
   },
   {
@@ -53,6 +55,15 @@ export const RESEARCH_PIPELINE_STEPS: ResearchStageStep[] = [
     icon: ShieldCheck,
   },
 ];
+
+/** The pipeline with the extraction stage named for the question's discipline (PICO only for clinical work). */
+export function pipelineStepsFor(query?: string): ResearchStageStep[] {
+  if (!query?.trim()) return RESEARCH_PIPELINE_STEPS;
+  const framework = frameworkForDiscipline(classifyResearchPrompt(query).discipline);
+  return RESEARCH_PIPELINE_STEPS.map((step) =>
+    step.id === "extraction" ? { ...step, label: framework.stageLabel, detail: framework.stageDetail } : step
+  );
+}
 
 export const DEEP_RESEARCH_STEPS = RESEARCH_PIPELINE_STEPS;
 export const STANDARD_RESEARCH_STEPS = RESEARCH_PIPELINE_STEPS.slice(0, 4);
@@ -89,7 +100,7 @@ export const LiveResearchTrajectoryVisualizer: React.FC<LiveResearchTrajectoryVi
   const [secondsElapsed, setSecondsElapsed] = useState<number>(0);
 
   const isDeepResearch = mode === "deep-research" || mode === "deep_research";
-  const pipelineSteps = RESEARCH_PIPELINE_STEPS;
+  const pipelineSteps = pipelineStepsFor(query);
   const totalSteps = pipelineSteps.length;
 
   // Live timer during thinking

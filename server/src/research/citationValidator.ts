@@ -200,15 +200,12 @@ export function validateAndRefineCitations(
     purifiedText = purifiedText.trim() + referencesBlock;
   }
 
-  const peerReviewAudit = generatePeerReviewAudit(purifiedText, finalCitationsList);
-
   return {
     text: purifiedText,
     citations: finalCitationsList,
     citedSourcesCount: finalCitationsList.length,
     hallucinatedUrlsPurged: purgedCount,
     unverifiedClaimsFlagged: purgedCount > 0,
-    peerReviewAudit,
   };
 }
 
@@ -247,80 +244,3 @@ function toCanonicalReference(src: SearchResultItem): CanonicalReference {
   } as CanonicalReference;
 }
 
-function generatePeerReviewAudit(
-  text: string,
-  citations: SearchResultItem[]
-): PeerReviewAudit {
-  const lower = text.toLowerCase();
-  const critiques: PeerReviewCritique[] = [];
-  const methodologicalStrengths: string[] = [];
-  const counterTheories: string[] = [];
-
-  const peerReviewedCount = citations.filter(
-    (c) => c.sourceType === "scholarly" || (c.authorityBadge || "").toLowerCase().includes("peer") || (c.authorityBadge || "").toLowerCase().includes("academic")
-  ).length;
-
-  const officialGovCount = citations.filter(
-    (c) => c.sourceType === "official" || (c.authorityBadge || "").toLowerCase().includes("gov") || (c.domain || "").endsWith(".gov") || (c.domain || "").endsWith(".int")
-  ).length;
-
-  if (peerReviewedCount > 0) {
-    methodologicalStrengths.push(`Anchored in ${peerReviewedCount} peer-reviewed empirical and scholarly publication(s).`);
-  }
-  if (officialGovCount > 0) {
-    methodologicalStrengths.push(`Validated against ${officialGovCount} primary government/institutional policy portal(s).`);
-  }
-  if (citations.length >= 4) {
-    methodologicalStrengths.push("Cross-indexed across multiple independent investigative frameworks.");
-  } else {
-    methodologicalStrengths.push("Direct targeted retrieval focused on primary verified indicators.");
-  }
-
-  if (lower.includes("causes") || lower.includes("leads to") || lower.includes("resulted in")) {
-    critiques.push({
-      type: "methodology",
-      title: "Causal Inference vs. Confounding Variables",
-      explanation: "Claims of direct causality should be qualified; observed correlations may be mediated by unobserved economic, demographic, or institutional covariates.",
-      severity: "medium",
-    });
-  }
-
-  if (lower.includes("survey") || lower.includes("poll") || lower.includes("voters") || lower.includes("respondents")) {
-    critiques.push({
-      type: "sample_size",
-      title: "Sampling Frame & Response Bias",
-      explanation: "Cross-sectional survey data often suffer from non-response bias and demographic weighting skews across varying turnout environments.",
-      severity: "low",
-    });
-  }
-
-  if (citations.some((c) => c.stance === "contradicting") || lower.includes("however") || lower.includes("on the other hand") || lower.includes("critics argue")) {
-    critiques.push({
-      type: "counter_argument",
-      title: "Competing Theoretical Paradigms",
-      explanation: "Literature exhibits divided empirical consensus; findings should account for alternative explanatory frameworks rather than a unified trajectory.",
-      severity: "medium",
-    });
-    counterTheories.push("Competing institutional models challenge single-factor explanatory paradigms.");
-  } else {
-    counterTheories.push("Potential publication bias towards statistically significant positive results.");
-  }
-
-  let rigorScore = 78;
-  if (peerReviewedCount >= 2) rigorScore += 10;
-  if (officialGovCount >= 1) rigorScore += 6;
-  if (citations.length >= 5) rigorScore += 4;
-  rigorScore = Math.min(98, rigorScore);
-
-  let overallVerdict = "Sound with Identified Methodological Caveats";
-  if (rigorScore >= 90) overallVerdict = "Strong Empirical Rigor (Peer Reviewer 2 Approved)";
-  else if (rigorScore >= 80) overallVerdict = "Methodologically Sound with Minor Caveats";
-
-  return {
-    overallVerdict,
-    rigorScore,
-    critiques: critiques.slice(0, 3),
-    methodologicalStrengths,
-    counterTheories,
-  };
-}

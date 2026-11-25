@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   extractEvidenceFromPaper,
+  canPoolStudies,
   calculateMetaAnalysis,
   exportEvidenceMatrixToLatex,
   type EvidenceMatrixItem,
@@ -21,10 +22,43 @@ describe("evidenceExtractionService", () => {
     expect(item.studyDesign).toBe("RCT");
     expect(item.sampleSizeTotal).toBe(450);
     expect(item.effectMetric).toBe("Cohen's d");
-    expect(item.effectSize).toBeCloseTo(0.42, 1);
-    expect(item.riskOfBias).toBe("low");
+    expect(item.effectSize).toBeCloseTo(0.58, 2);
     expect(item.verbatimQuote).toBeTruthy();
-    expect(item.quoteLocator).toBeTruthy();
+    expect(item.quoteLocator).toBeUndefined();
+  });
+
+  it("never fabricates statistics for a theoretical paper", () => {
+    const item = extractEvidenceFromPaper(
+      {
+        title: "Constructivism and the Making of Regional Order",
+        abstract: "This article argues that regional orders are socially constructed. It examines two cases through discourse analysis.",
+        authors: ["Smith, J."],
+      },
+      3
+    );
+    expect(item.effectSize).toBeUndefined();
+    expect(item.ciLower).toBeUndefined();
+    expect(item.ciUpper).toBeUndefined();
+    expect(item.pValue).toBeUndefined();
+    expect(item.sampleSizeTotal).toBeUndefined();
+    expect(item.quoteLocator).toBeUndefined();
+    expect(item.effectMetric).toBe("Qualitative");
+    expect(item.population).not.toMatch(/Adult Participants|Standardized/);
+    expect(item.intervention).not.toMatch(/Algorithmic/);
+    expect(item.year).toBeUndefined();
+    expect(item.findingsSummary).toMatch(/argues/);
+    expect(item.findingsSummary).not.toMatch(/Abstract:/);
+  });
+
+  it("only allows pooling with 2+ studies sharing a reported metric", () => {
+    const mk = (id: string, metric: EvidenceMatrixItem["effectMetric"], es?: number): EvidenceMatrixItem => ({
+      id, sourceId: id, paperTitle: id, authors: [], studyDesign: "RCT", population: "", intervention: "",
+      comparison: "", primaryOutcome: "", effectMetric: metric, effectSize: es, findingsSummary: "",
+      verbatimQuote: "", riskOfBias: "unclear", verificationStatus: "ai_extracted", tags: [],
+    });
+    expect(canPoolStudies([mk("a", "SMD", 0.4)])).toBe(false);
+    expect(canPoolStudies([mk("a", "SMD", 0.4), mk("b", "Odds Ratio", 1.2)])).toBe(false);
+    expect(canPoolStudies([mk("a", "SMD", 0.4), mk("b", "SMD", 0.5)])).toBe(true);
   });
 
   it("calculates fixed-effect and random-effects meta-analysis on compatible studies", () => {

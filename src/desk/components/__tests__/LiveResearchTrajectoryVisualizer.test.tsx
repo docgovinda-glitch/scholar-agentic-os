@@ -5,6 +5,7 @@ import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import LiveResearchTrajectoryVisualizer, {
   RESEARCH_PIPELINE_STEPS,
+  pipelineStepsFor,
 } from "../LiveResearchTrajectoryVisualizer";
 
 describe("LiveResearchTrajectoryVisualizer (Phase 5)", () => {
@@ -28,7 +29,7 @@ describe("LiveResearchTrajectoryVisualizer (Phase 5)", () => {
     expect(screen.getByText(/Inquiry: "CRISPR gene therapy efficacy"/i)).toBeInTheDocument();
 
     // Verify all 5 stages are present
-    RESEARCH_PIPELINE_STEPS.forEach((step) => {
+    pipelineStepsFor("CRISPR gene therapy efficacy").forEach((step) => {
       expect(screen.getByText(new RegExp(step.label, "i"))).toBeInTheDocument();
     });
   });
@@ -98,3 +99,12 @@ describe("LiveResearchTrajectoryVisualizer (Phase 5)", () => {
   });
 });
 
+
+describe("pipelineStepsFor", () => {
+  it("names the extraction stage by discipline, with PICO only for clinical questions", () => {
+    const label = (q: string) => pipelineStepsFor(q).find((s) => s.id === "extraction")!.label;
+    expect(label("CRISPR gene therapy efficacy in patients")).toMatch(/PICO/);
+    expect(label("Compare Wendt and Mearsheimer on regional security in East Asia")).not.toMatch(/PICO/);
+    expect(RESEARCH_PIPELINE_STEPS.length).toBe(5);
+  });
+});

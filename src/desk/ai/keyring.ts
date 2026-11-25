@@ -39,9 +39,29 @@ export const encodeKeyring = (entries: KeyringEntry[]): string => {
 export const routingHeaders = (preferences: Record<string, string> | undefined): Record<string, string> =>
   manualRouting(preferences) ? { [ROUTING_HEADER]: ROUTING_MANUAL } : {};
 
+let rotateNextRequest = false;
+
+/** The next AI request tries the following configured connection first (one request only). */
+export function requestNextModelOnce(): void {
+  rotateNextRequest = true;
+}
+
+/** Moves the primary connection to the back so the next one leads. Pure. */
+export function rotateKeyring<T>(ring: T[]): T[] {
+  return ring.length > 1 ? [...ring.slice(1), ring[0]] : ring;
+}
+
 /** This device's keyring and the headers that carry it (and the routing choice), from one read of the person's settings. */
 export async function aiRequestParts(): Promise<{ ring: KeyringEntry[]; headers: Record<string, string> }> {
   const settings = await loadUserAiSettings();
-  const ring = await buildKeyring(settings);
-  return { ring, headers: { ...(ring.length ? { "x-ai-keyring": encodeKeyring(ring) } : {}), ...routingHeaders(settings.preferences) } };
+  let ring = await buildKeyring(settings);
+  let routing = routingHeaders(settings.preferences);
+  if (rotateNextRequest) {
+    rotateNextRequest = false;
+    if (ring.length > 1) {
+      ring = rotateKeyring(ring);
+      routing = { ...routing, [ROUTING_HEADER]: ROUTING_MANUAL };
+    }
+  }
+  return { ring, headers: { ...(ring.length ? { "x-ai-keyring": encodeKeyring(ring) } : {}), ...routing } };
 }

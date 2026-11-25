@@ -9,6 +9,7 @@
  * - Produces valid Overleaf-compatible ZIP packages using JSZip
  */
 
+import { cleanVenue, normalizeAuthorList, plainTitle } from "../../shared/authorNames";
 import JSZip from "jszip";
 import {
   type EvidenceMatrixItem,
@@ -70,8 +71,8 @@ export function buildSynchronizedBibtex(
     id: string;
     title: string;
     authors: string[];
-    year: number;
-    journal: string;
+    year?: number;
+    journal?: string;
     doi?: string;
     url?: string;
     abstract?: string;
@@ -87,9 +88,9 @@ export function buildSynchronizedBibtex(
       records.push({
         id: it.id,
         title: it.paperTitle,
-        authors: it.authors,
-        year: it.year || 2023,
-        journal: it.journal || "Scholarly Journal",
+        authors: normalizeAuthorList(it.authors),
+        year: it.year,
+        journal: cleanVenue(it.journal),
         doi: it.doi,
         url: it.url,
         abstract: it.findingsSummary || it.verbatimQuote,
@@ -104,9 +105,9 @@ export function buildSynchronizedBibtex(
       records.push({
         id: p.id,
         title: p.title,
-        authors: p.authors,
-        year: p.year || 2023,
-        journal: p.journal || p.venue || "Academic Publication",
+        authors: normalizeAuthorList(p.authors),
+        year: p.year,
+        journal: cleanVenue(p.journal || p.venue),
         doi: p.doi,
         url: p.url,
         abstract: p.abstract,
@@ -116,7 +117,7 @@ export function buildSynchronizedBibtex(
 
   for (const rec of records) {
     const surname = getAuthorSurname(rec.authors[0]);
-    let baseKey = `${surname}${rec.year}`;
+    let baseKey = `${surname}${rec.year ?? "nd"}`;
     let key = baseKey;
     let counter = 1;
     while (seenKeys.has(key)) {
@@ -129,11 +130,11 @@ export function buildSynchronizedBibtex(
 
     const authorsBib = rec.authors.join(" and ");
     const titleBib = rec.title.replace(/[{}]/g, "");
-    let entry = `@article{${key},\n`;
+    let entry = `@${rec.journal ? "article" : "misc"}{${key},\n`;
     entry += `  author = {${authorsBib}},\n`;
     entry += `  title = {{${titleBib}}},\n`;
-    entry += `  journal = {${rec.journal}},\n`;
-    entry += `  year = {${rec.year}},\n`;
+    if (rec.journal) entry += `  journal = {${rec.journal}},\n`;
+    if (rec.year) entry += `  year = {${rec.year}},\n`;
     if (rec.doi) entry += `  doi = {${rec.doi}},\n`;
     if (rec.url) entry += `  url = {${rec.url}},\n`;
     if (rec.abstract) entry += `  abstract = {${rec.abstract.replace(/\n/g, " ").slice(0, 300)}...}\n`;
@@ -273,7 +274,7 @@ function generateMainTex(data: ResearchProjectExportData, docClass: string): str
     urlcolor=blue
 }
 
-\\title{\\textbf{${escapeLatex(data.title)}}}
+\\title{\\textbf{${escapeLatex(plainTitle(data.title, 120) || "Research Synthesis")}}}
 \\author{${authorNames}}
 \\date{\\today}
 

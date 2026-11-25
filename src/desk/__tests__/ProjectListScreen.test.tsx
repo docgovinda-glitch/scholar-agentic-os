@@ -1149,7 +1149,7 @@ describe("distinct academic format USPs & specs", () => {
     // Select Deep Research mode
     fireEvent.click(screen.getByRole("menuitem", { name: /Deep research/i }));
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
-    expect(screen.getByText("Deep Research")).toBeInTheDocument();
+    expect(screen.getAllByText("Deep Research").length).toBeGreaterThan(0);
 
     // Reset mode via × button on chip
     const resetChipBtn = screen.getByRole("button", { name: /Reset mode/i });

@@ -9,6 +9,7 @@
  * - Export to CSV, TSV, and LaTeX booktabs table syntax
  */
 
+import { extractFrameworkFields, type EvidenceFrameworkId } from "../../domain/ask/evidenceFramework";
 import { type CitationGraphNode } from "../discovery/snowballSamplingService";
 
 export type StudyDesignType =
@@ -72,6 +73,9 @@ export interface EvidenceMatrixItem {
   riskOfBias: RiskOfBiasType;
   verificationStatus: VerificationStatusType;
   tags: string[];
+  /** Discipline-specific columns (Theoretical Lens, Dataset, ...), filled only from the paper's own text. */
+  frameworkFields?: Record<string, string>;
+  frameworkId?: EvidenceFrameworkId;
 }
 
 export interface MetaAnalysisResult {
@@ -101,107 +105,126 @@ export interface MetaAnalysisResult {
   studyWeights: Record<string, number>; // item.id -> weight percentage
 }
 
+export const NOT_REPORTED = "Not reported in abstract";
+export const NOT_APPLICABLE = "N/A (Theoretical or Qualitative)";
+
+function num(v: string | undefined): number | undefined {
+  if (v === undefined) return undefined;
+  const n = Number(v.replace(/,/g, ""));
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/** First sentence of the abstract that states a result or argument. */
+export function extractKeyFinding(abstract: string): string | undefined {
+  const clean = abstract.replace(/^\s*abstract[:.\s]+/i, "").replace(/\s+/g, " ").trim();
+  if (!clean) return undefined;
+  const sentences = clean.split(/(?<=[.!?])\s+(?=[A-Z"(])/).filter((x) => x.length > 25);
+  if (sentences.length === 0) return clean.slice(0, 220);
+  const cue = /\b(find|found|show|shows|showed|argue|argues|argued|demonstrate|demonstrates|suggest|suggests|reveal|reveals|conclude|concludes|result|results|propose|proposes|contend)\b/i;
+  const pick = sentences.find((x) => cue.test(x)) || sentences[0];
+  return pick.length > 260 ? `${pick.slice(0, 257).trimEnd()}...` : pick;
+}
+
 /**
- * Extracts structured empirical evidence from academic papers or Ask Scholar sources.
+ * Extracts structured evidence from a paper's own title / abstract / snippet.
+ * Every statistic comes from the text; anything not stated is left empty or
+ * labelled "Not reported", never estimated.
  */
 export function extractEvidenceFromPaper(
   paper: Partial<CitationGraphNode> & { title: string },
-  index = 0
+  index = 0,
+  frameworkId: EvidenceFrameworkId = "clinical"
 ): EvidenceMatrixItem {
-  const text = ((paper.title || "") + " " + (paper.abstract || "") + " " + (paper.snippet || "")).toLowerCase();
+  const rawText = [paper.title || "", paper.abstract || "", paper.snippet || ""].join(" ");
+  const text = rawText.toLowerCase();
+  const body = [paper.abstract, paper.snippet].filter(Boolean).join(" ").trim();
 
-  // 1. Detect Study Design
-  let studyDesign: StudyDesignType = "Observational";
-  if (text.includes("randomized") || text.includes("rct") || text.includes("trial") || text.includes("placebo")) {
-    studyDesign = "RCT";
-  } else if (text.includes("cohort") || text.includes("longitudinal") || text.includes("prospective")) {
-    studyDesign = "Cohort";
-  } else if (text.includes("case-control") || text.includes("matched control")) {
-    studyDesign = "Case-Control";
-  } else if (text.includes("cross-sectional") || text.includes("survey") || text.includes("cross sectional")) {
-    studyDesign = "Cross-Sectional";
-  } else if (text.includes("meta-analysis") || text.includes("pooled analysis")) {
-    studyDesign = "Meta-Analysis";
-  } else if (text.includes("systematic review") || text.includes("prisma")) {
-    studyDesign = "Systematic Review";
-  } else if (text.includes("qualitative") || text.includes("interview") || text.includes("ethnograph")) {
-    studyDesign = "Qualitative";
+  // 1. Study design (only what the text names)
+  let studyDesign: StudyDesignType = "Other";
+  if (/randomi[sz]ed|\brct\b|placebo|controlled trial/.test(text)) studyDesign = "RCT";
+  else if (/cohort|longitudinal|prospective/.test(text)) studyDesign = "Cohort";
+  else if (/case-control|matched control/.test(text)) studyDesign = "Case-Control";
+  else if (/cross-sectional|cross sectional|\bsurvey\b/.test(text)) studyDesign = "Cross-Sectional";
+  else if (/meta-analysis|pooled analysis/.test(text)) studyDesign = "Meta-Analysis";
+  else if (/systematic review|prisma/.test(text)) studyDesign = "Systematic Review";
+  else if (/qualitative|interview|ethnograph|case study|discourse|theoretical|conceptual/.test(text)) studyDesign = "Qualitative";
+
+  // 2. Sample size, only when stated
+  const sampleMatch = rawText.match(/\b(?:n\s*=\s*|sample of\s+|participants\s*=\s*)(\d[\d,]*)/i)
+    || rawText.match(/\b(\d[\d,]*)\s+(?:participants|respondents|patients|students|subjects)\b/i);
+  const sampleSizeTotal = num(sampleMatch?.[1]);
+
+  // 3. Effect metric and statistics, only when stated
+  let effectMetric: EffectMetricType = "Qualitative";
+  let effectSize: number | undefined;
+  const metricPatterns: Array<[EffectMetricType, RegExp]> = [
+    ["Hedges' g", /hedges'?\s*g\s*=\s*(-?\d*\.?\d+)/i],
+    ["Cohen's d", /(?:cohen'?s?\s*)?\bd\s*=\s*(-?\d*\.?\d+)/i],
+    ["SMD", /\bsmd\s*=\s*(-?\d*\.?\d+)/i],
+    ["Odds Ratio", /(?:odds ratio|\bor)\s*(?:=|of|:)\s*(-?\d*\.?\d+)/i],
+    ["Hazard Ratio", /(?:hazard ratio|\bhr)\s*(?:=|of|:)\s*(-?\d*\.?\d+)/i],
+    ["Relative Risk", /(?:relative risk|risk ratio|\brr)\s*(?:=|of|:)\s*(-?\d*\.?\d+)/i],
+    ["Mean Difference", /mean difference\s*(?:=|of|:)\s*(-?\d*\.?\d+)/i],
+  ];
+  for (const [metric, re] of metricPatterns) {
+    const m = rawText.match(re);
+    const v = num(m?.[1]);
+    if (v !== undefined) {
+      effectMetric = metric;
+      effectSize = v;
+      break;
+    }
   }
 
-  // 2. Synthesize or extract sample size
-  let sampleSizeTotal: number | undefined;
-  const sampleMatch = text.match(/\b(n\s*=\s*|sample of\s*|participants\s*=\s*)(\d[\d,]*)/i);
-  if (sampleMatch && sampleMatch[2]) {
-    sampleSizeTotal = parseInt(sampleMatch[2].replace(/,/g, ""), 10);
-  } else {
-    sampleSizeTotal = studyDesign === "RCT" ? 350 + (index * 85) : 1200 + (index * 450);
+  let ciLower: number | undefined;
+  let ciUpper: number | undefined;
+  let standardError: number | undefined;
+  if (effectSize !== undefined) {
+    const ci = rawText.match(/95\s*%?\s*(?:ci|confidence interval)[^\d-]{0,8}(-?\d*\.?\d+)\s*(?:,|to|[-–])\s*(-?\d*\.?\d+)/i);
+    ciLower = num(ci?.[1]);
+    ciUpper = num(ci?.[2]);
+    if (ciLower !== undefined && ciUpper !== undefined && ciUpper > ciLower) {
+      const ratio = effectMetric === "Odds Ratio" || effectMetric === "Hazard Ratio" || effectMetric === "Relative Risk";
+      standardError = ratio && ciLower > 0
+        ? (Math.log(ciUpper) - Math.log(ciLower)) / 3.92
+        : (ciUpper - ciLower) / 3.92;
+    } else {
+      ciLower = undefined;
+      ciUpper = undefined;
+    }
   }
-  const sampleSizeIntervention = sampleSizeTotal ? Math.round(sampleSizeTotal * 0.52) : undefined;
-  const sampleSizeControl = sampleSizeTotal && sampleSizeIntervention ? sampleSizeTotal - sampleSizeIntervention : undefined;
+  const pMatch = rawText.match(/\bp\s*=\s*(\d*\.?\d+)/i);
+  const pValue = effectSize !== undefined ? num(pMatch?.[1]) : undefined;
 
-  // 3. Determine Effect Metric and Realistic Statistics
-  let effectMetric: EffectMetricType = "SMD";
-  let effectSize: number = 0.42 + (index % 3) * 0.18 - (index % 2 === 1 ? 0.08 : 0);
-  let standardError: number = 0.08 + (index % 4) * 0.02;
-  let ciLower: number = Number((effectSize - 1.96 * standardError).toFixed(2));
-  let ciUpper: number = Number((effectSize + 1.96 * standardError).toFixed(2));
-  let pValue: number = Number((0.001 + (index % 5) * 0.008).toFixed(4));
+  // 4. PICO-style fields: only from explicit labelled text; otherwise honest placeholders
+  const quantitative = effectSize !== undefined;
+  const placeholder = quantitative ? NOT_REPORTED : NOT_APPLICABLE;
+  const labelled = (label: string): string | undefined => {
+    const m = body.match(new RegExp(`${label}\\s*[:\\-]\\s*([^.;\\n]{4,120})`, "i"));
+    return m?.[1]?.trim();
+  };
+  const population = labelled("population|participants|sample") || placeholder;
+  const intervention = labelled("intervention|treatment|method") || placeholder;
+  const comparison = labelled("comparison|control|baseline") || placeholder;
+  const primaryOutcome = labelled("outcome|measure") || placeholder;
 
-  if (text.includes("odds ratio") || text.includes(" or ") || text.includes("binary") || text.includes("risk of")) {
-    effectMetric = "Odds Ratio";
-    effectSize = Number((1.45 + (index % 3) * 0.35).toFixed(2));
-    const logOR = Math.log(effectSize);
-    const seLog = 0.12 + (index % 3) * 0.03;
-    ciLower = Number(Math.exp(logOR - 1.96 * seLog).toFixed(2));
-    ciUpper = Number(Math.exp(logOR + 1.96 * seLog).toFixed(2));
-    standardError = seLog;
-    pValue = 0.005;
-  } else if (text.includes("hazard ratio") || text.includes("survival") || text.includes("cox")) {
-    effectMetric = "Hazard Ratio";
-    effectSize = Number((1.38 + (index % 2) * 0.22).toFixed(2));
-    ciLower = Number((effectSize - 0.24).toFixed(2));
-    ciUpper = Number((effectSize + 0.28).toFixed(2));
-    standardError = 0.13;
-  } else if (text.includes("cohen") || text.includes("d =") || text.includes("effect size")) {
-    effectMetric = "Cohen's d";
-  }
-
-  // 4. Extract or formulate population, intervention, comparison, and outcome (PICO)
-  const population = text.includes("clinical") || text.includes("patient")
-    ? "Clinical Cohort with Target Pathological Symptoms"
-    : text.includes("student") || text.includes("education")
-    ? "Higher Education Students & Academic Practitioners"
-    : "Adult Participants in Standardized Controlled Benchmark";
-
-  const intervention = text.includes("model") || text.includes("ai") || text.includes("algorithm")
-    ? "Algorithmic Intervention / Automated Architecture"
-    : "Target Experimental Protocol";
-
-  const comparison = "Standard Baseline / Control Protocol";
-  const primaryOutcome = "Standardized Empirical Performance & Accuracy Metrics";
-
-  // 5. Quote and locator
-  const verbatimQuote = paper.snippet || paper.abstract
-    ? `"${(paper.snippet || paper.abstract || "").slice(0, 180)}..."`
-    : `"The experimental cohort demonstrated statistically significant gains over control conditions (p < 0.01)."`;
-  const quoteLocator = `Section ${3 + (index % 3)}.${1 + (index % 2)}, p. ${85 + index * 12}`;
-
-  // 6. Risk of bias assessment
-  const riskOfBias: RiskOfBiasType = studyDesign === "RCT" ? "low" : index % 3 === 0 ? "moderate" : "low";
+  // 5. Key finding and quote (verbatim from the text, no locator we cannot know)
+  const keyFinding = extractKeyFinding(body);
+  const verbatimQuote = keyFinding ? `"${keyFinding}"` : "";
 
   return {
     id: `evidence-${paper.id || index}-${Date.now().toString(36)}`,
     sourceId: paper.id || `paper-${index}`,
     paperTitle: paper.title,
-    authors: Array.isArray(paper.authors) && paper.authors.length > 0 ? paper.authors : ["Scholarly Author"],
-    year: paper.year || 2023,
-    journal: paper.journal || paper.venue || "Academic Journal",
+    authors: Array.isArray(paper.authors) ? paper.authors : [],
+    year: paper.year,
+    journal: paper.journal || paper.venue || undefined,
     doi: paper.doi,
     url: paper.url,
     studyDesign,
     sampleSizeTotal,
-    sampleSizeIntervention,
-    sampleSizeControl,
+    sampleSizeIntervention: undefined,
+    sampleSizeControl: undefined,
     population,
     intervention,
     comparison,
@@ -212,13 +235,26 @@ export function extractEvidenceFromPaper(
     ciUpper,
     pValue,
     standardError,
-    findingsSummary: `Reported statistically significant positive empirical effect (${effectMetric} = ${effectSize}, 95% CI [${ciLower}, ${ciUpper}]).`,
+    findingsSummary: keyFinding
+      ? keyFinding
+      : "No abstract available; key finding not extracted.",
     verbatimQuote,
-    quoteLocator,
-    riskOfBias,
+    quoteLocator: undefined,
+    riskOfBias: "unclear",
     verificationStatus: "ai_extracted",
-    tags: [studyDesign, effectMetric, `${paper.year || 2023}`],
+    frameworkId,
+    frameworkFields: frameworkId === "clinical" ? undefined : extractFrameworkFields(frameworkId, rawText, keyFinding),
+    tags: [studyDesign, ...(quantitative ? [effectMetric] : []), ...(paper.year ? [String(paper.year)] : [])],
   };
+}
+
+/** Pooling needs 2+ studies that report the same real effect metric. */
+export function canPoolStudies(items: EvidenceMatrixItem[]): boolean {
+  const q = items.filter((it) => typeof it.effectSize === "number" && it.effectMetric !== "Qualitative");
+  if (q.length < 2) return false;
+  const counts = new Map<EffectMetricType, number>();
+  for (const it of q) counts.set(it.effectMetric, (counts.get(it.effectMetric) || 0) + 1);
+  return Array.from(counts.values()).some((c) => c >= 2);
 }
 
 /**
@@ -308,6 +344,31 @@ export function calculateMetaAnalysis(
       heterogeneityLevel: "extreme",
       incompatibilityReason:
         "Methodological Incompatibility: Cannot pool difference metrics (Cohen's d / SMD) with ratio metrics (Odds Ratio / Relative Risk). Stratify your synthesis by metric type.",
+      studyWeights: {},
+    };
+  }
+
+  const distinctMetrics = new Set(items.map((it) => it.effectMetric));
+  if (distinctMetrics.size > 1) {
+    return {
+      isPoolable: false,
+      model,
+      metricType: items[0].effectMetric,
+      totalStudies: items.length,
+      totalSampleSize: items.reduce((acc, it) => acc + (it.sampleSizeTotal || 0), 0),
+      pooledEffect: 0,
+      ciLower: 0,
+      ciUpper: 0,
+      standardError: 0,
+      zValue: 0,
+      pValue: 1,
+      cochranesQ: 0,
+      degreesOfFreedom: items.length - 1,
+      qPValue: 1,
+      iSquared: 0,
+      tauSquared: 0,
+      heterogeneityLevel: "low",
+      incompatibilityReason: `Studies report different effect metrics (${Array.from(distinctMetrics).join(", ")}); pool only studies sharing one metric.`,
       studyWeights: {},
     };
   }

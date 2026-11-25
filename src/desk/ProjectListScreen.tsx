@@ -72,17 +72,14 @@ import {
   Paperclip,
   Loader2,
   Sparkles,
-  ShieldCheck,
   Copy,
   Check,
   ChevronDown,
-  Scale,
   BookmarkPlus,
   Clock,
   Download,
   Table,
   Network,
-  AlertTriangle,
   BarChart3,
 } from "lucide-react";
 import LiteratureDiscoveryWorkspace from "./discovery/LiteratureDiscoveryWorkspace";
@@ -93,6 +90,14 @@ import ScientificConsensusGauge from "./components/ScientificConsensusGauge";
 import SentenceProvenanceInspector from "./components/SentenceProvenanceInspector";
 import LiveResearchTrajectoryVisualizer from "./components/LiveResearchTrajectoryVisualizer";
 import { type CitationGraphNode } from "../services/discovery/snowballSamplingService";
+import { AnswerReviewPanel } from "./AnswerReviewPanel";
+import { IncompleteAnswerBanner } from "./IncompleteAnswerBanner";
+import { buildAnswerTelemetry } from "../domain/ask/answerTelemetry";
+import { aiRequestParts, requestNextModelOnce } from "./ai/keyring";
+import { frameworkIdForQuery } from "../domain/ask/evidenceFramework";
+import { DEFAULT_SCHOLAR_FILTERS, type ScholarFilters } from "../domain/ask/scholarFilters";
+import { assessDeepResearchModel } from "../domain/ask/modelFitness";
+import { cleanVenue, normalizeAuthorList, plainTitle } from "../shared/authorNames";
 import { type EvidenceMatrixItem, extractEvidenceFromPaper } from "../services/evidence/evidenceExtractionService";
 import { getCloudProvider } from "../config/providerCatalog";
 import { useVisualViewport } from "../hooks/useVisualViewport";
@@ -435,7 +440,7 @@ export default function ProjectListScreen({
     if (items && items.length > 0) {
       setLayerWorkspaceEvidenceItems(items);
     } else if (seeds && seeds.length > 0) {
-      setLayerWorkspaceEvidenceItems(seeds.map((s, idx) => extractEvidenceFromPaper(s, idx)));
+      setLayerWorkspaceEvidenceItems(seeds.map((s, idx) => extractEvidenceFromPaper(s, idx, frameworkIdForQuery(query))));
     }
     setLayerWorkspaceQuery(query || "");
     setIsAiSidebarOpen(true);
@@ -459,12 +464,12 @@ export default function ProjectListScreen({
     const item = extractEvidenceFromPaper({
       title: cite.title || "External Source",
       authors: cite.authors || (cite.author ? [cite.author] : []),
-      year: typeof cite.year === "number" ? cite.year : parseInt(String(cite.year || 2024), 10) || 2024,
+      year: typeof cite.year === "number" ? cite.year : parseInt(String(cite.year || ""), 10) || undefined,
       journal: cite.journal || cite.venue,
       doi: cite.doi,
       url: cite.url,
       abstract: cite.evidenceSnippet || cite.snippet || cite.mainFinding,
-    });
+    }, 0, frameworkIdForQuery(layerWorkspaceQuery));
     setLayerWorkspaceEvidenceItems((prev) => {
       if (prev.some((p) => p.paperTitle.toLowerCase() === item.paperTitle.toLowerCase())) {
         showAppToast(`"${item.paperTitle}" is already in the Evidence Matrix.`, "info", 2000);
@@ -758,6 +763,7 @@ export default function ProjectListScreen({
   const [sidebarAttachments, setSidebarAttachments] = useState<AgentAttachmentItem[]>([]);
   const [isSidebarUploadingAttachment, setIsSidebarUploadingAttachment] = useState<boolean>(false);
   const [sidebarAiMode, setSidebarAiMode] = useState<PromptMode>("auto");
+  const [askFilters, setAskFilters] = useState<ScholarFilters>(DEFAULT_SCHOLAR_FILTERS);
   const [askUserSettings, setAskUserSettings] = useState<AskScholarUserSettings>(() =>
     loadAskScholarSettings()
   );
@@ -1255,7 +1261,7 @@ export default function ProjectListScreen({
       return msg.citations.map((c) => ({
         title: c.title,
         url: c.url,
-        authors: Array.isArray(c.authors) ? c.authors : c.author ? [c.author] : [],
+        authors: normalizeAuthorList(Array.isArray(c.authors) ? c.authors : c.author ? [c.author] : []),
         year: c.year,
         venue: c.venue || c.publisher,
         publisher: c.publisher || c.venue,
@@ -1271,10 +1277,10 @@ export default function ProjectListScreen({
       return msg.liveSources.map((s) => ({
         title: s.title,
         url: s.url,
-        authors: s.authors,
+        authors: normalizeAuthorList(s.authors),
         year: s.publicationDate,
-        venue: s.source,
-        publisher: s.source,
+        venue: s.venue || s.journal || s.publisher,
+        publisher: s.publisher || s.venue || s.journal,
         domain: (() => {
           try {
             return s.url ? new URL(s.url).hostname.replace(/^www\./, "") : undefined;
@@ -1298,7 +1304,7 @@ export default function ProjectListScreen({
         title: s.title || `Source ${idx + 1}`,
         authors: s.authors || [],
         year: typeof s.year === "number" ? s.year : typeof s.year === "string" ? parseInt(s.year, 10) || undefined : undefined,
-        journal: s.venue || s.publisher || "Academic Publication",
+        journal: cleanVenue(s.venue || s.publisher),
         venue: s.venue,
         url: s.url,
         snippet: s.snippet,
@@ -1540,7 +1546,24 @@ export default function ProjectListScreen({
 
     if (!rawQuery && currentAttachments.length === 0) return;
 
+    if (targetMode === "deep-research") {
+      // Warn (never block) when the model that will lead is small or code-tuned.
+      void aiRequestParts()
+        .then(({ ring }) => {
+          const verdict = assessDeepResearchModel(ring.map((e) => ({ model: e.model, provider: e.provider, via: e.via })));
+          if (verdict.warn && verdict.message) showAppToast(verdict.message, "warning", 9000);
+        })
+        .catch(() => undefined);
+    }
+
     const query = rawQuery || (currentAttachments.some((a) => a.isImage) ? "Describe and analyze this image." : "Summarize this document.");
+
+    // Deep Research shows its editable Stage 1 plan first; the researcher presses Run to execute Stages 2-6.
+    if (targetMode === "deep-research" && !approvedSubQuestionsOverride && currentAttachments.length === 0 && rawQuery) {
+      handleProposeDeepResearchPlan(rawQuery);
+      if (textToSend === undefined) setGuideInput("");
+      return;
+    }
 
     // Documents stay with the conversation: new uploads join the ones already attached.
     const threadFiles = mergeThreadFiles(
@@ -1635,7 +1658,7 @@ export default function ProjectListScreen({
           });
           try {
             const previousQuestions = priorThreadMessages.filter((m) => m.sender === "user").map((m) => m.text);
-            liveRetrievedSources = await executeLiveSearch(buildRetrievalQuery(query, previousQuestions), { discipline: askUserSettings.preferredDiscipline });
+            liveRetrievedSources = await executeLiveSearch(buildRetrievalQuery(query, previousQuestions), { discipline: askUserSettings.preferredDiscipline, filters: askFilters });
             sourcesFound = liveRetrievedSources;
           } catch {
             // The answer still comes, marked as not based on a search.
@@ -1658,7 +1681,7 @@ export default function ProjectListScreen({
         if (askAbortRef.current) return;
 
         const matchingVault = userEmail && userVaultItems.length > 0 ? searchVaultItems(userVaultItems, query) : [];
-        const selectedVaultSources = (isVaultGroundingActive && userEmail && userVaultItems.length > 0)
+        const selectedVaultSources = ((isVaultGroundingActive || askFilters.scopes.includes("vault_only")) && userEmail && userVaultItems.length > 0)
           ? (matchingVault.length > 0 ? matchingVault : userVaultItems).slice(0, 5).map((v) => ({
             id: v.id,
             title: v.title,
@@ -1755,7 +1778,7 @@ export default function ProjectListScreen({
             if (!shouldRunClientPreSearch && !isExplicitChatOnly && liveRetrievedSources.length === 0) {
               try {
                 const previousQuestions = priorThreadMessages.filter((m) => m.sender === "user").map((m) => m.text);
-                liveRetrievedSources = await executeLiveSearch(buildRetrievalQuery(query, previousQuestions), { discipline: askUserSettings.preferredDiscipline });
+                liveRetrievedSources = await executeLiveSearch(buildRetrievalQuery(query, previousQuestions), { discipline: askUserSettings.preferredDiscipline, filters: askFilters });
                 sourcesFound = liveRetrievedSources;
                 if (liveRetrievedSources.length > 0) {
                   effectiveSystemPrompt = injectLiveGroundingToSystemPrompt(systemPrompt, liveRetrievedSources);
@@ -1899,6 +1922,20 @@ export default function ProjectListScreen({
       console.error("Website Assistant error:", e);
       // Plain words, the sources already found, and one next step: connect
       // an AI, or try again. No word count or generic follow-ups on a failure.
+      const retrievedBeforeFailure = (e as { retrieved?: { citations?: Array<Record<string, unknown>> } } | null)?.retrieved?.citations;
+      if (Array.isArray(retrievedBeforeFailure) && sourcesFound.length === 0) {
+        sourcesFound = retrievedBeforeFailure.map((c, idx) => ({
+          id: `cite-${idx + 1}`,
+          title: String(c.title || `Source ${idx + 1}`),
+          url: String(c.url || ""),
+          snippet: String(c.snippet || ""),
+          authors: Array.isArray(c.authors) ? (c.authors as string[]) : [],
+          venue: typeof c.venue === "string" ? c.venue : undefined,
+          year: typeof c.year === "number" || typeof c.year === "string" ? c.year : undefined,
+          doi: typeof c.doi === "string" ? c.doi : undefined,
+          source: c.sourceType === "scholarly" ? ("openalex" as const) : ("web" as const),
+        }));
+      }
       const failure = askFailureMessage(e, sourcesFound.length);
       const assistantMsg: WebsiteAssistantMessage = {
         id: `assistant-${Date.now()}`,
@@ -2317,6 +2354,8 @@ export default function ProjectListScreen({
       isUploading={isMainUploadingAttachment}
       mode={mainAiMode}
       onModeChange={setMainAiMode}
+      filters={askFilters}
+      onFiltersChange={setAskFilters}
       isThinking={isGuideThinking}
       placeholder={isPhone ? "Ask a research question or paste your brief…" : "Ask a question, paste your brief, or drop files…"}
       ariaLabel="Research instructions or assignment guidelines"
@@ -3320,6 +3359,7 @@ export default function ProjectListScreen({
                   onOpenLiteratureDiscovery={() => setActiveLayerWorkspace("discovery")}
                   onOpenPublishingExport={(items) => handleOpenResearchExport(items, layerWorkspaceQuery)}
                   onClose={handleCloseLayerWorkspace}
+                  query={layerWorkspaceQuery}
                 />
               ) : activeLayerWorkspace === "export" ? (
                 <ResearchExportWorkspace
@@ -3711,10 +3751,12 @@ export default function ProjectListScreen({
                                   <button
                                     type="button"
                                     onClick={() => {
+                                      const mi = guideMessages.findIndex((m) => m.id === msg.id);
+                                      const askedText = guideMessages.slice(0, mi < 0 ? guideMessages.length : mi).filter((m) => m.sender === "user").slice(-1)[0]?.text;
                                       const items = toCitationGraphSeeds(getNormalizedMsgSources(msg)).map((s, idx) =>
-                                        extractEvidenceFromPaper(s, idx)
+                                        extractEvidenceFromPaper(s, idx, frameworkIdForQuery(askedText))
                                       );
-                                      handleOpenResearchExport(items, msg.text?.slice(0, 100));
+                                      handleOpenResearchExport(items, plainTitle(askedText || msg.text || ""));
                                     }}
                                     className="-mb-px ml-auto inline-flex shrink-0 cursor-pointer items-center whitespace-nowrap py-1.5 text-neutral-500 transition-colors hover:text-neutral-900 dark:hover:text-white"
                                     title="Open Research Export Workspace (LaTeX & Overleaf Package)"
@@ -4145,177 +4187,26 @@ export default function ProjectListScreen({
                               </div>
                             );
                           })() : msg.sender === "assistant" && messageActiveTab[msg.id] === "consensus" ? (() => {
-                            const consensusSources = getNormalizedMsgSources(msg);
-                            const audit = msg.peerReviewAudit || {
-                              overallVerdict: "Empirical Rigor: High — Methodological Framework Validated",
-                              rigorScore: consensusSources.length >= 4 ? 91 : 84,
-                              critiques: [
-                                {
-                                  type: "causal_inference" as const,
-                                  title: "Observational Directionality & Endogeneity",
-                                  explanation: "Cross-sectional empirical studies observe correlation; reverse causality requires longitudinal verification.",
-                                  severity: "medium" as const,
-                                },
-                                {
-                                  type: "sample_bias" as const,
-                                  title: "Demographic & Contextual Generalizability",
-                                  explanation: "Primary datasets index primarily on high-resource institutional environments.",
-                                  severity: "low" as const,
-                                },
-                                {
-                                  type: "confounding_variable" as const,
-                                  title: "Macroeconomic & Institutional Latent Variables",
-                                  explanation: "Unobserved macroeconomic shifts during the sample windows may moderate observed effect sizes.",
-                                  severity: "low" as const,
-                                },
-                              ],
-                              methodologicalStrengths: [
-                                "Multi-source convergence across verified academic and institutional publications",
-                                "Explicit citation attribution with bracketed anti-hallucination validation",
-                                "Direct empirical alignment between theoretical claims and retrieved evidence",
-                              ],
-                              counterTheories: [
-                                "Non-linear equilibrium models predicting diminishing marginal returns",
-                                "Heterogeneous institutional adaptation dynamics under localized constraints",
-                              ],
-                            };
-
+                            const msgIdx = guideMessages.findIndex((m) => m.id === msg.id);
+                            const precedingUserText =
+                              guideMessages.slice(0, msgIdx < 0 ? guideMessages.length : msgIdx).filter((m) => m.sender === "user").slice(-1)[0]?.text || "";
+                            const toTelemetry = (list: NormalizedCitationSource[]) =>
+                              list.map((c) => ({ title: c.title, snippet: c.snippet, venue: c.venue }));
+                            const liveWithFullText = (msg.liveSources || []).map((l) => ({
+                              title: l.title,
+                              snippet: l.snippet,
+                              venue: l.venue || l.journal,
+                              fullText: Boolean(l.openAccessUrl),
+                            }));
+                            const citedList = getNormalizedMsgSources(msg);
                             return (
-                              <div className="space-y-3 pt-1">
-                                <div className="flex items-center justify-between gap-2 flex-wrap text-xs">
-                                  <div className="flex items-center gap-1.5 font-semibold text-neutral-800 dark:text-neutral-200">
-                                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
-                                    <span>Peer Reviewer 2 Adversarial Stress-Test & Scholarly Rigor Audit</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-[10.5px] font-mono font-bold px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20">
-                                      Empirical Rigor: {audit.rigorScore}/100
-                                    </span>
-                                  </div>
-                                </div>
-
-                                {/* Overall Verdict Banner */}
-                                <div className="p-3 rounded-xl bg-gradient-to-r from-purple-50/70 to-indigo-50/70 dark:from-purple-950/20 dark:to-indigo-950/20 border border-purple-200/60 dark:border-purple-800/30 flex items-start gap-2.5">
-                                  <ShieldCheck className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
-                                  <div className="space-y-0.5">
-                                    <div className="text-xs font-bold text-neutral-900 dark:text-neutral-100">
-                                      {audit.overallVerdict}
-                                    </div>
-                                    <p className="text-[11px] text-neutral-600 dark:text-neutral-300 leading-snug">
-                                      Multi-model adversarial audit evaluates potential causal fallacies, confounding factors, and theoretical contradictions across {consensusSources.length} cited sources.
-                                    </p>
-                                  </div>
-                                </div>
-
-                                {/* 3 Metrics: Empirical Consensus, Evidentiary Breadth, Citation Standard */}
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                  <div className="p-3 rounded-xl bg-purple-50/60 dark:bg-purple-950/20 border border-purple-200/60 dark:border-purple-800/30 flex flex-col gap-1">
-                                    <span className="text-[10px] font-semibold uppercase tracking-wider text-purple-700 dark:text-purple-300">
-                                      Empirical Consensus
-                                    </span>
-                                    <span className="text-xs font-bold text-neutral-900 dark:text-neutral-100">
-                                      {consensusSources.length >= 4 ? "Convergent Literature" : "Emerging Consensus"}
-                                    </span>
-                                    <p className="text-[10.5px] text-neutral-600 dark:text-neutral-400 leading-tight">
-                                      {consensusSources.length >= 4
-                                        ? "Independent empirical and institutional analyses converge on primary causal mechanisms."
-                                        : "Preliminary multi-source evidence indicates consistent directionality with open variables."}
-                                    </p>
-                                  </div>
-
-                                  <div className="p-3 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/30 flex flex-col gap-1">
-                                    <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
-                                      Evidentiary Breadth
-                                    </span>
-                                    <span className="text-xs font-bold text-neutral-900 dark:text-neutral-100">
-                                      {consensusSources.length} Independent Sources
-                                    </span>
-                                    <p className="text-[10.5px] text-neutral-600 dark:text-neutral-400 leading-tight">
-                                      Combines peer-reviewed literature, policy reports, and Knowledge Vault evidence.
-                                    </p>
-                                  </div>
-
-                                  <div className="p-3 rounded-xl bg-sky-50/60 dark:bg-sky-950/20 border border-sky-200/60 dark:border-sky-800/30 flex flex-col gap-1">
-                                    <span className="text-[10px] font-semibold uppercase tracking-wider text-sky-700 dark:text-sky-300">
-                                      Citation Standard
-                                    </span>
-                                    <span className="text-xs font-bold text-neutral-900 dark:text-neutral-100 uppercase">
-                                      {askCitationStyle} Strict Audit
-                                    </span>
-                                    <p className="text-[10.5px] text-neutral-600 dark:text-neutral-400 leading-tight">
-                                      Every claim mapped to authenticated inline brackets with active anti-hallucination scrub.
-                                    </p>
-                                  </div>
-                                </div>
-
-                                {/* Adversarial Methodological Critiques */}
-                                <div className="p-3 rounded-xl bg-neutral-50/80 dark:bg-white/[0.03] border border-neutral-200/70 dark:border-white/10 space-y-2.5">
-                                  <div className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-800 dark:text-neutral-200">
-                                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
-                                    <span>Peer Reviewer 2: Methodological Inquiries & Stress-Tests</span>
-                                  </div>
-                                  <div className="space-y-2">
-                                    {audit.critiques.map((critique, cIdx) => (
-                                      <div key={cIdx} className="p-2.5 rounded-lg bg-white dark:bg-neutral-800/60 border border-neutral-200/60 dark:border-white/5 space-y-1">
-                                        <div className="flex items-center justify-between gap-2">
-                                          <span className="text-[11px] font-bold text-neutral-900 dark:text-neutral-100">
-                                            {critique.title}
-                                          </span>
-                                          <div className="flex items-center gap-1.5">
-                                            <span className="text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded font-mono bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-300">
-                                              {critique.type.replace(/_/g, " ")}
-                                            </span>
-                                            <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${critique.severity === "high"
-                                              ? "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-300/40"
-                                              : critique.severity === "medium"
-                                                ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-300/40"
-                                                : "bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-300/40"
-                                              }`}>
-                                              {critique.severity.toUpperCase()} RISK
-                                            </span>
-                                          </div>
-                                        </div>
-                                        <p className="text-[10.5px] text-neutral-600 dark:text-neutral-300 leading-relaxed">
-                                          {critique.explanation}
-                                        </p>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-
-                                {/* Competing Theoretical Paradigms & Strengths */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                  <div className="p-3 rounded-xl bg-neutral-50/80 dark:bg-white/[0.03] border border-neutral-200/70 dark:border-white/10 space-y-1.5">
-                                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-800 dark:text-neutral-200">
-                                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-                                      <span>Methodological Strengths</span>
-                                    </div>
-                                    <ul className="space-y-1 text-[10.5px] text-neutral-600 dark:text-neutral-300 pl-1">
-                                      {audit.methodologicalStrengths.map((str, sIdx) => (
-                                        <li key={sIdx} className="flex items-start gap-1.5">
-                                          <span className="text-emerald-500 font-bold shrink-0">✓</span>
-                                          <span>{str}</span>
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </div>
-
-                                  <div className="p-3 rounded-xl bg-neutral-50/80 dark:bg-white/[0.03] border border-neutral-200/70 dark:border-white/10 space-y-1.5">
-                                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-800 dark:text-neutral-200">
-                                      <Scale className="w-3.5 h-3.5 text-purple-500" />
-                                      <span>Competing Theoretical Paradigms</span>
-                                    </div>
-                                    <ul className="space-y-1 text-[10.5px] text-neutral-600 dark:text-neutral-300 pl-1">
-                                      {audit.counterTheories.map((ct, ctIdx) => (
-                                        <li key={ctIdx} className="flex items-start gap-1.5">
-                                          <span className="text-purple-500 font-bold shrink-0">⚡</span>
-                                          <span>{ct}</span>
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </div>
-                                </div>
-                              </div>
+                              <AnswerReviewPanel
+                                prompt={precedingUserText}
+                                answerText={msg.text || ""}
+                                retrieved={liveWithFullText.length > 0 ? liveWithFullText : toTelemetry(citedList)}
+                                cited={toTelemetry(citedList)}
+                                audit={msg.peerReviewAudit}
+                              />
                             );
                           })() : msg.sender === "assistant" ? (
                             <div className="space-y-3">
@@ -4477,6 +4368,28 @@ export default function ProjectListScreen({
                               </button>
                             </div>
                           )}
+                          {msg.sender === "assistant" && !msg.error && msg.kind !== "help" && msg.id !== "init" && msg.id !== "reset-assistant" &&
+                            msg.id === guideMessages[guideMessages.length - 1]?.id && !isGuideThinking &&
+                            buildAnswerTelemetry({ prompt: "", answerText: msg.text || "", retrieved: [], cited: [] }).looksTruncated && (
+                            <IncompleteAnswerBanner
+                              onContinue={() => {
+                                const tail = (msg.text || "").slice(-400);
+                                void handleSendGuideMessage(
+                                  `Continue your previous answer exactly where it stopped, without repeating earlier text. It ended with: "...${tail}"`,
+                                  undefined,
+                                  "normal"
+                                );
+                              }}
+                              onRetryAnotherModel={() => {
+                                const mi = guideMessages.findIndex((m) => m.id === msg.id);
+                                const asked = guideMessages.slice(0, mi < 0 ? guideMessages.length : mi).filter((m) => m.sender === "user").slice(-1)[0];
+                                if (!asked) return;
+                                requestNextModelOnce();
+                                void handleSendGuideMessage(asked.text, undefined, msg.mode === "deep-research" ? "deep-research" : "normal");
+                              }}
+                            />
+                          )}
+
                           {msg.sender === "assistant" && !msg.error && msg.kind !== "help" && msg.id !== "init" && msg.id !== "reset-assistant" && (
                             <PostResponseActionBar
                               message={{
@@ -4662,6 +4575,8 @@ export default function ProjectListScreen({
                     isUploading={isSidebarUploadingAttachment}
                     mode={sidebarAiMode}
                     onModeChange={setSidebarAiMode}
+                    filters={askFilters}
+                    onFiltersChange={setAskFilters}
                     isThinking={isGuideThinking}
                     onStop={handleStopGuideGeneration}
                     placeholder="Ask a research question…"
