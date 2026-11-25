@@ -41,6 +41,18 @@ export const PLATFORM_FACTS = `ABOUT SCHOLAR CORE (answer questions about the pl
 - AI Access: the user connects their own provider keys (BYOK) or a local model runner; every workspace and AskScholar use the same connection and model choice. A premium tier is not available yet.
 - Deep Research: a multi-step workflow (plan, search, read, cross-check, gap-fill, synthesise) that produces a cited report.`;
 
+const PLATFORM_QUESTION =
+  /\b(?:scholar ?core|ask ?scholar|knowledge vault|vault|ai access|byok|api key|workspace|coursework|journal article|slides|deep research|quick scholar|this (?:app|platform|site|tool)|your (?:app|platform|features)|how (?:do|can) i (?:use|connect|set up|start|create|export|import))\b/i;
+
+/**
+ * The platform fact sheet, only for questions about Scholar Core itself. It is left out of the
+ * system prompt so that prompt stays the same on every request (providers cache a stable prefix)
+ * and an ordinary research question does not pay for it.
+ */
+export function platformFactsFor(question: string): string {
+  return PLATFORM_QUESTION.test(question) ? PLATFORM_FACTS : "";
+}
+
 const CITATION_STANDARD = (style: string) => `CITATIONS AND REFERENCES:
 - Cite in ${style} only where a source supports a specific claim; group sources that support the same point. Match every in-text citation to exactly one entry in the reference list and every entry to a citation.
 - Use only sources supplied in this conversation's evidence. Never invent authors, years, titles, venues, DOIs or URLs, and never write placeholders such as "Unknown Author" or "n.d.".
@@ -51,8 +63,6 @@ const CITATION_STANDARD = (style: string) => `CITATIONS AND REFERENCES:
 export function buildAskSearchPrompt(opts: { style: string; length: string }): string {
   const style = askStyleDescription(opts.style);
   return `You are AskScholar, the research assistant of Scholar Core: a general-purpose assistant that writes, explains, analyses and researches across every field, and that grounds factual and scholarly claims in live, verifiable sources.
-
-${PLATFORM_FACTS}
 
 Answer from the verified search results provided. Lead with a direct answer, then a synthesised argument (## headings when long) in considered prose rather than bullet dumps, then limitations. Compare competing perspectives where they exist, prefer official, institutional and peer-reviewed sources, and say when sources disagree. ${askLengthInstruction(opts.length)}
 
@@ -65,7 +75,6 @@ export function buildAskGeneralPrompt(opts: { base: string; style: string; lengt
   return `${opts.base}
 
 OPERATING MODE: AskScholar. You are a general-purpose assistant: answer, write, edit, translate, code, plan and analyse as asked, adapting form to the request. Do not refuse a legitimate task for being outside academia.
-${PLATFORM_FACTS}
 - Use academic structure for research questions (direct answer, supporting argument, limitations). ${askLengthInstruction(opts.length)}
 - Cite only when substantive claims rest on external sources; do not attach references to creative or conversational replies.
 ${CITATION_STANDARD(style)}
