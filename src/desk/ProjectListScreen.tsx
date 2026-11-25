@@ -3536,7 +3536,7 @@ export default function ProjectListScreen({
                           {/* Deep Research Explicit State Machine (Section 12) */}
                           {msg.deepResearchState && (
                             <DeepResearchWorkflowCard
-                              key={`${msg.id}-${msg.deepResearchState.planSource ?? "plan"}`}
+                              key={`${msg.id}-${msg.deepResearchState.planSource === "ai" ? "ai" : "plan"}`}
                               planSource={msg.deepResearchState.planSource}
                               phase={msg.deepResearchState.phase}
                               subQuestions={msg.deepResearchState.subQuestions}
