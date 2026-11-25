@@ -145,15 +145,13 @@ export function CitationReconciliationCard({
 
         <div className="col-span-2 sm:col-span-1 p-3.5 rounded-xl bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)] space-y-1">
           <span className="text-xs font-medium text-[color:var(--text-muted)] block">
-            Match Rate
+            Matched to a source
           </span>
           <div className={`text-xl font-bold tabular-nums ${isFullyReconciled ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
-            {audit.totalInTextCitations > 0
-              ? `${Math.round(((audit.totalInTextCitations - activeUnresolved.length) / audit.totalInTextCitations) * 100)}%`
-              : "100%"}
+            {audit.totalInTextCitations - activeUnresolved.length} / {audit.totalInTextCitations}
           </div>
           <span className="text-xs text-[color:var(--text-muted)] block">
-            Resolution integrity
+            Citations in your prose
           </span>
         </div>
       </div>
@@ -232,7 +230,7 @@ export function CitationReconciliationCard({
       {/* Grounding Explanation */}
       <div className="pt-3 border-t border-[color:var(--border-subtle)]">
         <p className="text-xs text-[color:var(--text-muted)] leading-relaxed">
-          Scholar OS strictly prevents hallucinated citations. Every bibliographic entry in the camera-ready export is guaranteed to correspond to a real, verified peer-reviewed source or user upload.
+          The reference list is built only from the sources you approved, and a citation that matches none of them is listed above rather than exported. It does not check that a source supports the claim it is attached to: that is still yours to read.
         </p>
       </div>
     </div>
