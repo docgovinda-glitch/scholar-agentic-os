@@ -86,4 +86,18 @@ describe("InlineCitationBadge & Academic Citation Micro-Card (Phase 2)", () => {
     fireEvent.click(matrixBtn);
     expect(handleAddToEvidence).toHaveBeenCalledWith(SAMPLE_CITATION);
   });
+
+  it("shows the passage that supports the cited sentence, and says so when none does", () => {
+    const cite = {
+      ...SAMPLE_CITATION,
+      snippet: "We study alliance formation. States balance against threats rather than against raw power. Data cover 1945 to 2000.",
+    };
+    const { unmount } = render(<InlineCitationBadge num={1} label="[1]" citation={cite} claim="States balance against perceived threats rather than power" />);
+    expect(screen.getByTestId("citation-supporting-passage")).toHaveTextContent(/balance against threats rather than against raw power/);
+    expect(screen.queryByText(/Data cover 1945/)).toBeNull();
+    unmount();
+    render(<InlineCitationBadge num={1} label="[1]" citation={cite} claim="Monetary policy lowers inflation expectations" />);
+    expect(screen.getByTestId("citation-no-passage")).toBeInTheDocument();
+    expect(screen.queryByTestId("citation-supporting-passage")).toBeNull();
+  });
 });

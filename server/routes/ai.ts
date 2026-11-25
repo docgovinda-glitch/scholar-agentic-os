@@ -444,6 +444,16 @@ export function registerAIRoutes(
       }
 
       // ── Workflow: Deep Research Mode ──
+      const normalizeExcludedSources = (raw: unknown): Array<{ title?: string; doi?: string; url?: string }> =>
+        Array.isArray(raw)
+          ? raw.slice(0, 100).flatMap((e) => {
+              if (!e || typeof e !== "object") return [];
+              const r = e as Record<string, unknown>;
+              const pick = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 500) : undefined);
+              const out = { title: pick(r.title), doi: pick(r.doi), url: pick(r.url) };
+              return out.title || out.doi || out.url ? [out] : [];
+            })
+          : [];
       const approvedSubQuestions = Array.isArray(req.body?.approvedSubQuestions)
         ? req.body.approvedSubQuestions
         : undefined;
@@ -477,6 +487,7 @@ export function registerAIRoutes(
             cleanStyle,
             {
               approvedSubQuestions,
+              excludedSources: normalizeExcludedSources(req.body?.excludedSources),
               preRetrievedSources: normalizedPreRetrieved,
               onSourcesRetrieved: sse ? (citations, stages) => sse.send({ type: "sources", citations, stages }) : undefined,
               forceBrowserHandOff: !hasBrowserResult && where !== "server",

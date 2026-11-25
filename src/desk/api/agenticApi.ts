@@ -25,6 +25,7 @@ export async function executeAgenticQuery(
     citationStyle: req.citationStyle,
     answerLength: req.answerLength,
     approvedSubQuestions: req.approvedSubQuestions,
+    excludedSources: req.excludedSources,
     preRetrievedSources: req.preRetrievedSources,
     files: req.files,
     images: req.images,

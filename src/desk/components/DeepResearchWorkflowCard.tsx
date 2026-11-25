@@ -1,3 +1,4 @@
+import type { PreviewSource, SourceChoice } from "../../domain/ask/sourceSelection";
 import { useState } from "react";
 import {
   Compass,
@@ -84,6 +85,10 @@ export interface DeepResearchWorkflowCardProps {
   readCount?: number;
   citedCount?: number;
   onUpdateSubQuestions?: (nextQuestions: string[]) => void;
+  /** Sources found for this plan; pin keeps one, exclude drops it from the run. */
+  previewSources?: PreviewSource[];
+  previewStatus?: "loading" | "ready" | "failed";
+  onSetSourceChoice?: (index: number, choice: SourceChoice) => void;
   onApprovePlan: (approvedPlanOrQuestions: any) => void;
   onCancel?: () => void;
 }
@@ -94,6 +99,9 @@ export function DeepResearchWorkflowCard({
   plan,
   subQuestions,
   onUpdateSubQuestions,
+  previewSources,
+  previewStatus,
+  onSetSourceChoice,
   onApprovePlan,
   onCancel,
 }: DeepResearchWorkflowCardProps) {
@@ -266,6 +274,61 @@ export function DeepResearchWorkflowCard({
               <span>Add</span>
             </button>
           </div>
+
+
+          {(previewStatus || (previewSources && previewSources.length > 0)) && (
+            <div className="space-y-1.5 pt-1" data-testid="plan-source-preview">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">
+                Sources found so far (pin to keep, exclude to drop)
+              </label>
+              {previewStatus === "loading" && (
+                <p className="text-[11px] text-neutral-500">Searching for a preview of likely sources…</p>
+              )}
+              {previewStatus === "failed" && (
+                <p className="text-[11px] text-neutral-500">Source preview unavailable. The run will still search on its own.</p>
+              )}
+              <ul className="space-y-1 max-h-56 overflow-y-auto scholar-scrollbar pr-1">
+                {(previewSources || []).map((src, idx) => (
+                  <li
+                    key={`${src.doi || src.url || src.title}-${idx}`}
+                    data-choice={src.choice || "none"}
+                    className={`flex items-start gap-2 rounded-lg border px-2 py-1.5 text-[11px] ${
+                      src.choice === "excluded"
+                        ? "border-neutral-200 bg-neutral-50 opacity-60 dark:border-white/10 dark:bg-white/5"
+                        : src.choice === "pinned"
+                          ? "border-purple-300 bg-purple-50/60 dark:border-purple-700/50 dark:bg-purple-950/20"
+                          : "border-neutral-200 dark:border-white/10"
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className={`font-semibold text-neutral-900 dark:text-neutral-100 ${src.choice === "excluded" ? "line-through" : ""}`}>{src.title}</div>
+                      <div className="truncate text-neutral-500">
+                        {[Array.isArray(src.authors) && src.authors[0], src.year, src.venue || src.journal].filter(Boolean).join(" · ")}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      aria-pressed={src.choice === "pinned"}
+                      aria-label={`Pin ${src.title}`}
+                      onClick={() => onSetSourceChoice?.(idx, "pinned")}
+                      className={`shrink-0 cursor-pointer rounded-md border px-1.5 py-0.5 font-medium ${src.choice === "pinned" ? "border-purple-500 bg-purple-600 text-white" : "border-neutral-200 text-neutral-600 hover:bg-neutral-100 dark:border-white/10 dark:text-neutral-300 dark:hover:bg-white/10"}`}
+                    >
+                      Pin
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={src.choice === "excluded"}
+                      aria-label={`Exclude ${src.title}`}
+                      onClick={() => onSetSourceChoice?.(idx, "excluded")}
+                      className={`shrink-0 cursor-pointer rounded-md border px-1.5 py-0.5 font-medium ${src.choice === "excluded" ? "border-neutral-700 bg-neutral-700 text-white" : "border-neutral-200 text-neutral-600 hover:bg-neutral-100 dark:border-white/10 dark:text-neutral-300 dark:hover:bg-white/10"}`}
+                    >
+                      Exclude
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <div className="flex items-center justify-end gap-2 pt-2">
             {onCancel && (

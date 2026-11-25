@@ -96,6 +96,7 @@ import { buildAnswerTelemetry } from "../domain/ask/answerTelemetry";
 import { aiRequestParts, requestNextModelOnce } from "./ai/keyring";
 import { frameworkIdForQuery } from "../domain/ask/evidenceFramework";
 import { DEFAULT_SCHOLAR_FILTERS, type ScholarFilters } from "../domain/ask/scholarFilters";
+import { selectionFrom, setChoice as setSourceChoice, type PreviewSource } from "../domain/ask/sourceSelection";
 import { assessDeepResearchModel } from "../domain/ask/modelFitness";
 import { cleanVenue, normalizeAuthorList, plainTitle } from "../shared/authorNames";
 import { type EvidenceMatrixItem, extractEvidenceFromPaper } from "../services/evidence/evidenceExtractionService";
@@ -1492,9 +1493,36 @@ export default function ProjectListScreen({
         subQuestions,
       },
     };
+    planMsg.deepResearchState = { ...planMsg.deepResearchState!, previewStatus: "loading", previewSources: [] };
     setGuideMessages((prev) => [...prev, userMsg, planMsg]);
     setGuideInput("");
-  }, []);
+    const patchPreview = (patch: Partial<NonNullable<WebsiteAssistantMessage["deepResearchState"]>>) =>
+      setGuideMessages((prev) =>
+        prev.map((m) => (m.id === planMsg.id && m.deepResearchState ? { ...m, deepResearchState: { ...m.deepResearchState, ...patch } } : m))
+      );
+    // A preview of likely sources, so the researcher can pin or exclude before the run.
+    void executeLiveSearch(query, { discipline: askUserSettings.preferredDiscipline, filters: askFilters, limit: 12 })
+      .then((found) =>
+        patchPreview({
+          previewStatus: "ready",
+          previewSources: found.map((f) => ({
+            title: f.title,
+            url: f.url,
+            doi: f.doi,
+            snippet: f.snippet,
+            authors: f.authors,
+            year: f.year,
+            publicationDate: f.publicationDate,
+            venue: f.venue,
+            journal: f.journal,
+            openAccessUrl: f.openAccessUrl,
+            source: f.source,
+            sourceType: f.sourceType,
+          })),
+        })
+      )
+      .catch(() => patchPreview({ previewStatus: "failed" }));
+  }, [askFilters, askUserSettings.preferredDiscipline]);
 
   const handleApproveDeepResearchPlan = useCallback(
     async (planMsgId: string, approvedSubQuestions: string[]) => {
@@ -1521,7 +1549,8 @@ export default function ProjectListScreen({
       };
       updatePhase("plan_approved");
       updatePhase("searching");
-      await handleSendGuideMessage(baseQuery, undefined, "deep-research", undefined, approvedSubQuestions);
+      const selection = selectionFrom(targetMsg?.deepResearchState?.previewSources ?? []);
+      await handleSendGuideMessage(baseQuery, undefined, "deep-research", undefined, approvedSubQuestions, selection);
       updatePhase("report_ready");
     },
     [guideMessages]
@@ -1532,7 +1561,8 @@ export default function ProjectListScreen({
     attachmentsToSend?: AgentAttachmentItem[],
     modeToSend?: "normal" | "search" | "deep-research",
     baseMessagesOverride?: WebsiteAssistantMessage[],
-    approvedSubQuestionsOverride?: string[]
+    approvedSubQuestionsOverride?: string[],
+    sourceSelection?: { pinned: PreviewSource[]; excluded: PreviewSource[] }
   ) {
     const isSidebarDirect = textToSend === undefined;
     const rawQuery = (textToSend !== undefined ? textToSend : guideInput).trim();
@@ -1752,7 +1782,8 @@ export default function ProjectListScreen({
               citationStyle: askCitationStyle,
               answerLength: askUserSettings.answerLengthPreference,
               approvedSubQuestions: approvedSubQuestionsOverride,
-              preRetrievedSources: liveRetrievedSources,
+              excludedSources: sourceSelection?.excluded.map((e) => ({ title: e.title, doi: e.doi, url: e.url })),
+              preRetrievedSources: sourceSelection?.pinned.length ? [...(sourceSelection.pinned as typeof liveRetrievedSources), ...liveRetrievedSources] : liveRetrievedSources,
               files: threadFiles,
               images: currentAttachments.filter((a) => a.imageData).map((a) => a.imageData!),
               history,
@@ -4271,6 +4302,17 @@ export default function ProjectListScreen({
                             <DeepResearchWorkflowCard
                               phase={msg.deepResearchState.phase}
                               subQuestions={msg.deepResearchState.subQuestions}
+                              previewSources={msg.deepResearchState.previewSources}
+                              previewStatus={msg.deepResearchState.previewStatus}
+                              onSetSourceChoice={(idx, choice) =>
+                                setGuideMessages((prev) =>
+                                  prev.map((m) =>
+                                    m.id === msg.id && m.deepResearchState?.previewSources
+                                      ? { ...m, deepResearchState: { ...m.deepResearchState, previewSources: setSourceChoice(m.deepResearchState.previewSources, idx, choice) } }
+                                      : m
+                                  )
+                                )
+                              }
                               searchedCount={msg.deepResearchState.searchedCount}
                               readCount={msg.deepResearchState.readCount}
                               citedCount={msg.deepResearchState.citedCount}

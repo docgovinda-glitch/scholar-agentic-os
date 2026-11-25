@@ -11,6 +11,7 @@
  * Stage 7: Follow-Up & Context Preservation — Generate contextual follow-up questions and preserve source registry.
  */
 
+import { isSameWork } from "../../../src/shared/retrieval/identity.ts";
 import { z } from "zod";
 import { executeWebSearch, sanitizeUntrustedExternalText, type SearchResultItem } from "./webSearchEngine.ts";
 import { retrieveSources, retrievedToSearchItem } from "../retrieval/retrievalService.ts";
@@ -282,6 +283,8 @@ export interface DeepResearchExecutionOptions {
   forceBrowserHandOff?: boolean;
   verifyAndReadBrowserResult?: (systemPrompt: string, userPrompt: string) => string | null;
   /** Called with everything Stages 1-5 found, before synthesis starts, so a failed synthesis never loses the sources. */
+  /** Works the researcher excluded in the plan step; they are never registered, however they are found. */
+  excludedSources?: Array<{ title?: string; doi?: string; url?: string }>;
   onSourcesRetrieved?: (citations: SearchResultItem[], stages: ResearchStageTelemetry[]) => void;
 }
 
@@ -432,7 +435,9 @@ export async function executeDeepResearch(
   const seenUrls = new Set<string>();
   const seenTitles = new Set<string>();
 
+  const excludedWorks = Array.isArray(options?.excludedSources) ? options!.excludedSources : [];
   const registerSource = (source: SearchResultItem): boolean => {
+    if (excludedWorks.length > 0 && excludedWorks.some((e) => isSameWork({ title: source.title, doi: (source as { doi?: string }).doi, url: source.url }, e))) return false;
     const normUrl = (source.url || "").toLowerCase().trim();
     const normTitle = (source.title || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
     if ((normUrl && seenUrls.has(normUrl)) || (normTitle && seenTitles.has(normTitle))) {

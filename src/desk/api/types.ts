@@ -47,6 +47,8 @@ export interface AgenticQueryRequest {
   citationStyle?: string;
   answerLength?: "concise" | "standard" | "detailed";
   approvedSubQuestions?: string[];
+  /** Works the researcher excluded in the Deep Research plan step. */
+  excludedSources?: Array<{ title?: string; doi?: string; url?: string }>;
   preRetrievedSources?: Array<{
     id?: string;
     title: string;

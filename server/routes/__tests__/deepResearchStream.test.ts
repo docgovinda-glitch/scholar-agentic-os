@@ -51,4 +51,21 @@ describe("Deep Research stream", () => {
     expect(ev.at(-1)).toMatchObject({ type: "error" });
     expect(String(ev.at(-1)!.message)).toMatch(/All connected AI models failed/);
   });
+
+  it("passes the researcher's excluded sources to the engine, trimmed and capped", async () => {
+    executeDeepResearch.mockReset();
+    executeDeepResearch.mockImplementation(async () => {
+      throw new Error("stop");
+    });
+    await request(app())
+      .post("/api/ai/agent")
+      .set("Accept", "text/event-stream")
+      .send({
+        prompt: "Compare Wendt and Mearsheimer",
+        mode: "deep-research",
+        excludedSources: [{ title: " Offensive Realism Revisited ", doi: "10.1017/b2" }, { nothing: true }, "junk", null],
+      });
+    const options = executeDeepResearch.mock.calls.at(-1)![7] as { excludedSources: unknown[] };
+    expect(options.excludedSources).toEqual([{ title: "Offensive Realism Revisited", doi: "10.1017/b2", url: undefined }]);
+  });
 });
