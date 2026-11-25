@@ -28,6 +28,7 @@ import { countExactWords } from "../src/utils/wordBudgetAllocator.ts";
 import { evaluateBurstiness } from "../src/utils/scholarlyVoiceGuard.ts";
 import { chunkAndRerankEvidence } from "../src/services/semanticRagEngine.ts";
 import { decideAskMode } from "../../src/shared/askRouting.ts";
+import { buildConversationContext, normalizeAskHistory } from "../../src/shared/askConversation.ts";
 import { ASK_BASE_IDENTITY, askStyleDescription } from "../../src/shared/askPrompts.ts";
 import { deleteThread, listThreads, parseThreads, saveThreads } from "../src/askThreads/threadStore.ts";
 
@@ -623,14 +624,8 @@ export function registerAIRoutes(
       }
 
       // 4. Assemble Conversation History
-      let conversationHistoryText = "";
-      if (history && history.length > 0) {
-        conversationHistoryText = "Prior Conversation Context:\n";
-        for (const msg of history.slice(-6)) {
-          conversationHistoryText += `${msg.role === "user" ? "User" : "Scholar Core"}: ${msg.content}\n`;
-        }
-        conversationHistoryText += "\n";
-      }
+      // Last turns nearly in full, older ones shortened, earlier reference lists left out (askConversation.ts).
+      const conversationHistoryText = buildConversationContext(normalizeAskHistory(history));
 
       const styleDescription = askStyleDescription(cleanStyle);
 
@@ -678,6 +673,11 @@ Formatting & Verification Rules:
       if (hasBrowserResult && incomingLlmResult === null) {
         incomingLlmResult = readVerifiedBrowserResult(req, effectiveSystemPrompt, assembledUserPrompt);
       }
+
+      // Prompt size per Ask call (about 4 characters a token), so token savings can be measured.
+      console.info(
+        `[ask] mode=${mode} sources=${citations.length} history=${conversationHistoryText.length}ch system=${effectiveSystemPrompt.length}ch user=${assembledUserPrompt.length}ch ~${Math.round((effectiveSystemPrompt.length + assembledUserPrompt.length) / 4)}tok`
+      );
 
       // 6. Execute Agent with Multimodal & Model Failover Support
       if (!incomingLlmResult && (await aiAvailability(req, normalizedImages.length > 0 ? "vision" : "drafting").catch(() => "server" as const)) !== "server") {

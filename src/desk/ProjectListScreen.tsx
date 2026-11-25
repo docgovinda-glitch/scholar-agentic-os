@@ -102,6 +102,7 @@ import { type PromptMode } from "./PromptBarActionMenu";
 import { AskPromptBox } from "./ask/AskPromptBox";
 import { ASK_BASE_IDENTITY, buildAskGeneralPrompt } from "../shared/askPrompts";
 import { decideAskMode, isTimeSensitiveQuery } from "../shared/askRouting";
+import { MAX_TURNS, withConversation } from "../shared/askConversation";
 import {
   ASK_SCHOLAR_CITATION_STYLES,
   formatAskScholarBibliography,
@@ -1446,7 +1447,7 @@ export default function ProjectListScreen({
         // Assemble conversation history for continuous context
         const history = priorThreadMessages
           .filter((m) => m.id !== "init" && m.id !== "reset-assistant" && !m.error)
-          .slice(-6)
+          .slice(-MAX_TURNS)
           .map((m) => ({
             role: m.sender === "user" ? ("user" as const) : ("assistant" as const),
             content: m.text,
@@ -1529,52 +1530,9 @@ export default function ProjectListScreen({
           ? injectLiveGroundingToSystemPrompt(systemPrompt, liveRetrievedSources)
           : systemPrompt;
 
-        const isAcademicOrDeliverable =
-          !isExplicitChatOnly &&
-          (targetMode !== "normal" ||
-            query.toLowerCase().includes("deep research") ||
-            query.toLowerCase().includes("search the web") ||
-            /\b(?:essay|paper|coursework|thesis|dissertation|proposal|review|analysis|history|study)\b/i.test(query));
-
-        if (currentAttachments.length === 0 && threadFiles.length === 0 && targetMode === "normal" && !isAcademicOrDeliverable) {
-          // Standard text generation — streams tokens live via executeAgenticLLM
-          try {
-            const txt = await executeAgenticLLM(effectiveSystemPrompt, query, "simple", (chunk) => {
-              if (!askAbortRef.current) {
-                setStreamingGuideText((prev) => prev + chunk);
-              }
-            });
-            agentResponse = { ok: true, text: txt, mode: "chat", citationStyle: askCitationStyle };
-          } catch {
-            if (askAbortRef.current) return;
-            // Server fallback
-            agentResponse = await executeAgenticQuery({
-              prompt: query,
-              mode: targetMode,
-              citationStyle: askCitationStyle,
-              answerLength: askUserSettings.answerLengthPreference,
-              preRetrievedSources: liveRetrievedSources,
-              history,
-              vaultSources: selectedVaultSources,
-              onStageUpdate: (update) => {
-                if (!askAbortRef.current) {
-                  if (update?.status) {
-                    setAskPhase({ step: "searching", detail: update.status });
-                  }
-                  if (update?.stage) {
-                    setActiveResearchStage(update.stage);
-                  }
-                }
-              },
-              onChunk: (chunk) => {
-                if (!askAbortRef.current) {
-                  setStreamingGuideText((prev) => prev + chunk);
-                }
-              },
-            });
-          }
-        } else {
-          // Substantive scholarly retrieval query, Deep Research, or multimodal
+        // Every answer goes through the server (one prompt, memory, citation checks); the browser
+        // runs the model itself only when the server hands the prompt back (426) or cannot answer.
+        {
           try {
             agentResponse = await executeAgenticQuery({
               prompt: query,
@@ -1621,7 +1579,7 @@ export default function ProjectListScreen({
             // The server could not answer: try the user's own key directly from
             // this browser, and say so (an answer from a different path is never silent).
             try {
-              const clientTxt = await executeAgenticLLM(effectiveSystemPrompt, query, "reasoning", (chunk) => {
+              const clientTxt = await executeAgenticLLM(effectiveSystemPrompt, withConversation(query, history), "reasoning", (chunk) => {
                 if (!askAbortRef.current) {
                   setStreamingGuideText((prev) => prev + chunk);
                 }
