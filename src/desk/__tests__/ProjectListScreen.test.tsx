@@ -802,9 +802,9 @@ describe("minimal website assistant", () => {
     expect(input).toBeInTheDocument();
   });
 
-  it("answers general inquiries using connected AI while keeping suggestive questions useful for the platform", async () => {
+  it("answers general inquiries through the server, never a browser-only path", async () => {
     listProjects.mockResolvedValue({ items: [] });
-    executeAgenticLLM.mockResolvedValueOnce("Quantum coherence in biological systems facilitates near-unity energy transfer efficiency.");
+    executeAgenticQuery.mockResolvedValueOnce({ ok: true, text: "Quantum coherence in biological systems facilitates near-unity energy transfer efficiency.", mode: "chat" });
 
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
@@ -818,7 +818,9 @@ describe("minimal website assistant", () => {
     fireEvent.click(sendBtn);
 
     expect(await screen.findByText(/Quantum coherence in biological systems facilitates/i, {}, { timeout: 2000 })).toBeInTheDocument();
-    expect(executeAgenticLLM).toHaveBeenCalled();
+    // Every answer goes through the server (one prompt, memory, citation checks); the browser does not call the model itself.
+    expect(executeAgenticQuery).toHaveBeenCalled();
+    expect(executeAgenticLLM).not.toHaveBeenCalled();
   });
 
   it("does not call LLM for general inquiries in guest mode, prompting to sign in instead", async () => {
