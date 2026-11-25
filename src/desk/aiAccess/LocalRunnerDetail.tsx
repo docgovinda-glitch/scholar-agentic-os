@@ -2,8 +2,11 @@ import { useState, useMemo } from "react";
 import { resolveRunnerEndpoint, type LocalRunnerSpec } from "../../config/localRunnerCatalog";
 import { isRemoteHttpsEndpoint } from "../../platform/router/baseUrl";
 import {
+  detectUserOS,
   diagnoseOllamaConnection,
   generateDiagnosticReport,
+  getCurrentAppOrigin,
+  getOllamaOriginSetupCommand,
   type OllamaDiagnosisResult,
   type OllamaModelInfo,
 } from "../../services/ollamaService";
@@ -56,6 +59,15 @@ export default function LocalRunnerDetail({
   // A public https address (Cloudflare Tunnel to a Kaggle/Colab/Modal GPU, a LiteLLM gateway) is called by Scholar's
   // server, not by this browser, whose security policy only allows runners on this computer.
   const remoteEndpoint = isRemoteHttpsEndpoint(resolveRunnerEndpoint(runner, endpoint));
+
+  const defaultOriginSetup = useMemo(() => {
+    if (runner.id !== "ollama") return null;
+    const os = detectUserOS();
+    return { os, command: getOllamaOriginSetupCommand(os, getCurrentAppOrigin()) };
+  }, [runner.id]);
+
+  const originSetupOs = diagnosis?.os ?? defaultOriginSetup?.os ?? null;
+  const originSetupCommand = diagnosis?.requiredOriginCommand ?? defaultOriginSetup?.command ?? null;
 
   // Filter models based on selection
   const filteredModels = useMemo(() => {
@@ -255,20 +267,20 @@ export default function LocalRunnerDetail({
           <div className="space-y-2">
             <p className="text-sm text-[color:var(--text-secondary)]">{runner.corsGuidance}</p>
 
-            {diagnosis?.requiredOriginCommand && (
+            {originSetupCommand && originSetupOs && (
               <div className="rounded-lg bg-neutral-900 text-neutral-100 p-3 text-xs font-mono relative group">
                 <div className="flex items-center justify-between mb-1 text-[10px] text-neutral-400">
-                  <span className="uppercase font-bold">{diagnosis.os} Command</span>
+                  <span className="uppercase font-bold">{originSetupOs} Command</span>
                   <button
                     type="button"
-                    onClick={() => handleCopyCommand(diagnosis.requiredOriginCommand)}
+                    onClick={() => handleCopyCommand(originSetupCommand)}
                     className="text-emerald-400 hover:text-emerald-300 font-sans font-bold flex items-center gap-1"
                   >
                     {copiedCmd ? "✓ Copied!" : "📋 Copy Command"}
                   </button>
                 </div>
                 <div className="overflow-x-auto whitespace-pre pr-12 text-emerald-400">
-                  {diagnosis.requiredOriginCommand}
+                  {originSetupCommand}
                 </div>
               </div>
             )}
@@ -481,7 +493,7 @@ export default function LocalRunnerDetail({
               </button>
             </div>
             <div className="text-xs font-mono space-y-1 text-[color:var(--text-secondary)] bg-[color:var(--surface-inset)] p-3 rounded-lg border border-[color:var(--border-subtle)] overflow-x-auto">
-              <div><strong>Scholar Origin:</strong> {diagnosis?.currentOrigin || "https://scholar.gkshah.com.np"}</div>
+              <div><strong>Scholar Origin:</strong> {diagnosis?.currentOrigin || getCurrentAppOrigin()}</div>
               <div><strong>Active Endpoint:</strong> {endpoint}</div>
               <div><strong>Environment:</strong> {diagnosis?.os || "macos"} · {diagnosis?.browser || "chrome"} {diagnosis?.browserVersion || ""}</div>
               <div><strong>Ollama Version:</strong> {diagnosis?.version || "Unknown"}</div>
