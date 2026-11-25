@@ -9,7 +9,7 @@
 // NEW password — it never displays or pre-populates the existing one.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, waitFor, act } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 
 const getProfile = vi.fn();
@@ -24,6 +24,13 @@ vi.mock("../../../services/supabaseAuthService", () => ({
 const getAiAccessStatus = vi.fn();
 vi.mock("../../aiAccess/aiAccessApi", () => ({
   getAiAccessStatus: (...args: unknown[]) => getAiAccessStatus(...args),
+}));
+
+vi.mock("../../../services/supabaseClient", () => ({
+  isSupabaseConfigured: () => true,
+  getSupabaseClient: () => ({
+    auth: { getSession: async () => ({ data: { session: { user: { email: "ada@example.com", user_metadata: { full_name: "Ada Lovelace" } } } } }) },
+  }),
 }));
 
 import AccountSettingsScreen from "../AccountSettingsScreen";
@@ -293,5 +300,44 @@ describe("AccountSettingsScreen — tabbed navigation and username immutability"
 
     expect(screen.queryByRole("tab", { name: /Users & Accounts/i })).not.toBeInTheDocument();
     expect(screen.queryByText("Switch between registered scholar accounts")).not.toBeInTheDocument();
+  });
+});
+
+
+describe("Account Settings loading and layout", () => {
+  it("covers the whole viewport and ignores an Escape another layer already handled", () => {
+    getProfile.mockReturnValue(new Promise(() => {}));
+    const onClose = vi.fn();
+    const { container } = render(<AccountSettingsScreen onClose={onClose} />);
+    expect((container.firstElementChild as HTMLElement).className).toMatch(/w-screen/);
+    expect((container.firstElementChild as HTMLElement).className).toMatch(/h-screen/);
+    const handled = new KeyboardEvent("keydown", { key: "Escape", cancelable: true });
+    handled.preventDefault();
+    window.dispatchEvent(handled);
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("replaces a stalled profile load with an error, the signed-in name and Retry", async () => {
+    vi.useFakeTimers();
+    try {
+      getProfile.mockReturnValueOnce(new Promise(() => {}));
+      render(<AccountSettingsScreen onClose={vi.fn()} />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(12_100);
+      });
+      expect(screen.queryByText(/Loading profile/)).toBeNull();
+      expect(screen.getByText(/took too long/i)).toBeInTheDocument();
+      expect(screen.getByText(/Signed in as/)).toHaveTextContent("Ada Lovelace");
+      getProfile.mockResolvedValueOnce({ success: true, profile: PROFILE });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+        await vi.advanceTimersByTimeAsync(50);
+      });
+      expect(screen.getByDisplayValue("Ada Lovelace")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
