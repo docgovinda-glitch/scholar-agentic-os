@@ -76,7 +76,7 @@ export default function GapFinder({
             onChange={(e) => onInterest(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && void run()}
             placeholder="e.g. AI governance in healthcare, Himalayan climate adaptation"
-            className="flex-1 bg-[color:var(--surface-sunken)] border border-[color:var(--border-control)] rounded-xl px-4 py-2 text-xs text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:border-[color:var(--accent)] outline-none"
+            className="flex-1 bg-[color:var(--surface-raised)] border border-[color:var(--border-control)] rounded-xl px-4 py-2 text-xs text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:border-[color:var(--accent)] outline-none"
           />
           <button type="button" onClick={() => void run()} disabled={busy || interest.trim().length < 3} className="studio-btn studio-btn-primary shrink-0">
             {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Search className="w-3.5 h-3.5" aria-hidden="true" />}

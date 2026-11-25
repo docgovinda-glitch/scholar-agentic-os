@@ -1,7 +1,7 @@
 import { Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
 
 const field =
-  "w-full bg-[color:var(--surface-sunken)] border border-[color:var(--border-control)] rounded-xl px-3 py-2 text-xs text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:border-[color:var(--accent)] outline-none";
+  "w-full bg-[color:var(--surface-raised)] border border-[color:var(--border-control)] rounded-xl px-3 py-2 text-xs text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:border-[color:var(--accent)] outline-none";
 
 /**
  * The study's research questions and working title, always editable. AI

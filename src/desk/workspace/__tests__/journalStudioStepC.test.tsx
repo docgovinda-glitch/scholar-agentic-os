@@ -441,10 +441,8 @@ describe("Journal Rebuild Step C — Mode 3 Grounded Manuscript Studio & Mode 4 
 
       // Verify Mode 4 header & 5 specialist personas
       await waitFor(() => {
-        expect(screen.getByText("Mode 4")).toBeInTheDocument();
-        expect(
-          screen.getByText(/Adversarial 5-Referee Peer Review & Surgical Rebuttal Workbench/i)
-        ).toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "Peer Review & Rebuttal" })).toBeInTheDocument();
+        expect(screen.getByText("5-Referee Pre-Submission Review")).toBeInTheDocument();
         expect(screen.getAllByText("Methodologist").length).toBeGreaterThanOrEqual(1);
         expect(screen.getAllByText("Domain Specialist").length).toBeGreaterThanOrEqual(1);
         expect(screen.getAllByText("Biostatistician").length).toBeGreaterThanOrEqual(1);
@@ -453,7 +451,7 @@ describe("Journal Rebuild Step C — Mode 3 Grounded Manuscript Studio & Mode 4 
       });
 
       // Run 5-Referee simulation
-      const simButton = screen.getByRole("button", { name: /Simulate 5-Referee Adversarial Review/i });
+      const simButton = screen.getByRole("button", { name: /Run 5-referee review/i });
       fireEvent.click(simButton);
 
       await waitFor(() => {
@@ -486,7 +484,7 @@ describe("Journal Rebuild Step C — Mode 3 Grounded Manuscript Studio & Mode 4 
       );
 
       await waitFor(() => {
-        expect(screen.getByText(/B\. Surgical Patch Diff & Point-by-Point Rebuttal Matrix/i)).toBeInTheDocument();
+        expect(screen.getByText("Point-by-Point Responses")).toBeInTheDocument();
         expect(screen.getByText(/±2\.1ps PLL clock jitter tolerance/i)).toBeInTheDocument();
       });
 

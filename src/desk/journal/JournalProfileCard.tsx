@@ -5,7 +5,7 @@ import { authedJsonFetch, getJournalRequirements, saveIntakeAnswers, saveJournal
 import { requestAppConfirm } from "../../components/ui/FeedbackSystem";
 import { safeParseAnswerField } from "../../shared/projectStateSchema";
 import { blueprintFromStructure, citationStyleOption } from "./journalProfile";
-import { reviewFormatFromGuidelines, spellingFromGuidelines } from "../../domain/journal/blueprintFunnel";
+import { SPELLING_OPTIONS, reviewFormatFromGuidelines, spellingFromGuidelines, spellingLabel } from "../../domain/journal/blueprintFunnel";
 
 type Fields = {
   journalName: string;
@@ -21,7 +21,7 @@ type Fields = {
 
 const EMPTY: Fields = { journalName: "", articleType: "", wordMax: "", sections: "", citationStyle: "", declarations: "", notes: "", spelling: "", reviewFormat: "" };
 
-export const SPELLING_OPTIONS = ["British / Oxford English (-ise/-our/-re)", "US English"];
+export { SPELLING_OPTIONS };
 
 /** A journal picked in the matcher: the form opens with its name and a link to its site. */
 export interface SuggestedJournal {
@@ -54,15 +54,19 @@ export default function JournalProfileCard({
   project,
   onApplied,
   suggested,
+  onEditingChange,
 }: {
   project: ProjectView;
   onApplied: (updated: ProjectView) => void;
   /** Set when the author picks a journal in the matcher; remount (key) to apply. */
   suggested?: SuggestedJournal | null;
+  /** Told when the form opens or closes, so the page shows one set of manuscript settings. */
+  onEditingChange?: (editing: boolean) => void;
 }) {
   const pid = project.projectId;
   const [saved, setSaved] = useState<JournalRequirements | null>(null);
-  const [editing, setEditing] = useState(false);
+  // The form is optional: it opens on request, or when a journal is picked in the matcher.
+  const [editing, setEditing] = useState(Boolean(suggested));
   const [fields, setFields] = useState<Fields>(() => (suggested ? { ...EMPTY, journalName: suggested.journalName } : EMPTY));
   const [guidelines, setGuidelines] = useState("");
   const [unresolved, setUnresolved] = useState<string[]>([]);
@@ -78,13 +82,16 @@ export default function JournalProfileCard({
       .then((r) => {
         if (!alive) return;
         setSaved(r);
-        if (!r || suggested) setEditing(true);
       })
-      .catch(() => alive && setEditing(true));
+      .catch(() => undefined);
     return () => {
       alive = false;
     };
   }, [pid]);
+
+  useEffect(() => {
+    onEditingChange?.(editing);
+  }, [editing, onEditingChange]);
 
   const set = (k: keyof Fields) => (e: { target: { value: string } }) => setFields((f) => ({ ...f, [k]: e.target.value }));
   const notStated = (k: string) => unresolved.includes(k);
@@ -204,10 +211,18 @@ export default function JournalProfileCard({
           <div><dt className="text-[color:var(--text-muted)]">Word limit</dt><dd className="text-[color:var(--text-primary)]">{saved.wordLimit?.max ? `${saved.wordLimit.max.toLocaleString()} words` : "Not set"}</dd></div>
           <div><dt className="text-[color:var(--text-muted)]">Sections</dt><dd className="text-[color:var(--text-primary)]">{saved.structureOverride?.length ? saved.structureOverride.join(" · ") : "Not set (generic outline)"}</dd></div>
           <div><dt className="text-[color:var(--text-muted)]">Citation style</dt><dd className="text-[color:var(--text-primary)]">{saved.citationStyle || "Not set"}</dd></div>
-          <div><dt className="text-[color:var(--text-muted)]">Spelling</dt><dd className="text-[color:var(--text-primary)]">{project.answers?.["orthography"] || "Not set"}</dd></div>
           <div><dt className="text-[color:var(--text-muted)]">Peer review</dt><dd className="text-[color:var(--text-primary)]">{project.answers?.["peer_review_format"] || "Not stated"}</dd></div>
           <div className="sm:col-span-2"><dt className="text-[color:var(--text-muted)]">Required statements</dt><dd className="text-[color:var(--text-primary)]">{saved.requiredDeclarations.length ? saved.requiredDeclarations.join(" · ") : "None listed"}</dd></div>
         </dl>
+      ) : !editing ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-[color:var(--border-control)] px-4 py-3" data-testid="journal-profile-collapsed">
+          <p className="text-xs text-[color:var(--text-secondary)]">
+            Optional: paste the journal's author guidelines, or enter its name, sections and required statements.
+          </p>
+          <button type="button" onClick={() => setEditing(true)} className="studio-btn">
+            Add journal details
+          </button>
+        </div>
       ) : (
         <div className="space-y-4">
           {suggested && (
@@ -256,7 +271,7 @@ export default function JournalProfileCard({
               <select id="jp-spelling" value={fields.spelling} onChange={set("spelling")} className={input}>
                 <option value="">Not stated (keep current)</option>
                 {SPELLING_OPTIONS.map((o) => (
-                  <option key={o} value={o}>{o}</option>
+                  <option key={o} value={o} title={o}>{spellingLabel(o)}</option>
                 ))}
               </select>
               {hint("spelling")}
@@ -271,9 +286,7 @@ export default function JournalProfileCard({
             <button type="button" onClick={() => void save()} disabled={busy !== null || !fields.journalName.trim()} className="studio-btn studio-btn-primary">
               {busy === "save" ? "Saving…" : "Save journal profile"}
             </button>
-            {saved && (
-              <button type="button" onClick={() => setEditing(false)} className="studio-btn">Cancel</button>
-            )}
+            <button type="button" onClick={() => setEditing(false)} className="studio-btn">Cancel</button>
             <span className="text-[11px] text-[color:var(--text-muted)]">Saving sets the outline from the sections above, the word target and the citation style.</span>
           </div>
         </div>

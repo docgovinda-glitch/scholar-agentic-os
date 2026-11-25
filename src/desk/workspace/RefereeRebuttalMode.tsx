@@ -15,6 +15,7 @@ import { safeParseAnswerField } from "../../shared/projectStateSchema";
 import RevisionRoundPanel from "../journal/RevisionRoundPanel";
 import type { RevisionRound } from "../../domain/journal/revision";
 import { manuscriptAnswerPatch, readManuscriptMarkdown } from "../../domain/journal/manuscriptText";
+import { spellingVariant } from "../../domain/journal/blueprintFunnel";
 
 export const REFEREE_PERSONAS: Array<{
   role: RefereeRole;
@@ -56,9 +57,17 @@ export const REFEREE_PERSONAS: Array<{
     title: "Dr. M. Pemberton (Journal Managing Editor)",
     lens: "Scholarly Voice, Orthography & Standards Compliance",
     avatarIcon: "⚖️",
-    description: "Enforces British English orthography, terminology precision, and 2026 ICMJE/COPE declarations.",
+    // Completed with the project's own spelling convention (personaDescription).
+    description: "Checks terminology precision and 2026 ICMJE/COPE declarations.",
   },
 ];
+
+/** The card text for a referee; the Formal Editor names the project's spelling setting. */
+export function personaDescription(p: (typeof REFEREE_PERSONAS)[number], orthography: unknown): string {
+  if (p.role !== "Formal Editor") return p.description;
+  const spelling = spellingVariant(orthography) === "us" ? "US English spelling" : "British English orthography";
+  return `Checks ${spelling}, terminology precision, and 2026 ICMJE/COPE declarations.`;
+}
 
 export default function RefereeRebuttalMode() {
   const { project, projectId, setProject, setMode } = useResearchWorkspace();
@@ -274,18 +283,15 @@ export default function RefereeRebuttalMode() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-rose-600 text-white">
-                Mode 4
-              </span>
-              <span className="text-xs font-semibold text-[color:var(--text-muted)]">
-                Adversarial 5-Referee Peer Review & Surgical Rebuttal Workbench
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[color:var(--accent)] text-[color:var(--text-inverse)]">
+                Review
               </span>
             </div>
             <h1 className="text-lg font-bold text-[color:var(--text-primary)]">
-              Referee & Rebuttal Workbench
+              Peer Review & Rebuttal
             </h1>
             <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">
-              Simulate rigorous critiques from 5 specialist academic reviewer personas. Formulate point-by-point author responses and apply surgical find/replace diffs directly to the manuscript.
+              Get critiques from five reviewer perspectives before you submit, answer them point by point, and apply the agreed edits to the manuscript. Reviews from the journal come after.
             </p>
           </div>
 
@@ -300,22 +306,22 @@ export default function RefereeRebuttalMode() {
               <span>📄 Rebuttal Letter</span>
             </button>
 
-            {/* Back to Mode 3 */}
+            {/* Back to Studio */}
             <button
               type="button"
               onClick={() => setMode("studio")}
               className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[color:var(--surface-sunken)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-control)] text-[color:var(--text-primary)] transition-all cursor-pointer"
             >
-              ← Mode 3: Manuscript
+              ← Studio
             </button>
 
-            {/* Proceed to Mode 5 */}
+            {/* Proceed to Delivery */}
             <button
               type="button"
               onClick={() => setMode("audit_export")}
               className="px-4 py-1.5 rounded-xl text-xs font-bold bg-[color:var(--accent)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
             >
-              <span>Proceed to Mode 5: Audit</span>
+              <span>Continue to Delivery</span>
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
               </svg>
@@ -325,20 +331,8 @@ export default function RefereeRebuttalMode() {
       </div>
 
       {/* WORKBENCH BODY: 2 COLUMN SPLIT */}
-      <div className="flex-1 overflow-y-auto p-6 max-w-7xl mx-auto w-full space-y-8">
-        {/* The journal's real reviews come first; the simulated panel is practice before submission. */}
-        <RevisionRoundPanel
-          stored={answers["revision_round"]}
-          manuscript={manuscriptText}
-          title={workingTitle}
-          journal={String(answers["target_journal"] || "").trim() || undefined}
-          onSave={async (round: RevisionRound | null) => {
-            if (!effectiveProjectId) return;
-            const saved = await saveIntakeAnswers(effectiveProjectId, { ...(project?.answers || answers), revision_round: round ? JSON.stringify(round) : "" });
-            setProject(saved);
-          }}
-        />
-
+      <div className="flex-1 overflow-y-auto">
+      <div className="p-6 max-w-7xl mx-auto w-full space-y-8">
         {/* TOP SECTION: 5-REFEREE PANEL SIMULATOR */}
         <section
           aria-labelledby="referee-panel-heading"
@@ -348,7 +342,7 @@ export default function RefereeRebuttalMode() {
             <div>
               <h2 id="referee-panel-heading" className="text-sm font-bold text-[color:var(--text-primary)] flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-rose-500" />
-                A. 5-Referee Adversarial Peer Review Panel Simulator
+                5-Referee Pre-Submission Review
               </h2>
               <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">
                 Evaluates internal validity, quantitative power, literature novelty, synthesis coherence, and editorial standards.
@@ -364,11 +358,11 @@ export default function RefereeRebuttalMode() {
               {isSimulatingReview ? (
                 <>
                   <div className="spinner w-3.5 h-3.5" />
-                  <span>Simulating 5 Referees…</span>
+                  <span>Reviewing…</span>
                 </>
               ) : (
                 <>
-                  <span>⚡ Simulate 5-Referee Adversarial Review</span>
+                  <span>Run 5-referee review</span>
                 </>
               )}
             </button>
@@ -379,7 +373,7 @@ export default function RefereeRebuttalMode() {
           )}
 
           {/* 5 Persona Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 gap-3">
             {REFEREE_PERSONAS.map((p) => {
               const matchedCritique = critiques.find((c) => c.referee === p.role);
               const isSelected = selectedRefereeRole === p.role;
@@ -424,13 +418,13 @@ export default function RefereeRebuttalMode() {
                     <h4 className="text-xs font-bold text-[color:var(--text-primary)]">
                       {p.role}
                     </h4>
-                    <p className="text-[10px] text-[color:var(--text-secondary)] font-medium line-clamp-2">
+                    <p className="text-[11px] text-[color:var(--text-secondary)] font-medium">
                       {p.lens}
                     </p>
                   </div>
 
-                  <p className="text-[9px] text-[color:var(--text-muted)] mt-2 line-clamp-2">
-                    {p.description}
+                  <p className="text-[11px] leading-snug text-[color:var(--text-muted)] mt-2">
+                    {personaDescription(p, answers["orthography"])}
                   </p>
                 </div>
               );
@@ -447,7 +441,7 @@ export default function RefereeRebuttalMode() {
             <div>
               <h2 id="rebuttal-matrix-heading" className="text-sm font-bold text-[color:var(--text-primary)] flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                B. Surgical Patch Diff & Point-by-Point Rebuttal Matrix
+                Point-by-Point Responses
               </h2>
               <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">
                 Review referee concerns, formulate evidence-grounded author responses, and apply find/replace diffs directly to the manuscript.
@@ -505,7 +499,7 @@ export default function RefereeRebuttalMode() {
           {/* Rebuttal Matrix Items List */}
           {filteredMatrix.length === 0 ? (
             <div className="p-12 text-center text-xs text-[color:var(--text-muted)] border border-dashed border-[color:var(--border-control)] rounded-2xl space-y-3">
-              <p>No peer critiques simulated yet. Click above to run the 5-Referee Adversarial Panel.</p>
+              <p>No reviews yet. Run the 5-referee review above to get critiques before you submit.</p>
             </div>
           ) : (
             <div className="space-y-6">
@@ -644,6 +638,20 @@ export default function RefereeRebuttalMode() {
             </div>
           )}
         </section>
+
+        {/* Pre-submission review first; the journal's decision letter comes after submission. */}
+        <RevisionRoundPanel
+          stored={answers["revision_round"]}
+          manuscript={manuscriptText}
+          title={workingTitle}
+          journal={String(answers["target_journal"] || "").trim() || undefined}
+          onSave={async (round: RevisionRound | null) => {
+            if (!effectiveProjectId) return;
+            const saved = await saveIntakeAnswers(effectiveProjectId, { ...(project?.answers || answers), revision_round: round ? JSON.stringify(round) : "" });
+            setProject(saved);
+          }}
+        />
+      </div>
       </div>
 
       {/* EXPORT REBUTTAL LETTER MODAL */}

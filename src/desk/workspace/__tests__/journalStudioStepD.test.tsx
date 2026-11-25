@@ -34,7 +34,7 @@ describe("Journal Rebuild Step D — Mode 5 Pre-Flight Compliance Studio & Camer
   const mockBlueprint: WordBudgetBlueprint = {
     projectId: "proj-step-d",
     template: "IMRaD",
-    targetTotalWords: 200,
+    targetTotalWords: 160, // the sample has 157 words as the Studio counts them (headings and citation tokens excluded)
     allocatedTotalWords: 200,
     totalSubSections: 4,
     createdAt: new Date().toISOString(),
@@ -181,7 +181,7 @@ These findings establish that multi-agent consensus can achieve provable stabili
     }
   });
 
-  it("renders Mode 5 header, Conductor Gate G7 certification badge, and 4-part Gatekeeper Scorecard", async () => {
+  it("renders the Delivery header, readiness badge, and 4-part Gatekeeper Scorecard", async () => {
     render(
       <ResearchProvider projectId="proj-step-d" initialStage="export" onStageChangeCallback={vi.fn()}>
         <AuditExportMode />
@@ -190,13 +190,12 @@ These findings establish that multi-agent consensus can achieve provable stabili
 
     // Wait for async project data to load into ResearchContext
     await waitFor(() => {
-      expect(screen.getByText(/Gate G7: CERTIFIED READY/i)).toBeInTheDocument();
+      expect(screen.getByText(/Ready to submit/i)).toBeInTheDocument();
     });
 
     // Header inspection
-    expect(screen.getByText("Mode 5")).toBeInTheDocument();
-    expect(screen.getByText("Conductor Gate G7")).toBeInTheDocument();
-    expect(screen.getByText(/Pre-Flight Compliance Audit & Submission Compiler/i)).toBeInTheDocument();
+    expect(screen.getByText("Pre-Submission Check")).toBeInTheDocument();
+    expect(screen.queryByText(/Conductor|Gate G7/)).not.toBeInTheDocument();
 
     // Check 1: Word Count Budget Compliance
     expect(screen.getByText(/1\. Word Count Budget Compliance/i)).toBeInTheDocument();
@@ -243,7 +242,7 @@ These findings establish that multi-agent consensus can achieve provable stabili
       expect((screen.getByRole("textbox", { name }) as HTMLTextAreaElement).value).toBe("");
     }
     expect(document.body.textContent).not.toMatch(/Rostova|Oxford|0000-0002-1825-0097|no known competing/);
-    expect(screen.getByText(/Gate G7: ACTION REQUIRED/i)).toBeInTheDocument();
+    expect(screen.getByText(/Action required/i)).toBeInTheDocument();
   });
 
   it("an empty manuscript passes no text checks: 0 of 5 and nothing to check yet", async () => {
@@ -255,7 +254,9 @@ These findings establish that multi-agent consensus can achieve provable stabili
     );
     await waitFor(() => expect(screen.getAllByText("Nothing to check yet")).toHaveLength(2));
     expect(screen.getByText(/^0 of 5 checks pass$/)).toBeInTheDocument();
-    expect(screen.getByText("No word target set in Blueprint")).toBeInTheDocument();
+    // No target saved: the same default 6,000 the Studio and header show, never "not set".
+    expect(screen.getByText(/0 \/ 6,000 words/)).toBeInTheDocument();
+    expect(screen.getByText(/default target; set yours in Blueprint/)).toBeInTheDocument();
     expect(screen.queryByText(/No problems found|all resolved/)).not.toBeInTheDocument();
   });
 

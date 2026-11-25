@@ -60,7 +60,7 @@ const mount = () =>
 const fill = (labelText: string, value: string) => fireEvent.change(screen.getByLabelText(labelText), { target: { value } });
 
 describe("Authors in Delivery", () => {
-  it("adds co-authors with CRediT roles, saves them, and writes the contribution statement", async () => {
+  it("adds co-authors with CRediT roles, saves them on their own, and writes the contribution statement", async () => {
     mount();
     const editor = await screen.findByRole("region", { name: "Authors" });
     expect(within(editor).getByText("Add at least one author.")).toBeInTheDocument();
@@ -85,11 +85,11 @@ describe("Authors in Delivery", () => {
     expect(within(editor).queryByRole("list", { name: "Author details still needed" })).not.toBeInTheDocument();
     expect((screen.getByLabelText("Author 1 ORCID iD") as HTMLInputElement).value).toBe("0000-0002-1825-0097");
 
-    // Author 2 first, then the byline order is saved as shown.
+    // No save button: leaving a field saves, and a reorder saves at once in the order shown.
+    expect(within(editor).queryByRole("button", { name: "Save authors" })).not.toBeInTheDocument();
     fireEvent.click(within(editor).getByRole("button", { name: "Move author 2 up" }));
-    fireEvent.click(within(editor).getByRole("button", { name: "Save authors" }));
     await waitFor(() => expect(api.saveAuthors).toHaveBeenCalled());
-    const saved = vi.mocked(api.saveAuthors).mock.calls[0][1];
+    const saved = vi.mocked(api.saveAuthors).mock.calls.at(-1)![1];
     expect(saved.map((a) => [a.firstName, a.surname, a.isCorresponding, a.creditRoles])).toEqual([
       ["Charles", "Babbage", false, ["Software"]],
       ["Ada", "Lovelace", true, ["Conceptualization", "Writing – original draft"]],
@@ -115,5 +115,27 @@ describe("Authors in Delivery", () => {
     fill("Author 1 ORCID iD", "0000-0002-1825-0098");
     expect(screen.getByLabelText("Author 1 ORCID iD")).toHaveAttribute("aria-invalid", "true");
     expect(within(editor).getByText(/check digit doesn't match/)).toBeInTheDocument();
+  });
+
+  it("saves a typed field when the author leaves it or presses Enter, and nothing when unchanged", async () => {
+    mount();
+    const editor = await screen.findByRole("region", { name: "Authors" });
+    fireEvent.click(within(editor).getByRole("button", { name: "Add author" }));
+    fill("Author 1 first name", "Ada");
+    expect(api.saveAuthors).not.toHaveBeenCalled();
+    fireEvent.blur(screen.getByLabelText("Author 1 first name"));
+    await waitFor(() => expect(api.saveAuthors).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(api.saveAuthors).mock.calls[0][1][0]).toMatchObject({ firstName: "Ada" });
+    expect(await within(editor).findByText("Authors saved.")).toBeInTheDocument();
+
+    // Leaving a field without a change sends nothing.
+    fireEvent.blur(screen.getByLabelText("Author 1 first name"));
+    expect(api.saveAuthors).toHaveBeenCalledTimes(1);
+
+    fill("Author 1 surname", "Lovelace");
+    fireEvent.keyDown(screen.getByLabelText("Author 1 surname"), { key: "Enter" });
+    fireEvent.blur(screen.getByLabelText("Author 1 surname"));
+    await waitFor(() => expect(api.saveAuthors).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(api.saveAuthors).mock.calls[1][1][0]).toMatchObject({ firstName: "Ada", surname: "Lovelace" });
   });
 });

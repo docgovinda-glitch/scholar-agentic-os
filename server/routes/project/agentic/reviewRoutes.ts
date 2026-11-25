@@ -24,6 +24,7 @@ import {
 import type { RefereeRole, AcademicCritiqueItem, RebuttalMatrixItem } from "./types.ts";
 import { countManuscriptWords, manuscriptAnswerPatch, readManuscriptMarkdown } from "../../../../src/domain/journal/manuscriptText.ts";
 import { finalEditorBodySchema } from "./journalStudioSchemas.ts";
+import { spellingVariant } from "../../../../src/domain/journal/blueprintFunnel.ts";
 import { citationLockTokens, withCitationTokensMasked } from "../../../src/utils/citationLock.ts";
 
 export const reviewRoutes = express.Router({ mergeParams: true });
@@ -35,7 +36,7 @@ reviewRoutes.post("/peer-review", async (req: express.Request<{ id: string }>, r
   const context = JSON.stringify(project.answers);
 
   try {
-    const systemPrompt = scholarBrain.journalPrompts.peerReviewSystemPrompt();
+    const systemPrompt = scholarBrain.journalPrompts.peerReviewSystemPrompt(spellingVariant(project.answers?.["orthography"]));
     const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`, undefined, "long-context");
     // Falsy: the request was handed to the browser (426) or already answered.
     if (!result) return;

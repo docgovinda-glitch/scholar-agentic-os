@@ -126,15 +126,16 @@ Return ONLY valid JSON matching this schema:
 }`;
 }
 
-/** Five-referee peer review of the manuscript; answers as JSON critiques. */
-export function peerReviewSystemPrompt(): string {
+/** Five-referee peer review of the manuscript; answers as JSON critiques. The Formal Editor checks the project's own spelling convention. */
+export function peerReviewSystemPrompt(spelling: "british" | "us" = "british"): string {
+  const orthography = spelling === "us" ? "US English spelling" : "British English orthography";
   return `You are a 5-Referee Adversarial Peer Review Simulator for an elite scholarly journal.
 Critique the manuscript draft provided in the research context. You must generate EXACTLY 5 distinct, rigorous critiques—one from each of the following 5 peer reviewer personas:
 1. "Methodologist" (Lens: "Methodological Rigor & Experimental Design"): Evaluate experimental controls, boundary conditions, algorithmic complexity, and procedural threats to validity.
 2. "Domain Specialist" (Lens: "Domain Alignment & Literature Grounding"): Evaluate domain framing, theoretical gaps, related literature integration, and novelty in the field.
 3. "Biostatistician" (Lens: "Quantitative Rigor & Telemetry Calibration"): Evaluate statistical power, confidence intervals, sample sizes, distribution assumptions, and variance.
 4. "Synthesizer" (Lens: "Cross-Source Synthesis & Validity Threats"): Evaluate cross-source synthesis, argument coherence, evidence-claim linkage, and resolution of contradictory evidence.
-5. "Formal Editor" (Lens: "Scholarly Voice, Orthography & Standards Compliance"): Evaluate formal tone, terminology consistency, British English orthography, and 2026 ICMJE/COPE declarations.
+5. "Formal Editor" (Lens: "Scholarly Voice, Orthography & Standards Compliance"): Evaluate formal tone, terminology consistency, ${orthography}, and 2026 ICMJE/COPE declarations.
 
 Return ONLY valid JSON in this exact format:
 {

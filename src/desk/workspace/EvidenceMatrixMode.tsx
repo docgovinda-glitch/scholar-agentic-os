@@ -474,18 +474,15 @@ export default function EvidenceMatrixMode() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-purple-600 text-white">
-                Mode 2
-              </span>
-              <span className="text-xs font-semibold text-[color:var(--text-muted)]">
-                Primary User Data Ingestion & Smart Evidence Synthesis Matrix
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[color:var(--accent)] text-[color:var(--text-inverse)]">
+                Evidence
               </span>
             </div>
             <h1 className="text-xl font-bold text-[color:var(--text-primary)]">
-              Literature & Data Matrix
+              Literature & Data
             </h1>
             <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">
-              Upload empirical datasets, field notes, and documents in memory. Harmonize user data with live peer-reviewed literature and assign findings to blueprint sub-sections.
+              Add your own data and notes, find peer-reviewed literature, and map each source to the Blueprint section it supports.
             </p>
           </div>
 
@@ -495,14 +492,14 @@ export default function EvidenceMatrixMode() {
               onClick={() => setMode("protocol")}
               className="px-3.5 py-2 rounded-xl text-xs font-bold bg-[color:var(--surface-sunken)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-control)] text-[color:var(--text-primary)] transition-all cursor-pointer"
             >
-              ← Mode 1: Protocol
+              ← Blueprint
             </button>
             <button
               type="button"
               onClick={() => setMode("studio")}
               className="px-4 py-2 rounded-xl text-xs font-bold bg-[color:var(--accent)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] transition-all shadow-sm flex items-center gap-2 cursor-pointer"
             >
-              <span>Proceed to Mode 3: Manuscript Studio</span>
+              <span>Continue to Studio</span>
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
               </svg>
@@ -519,10 +516,10 @@ export default function EvidenceMatrixMode() {
             <div>
               <h2 id="user-data-heading" className="text-sm font-bold text-[color:var(--text-primary)] flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                A. Primary User Data & Empirical Document Ingestion
+                Your Data & Notes
               </h2>
               <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">
-                Ingest your own empirical research data, lab sheets, survey CSVs, interview transcripts, or raw notes. Zero residual disk storage.
+                Add your own research data, lab sheets, survey CSVs, interview transcripts or notes. Files are read in memory and not stored on disk.
               </p>
             </div>
 
@@ -639,27 +636,17 @@ export default function EvidenceMatrixMode() {
           )}
         </section>
 
-        {/* SECTION B: Live Multi-Portal Scholarly & Web Search */}
+        {/* SECTION B: Scholarly literature search (primary), then add by DOI */}
         <section aria-labelledby="scholarly-search-heading" className="bg-[color:var(--surface-canvas)] border border-[color:var(--border-subtle)] rounded-2xl p-6 shadow-xs space-y-6">
           <div className="border-b border-[color:var(--border-subtle)] pb-4">
             <h2 id="scholarly-search-heading" className="text-sm font-bold text-[color:var(--text-primary)] flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-blue-500" />
-              B. Live Multi-Portal Scholarly & Web Literature Harvester
+              Scholarly Literature
             </h2>
             <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">
-              Query 250M+ peer-reviewed papers across OpenAlex, CrossRef, arXiv, and live web grounding to synthesize evidence.
+              Search peer-reviewed papers across OpenAlex, Crossref, arXiv and the web, then add the ones you will cite.
             </p>
           </div>
-
-          {effectiveProjectId && (
-            <div className="space-y-1.5">
-              <p className="text-xs font-semibold text-[color:var(--text-primary)]">Add a source by DOI</p>
-              <p className="text-[11px] text-[color:var(--text-muted)]">
-                Authors, year, journal, volume and pages come from the DOI registry (Crossref or DataCite), with any retraction on record.
-              </p>
-              <AddByDoi projectId={effectiveProjectId} onAdded={handleAddByDoi} />
-            </div>
-          )}
 
           {/* Search Bar & Portal Pills */}
           <div className="space-y-3">
@@ -670,7 +657,8 @@ export default function EvidenceMatrixMode() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleExecuteSearch()}
-                  placeholder="Search empirical literature (e.g. quantum decoding latency, FPGA fault tolerance, surface codes)..."
+                  aria-label="Search scholarly literature"
+                  placeholder="Search scholarly literature by topic, method or keywords…"
                   className="w-full bg-[color:var(--surface-sunken)] border border-[color:var(--border-control)] rounded-xl px-4 py-2 text-xs font-medium text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:border-[color:var(--accent)] focus:ring-1 focus:ring-[color:var(--accent)] outline-none transition-colors"
                 />
               </div>
@@ -684,14 +672,14 @@ export default function EvidenceMatrixMode() {
                 {isSearching ? (
                   <>
                     <div className="spinner w-3.5 h-3.5" />
-                    <span>Harvesting…</span>
+                    <span>Searching…</span>
                   </>
                 ) : (
                   <>
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
-                    <span>Search Portals</span>
+                    <span>Search</span>
                   </>
                 )}
               </button>
@@ -727,7 +715,7 @@ export default function EvidenceMatrixMode() {
           {searchResults.length > 0 && (
             <div className="space-y-3 pt-2">
               <span className="text-xs font-bold text-[color:var(--text-primary)] uppercase tracking-wider">
-                Harvested Scholarly Literature ({searchResults.length})
+                Search results ({searchResults.length})
               </span>
               <div className="grid grid-cols-1 gap-3 max-h-96 overflow-y-auto pr-1">
                 {searchResults.map((item) => (
@@ -769,23 +757,38 @@ export default function EvidenceMatrixMode() {
               </div>
             </div>
           )}
+
+          {/* Secondary: a known paper, added straight from its DOI. */}
+          {effectiveProjectId && (
+            <details className="border-t border-[color:var(--border-subtle)] pt-4">
+              <summary className="cursor-pointer text-xs font-semibold text-[color:var(--text-primary)] select-none">
+                Already have a DOI? Add a source by DOI
+              </summary>
+              <div className="space-y-1.5 mt-3">
+                <p className="text-[11px] text-[color:var(--text-muted)]">
+                  Authors, year, journal, volume and pages come from the DOI registry (Crossref or DataCite), with any retraction on record.
+                </p>
+                <AddByDoi projectId={effectiveProjectId} onAdded={handleAddByDoi} />
+              </div>
+            </details>
+          )}
         </section>
 
-        {/* SECTION C: Elicit/Scite-Style Smart Evidence Synthesis Matrix */}
+        {/* SECTION C: Evidence matrix */}
         <section aria-labelledby="evidence-matrix-heading" className="bg-[color:var(--surface-canvas)] border border-[color:var(--border-subtle)] rounded-2xl p-6 shadow-xs space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[color:var(--border-subtle)] pb-4">
             <div>
               <h2 id="evidence-matrix-heading" className="text-sm font-bold text-[color:var(--text-primary)] flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-indigo-500" />
-                C. Elicit/Scite-Style Smart Evidence Synthesis Matrix
+                Evidence Matrix
               </h2>
               <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">
-                Unified evidence ledger synthesizing peer-reviewed literature and uploaded primary user datasets. Directly map sources to Mode 1 sub-sections.
+                Every source and dataset in one table. Map each to the Blueprint sub-section it supports.
               </p>
             </div>
 
             <span className="text-xs font-mono font-bold text-[color:var(--text-secondary)]">
-              {combinedMatrixRows.length} Ledger Rows
+              {combinedMatrixRows.length} {combinedMatrixRows.length === 1 ? "row" : "rows"}
             </span>
           </div>
 
@@ -985,7 +988,7 @@ export default function EvidenceMatrixMode() {
         <section aria-labelledby="figures-heading" className="bg-[color:var(--surface-canvas)] border border-[color:var(--border-subtle)] rounded-2xl p-6 shadow-xs space-y-4">
           <div className="border-b border-[color:var(--border-subtle)] pb-4">
             <h2 id="figures-heading" className="text-sm font-bold text-[color:var(--text-primary)]">
-              D. Figures and tables
+              Figures & Tables
             </h2>
             <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">
               Upload figures (PNG or JPEG) and type or paste tables. Each gets a caption; refer to it from the Studio and it is numbered in order of first mention.

@@ -145,7 +145,7 @@ export function AppleStudioHeader({
       className="apple-glass-header h-14 px-4 flex items-center justify-between gap-3 shrink-0 z-30 select-none"
     >
       {/* Left Zone: Back to Desk + Deliverable Type Badge + Inline Editable Project Title */}
-      <div className="flex items-center gap-2.5 min-w-0 flex-1 max-w-[32%]">
+      <div className="flex items-center gap-2.5 min-w-0 flex-1 max-w-[32%] overflow-hidden">
         {onBack && (
           <button
             type="button"
@@ -161,7 +161,7 @@ export function AppleStudioHeader({
 
         <span
           data-testid="studio-deliverable-badge"
-          className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-surface-hover text-primary border border-border/70 shrink-0"
+          className="hidden xl:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-surface-hover text-primary border border-border/70 shrink-0"
         >
           <span className="font-mono text-accent">{deliverableCode}</span>
           <span className="text-border">·</span>
@@ -265,7 +265,8 @@ export function AppleStudioHeader({
       {/* Right Zone: Progressive Disclosure Status & Focus Capsule */}
       <div
         data-testid="studio-status-capsule"
-        className="flex items-center justify-end gap-1.5 sm:gap-2 min-w-0 flex-1 max-w-[36%]"
+        // Keeps its natural width so its controls never spill over the mode tabs; the title truncates instead.
+        className="flex items-center justify-end gap-1.5 sm:gap-2 shrink-0"
       >
         {metricLabel && (
           <span

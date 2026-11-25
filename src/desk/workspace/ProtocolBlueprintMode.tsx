@@ -12,13 +12,13 @@ import QuestionsAndTitle from "../journal/blueprint/QuestionsAndTitle";
 import JournalMatcher, { type SavedJournals } from "../journal/blueprint/JournalMatcher";
 import { suggestQuestions, writeOutline } from "../journal/blueprintApi";
 import { isAiOutline, rescaleOutline } from "../../domain/journal/aiOutline";
-import { ARTICLE_TYPES, missingForLock, templateForArticleType, type GroundedGap } from "../../domain/journal/blueprintFunnel";
+import { ARTICLE_TYPES, missingForLock, spellingLabel, templateForArticleType, type GroundedGap } from "../../domain/journal/blueprintFunnel";
 
 type Path = "explore" | "own";
 
 const card = "bg-[color:var(--surface-canvas)] border border-[color:var(--border-subtle)] rounded-2xl p-6 shadow-xs space-y-5";
 const field =
-  "w-full bg-[color:var(--surface-sunken)] border border-[color:var(--border-control)] rounded-xl px-3 py-2 text-xs text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:border-[color:var(--accent)] outline-none";
+  "w-full bg-[color:var(--surface-raised)] border border-[color:var(--border-control)] rounded-xl px-3 py-2 text-xs text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:border-[color:var(--accent)] outline-none";
 
 /** Older projects saved title options as objects; newer ones as plain strings. */
 function parseTitleOptions(raw: unknown): string[] {
@@ -94,6 +94,8 @@ export default function ProtocolBlueprintMode() {
   });
   const [citationStyle, setCitationStyle] = useState<string>(() => answers["citation_style"] || "APA 7");
   const [orthography, setOrthography] = useState<string>(() => answers["orthography"] || SPELLING_OPTIONS[0]);
+  // While the journal form is open it holds these settings; the page never shows two sets.
+  const [journalFormOpen, setJournalFormOpen] = useState(false);
 
   // ── Step 3 state ──
   const [blueprint, setBlueprint] = useState<WordBudgetBlueprint | null>(() => {
@@ -373,8 +375,8 @@ export default function ProtocolBlueprintMode() {
       <div className="shrink-0 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-6 py-5">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[color:var(--accent)] text-[color:var(--text-inverse)]">Mode 1</span>
-            <h1 className="text-xl font-bold text-[color:var(--text-primary)] mt-1">Blueprint</h1>
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[color:var(--accent)] text-[color:var(--text-inverse)]">Blueprint</span>
+            <h1 className="text-xl font-bold text-[color:var(--text-primary)] mt-1">Plan your article</h1>
             <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">From an interest or your own topic to a locked plan: gap, questions, title, journal and word budget.</p>
           </div>
           <ol className="flex items-center gap-3 flex-wrap" aria-label="Blueprint steps">
@@ -485,9 +487,20 @@ export default function ProtocolBlueprintMode() {
             />
           )}
 
-          {project && <JournalProfileCard key={suggested?.journalName ?? "profile"} project={project} onApplied={setProject} suggested={suggested} />}
+          {project && (
+            <JournalProfileCard key={suggested?.journalName ?? "profile"} project={project} onApplied={setProject} suggested={suggested} onEditingChange={setJournalFormOpen} />
+          )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+          {!journalFormOpen && (
+          <details className="group rounded-xl border border-[color:var(--border-subtle)]" data-testid="manuscript-settings">
+            <summary className="cursor-pointer select-none list-none px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-bold text-[color:var(--text-primary)]">Customize manuscript defaults</span>
+              <span className="text-[11px] text-[color:var(--text-secondary)]">
+                {(ARTICLE_TYPES.find((a) => a.id === articleType)?.label ?? "Article type not chosen")} · {targetTotalWords.toLocaleString()} words · {citationStyle} · {spellingLabel(orthography)}
+                <span className="ml-2 underline group-open:hidden">Change</span>
+              </span>
+            </summary>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 px-4 pb-4">
             <div className="space-y-1.5">
               <label htmlFor="bp-article-type" className="text-xs font-bold text-[color:var(--text-primary)]">
                 Article type
@@ -548,17 +561,19 @@ export default function ProtocolBlueprintMode() {
               </label>
               <select id="orthography-select" value={orthography} onChange={(e) => void handleSaveFormattingProfile(targetTotalWords, template, citationStyle, e.target.value)} className={`${field} cursor-pointer`}>
                 {SPELLING_OPTIONS.map((o) => (
-                  <option key={o} value={o}>
-                    {o}
+                  <option key={o} value={o} title={o}>
+                    {spellingLabel(o)}
                   </option>
                 ))}
               </select>
             </div>
           </div>
-          <p className="text-[11px] text-[color:var(--text-muted)]">
-            These are set from the journal's guidelines when you save them above; change them here if you know better.
+          <p className="px-4 pb-4 text-[11px] text-[color:var(--text-muted)]">
+            Saving a journal profile sets these from its guidelines; change them here if you know better.
             {answers["peer_review_format"] ? ` Review model: ${answers["peer_review_format"]}.` : ""}
           </p>
+          </details>
+          )}
         </section>
 
         {/* STEP 3 */}
@@ -685,7 +700,7 @@ export default function ProtocolBlueprintMode() {
                               const val = parseInt(e.target.value, 10);
                               if (!isNaN(val)) void handleUpdateSubSectionTarget(sec.id, sub.id, val);
                             }}
-                            className="w-20 bg-[color:var(--surface-sunken)] border border-[color:var(--border-control)] rounded-lg px-2 py-1 text-xs font-mono text-right text-[color:var(--text-primary)] outline-none"
+                            className="w-20 bg-[color:var(--surface-raised)] border border-[color:var(--border-control)] rounded-lg px-2 py-1 text-xs font-mono text-right text-[color:var(--text-primary)] outline-none"
                           />
                           <span className="text-[10px] text-[color:var(--text-muted)] font-mono">words</span>
                         </span>
@@ -716,7 +731,7 @@ export default function ProtocolBlueprintMode() {
           <div className="flex items-center gap-3 flex-wrap">
             <button type="button" onClick={() => void lockAndContinue()} disabled={missing.length > 0} className="studio-btn studio-btn-primary">
               <Lock className="w-3.5 h-3.5" aria-hidden="true" />
-              Lock blueprint and continue to Mode 2 (Evidence Matrix)
+              Lock blueprint and continue to Evidence
             </button>
             {missing.length > 0 ? (
               <span className="text-[11px] text-[color:var(--text-muted)]">Still needed: {missing.join(", ")}.</span>

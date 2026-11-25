@@ -76,7 +76,7 @@ describe("Verification in Delivery", () => {
     expect(within(panel).getByText(/recomputed p \.036\. This changes the conclusion at \.05\./)).toBeInTheDocument();
     expect(within(panel).getByText(/“analyzed” \(1\) and “analysed” \(1\)/)).toBeInTheDocument();
     expect(within(panel).getByText(/The abstract states 14%/)).toBeInTheDocument();
-    expect(screen.getByText(/Gate G7: ACTION REQUIRED/)).toBeInTheDocument();
+    expect(screen.getByText(/Action required/)).toBeInTheDocument();
   });
 
   it("says when there are no results to recompute, rather than passing them", async () => {
