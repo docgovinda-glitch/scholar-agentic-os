@@ -2,6 +2,7 @@ import { readSse } from "../../shared/sseReader";
 import { authHeaders } from "./authHeaders";
 import { aiRequestParts } from "../ai/keyring";
 import { inspectAiResponse } from "../ai/aiRouteNotices";
+import { inspectAiFailure } from "../ai/aiUnavailableNotice";
 import { liveAiStatus } from "../ai/liveAiStatus";
 import { runAiText } from "../ai/aiRun";
 import type { TaskClass } from "../../platform/router/types";
@@ -188,9 +189,49 @@ export async function authedFetch(input: string, init: RequestInit = {}): Promis
     ...(init.headers as Record<string, string> | undefined),
     ...(await authHeaders()),
   });
-  const res = await originalFetch(input, { ...init, headers });
-  if (routeUsesClientAi(input)) inspectAiResponse(res);
+  const res = await fetchWithResponseDeadline(input, { ...init, headers }, routeUsesClientAi(input) ? AI_RESPONSE_DEADLINE_MS : API_RESPONSE_DEADLINE_MS);
+  if (routeUsesClientAi(input)) {
+    inspectAiResponse(res);
+    inspectAiFailure(res);
+  }
   return res;
+}
+
+/** How long a request may wait for the server to answer (headers), when its caller set no signal. */
+export const API_RESPONSE_DEADLINE_MS = 90_000;
+/** AI routes wait on a model before answering; still bounded, so nothing spins forever. */
+export const AI_RESPONSE_DEADLINE_MS = 10 * 60_000;
+
+/** Thrown when the server did not answer within the deadline. */
+export class RequestTimeoutError extends Error {
+  constructor(ms: number) {
+    super(`The server did not answer within ${Math.round(ms / 1000)} seconds, so the request was stopped. Check your connection and try again.`);
+    this.name = "RequestTimeoutError";
+  }
+}
+
+/**
+ * A caller's own signal always wins (Stop buttons, unmounts). Without one, the
+ * request is aborted if no response arrives in time. Only the wait for the
+ * response is bounded: once headers arrive the timer is cleared, so a long SSE
+ * stream that keeps sending is never cut off.
+ */
+async function fetchWithResponseDeadline(input: string, init: RequestInit, deadlineMs: number): Promise<Response> {
+  if (init.signal) return originalFetch(input, init);
+  const controller = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, deadlineMs);
+  try {
+    return await originalFetch(input, { ...init, signal: controller.signal });
+  } catch (err) {
+    if (timedOut) throw new RequestTimeoutError(deadlineMs);
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function authedJsonFetch(

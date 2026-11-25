@@ -7,6 +7,7 @@ import {
   type ExtractedPalette,
   getFallbackPalette,
 } from '../services/imagePaletteExtractor';
+import { isUntitledDeckTitle } from '../../../shared/presentationBrief';
 
 export interface ThemeScreenshotClonerProps {
   deck: SlideDeck;
@@ -51,7 +52,7 @@ export default function ThemeScreenshotCloner({
   const headlinePreviewText =
     deck.slides?.[0]?.actionHeadline ||
     deck.topic ||
-    (deck.title && deck.title !== 'Untitled Presentation'
+    (!isUntitledDeckTitle(deck.title)
       ? deck.title
       : 'Your presentation title');
 

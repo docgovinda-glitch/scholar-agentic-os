@@ -7,6 +7,15 @@
 import { stripCourseCodes } from "../utils/briefExtractor";
 import { groupBriefQuestions, parseBriefQuestions, shortQuestionLabel, stripPageFurniture } from "../utils/briefQuestions";
 
+/** The placeholder a deck carries until it has a title of its own. */
+export const UNTITLED_PRESENTATION = "Untitled Presentation";
+
+/** True for an empty deck title or any untitled placeholder ("Untitled presentation", "... (Blank Sheet)"). */
+export function isUntitledDeckTitle(title: string | null | undefined): boolean {
+  const t = (title ?? "").trim().toLowerCase();
+  return !t || t.startsWith("untitled presentation");
+}
+
 export const VISUAL_TYPES = [
   "Title Hero",
   "2-Column Comparison",
@@ -94,7 +103,7 @@ export function deriveDocumentTitle(text: string, fileName = ""): string {
     .replace(/\b\d{3,5}\b/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-  return base.replace(/\b\w/g, (c) => c.toUpperCase()) || "Untitled presentation";
+  return base.replace(/\b\w/g, (c) => c.toUpperCase()) || UNTITLED_PRESENTATION;
 }
 
 /** Which card type suits a topic, from its own words. */

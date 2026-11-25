@@ -23,10 +23,6 @@ interface ResearchContextValue {
   isLoading: boolean;
   chapterId: string | null;
   setChapterId: (id: string | null) => void;
-  aiExhaustedError: string | null;
-  setAiExhaustedError: (err: string | null) => void;
-  fallbackToast: string | null;
-  setFallbackToast: (msg: string | null) => void;
 }
 
 const ResearchContext = createContext<ResearchContextValue | null>(null);
@@ -60,8 +56,6 @@ export function ResearchProvider({
   const [outputType, setOutputType] = useState<OutputTypeSpec | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [aiExhaustedError, setAiExhaustedError] = useState<string | null>(null);
-  const [fallbackToast, setFallbackToast] = useState<string | null>(null);
 
   const currentStage = initialStage ?? "definition";
   const [currentMode, setCurrentModeState] = useState<JournalStudioMode>(() => {
@@ -290,10 +284,6 @@ export function ResearchProvider({
     isLoading,
     chapterId,
     setChapterId,
-    aiExhaustedError,
-    setAiExhaustedError,
-    fallbackToast,
-    setFallbackToast,
   };
 
   return (

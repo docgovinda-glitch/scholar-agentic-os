@@ -4,6 +4,10 @@ interface AiExhaustedModalProps {
   onClose: () => void;
   onOpenAiAccess: () => void;
   errorMessage?: string | null;
+  /** Heading; defaults to the every-provider-failed case. */
+  title?: string;
+  /** Explanation under the heading. */
+  explanation?: string;
 }
 
 export default function AiExhaustedModal({
@@ -11,6 +15,8 @@ export default function AiExhaustedModal({
   onClose,
   onOpenAiAccess,
   errorMessage,
+  title = "All Configured AI Services Are Unavailable",
+  explanation = "All available AI providers or API keys configured on this workspace have either exceeded their rate/quota limits, failed authentication, or are unreachable.",
 }: AiExhaustedModalProps) {
   if (!isOpen) return null;
 
@@ -18,6 +24,8 @@ export default function AiExhaustedModal({
     <div
       role="dialog"
       aria-modal="true"
+      aria-labelledby="ai-exhausted-title"
+      data-testid="ai-unavailable-dialog"
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
     >
       <div className="bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-scale-in">
@@ -27,8 +35,8 @@ export default function AiExhaustedModal({
             ⚠️
           </div>
           <div>
-            <h3 className="text-base font-bold text-[color:var(--text-primary)]">
-              All Configured AI Services Are Unavailable
+            <h3 id="ai-exhausted-title" className="text-base font-bold text-[color:var(--text-primary)]">
+              {title}
             </h3>
             <p className="text-xs text-[color:var(--text-secondary)] mt-1">
               Your workflow and current results are completely safe.
@@ -38,9 +46,7 @@ export default function AiExhaustedModal({
 
         {/* Informational Body */}
         <div className="p-3.5 rounded-xl bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] text-xs text-[color:var(--text-primary)] leading-relaxed space-y-2">
-          <p>
-            All available AI providers or API keys configured on this workspace have either exceeded their rate/quota limits, failed authentication, or are unreachable.
-          </p>
+          <p>{explanation}</p>
           {errorMessage && (
             <p className="font-mono text-[11px] text-[color:var(--state-danger)] border-t border-[color:var(--border-subtle)] pt-2">
               Details: {errorMessage}

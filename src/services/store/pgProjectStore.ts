@@ -118,8 +118,10 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
       };
       await db.query(
         `insert into public.projects
-           (project_id, version, owner_id, output_type_id, answers, authors, gates, document, rubric_report, claim_graph, waivers, submissions, journal_requirements, evidence_ledger, generation_job, peer_review_history, cover_letter, anonymization_report, anonymized_document, source_count_override)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`,
+           (project_id, version, owner_id, output_type_id, answers, authors, gates, claim_graph, waivers, submissions, evidence_ledger, peer_review_history)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+        // One value per listed column, in the same order (the nullable columns a new
+        // project does not have yet are left to their defaults).
         [
           record.projectId,
           record.version,

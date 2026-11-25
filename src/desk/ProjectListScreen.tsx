@@ -35,6 +35,7 @@ import {
   getProjectDisplayName,
   matchesProjectSearch,
 } from "./projectNaming";
+import { vaultImportOutcome } from "../domain/vault/importOutcome";
 import { markProjectDeleted, normalizeProjectList, readDeletedProjectIds, unmarkProjectDeleted, withoutDeletedProjects } from "./sidebarProjects";
 import { hasVaultPassphraseOnThisDevice, currentUserId } from "../services/userVault";
 import { addVaultItem, setSessionUnlocked, listVaultItems, searchVaultItems, type VaultItem } from "../services/vaultContents";
@@ -713,15 +714,6 @@ export default function ProjectListScreen({
     };
   }, [choosing, types]);
 
-  const typeMap = useMemo(() => {
-    const map = new Map<string, OutputTypeSummary>();
-    if (types) {
-      for (const t of types) {
-        map.set(t.id, t);
-      }
-    }
-    return map;
-  }, [types]);
 
   // Main Dashboard Prompt Bar State
   const [mainPromptInput, setMainPromptInput] = useState("");
@@ -1413,12 +1405,13 @@ export default function ProjectListScreen({
         if (!hasPass) {
           setSessionUnlocked(true);
         }
+        let saved = 0;
         for (const csl of items) {
           const authors = csl.author
             .map((a) => a.literal || (a.given ? `${a.family}, ${a.given}` : a.family))
             .filter((name): name is string => Boolean(name));
           const year = csl.issued["date-parts"]?.[0]?.[0];
-          await addVaultItem(uid, {
+          const ok = await addVaultItem(uid, {
             title: csl.title,
             content: `${csl.title}${csl["container-title"] ? ` — ${csl["container-title"]}` : ""}`,
             sourceType: "reference",
@@ -1428,15 +1421,16 @@ export default function ProjectListScreen({
             journal: csl["container-title"] || csl.publisher,
             tags: ["Ask Scholar Import", "CSL-JSON"],
             metadata: { cslItem: csl, doi: csl.DOI },
-          }).catch(() => { });
+          })
+            .then(() => true)
+            .catch(() => false);
+          if (ok) saved++;
         }
-        showAppToast(
-          `Imported ${items.length} verified reference${items.length === 1 ? "" : "s"} into Knowledge Vault.`,
-          "success",
-          3500
-        );
+        // Say what actually happened: a failed save is never reported as imported.
+        const outcome = vaultImportOutcome(saved, items.length);
+        showAppToast(outcome.message, outcome.variant, outcome.variant === "success" ? 3500 : 7000);
       } catch {
-        showAppToast(`Imported ${items.length} reference${items.length === 1 ? "" : "s"}.`, "success", 3000);
+        showAppToast("The references could not be imported into your Knowledge Vault. Try again.", "error", 6000);
       }
     },
     [userEmail]
@@ -2114,7 +2108,7 @@ export default function ProjectListScreen({
         navigator.clipboard
           .writeText(shareUrl)
           .then(() => showAppToast("Project link copied to clipboard.", "success"))
-          .catch(() => { });
+          .catch(() => showAppToast(`Could not copy the link. Copy it yourself: ${shareUrl}`, "warning", 8000));
       }
     } else if (action === "pin") {
       setPinnedRecentIds((prev) =>
@@ -2271,17 +2265,7 @@ export default function ProjectListScreen({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [projectToDelete]);
 
-  function getProjectTitle(p: ProjectView | null): string {
-    if (!p) return "Project";
-    return (
-      p.answers?.title?.trim() ||
-      p.answers?.research_question?.trim() ||
-      p.answers?.topic?.trim() ||
-      typeMap.get(p.outputTypeId)?.label ||
-      p.outputTypeId ||
-      "Project"
-    );
-  }
+
 
 
   // "Resume chat": the conversation in progress, or after a reload the most recent saved one.
@@ -4713,7 +4697,7 @@ export default function ProjectListScreen({
 
             {/* Sub-label */}
             <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed mb-7 font-normal font-sans">
-              Are you sure you want to delete <span className="font-semibold text-neutral-900 dark:text-neutral-100">"{getProjectTitle(projectToDelete)}"</span>? All associated notes, drafts, and evidence will be permanently removed. This action cannot be undone.
+              Are you sure you want to delete <span className="font-semibold text-neutral-900 dark:text-neutral-100">"{getProjectDisplayName(projectToDelete, projects || [])}"</span>? All associated notes, drafts, and evidence will be permanently removed. This action cannot be undone.
             </p>
 
             {/* Action Buttons */}

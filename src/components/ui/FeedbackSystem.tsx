@@ -193,7 +193,10 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
         <div
           role="region"
           aria-label="Notifications"
-          className="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2.5 max-w-sm w-full px-4 sm:px-0 pointer-events-none"
+          data-testid="toast-region"
+          // Phones: top of the screen below the notch, full width with a gutter, clear of the
+          // prompt bar, keyboard and bottom docks. From 640px: bottom-right, as before.
+          className="fixed inset-x-0 top-[calc(env(safe-area-inset-top)+0.75rem)] z-[9999] mx-auto flex w-full max-w-sm flex-col gap-2.5 px-4 pointer-events-none sm:inset-x-auto sm:top-auto sm:right-4 sm:bottom-[calc(env(safe-area-inset-bottom)+1rem)] sm:mx-0 sm:px-0"
         >
           {toasts.map((toast) => {
             const isAlert = toast.variant === "error" || toast.variant === "warning";

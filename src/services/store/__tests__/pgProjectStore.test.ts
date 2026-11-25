@@ -522,3 +522,39 @@ describe("pgProjectStore.delete", () => {
     await expect(createPgProjectStore(gone).delete("proj-1")).resolves.toBeUndefined();
   });
 });
+
+describe("pgProjectStore SQL shape", () => {
+  /** Columns listed, highest $n placeholder in VALUES, and parameters sent must all agree. */
+  function shape(text: string, params: unknown[] = []) {
+    const cols = (text.match(/\(([^)]*)\)\s*values/i)?.[1] ?? "").split(",").map((c) => c.trim()).filter(Boolean);
+    const values = text.match(/values\s*\(([^)]*)\)/i)?.[1] ?? "";
+    const placeholders = (values.match(/\$\d+/g) ?? []).length;
+    const highest = Math.max(0, ...(text.match(/\$(\d+)/g) ?? []).map((m) => Number(m.slice(1))));
+    return { cols: cols.length, values: values.split(",").length, placeholders, highest, params: params.length };
+  }
+
+  it("create(): one parameter per column (a 12-for-20 mismatch broke every DATABASE_URL create)", async () => {
+    const db = fakeDb();
+    await createPgProjectStore(db).create("OT-10", "11111111-1111-4111-8111-111111111111");
+    const s = shape(db.calls[0].text, db.calls[0].params);
+    expect(s.cols).toBe(s.values);
+    expect(s.placeholders).toBe(s.params);
+    expect(s.highest).toBe(s.params);
+  });
+
+  it("save(): columns, values and parameters agree (plus the version guard)", async () => {
+    const db: PgQueryable & { calls: { text: string; params?: unknown[] }[] } = {
+      calls: [],
+      async query(text: string, params?: unknown[]) {
+        this.calls.push({ text, params });
+        return { rows: [{ project_id: "proj-1" }] };
+      },
+    };
+    const store = createPgProjectStore(db);
+    const record = await createPgProjectStore(fakeDb()).create("OT-01", "11111111-1111-4111-8111-111111111111");
+    await store.save(record);
+    const s = shape(db.calls[0].text, db.calls[0].params);
+    expect(s.cols).toBe(s.values);
+    expect(s.highest).toBe(s.params);
+  });
+});

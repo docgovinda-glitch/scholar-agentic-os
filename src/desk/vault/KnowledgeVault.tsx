@@ -954,7 +954,7 @@ export default function KnowledgeVault({
             onRefreshDrives={() => {
               getConnectedCloudDrives(userId)
                 .then(setConnectedDrives)
-                .catch(() => {});
+                .catch(() => showAppToast("Could not refresh your connected drives. Try again.", "warning", 5000));
             }}
             onResetVault={onResetVault}
           />
@@ -974,7 +974,7 @@ export default function KnowledgeVault({
               Delete Project
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 leading-relaxed">
-              Are you sure you want to delete <strong className="text-gray-900 dark:text-gray-200 font-semibold">"{projectToDelete.answers?.title || "Untitled Project"}"</strong>? This action cannot be undone and will permanently remove all draft chapters and evidence matrices.
+              Are you sure you want to delete <strong className="text-gray-900 dark:text-gray-200 font-semibold">"{getProjectDisplayName(projectToDelete, projects || [])}"</strong>? This action cannot be undone and will permanently remove all draft chapters and evidence matrices.
             </p>
             <div className="flex items-center justify-end gap-3 mt-6">
               <button

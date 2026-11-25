@@ -1,5 +1,6 @@
 import { useCallback,useEffect,useState,lazy,Suspense } from "react";
 import { LiveAiStatusDock } from "./ai/LiveAiStatusDock";
+import { AiUnavailableHost } from "./ai/AiUnavailableHost";
 import { Routes,Route,Navigate,Outlet,useNavigate,useLocation,useParams,useOutletContext } from "react-router-dom";
 import { RequireAuth,PublicOnly,RequireRecovery,RequireOnboarding } from "./DeskAuthGate";
 import {
@@ -503,6 +504,7 @@ export default function DeskApp() {
           </Routes>
           <SyncToast />
           <LiveAiStatusDock />
+          <AiUnavailableHost />
         </Suspense>
       </LoadingProvider>
     </div>

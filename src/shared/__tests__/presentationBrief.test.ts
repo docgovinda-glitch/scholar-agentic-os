@@ -45,3 +45,15 @@ describe("presentation brief (OT-22)", () => {
     expect(suggestVisualType("Surface codes, syndrome measurement")).toBe("Architecture Diagram");
   });
 });
+
+describe("isUntitledDeckTitle", () => {
+  it("treats empty and every untitled placeholder as untitled, and nothing else", async () => {
+    const { isUntitledDeckTitle, UNTITLED_PRESENTATION } = await import("../presentationBrief");
+    expect(isUntitledDeckTitle("")).toBe(true);
+    expect(isUntitledDeckTitle(undefined)).toBe(true);
+    expect(isUntitledDeckTitle(UNTITLED_PRESENTATION)).toBe(true);
+    expect(isUntitledDeckTitle("Untitled presentation")).toBe(true);
+    expect(isUntitledDeckTitle(`${UNTITLED_PRESENTATION} (Blank Sheet)`)).toBe(true);
+    expect(isUntitledDeckTitle("Coastal fisheries and microplastics")).toBe(false);
+  });
+});

@@ -6,7 +6,7 @@ import { DEFAULT_DECK_THEME_ID } from '../gamma/theme';
 import { normalizeDeck } from '../gamma/content';
 import { authedJsonFetch } from '../../../desk/api';
 import { stripCourseCodes } from '../../../utils/briefExtractor';
-import { buildOutlineFromBrief, cleanBriefText, deriveDocumentTitle, newOutlineId, type OutlineCard } from '../../../shared/presentationBrief';
+import { buildOutlineFromBrief, cleanBriefText, deriveDocumentTitle, isUntitledDeckTitle, newOutlineId, type OutlineCard } from '../../../shared/presentationBrief';
 import OutlineBuilder from './OutlineBuilder';
 
 export interface Step01UnderstandProps {
@@ -32,7 +32,7 @@ const signature = (cards: OutlineCard[]) => JSON.stringify(cards.map((c) => [c.t
 const nearestCount = (n: number) => SLIDE_COUNT_OPTIONS.reduce((a, b) => (Math.abs(b - n) < Math.abs(a - n) ? b : a));
 
 export default function Step01Understand({ projectId, deck, onUpdateDeck, onNextStep }: Step01UnderstandProps) {
-  const [topic, setTopic] = useState(deck.topic || (deck.title && deck.title !== 'Untitled Presentation' ? deck.title : '') || '');
+  const [topic, setTopic] = useState(deck.topic || (!isUntitledDeckTitle(deck.title) ? deck.title : '') || '');
   const [inputMode, setInputMode] = useState<'topic' | 'upload'>('topic');
   const [slideCount, setSlideCount] = useState<number>(nearestCount(deck.outline?.length || deck.slides.length || 10));
   const [rawText, setRawText] = useState('');

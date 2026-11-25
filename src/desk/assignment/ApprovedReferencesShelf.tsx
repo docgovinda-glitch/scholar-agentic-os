@@ -52,7 +52,7 @@ export const ApprovedReferencesShelf: React.FC<ApprovedReferencesShelfProps> = (
   };
 
   return (
-    <div className={`fixed bottom-3 sm:bottom-6 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center pointer-events-none ${className}`}>
+    <div className={`fixed bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] sm:bottom-6 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center pointer-events-none ${className}`}>
       {/* Expanded Reference Drawer */}
       {isExpanded && (
         <div className="w-[92vw] max-w-3xl mb-3 bg-[color:var(--surface-raised)] backdrop-blur-xl border border-[color:var(--border-subtle)] rounded-2xl p-4 shadow-2xl space-y-3 pointer-events-auto animate-in fade-in slide-in-from-bottom-3 duration-200">

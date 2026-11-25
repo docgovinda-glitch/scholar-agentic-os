@@ -1,5 +1,6 @@
 import type { SlideDeck, SlideCard } from '../types/slides';
 import type { CustomTheme } from '../types/themes';
+import { isUntitledDeckTitle, UNTITLED_PRESENTATION } from '../../../shared/presentationBrief';
 
 /**
  * Creates a clean, distraction-free "Blank Sheet" presentation deck.
@@ -31,9 +32,9 @@ export function createBlankSheetDeck(
   };
 
   const title =
-    existingDeck?.title && existingDeck.title !== 'Untitled Presentation'
+    existingDeck && !isUntitledDeckTitle(existingDeck.title)
       ? existingDeck.title
-      : 'Untitled Presentation (Blank Sheet)';
+      : `${UNTITLED_PRESENTATION} (Blank Sheet)`;
 
   const blankSlides: SlideCard[] = [
     {

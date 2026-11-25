@@ -4,7 +4,6 @@ import ContextPanel from "./ContextPanel";
 import { ResearchProvider, useResearchWorkspace } from "./ResearchContext";
 import JournalHeaderActions from "./JournalHeaderActions";
 import Tray from "../regions/Tray";
-import AiExhaustedModal from "./AiExhaustedModal";
 import { useUnsavedChangesGuard } from "../../hooks/useUnsavedChangesGuard";
 import AppleStudioHeader, { type AppleStudioPhaseId } from "../../components/ui/AppleStudioShell";
 import { studioEvidence } from "../../domain/journal/studioEvidence";
@@ -36,10 +35,6 @@ function ResearchWorkspaceInner({
     setMode,
     error,
     isLoading,
-    aiExhaustedError,
-    setAiExhaustedError,
-    fallbackToast,
-    setFallbackToast,
   } = useResearchWorkspace();
 
 
@@ -224,29 +219,7 @@ function ResearchWorkspaceInner({
 
       {trayOpen && <Tray projectId={projectId} onClose={() => setTrayOpen(false)} />}
 
-      {fallbackToast && (
-        <div className="fixed bottom-12 right-6 z-50 max-w-md p-4 bg-[color:var(--surface-raised)] border border-[color:var(--accent)] text-[color:var(--text-primary)] rounded-xl shadow-xl flex items-center justify-between gap-3 animate-fade-in">
-          <div className="flex items-center gap-2.5 text-xs font-semibold">
-            <span className="w-2 h-2 rounded-full bg-[color:var(--accent)] animate-pulse shrink-0" />
-            <span>{fallbackToast}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setFallbackToast(null)}
-            aria-label="Dismiss"
-            className="text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] text-xs font-bold px-1.5 py-0.5 rounded cursor-pointer"
-          >
-            ✕
-          </button>
-        </div>
-      )}
 
-      <AiExhaustedModal
-        isOpen={!!aiExhaustedError}
-        errorMessage={aiExhaustedError}
-        onClose={() => setAiExhaustedError(null)}
-        onOpenAiAccess={onOpenAiAccess || (() => {})}
-      />
     </div>
   );
 }
