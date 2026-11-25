@@ -10,6 +10,17 @@ vi.mock("../../src/middleware/auth.ts", () => ({
 
 const mockExecuteWebSearch = vi.fn();
 
+// The search route enriches its top results by fetching each page's full text
+// (safeFetchHtml, 3.2 s timeout per page). The fixtures below use real URLs, so
+// without this the test made live requests to mofa.gov.np, kathmandupost.com and
+// orfonline.org and timed out on a slow runner. No page is fetched here: each
+// source keeps its fixture snippet, which is all these tests assert on.
+const mockSafeFetchHtml = vi.fn(async () => null);
+vi.mock("../../utils/ssrfGuard.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../utils/ssrfGuard.ts")>();
+  return { ...actual, safeFetchHtml: (...args: unknown[]) => mockSafeFetchHtml(...(args as [])) };
+});
+
 vi.mock("../../src/research/webSearchEngine.ts", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../src/research/webSearchEngine.ts")>();
   return {
@@ -160,6 +171,8 @@ In parallel, economic cooperation has expanded into cross-border retail digital 
       expect(res.body.citations).toHaveLength(2);
       expect(res.body.citations[0].url).toContain("mofa.gov.np");
       expect(res.body.citations[0].authorityBadge).toBe("Government / Official");
+      // The enrichment step ran on the fixture URLs, through the stub rather than the network.
+      expect(mockSafeFetchHtml).toHaveBeenCalled();
     });
   });
 
