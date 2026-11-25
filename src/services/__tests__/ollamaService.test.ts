@@ -30,6 +30,9 @@ describe("ollamaService — Architecture, Parsing & Diagnostics", () => {
       const origin = "https://scholar.gkshah.com.np";
       const macCmd = getOllamaOriginSetupCommand("macos", origin);
       expect(macCmd).toContain(`launchctl setenv OLLAMA_ORIGINS "${origin}"`);
+      // Must kill both the GUI wrapper (`Ollama`) and `ollama serve` (`ollama`) case-insensitively before relaunching.
+      expect(macCmd).toContain("(pkill -ix ollama || true)");
+      expect(macCmd).toContain("sleep ");
       expect(macCmd).toContain("open -a Ollama");
 
       const linuxCmd = getOllamaOriginSetupCommand("linux", origin);
@@ -133,6 +136,29 @@ describe("ollamaService — Architecture, Parsing & Diagnostics", () => {
       expect(diag.models).toHaveLength(1);
       expect(diag.recommendedModel).toBe("qwen2.5-coder:1.5b");
       expect(diag.checks.every((c) => c.status === "pass")).toBe(true);
+      expect((mockFetch.mock.calls[0]?.[1] as Record<string, unknown>)?.targetAddressSpace).toBe("local");
+    });
+
+    it("uses private targetAddressSpace for LAN endpoints and classifies CORS_MISCONFIGURED across fallback candidates", async () => {
+      const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+        if (init?.mode === "no-cors" && url.startsWith("http://127.0.0.1:11434")) {
+          return Promise.resolve({ ok: false, type: "opaque" });
+        }
+        return Promise.reject(new TypeError("Failed to fetch"));
+      });
+
+      globalThis.fetch = mockFetch;
+
+      const localhostDiag = await diagnoseOllamaConnection("http://localhost:11434");
+      expect(localhostDiag.ok).toBe(false);
+      expect(localhostDiag.errorKind).toBe("CORS_MISCONFIGURED");
+      expect(localhostDiag.activeEndpoint).toBe("http://127.0.0.1:11434");
+      expect(localhostDiag.requiredOriginCommand).toContain("(pkill -ix ollama || true)");
+
+      mockFetch.mockClear();
+      mockFetch.mockImplementation(() => Promise.reject(new TypeError("Failed to fetch")));
+      await diagnoseOllamaConnection("http://192.168.1.50:11434");
+      expect((mockFetch.mock.calls[0]?.[1] as Record<string, unknown>)?.targetAddressSpace).toBe("private");
     });
 
     it("generates markdown diagnostic report for developer support", () => {

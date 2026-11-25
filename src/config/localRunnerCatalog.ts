@@ -68,7 +68,7 @@ export const LOCAL_RUNNERS: LocalRunnerSpec[] = [
       "Install Ollama, then run `ollama pull llama3.1:8b` in a terminal. Ollama starts its server automatically at localhost:11434.",
     installUrl: "https://ollama.com/download",
     corsGuidance:
-      "Ollama blocks browser requests from other origins by default. Set the environment variable OLLAMA_ORIGINS=* (or to this app's exact address) and restart Ollama. On macOS: `launchctl setenv OLLAMA_ORIGINS \"*\"` then restart the Ollama app.",
+      "Ollama blocks browser requests from other origins by default. Set the environment variable OLLAMA_ORIGINS=* (or to this app's exact address) and fully quit and restart Ollama. On macOS: `launchctl setenv OLLAMA_ORIGINS \"*\"`, then quit Ollama from the menu bar and reopen it.",
     difficulty: "Easy",
     hasGui: false,
     icon: "🦙",
