@@ -29,7 +29,8 @@ import { evaluateBurstiness } from "../src/utils/scholarlyVoiceGuard.ts";
 import { chunkAndRerankEvidence } from "../src/services/semanticRagEngine.ts";
 import { decideAskMode } from "../../src/shared/askRouting.ts";
 import { buildConversationContext, normalizeAskHistory } from "../../src/shared/askConversation.ts";
-import { ASK_BASE_IDENTITY, askStyleDescription } from "../../src/shared/askPrompts.ts";
+import { ASK_BASE_IDENTITY, askStyleDescription, platformFactsFor } from "../../src/shared/askPrompts.ts";
+import { ASK_QUICK_MAX_SOURCES, budgetSourcesForPrompt } from "../../src/shared/askBudget.ts";
 import { deleteThread, listThreads, parseThreads, saveThreads } from "../src/askThreads/threadStore.ts";
 
 /** Deep research runs each of its AI steps through the request's router chain. */
@@ -149,7 +150,8 @@ async function enrichTopSourcesWithFullText(
   const candidateIndices: number[] = [];
   for (let i = 0; i < Math.min(enriched.length, 6); i++) {
     const s = enriched[i];
-    if (s && s.url && /^https?:\/\//i.test(s.url) && (!s.snippet || s.snippet.length < 340)) {
+    // Fetch the page only for a source with no usable abstract: each fetched passage adds ~450 tokens.
+    if (s && s.url && /^https?:\/\//i.test(s.url) && (!s.snippet || s.snippet.length < 120)) {
       candidateIndices.push(i);
       if (candidateIndices.length >= 3) break;
     }
@@ -555,6 +557,10 @@ export function registerAIRoutes(
         contextBlocks.push(`=== VISUAL MEDIA ATTACHMENTS ===\nThe user has attached ${normalizedImages.length} image(s): ${imgDetails}.\nThe image payload is delivered directly to your vision pipeline for detailed visual inspection.\n=== END OF VISUAL MEDIA ATTACHMENTS ===`);
       }
 
+      // Platform facts only for questions about Scholar Core (keeps the system prompt stable and cacheable).
+      const platformFacts = platformFactsFor(effectivePrompt);
+      if (platformFacts) contextBlocks.push(platformFacts);
+
       // 2. Canonical Citation Ledger Context Block (when operating in strict Vault/Canonical ledger mode)
       if (useStrictVaultLedger && canonicalSources.length > 0) {
         const verifiedCanonical = canonicalSources.filter((s) => s.authors && s.authors.length > 0 && s.year);
@@ -594,10 +600,11 @@ export function registerAIRoutes(
         if (normalizedPreRetrieved.length > 0) {
           citations = [...vaultMapped, ...normalizedPreRetrieved];
         } else {
-          const searchResponse = await cachedAskScholarWebSearch(effectivePrompt);
+          const searchResponse = await cachedAskScholarWebSearch(effectivePrompt, ASK_QUICK_MAX_SOURCES);
           const enrichedWeb = await enrichTopSourcesWithFullText(searchResponse.results || [], effectivePrompt);
           citations = [...vaultMapped, ...enrichedWeb];
         }
+        citations = budgetSourcesForPrompt(citations);
         contextBlocks.push(`=== LIVE VERIFIED WEB, INSTITUTIONAL & SCHOLARLY SEARCH RESULTS ===\n${formatSearchResultsForPrompt(citations)}\n=== END OF SEARCH RESULTS ===`);
       } else if (isExplicitNormalChat && vaultSources.length > 0) {
         citations = vaultSources
@@ -619,7 +626,7 @@ export function registerAIRoutes(
         }
       }
       if (citations.length === 0 && normalizedPreRetrieved.length > 0) {
-        citations = normalizedPreRetrieved;
+        citations = budgetSourcesForPrompt(normalizedPreRetrieved);
         contextBlocks.push(`=== VERIFIED SCHOLARLY & WEB EVIDENCE ===\n${formatSearchResultsForPrompt(citations)}\n=== END OF VERIFIED EVIDENCE ===`);
       }
 
@@ -658,14 +665,8 @@ export function registerAIRoutes(
       } else if (useStrictVaultLedger && (isSubstantive || canonicalSources.length > 0)) {
         assembledUserPrompt += `User Inquiry: ${effectivePrompt}\n\nDeliver an authoritative, research-grounded synthesis. Strict requirements:\n1. Only cite sources from the Exclusive Citation Ledger above using verified [CITE:id] tokens.\n2. Do NOT fabricate authors, years, or citations not in the ledger.\n3. State plainly when a statistic has no verified source in the ledger instead of citing it. Never write a tag such as [Unverified Claim] into the prose.\n4. Do NOT output fake word count declarations.`;
       } else if (mode === "search") {
-        assembledUserPrompt += `User Inquiry: ${effectivePrompt}\n\nSynthesize a rigorous, well-verified academic answer using the retrieved sources above.
-
-Formatting & Verification Rules:
-1. Direct Answer First: Open with a direct answer, develop the supporting argument in synthesized analytical prose (avoiding bullet-point dumps), and note methodological or evidence limitations.
-2. Accurate In-Text Citations: Cite only the relevant retrieved sources above where they support a specific claim, grouping sources that support the same point. Ignore any retrieved source that is off-topic.
-3. Cross-Verification: Compare and contrast perspectives where studies or institutional reports diverge.
-4. Zero Fabrication: Never invent citations, DOIs, URLs, or placeholder metadata ("Unknown Author", "n.d.").
-5. Conclude with a "## References" section formatted in ${styleDescription} with strict 1-to-1 correspondence between in-text citations and reference entries.`;
+        // The answer and citation rules are in the search system prompt; they are not repeated here.
+        assembledUserPrompt += `User Inquiry: ${effectivePrompt}\n\nAnswer from the retrieved sources above.`;
       } else {
         assembledUserPrompt += effectivePrompt;
       }

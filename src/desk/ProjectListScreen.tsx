@@ -100,7 +100,7 @@ import {
 import { loadUserAiSettings } from "../services/userAiSettings";
 import { type PromptMode } from "./PromptBarActionMenu";
 import { AskPromptBox } from "./ask/AskPromptBox";
-import { ASK_BASE_IDENTITY, buildAskGeneralPrompt } from "../shared/askPrompts";
+import { ASK_BASE_IDENTITY, buildAskGeneralPrompt, platformFactsFor } from "../shared/askPrompts";
 import { decideAskMode, isTimeSensitiveQuery } from "../shared/askRouting";
 import { MAX_TURNS, withConversation } from "../shared/askConversation";
 import {
@@ -1579,7 +1579,7 @@ export default function ProjectListScreen({
             // The server could not answer: try the user's own key directly from
             // this browser, and say so (an answer from a different path is never silent).
             try {
-              const clientTxt = await executeAgenticLLM(effectiveSystemPrompt, withConversation(query, history), "reasoning", (chunk) => {
+              const clientTxt = await executeAgenticLLM(effectiveSystemPrompt, [platformFactsFor(query), withConversation(query, history)].filter(Boolean).join("\n\n"), "reasoning", (chunk) => {
                 if (!askAbortRef.current) {
                   setStreamingGuideText((prev) => prev + chunk);
                 }
