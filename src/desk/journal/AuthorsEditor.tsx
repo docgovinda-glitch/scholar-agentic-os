@@ -8,6 +8,8 @@ const label = "block text-[11px] font-bold text-[color:var(--text-primary)] mb-1
 /**
  * Every author in byline order, with affiliation, email, ORCID iD, the
  * corresponding author, and CRediT roles. Nothing is filled in for them.
+ * Changes save on their own: a typed field when it loses focus (or on
+ * Enter), a reorder, removal, role or corresponding-author choice at once.
  */
 export default function AuthorsEditor({
   authors,
@@ -17,19 +19,33 @@ export default function AuthorsEditor({
 }: {
   authors: ManuscriptAuthor[];
   onChange: (next: ManuscriptAuthor[]) => void;
-  onSave: () => void;
+  /** Persist this list; called on blur/Enter and after each structural change. */
+  onSave: (authors: ManuscriptAuthor[]) => void;
   saveState: "idle" | "saving" | "saved" | "error";
 }) {
   const problems = checkAuthors(authors);
-  const set = (i: number, patch: Partial<ManuscriptAuthor>) => onChange(authors.map((a, j) => (j === i ? { ...a, ...patch } : a)));
+  const patched = (i: number, patch: Partial<ManuscriptAuthor>) => authors.map((a, j) => (j === i ? { ...a, ...patch } : a));
+  const set = (i: number, patch: Partial<ManuscriptAuthor>) => onChange(patched(i, patch));
+  /** A change that is complete as soon as it is made: show it and save it. */
+  const commit = (next: ManuscriptAuthor[]) => {
+    onChange(next);
+    onSave(next);
+  };
   const move = (i: number, d: -1 | 1) => {
     const next = [...authors];
     [next[i], next[i + d]] = [next[i + d], next[i]];
-    onChange(next);
+    commit(next);
   };
   const toggleRole = (i: number, role: string) => {
     const roles = authors[i].creditRoles;
-    set(i, { creditRoles: roles.includes(role) ? roles.filter((r) => r !== role) : [...roles, role] });
+    commit(patched(i, { creditRoles: roles.includes(role) ? roles.filter((r) => r !== role) : [...roles, role] }));
+  };
+  // Typed fields save when the author leaves them, or presses Enter.
+  const saveOnLeave = {
+    onBlur: () => onSave(authors),
+    onKeyDown: (e: { key: string; currentTarget: HTMLInputElement }) => {
+      if (e.key === "Enter") e.currentTarget.blur();
+    },
   };
 
   return (
@@ -52,7 +68,7 @@ export default function AuthorsEditor({
                   <button
                     type="button"
                     aria-label={`Remove author ${n}`}
-                    onClick={() => onChange(authors.filter((_, j) => j !== i).map((x, j, arr) => (a.isCorresponding && j === 0 && !arr.some((y) => y.isCorresponding) ? { ...x, isCorresponding: true } : x)))}
+                    onClick={() => commit(authors.filter((_, j) => j !== i).map((x, j, arr) => (a.isCorresponding && j === 0 && !arr.some((y) => y.isCorresponding) ? { ...x, isCorresponding: true } : x)))}
                     className="p-1 rounded hover:bg-[color:var(--surface-hover)] text-[color:var(--state-danger)] cursor-pointer"
                   >
                     <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
@@ -62,21 +78,21 @@ export default function AuthorsEditor({
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label htmlFor={`au-${a.id}-first`} className={label}>Author {n} first name</label>
-                  <input id={`au-${a.id}-first`} className={input} value={a.firstName} onChange={(e) => set(i, { firstName: e.target.value })} />
+                  <input id={`au-${a.id}-first`} className={input} value={a.firstName} onChange={(e) => set(i, { firstName: e.target.value })} {...saveOnLeave} />
                 </div>
                 <div>
                   <label htmlFor={`au-${a.id}-sur`} className={label}>Author {n} surname</label>
-                  <input id={`au-${a.id}-sur`} className={input} value={a.surname} onChange={(e) => set(i, { surname: e.target.value })} />
+                  <input id={`au-${a.id}-sur`} className={input} value={a.surname} onChange={(e) => set(i, { surname: e.target.value })} {...saveOnLeave} />
                 </div>
               </div>
               <div>
                 <label htmlFor={`au-${a.id}-aff`} className={label}>Author {n} affiliation</label>
-                <input id={`au-${a.id}-aff`} className={input} placeholder="Department, institution, city, country" value={a.affiliation ?? ""} onChange={(e) => set(i, { affiliation: e.target.value })} />
+                <input id={`au-${a.id}-aff`} className={input} placeholder="Department, institution, city, country" value={a.affiliation ?? ""} onChange={(e) => set(i, { affiliation: e.target.value })} {...saveOnLeave} />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label htmlFor={`au-${a.id}-email`} className={label}>Author {n} email</label>
-                  <input id={`au-${a.id}-email`} type="email" className={input} value={a.email} onChange={(e) => set(i, { email: e.target.value })} />
+                  <input id={`au-${a.id}-email`} type="email" className={input} value={a.email} onChange={(e) => set(i, { email: e.target.value })} {...saveOnLeave} />
                 </div>
                 <div>
                   <label htmlFor={`au-${a.id}-orcid`} className={label}>Author {n} ORCID iD</label>
@@ -87,12 +103,13 @@ export default function AuthorsEditor({
                     aria-invalid={orcidBad}
                     value={a.orcid ?? ""}
                     onChange={(e) => set(i, { orcid: e.target.value })}
-                    onBlur={(e) => set(i, { orcid: normalizeOrcid(e.target.value) })}
+                    onBlur={(e) => commit(patched(i, { orcid: normalizeOrcid(e.target.value) }))}
+                    onKeyDown={saveOnLeave.onKeyDown}
                   />
                 </div>
               </div>
               <label className="flex items-center gap-2 text-[11px] text-[color:var(--text-secondary)]">
-                <input type="radio" name="corresponding-author" checked={a.isCorresponding} onChange={() => onChange(authors.map((x, j) => ({ ...x, isCorresponding: j === i })))} />
+                <input type="radio" name="corresponding-author" checked={a.isCorresponding} onChange={() => commit(authors.map((x, j) => ({ ...x, isCorresponding: j === i })))} />
                 Corresponding author
               </label>
               <fieldset>
@@ -128,16 +145,16 @@ export default function AuthorsEditor({
           <Plus className="w-3.5 h-3.5" aria-hidden="true" />
           Add author
         </button>
-        <button
-          type="button"
-          onClick={onSave}
-          disabled={saveState === "saving"}
-          className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[color:var(--text-primary)] text-[color:var(--surface-canvas)] disabled:opacity-50 cursor-pointer"
-        >
-          {saveState === "saving" ? "Saving…" : "Save authors"}
-        </button>
+        {saveState === "saving" && <span role="status" className="text-[11px] text-[color:var(--text-muted)]">Saving…</span>}
         {saveState === "saved" && <span role="status" className="text-[11px] text-[color:var(--state-success)]">Authors saved.</span>}
-        {saveState === "error" && <span role="alert" className="text-[11px] text-[color:var(--state-danger)]">The authors could not be saved.</span>}
+        {saveState === "error" && (
+          <span role="alert" className="text-[11px] text-[color:var(--state-danger)]">
+            The authors could not be saved.{" "}
+            <button type="button" onClick={() => onSave(authors)} className="underline cursor-pointer">
+              Try again
+            </button>
+          </span>
+        )}
       </div>
 
       {problems.length > 0 && (

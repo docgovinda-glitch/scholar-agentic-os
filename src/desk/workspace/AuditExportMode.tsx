@@ -26,7 +26,7 @@ import AuthorsEditor from "../journal/AuthorsEditor";
 import { checkAuthors, creditStatement as creditFromRoles, fullName, type ManuscriptAuthor } from "../../domain/journal/authorship";
 import { checkDois, lookupDoi } from "../journal/referenceApi";
 import { studioEvidence } from "../../domain/journal/studioEvidence";
-import { manuscriptAnswerPatch, readManuscriptMarkdown } from "../../domain/journal/manuscriptText";
+import { countManuscriptWords, journalTargetWords, manuscriptAnswerPatch, readManuscriptMarkdown } from "../../domain/journal/manuscriptText";
 import { auditCitations, recordsForSources } from "../../domain/journal/referenceAudit";
 import { cleanDoi, parseReferenceRecords, type ReferenceRecord } from "../../domain/journal/references";
 import { isNumeric, renderManuscript, styleKey, type StyleKey } from "../../domain/journal/citationStyles";
@@ -100,19 +100,19 @@ export default function AuditExportMode() {
   // Vault sources in Mode 2
 
   // ── 1. Word Count Compliance ──
-  // The author's own target from Blueprint (or the journal profile); none is assumed.
-  const targetWords = blueprint?.targetTotalWords || Number(answers["target_word_count"]) || 0;
-  const actualWords = useMemo(() => {
-    return manuscriptMarkdown.trim() ? manuscriptMarkdown.trim().split(/\s+/).length : 0;
-  }, [manuscriptMarkdown]);
+  // The same target and the same count the Studio and the header show:
+  // the Blueprint's (or journal profile's) target, else the default 6,000.
+  const targetWords = useMemo(() => journalTargetWords(answers), [answers]);
+  const actualWords = useMemo(() => countManuscriptWords(manuscriptMarkdown), [manuscriptMarkdown]);
 
   const wordDeltaPercent = useMemo(() => {
     if (targetWords === 0) return 0;
     return Number((((actualWords - targetWords) / targetWords) * 100).toFixed(1));
   }, [actualWords, targetWords]);
 
-  const hasWordTarget = targetWords > 0;
-  const isWordCountCompliant = hasWordTarget && actualWords > 0 && Math.abs(wordDeltaPercent) <= 5.0;
+  // Whether the author chose the target (Blueprint or journal profile) or it is the default.
+  const targetIsDefault = !blueprint?.targetTotalWords && !(parseInt(String(answers["target_word_count"] ?? ""), 10) > 0);
+  const isWordCountCompliant = actualWords > 0 && Math.abs(wordDeltaPercent) <= 5.0;
 
   // ── 2. References: every citation resolved, nothing retracted unacknowledged ──
   const sources = useMemo(() => studioEvidence(answers), [answers]);
@@ -238,7 +238,7 @@ export default function AuditExportMode() {
   const [isExporting, setIsExporting] = useState<string | null>(null);
   const [exportNotice, setExportNotice] = useState<string | null>(null);
 
-  // Conductor Gate G7 Certification status
+  // Pre-submission check status
   // The share of the five checks that pass; nothing is granted up front.
   const declarationsWritten = [
     [dataAvailabilityEnabled, dataAvailabilityStatement],
@@ -414,21 +414,28 @@ export default function AuditExportMode() {
     .filter(([, on, text]) => on && String(text).trim())
     .map(([label, , text]) => ({ label, text: String(text).trim() }));
 
-  const handleSaveAuthors = useCallback(async () => {
-    if (!effectiveProjectId) return;
-    setAuthorSave("saving");
-    try {
-      const saved = await saveAuthors(
-        effectiveProjectId,
-        authorList.map((a) => ({ ...a, orcid: a.orcid?.trim() || undefined, affiliation: a.affiliation?.trim() || undefined })) as Author[]
-      );
-      authorsDirty.current = false;
-      setProject(saved);
-      setAuthorSave("saved");
-    } catch {
-      setAuthorSave("error");
-    }
-  }, [effectiveProjectId, authorList, setProject]);
+  // Authors save on their own (blur, Enter, or a reorder/role change); only
+  // an edited list is sent, and edits made while a save runs stay unsaved.
+  const authorEdits = React.useRef(0);
+  const handleSaveAuthors = useCallback(
+    async (list: ManuscriptAuthor[]) => {
+      if (!effectiveProjectId || !authorsDirty.current) return;
+      const version = authorEdits.current;
+      setAuthorSave("saving");
+      try {
+        const saved = await saveAuthors(
+          effectiveProjectId,
+          list.map((a) => ({ ...a, orcid: a.orcid?.trim() || undefined, affiliation: a.affiliation?.trim() || undefined })) as Author[]
+        );
+        if (authorEdits.current === version) authorsDirty.current = false;
+        setProject(saved);
+        setAuthorSave("saved");
+      } catch {
+        setAuthorSave("error");
+      }
+    },
+    [effectiveProjectId, setProject]
+  );
 
   // Export handlers
   const handleDownloadDocx = useCallback(async () => {
@@ -610,17 +617,14 @@ export default function AuditExportMode() {
         <div>
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[color:var(--accent-subtle)] text-[color:var(--accent)]">
-              Mode 5
-            </span>
-            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]">
-              Conductor Gate G7
+              Delivery
             </span>
             <h2 className="text-lg font-bold text-[color:var(--text-primary)]">
-              Pre-Flight Compliance Audit & Submission Compiler
+              Pre-Submission Check
             </h2>
           </div>
           <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">
-            Synchronized Gate G7 compliance verification, 2026 publisher ethical declarations, and camera-ready document generation.
+            Word count, references, verification and declarations checked before you export the submission files.
           </p>
         </div>
 
@@ -632,7 +636,7 @@ export default function AuditExportMode() {
                 : "bg-[color:var(--state-warning-subtle)] text-[color:var(--state-warning)] border-[color:var(--state-warning)]"
             }`}
           >
-            <span>{g7CertifiedReady ? "✓ Gate G7: CERTIFIED READY" : "⚠ Gate G7: ACTION REQUIRED"}</span>
+            <span>{g7CertifiedReady ? "✓ Ready to submit" : "⚠ Action required"}</span>
             <span className="px-1.5 py-0.2 rounded bg-[color:var(--surface-raised)] text-[11px]">
               {g7Passed} of {g7Checks.length} checks pass
             </span>
@@ -650,16 +654,16 @@ export default function AuditExportMode() {
       {/* ── Main Two-Panel Grid ── */}
       <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* ==================================================================== */}
-        {/* LEFT PANEL: GATE G7 PRE-SUBMISSION GATEKEEPER SCORECARD             */}
+        {/* LEFT PANEL: PRE-SUBMISSION CHECKS                                    */}
         {/* ==================================================================== */}
         <section
-          aria-label="Pre-Submission Gatekeeper Scorecard"
+          aria-label="Pre-submission checks"
           className="lg:col-span-7 flex flex-col gap-6"
         >
           {/* Card Header */}
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold uppercase tracking-wider text-[color:var(--text-secondary)] flex items-center gap-2">
-              <span>Gate G7 Scorecard</span>
+              <span>Pre-submission checks</span>
               <span className="text-xs font-normal normal-case text-[color:var(--text-muted)]">
                 (Word budget, references, verification and declarations)
               </span>
@@ -674,7 +678,7 @@ export default function AuditExportMode() {
                   1. Word Count Budget Compliance
                 </span>
                 <span className="text-xs text-[color:var(--text-muted)]">
-                  (Mode 1 Target Blueprint)
+                  ({targetIsDefault ? "default target; set yours in Blueprint" : "target from Blueprint"})
                 </span>
               </div>
               <span
@@ -684,9 +688,7 @@ export default function AuditExportMode() {
                     : "bg-[color:var(--state-warning-subtle)] text-[color:var(--state-warning)]"
                 }`}
               >
-                {!hasWordTarget
-                  ? "No word target set in Blueprint"
-                  : isWordCountCompliant
+                {isWordCountCompliant
                   ? `Within Budget (±5% Target: ${actualWords.toLocaleString()} / ${targetWords.toLocaleString()} words, ${wordDeltaPercent > 0 ? "+" : ""}${wordDeltaPercent}%)`
                   : `Budget Deviation: ${actualWords.toLocaleString()} / ${targetWords.toLocaleString()} words (${wordDeltaPercent > 0 ? "+" : ""}${wordDeltaPercent}%)`}
               </span>
@@ -700,15 +702,15 @@ export default function AuditExportMode() {
                 </div>
               </div>
               <div className="p-2.5 rounded bg-[color:var(--surface-canvas)] border border-[color:var(--border-control)]">
-                <div className="text-[11px] text-[color:var(--text-muted)]">Mode 1 Target Budget</div>
+                <div className="text-[11px] text-[color:var(--text-muted)]">Blueprint Target</div>
                 <div className="text-base font-bold text-[color:var(--text-primary)] mt-0.5">
-                  {hasWordTarget ? targetWords.toLocaleString() : "Not set"}
+                  {targetWords.toLocaleString()}
                 </div>
               </div>
               <div className="p-2.5 rounded bg-[color:var(--surface-canvas)] border border-[color:var(--border-control)]">
                 <div className="text-[11px] text-[color:var(--text-muted)]">Tolerance Band (±5%)</div>
                 <div className="text-base font-bold text-[color:var(--text-primary)] mt-0.5">
-                  {hasWordTarget ? `${Math.round(targetWords * 0.95).toLocaleString()} – ${Math.round(targetWords * 1.05).toLocaleString()}` : "—"}
+                  {`${Math.round(targetWords * 0.95).toLocaleString()} – ${Math.round(targetWords * 1.05).toLocaleString()}`}
                 </div>
               </div>
             </div>
@@ -1103,6 +1105,7 @@ export default function AuditExportMode() {
               authors={authorList}
               onChange={(next) => {
                 authorsDirty.current = true;
+                authorEdits.current += 1;
                 setAuthorSave("idle");
                 setAuthorList(next);
               }}
@@ -1169,7 +1172,7 @@ export default function AuditExportMode() {
             >
               <span>Download Point-by-Point Referee Response Letter (.docx)</span>
               <span className="text-[10px] text-[color:var(--text-muted)]">
-                Mode 4 Rebuttal Letter
+                Review Rebuttal Letter
               </span>
             </button>
 

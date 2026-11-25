@@ -21,6 +21,8 @@ vi.mock("../../../components/ui/FeedbackSystem", async (orig) => ({
 const { default: JournalProfileCard } = await import("../JournalProfileCard");
 
 const project = { projectId: "p1", answers: { target_word_count: "6000" } } as unknown as ProjectView;
+/** The form is optional and starts closed. */
+const openForm = async () => fireEvent.click(await screen.findByRole("button", { name: "Add journal details" }));
 const GUIDE = Array.from({ length: 45 }, (_, i) => `word${i}`).join(" ");
 
 describe("JournalProfileCard", () => {
@@ -32,11 +34,26 @@ describe("JournalProfileCard", () => {
     api.saveIntakeAnswers.mockImplementation(async (_id, answers) => ({ ...project, answers: { ...project.answers, ...answers } }));
   });
 
+  it("starts closed with no saved profile, tells the page when the form opens, and spelling options are not clipped", async () => {
+    const onEditingChange = vi.fn();
+    render(<JournalProfileCard project={project} onApplied={vi.fn()} onEditingChange={onEditingChange} />);
+    expect(await screen.findByTestId("journal-profile-collapsed")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Journal name *")).toBeNull();
+    expect(onEditingChange).toHaveBeenLastCalledWith(false);
+    await openForm();
+    expect(onEditingChange).toHaveBeenLastCalledWith(true);
+    const spelling = screen.getByLabelText("Spelling") as HTMLSelectElement;
+    expect(Array.from(spelling.options).map((o) => o.textContent)).toEqual(["Not stated (keep current)", "British / Oxford English", "US English"]);
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.getByTestId("journal-profile-collapsed")).toBeInTheDocument();
+  });
+
   it("fills the form from pasted guidelines and marks what they do not state", async () => {
     api.authedJsonFetch.mockResolvedValue(
       new Response(JSON.stringify({ proposal: { journalName: "J Quantum Syst", wordLimit: { max: 4500 }, structureOverride: ["Abstract", "Introduction", "Methods", "Results", "Discussion"], requiredDeclarations: ["Data availability"], unresolvedFields: ["citationStyle"] } }), { status: 200 }),
     );
     render(<JournalProfileCard project={project} onApplied={vi.fn()} />);
+    await openForm();
     fireEvent.change(await screen.findByLabelText(/Author guidelines/), { target: { value: GUIDE } });
     fireEvent.click(screen.getByRole("button", { name: /Fill from guidelines with AI/ }));
     await waitFor(() => expect((screen.getByLabelText("Journal name *") as HTMLInputElement).value).toBe("J Quantum Syst"));
@@ -50,6 +67,7 @@ describe("JournalProfileCard", () => {
     api.authedJsonFetch.mockResolvedValue(new Response(JSON.stringify({ proposal: { journalName: "Health Policy", requiredDeclarations: [], unresolvedFields: [] } }), { status: 200 }));
     const onApplied = vi.fn();
     render(<JournalProfileCard project={project} onApplied={onApplied} />);
+    await openForm();
     const text = `${GUIDE} Manuscripts must be written in British English spelling. The journal operates a double-blind peer review process.`;
     fireEvent.change(await screen.findByLabelText(/Author guidelines/), { target: { value: text } });
     fireEvent.click(screen.getByRole("button", { name: /Fill from guidelines with AI/ }));
@@ -73,6 +91,7 @@ describe("JournalProfileCard", () => {
   it("saving sets the word target, citation style and an outline of the journal's sections", async () => {
     const onApplied = vi.fn();
     render(<JournalProfileCard project={project} onApplied={onApplied} />);
+    await openForm();
     fireEvent.change(await screen.findByLabelText("Journal name *"), { target: { value: "J Quantum Syst" } });
     fireEvent.change(screen.getByLabelText("Word limit"), { target: { value: "4500" } });
     fireEvent.change(screen.getByLabelText("Citation style"), { target: { value: "IEEE numbered" } });
@@ -90,6 +109,7 @@ describe("JournalProfileCard", () => {
     confirmAnswer = false;
     const withText = { ...project, answers: { ...project.answers, manuscript_sections: JSON.stringify({ texts: { "sub-1": "Some words." }, unsorted: "" }) } } as unknown as ProjectView;
     render(<JournalProfileCard project={withText} onApplied={vi.fn()} />);
+    await openForm();
     fireEvent.change(await screen.findByLabelText("Journal name *"), { target: { value: "J" } });
     fireEvent.change(screen.getByLabelText(/Sections, in order/), { target: { value: "Introduction\nMethods" } });
     fireEvent.click(screen.getByRole("button", { name: "Save journal profile" }));

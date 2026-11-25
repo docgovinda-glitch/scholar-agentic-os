@@ -188,7 +188,7 @@ describe("Journal Rebuild Step B — 5-Mode Navigation, Mode 1 Word Budgeter & M
       expect(screen.getByLabelText(/Working article title/)).toHaveValue("Timing FPGA Decoders on Real Hardware");
 
       // No journal yet: the lock is closed and says why.
-      const lock = screen.getByRole("button", { name: /Lock blueprint and continue to Mode 2/i });
+      const lock = screen.getByRole("button", { name: /Lock blueprint and continue to Evidence/i });
       expect(lock).toBeDisabled();
       expect(screen.getByText(/Still needed: a target journal/)).toBeInTheDocument();
 
@@ -197,6 +197,9 @@ describe("Journal Rebuild Step B — 5-Mode Navigation, Mode 1 Word Budgeter & M
       fireEvent.click(screen.getByRole("button", { name: "Select Quantum" }));
       // The guidelines form opens for the chosen journal; its rules come from there, not the index.
       expect(await screen.findByTestId("journal-guidelines-prompt")).toHaveTextContent("not in public indexes");
+      // One set of manuscript settings on screen: the journal form holds them while it is open.
+      expect(screen.getAllByLabelText("Spelling")).toHaveLength(1);
+      expect(screen.queryByTestId("manuscript-settings")).toBeNull();
 
       await waitFor(() => expect(lock).toBeEnabled());
       fireEvent.click(lock);
@@ -206,6 +209,23 @@ describe("Journal Rebuild Step B — 5-Mode Navigation, Mode 1 Word Budgeter & M
       const lockPatch = vi.mocked(api.saveIntakeAnswers).mock.calls.map(([, a]) => a as Record<string, string>).find((a) => a.blueprint_locked === "true")!;
       expect(lockPatch).toMatchObject({ core_problem: "Physical decoder timing is unmeasured.", primary_research_question: "How fast are FPGA decoders on physical testbeds?", title: "Timing FPGA Decoders on Real Hardware" });
       expect(calls.every((u) => u.startsWith("/api/projects/proj-step-b/agentic/blueprint/"))).toBe(true);
+    });
+
+    it("shows one collapsed set of manuscript defaults with readable spelling labels", async () => {
+      render(
+        <ResearchProvider projectId="proj-step-b" initialStage="definition" onStageChangeCallback={() => {}}>
+          <ProtocolBlueprintMode />
+        </ResearchProvider>
+      );
+      const settings = await screen.findByTestId("manuscript-settings");
+      expect(settings).not.toHaveAttribute("open");
+      expect(settings).toHaveTextContent(/Customize manuscript defaults/);
+      expect(screen.getAllByLabelText("Spelling")).toHaveLength(1);
+      expect(screen.getAllByLabelText("Citation style")).toHaveLength(1);
+      const spelling = screen.getByLabelText("Spelling") as HTMLSelectElement;
+      expect(Array.from(spelling.options).map((o) => o.textContent)).toEqual(["British / Oxford English", "US English"]);
+      // The journal form is optional and starts closed.
+      expect(await screen.findByTestId("journal-profile-collapsed")).toBeInTheDocument();
     });
 
     it("renders the interactive 350–500 word sub-section budget table and allows target tweaking", async () => {
@@ -313,7 +333,7 @@ describe("Journal Rebuild Step B — 5-Mode Navigation, Mode 1 Word Budgeter & M
       );
 
       await waitFor(() => {
-        expect(screen.getByText(/Primary User Data & Empirical Document Ingestion/i)).toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "Your Data & Notes" })).toBeInTheDocument();
       });
 
       // Open Direct Paste Modal
@@ -353,14 +373,14 @@ describe("Journal Rebuild Step B — 5-Mode Navigation, Mode 1 Word Budgeter & M
       );
 
       await waitFor(() => {
-        expect(screen.getByPlaceholderText(/Search empirical literature/i)).toBeInTheDocument();
+        expect(screen.getByRole("textbox", { name: "Search scholarly literature" })).toBeInTheDocument();
       });
 
       // Search query
-      const searchInput = screen.getByPlaceholderText(/Search empirical literature/i);
+      const searchInput = screen.getByRole("textbox", { name: "Search scholarly literature" });
       fireEvent.change(searchInput, { target: { value: "surface codes" } });
 
-      const searchBtn = screen.getByRole("button", { name: /Search Portals/i });
+      const searchBtn = screen.getByRole("button", { name: /^Search$/ });
       fireEvent.click(searchBtn);
 
       await waitFor(() => {

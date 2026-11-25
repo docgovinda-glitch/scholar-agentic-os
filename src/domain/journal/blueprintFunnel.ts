@@ -243,6 +243,19 @@ export const ARTICLE_TYPES: Array<{ id: string; label: string; template: Structu
 export const templateForArticleType = (id: string | undefined): StructureTemplate =>
   ARTICLE_TYPES.find((a) => a.id === id)?.template ?? "IMRaD";
 
+/** The stored spelling choices (saved answers keep these exact values). */
+export const SPELLING_OPTIONS = ["British / Oxford English (-ise/-our/-re)", "US English"] as const;
+
+/** The project's spelling convention; British unless US English is chosen. */
+export function spellingVariant(orthography: unknown): "british" | "us" {
+  return String(orthography ?? "").includes("US") ? "us" : "british";
+}
+
+/** A short label for a stored spelling choice, short enough for a narrow select. */
+export function spellingLabel(orthography: unknown): "British / Oxford English" | "US English" {
+  return spellingVariant(orthography) === "us" ? "US English" : "British / Oxford English";
+}
+
 /** Spelling the guidelines ask for, only when they name it. */
 export function spellingFromGuidelines(text: string): "British / Oxford English (-ise/-our/-re)" | "US English" | undefined {
   const t = text.toLowerCase();

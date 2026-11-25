@@ -49,7 +49,13 @@ Saved projects are cleaned of legacy template text on load (`src/domain/assignme
 | IV. Peer Review | 21 AI Peer Review, 22 AI Revision |
 | V. Publication | 23 Final Editor, 24 Readiness Check, 25 Format & Export |
 
-The same workspace also exposes a five-mode studio (Protocol Blueprint, Evidence Matrix, Manuscript Studio, Referee Rebuttal, Audit & Export: `ProtocolBlueprintMode.tsx`, `EvidenceMatrixMode.tsx`, `ManuscriptStudioMode.tsx`, `RefereeRebuttalMode.tsx`, `AuditExportMode.tsx`). Notes:
+The same workspace also exposes a five-mode studio, named the same in the header tabs, each mode's own heading and every back/continue button: Blueprint, Evidence, Studio, Review, Delivery (`ProtocolBlueprintMode.tsx`, `EvidenceMatrixMode.tsx`, `ManuscriptStudioMode.tsx`, `RefereeRebuttalMode.tsx`, `AuditExportMode.tsx`). Notes:
+
+- **Blueprint** shows one set of manuscript settings (article type, word target, citation style, spelling) in a collapsed "Customize manuscript defaults" group; the optional journal-profile form (`JournalProfileCard`) starts closed ("Add journal details", or opened by picking a journal in the matcher), and while it is open the settings group is hidden because the form holds the same fields. Spelling is stored as `orthography` and read through `spellingVariant` / `spellingLabel` (`src/domain/journal/blueprintFunnel.ts`).
+- **Evidence** puts the literature search first; "Add a source by DOI" is a secondary disclosure below it.
+- **Studio** inside the workspace keeps only its own views in its bar (Read manuscript, Sources); the header carries the word count, save state, focus and mode navigation.
+- **Review** shows the 5-referee pre-submission review first, then the journal's own reviews (`RevisionRoundPanel`). The Formal Editor card and its prompt (`peerReviewSystemPrompt(spelling)`) follow the project's spelling setting.
+- **Delivery** reads the same target and count as the header and Studio (`journalTargetWords`, default 6,000; `countManuscriptWords`). Authors save on their own (a field on blur or Enter; reorder, removal, roles and corresponding author at once); there is no save button.
 
 - **Peer review** runs one bounded model call per lens over seven lenses (`REVIEW_LENSES`: contribution, literature, methodology, evidence, argument, citation, journal_fit; `src/app/review/peerReview.ts`). A failed lens is recorded, not fatal. Critiques are stored in `peer_review_critiques` and can be waived. The rebuttal matrix and rebuttal-letter export hang off `/agentic/rebuttal-matrix` and `/agentic/export/rebuttal-letter`.
 - **Claims and evidence**: `/api/projects/:id/claims` and `/evidence` hold the claim-evidence graph (claims, evidence items, bindings; unsupported claims can be listed and marked).
