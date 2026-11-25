@@ -75,12 +75,13 @@ export default function ThemeLibraryGrid({
   const [modeFilter, setModeFilter] = useState<'all' | 'light' | 'dark'>('all');
   const [expandedTheme, setExpandedTheme] = useState<UnifiedThemeItem | null>(null);
 
+  const isPlaceholderTitle = (t?: string) =>
+    !t || /^untitled(\s+(project|presentation))?(\s+\d+)?$/i.test(t.trim());
   const headlinePreviewText =
-    deck.slides?.[0]?.actionHeadline ||
-    deck.topic ||
-    (deck.title && deck.title !== 'Untitled Presentation'
-      ? deck.title
-      : 'Your presentation title');
+    (!isPlaceholderTitle(deck.slides?.[0]?.actionHeadline) && deck.slides?.[0]?.actionHeadline) ||
+    (!isPlaceholderTitle(deck.topic) && deck.topic) ||
+    (!isPlaceholderTitle(deck.title) && deck.title) ||
+    'Your presentation title';
 
   // Unified theme dataset: Custom user themes + 100 Best Royalty-Free Slide Designs + User's favored Warm Clay Quartz
   const allThemesList = useMemo<UnifiedThemeItem[]>(() => {

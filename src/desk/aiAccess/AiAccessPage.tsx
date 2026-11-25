@@ -1,4 +1,6 @@
 import { useMemo, useState, useEffect } from "react";
+import { isUndersizedForProse } from "../../platform/router/taskAffinity";
+import { routeDecision } from "./aiAccessApi";
 import { LiveRouting, QuickStart, providerLabel } from "./AiAccessExtras";
 import { getCloudProvider, providerAccessFacts, CLOUD_PROVIDERS } from "../../config/providerCatalog";
 import { getLocalRunner, LOCAL_RUNNERS } from "../../config/localRunnerCatalog";
@@ -71,6 +73,24 @@ export default function AiAccessPage({
   const [internalSection, setInternalSection] = useState<SectionId>(normalizeSectionId(initialSection));
   const activeSection = normalizeSectionId(controlledSection ?? internalSection);
 
+  /** Name of the default model when it is too small for long-form synthesis, else null. */
+  const [undersizedDefault, setUndersizedDefault] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    try {
+      routeDecision("reasoning")
+        .then((d) => {
+          if (active) setUndersizedDefault(d.ok && d.choice.modelId && isUndersizedForProse(d.choice.modelId) ? d.choice.modelId : null);
+        })
+        .catch(() => {});
+    } catch {
+      /* routing preview unavailable; no warning */
+    }
+    return () => {
+      active = false;
+    };
+  }, [access]);
+
   /** Provider id whose detail pane is open, or null for the section's list. */
   const [openProvider, setOpenProvider] = useState<string | null>(null);
 
@@ -83,7 +103,7 @@ export default function AiAccessPage({
   // Handle ESC key to close modal
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && openProvider) {
+      if (e.key === "Escape" && openProvider && !e.defaultPrevented) {
         setOpenProvider(null);
       }
     }
@@ -129,6 +149,12 @@ export default function AiAccessPage({
           </div>
         )}
       </header>
+
+      {undersizedDefault && (
+        <div role="alert" data-testid="undersized-default-warning" className="mx-auto mt-4 max-w-5xl rounded-[var(--radius-md)] border border-[color:var(--state-warning)] bg-[color:var(--state-warning-subtle)] px-4 py-3 text-xs text-[color:var(--text-primary)]">
+          Your default model <strong>{undersizedDefault}</strong> is small or code-only. It can time out or stop mid-sentence on Deep Research, slide outlines and manuscript drafting. Connect a cloud key or a 7B+ model for those tasks.
+        </div>
+      )}
 
       <div className="mx-auto grid max-w-5xl grid-cols-[minmax(0,1fr)] gap-6 px-5 py-6 md:grid-cols-[13rem_minmax(0,1fr)]">
         {/* Decluttered sidebar: No subtitle text, 4 primary tabs, font-semibold & tracking-tight on active */}

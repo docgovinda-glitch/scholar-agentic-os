@@ -63,12 +63,14 @@ export function CommandPalette({
         e.preventDefault();
         onClose();
       } else if (e.key === "Escape") {
+        // Topmost layer wins: close only the palette, not the modal beneath it.
         e.preventDefault();
+        e.stopPropagation();
         onClose();
       }
     }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, [isOpen, onClose]);
 
   // Command items builder
@@ -195,7 +197,7 @@ export function CommandPalette({
       {
         id: "act-ai",
         title: "AI Access Settings",
-        subtitle: "Configure Gemini, OpenAI, Claude, or BYOK API keys",
+        subtitle: "Configure cloud API keys and local runners like Ollama or LM Studio",
         icon: <Sliders className="w-4 h-4 text-indigo-500" />,
         action: () => {
           onClose();

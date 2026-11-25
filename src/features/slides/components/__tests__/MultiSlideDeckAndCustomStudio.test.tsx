@@ -219,7 +219,7 @@ describe('CustomThemeStudio ("Bring Your Own Theme")', () => {
       />
     );
 
-    const applyBtn = screen.getByRole('button', { name: /Apply Custom Theme to Presentation Deck/i });
+    const applyBtn = screen.getByRole('button', { name: /^Apply Custom Theme to Deck$/i });
     fireEvent.click(applyBtn);
 
     expect(handleUpdate).toHaveBeenCalledTimes(1);
@@ -243,25 +243,10 @@ describe('CustomThemeStudio ("Bring Your Own Theme")', () => {
     expect(screen.getByText(/My Saved Custom Themes/)).toBeInTheDocument();
   });
 
-  it('starts from blank sheet when Blank Sheet button is clicked', () => {
-    const handleUpdate = vi.fn();
-    const handleProceed = vi.fn();
-    render(
-      <CustomThemeStudio
-        deck={mockDeck}
-        onUpdateDeck={handleUpdate}
-        onProceedToStudio={handleProceed}
-      />
-    );
-
-    const blankSheetBtn = screen.getByTestId('blank-sheet-btn');
-    fireEvent.click(blankSheetBtn);
-
-    expect(handleUpdate).toHaveBeenCalledTimes(1);
-    const updated = handleUpdate.mock.calls[0][0];
-    expect(updated.slides).toHaveLength(5);
-    expect(updated.themeId).toBe('minimal-slate');
-    expect(handleProceed).toHaveBeenCalledTimes(1);
+  it('offers a single Apply and no duplicate blank-sheet button (the header owns Start from Blank Sheet)', () => {
+    render(<CustomThemeStudio deck={mockDeck} onUpdateDeck={vi.fn()} />);
+    expect(screen.getAllByRole('button', { name: /Apply Custom Theme to/i })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: /Blank Sheet/i })).toBeNull();
   });
 
   it('renders upload presentation deck dropzone for recreating decks', () => {

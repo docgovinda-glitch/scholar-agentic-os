@@ -1,3 +1,4 @@
+import { useDisplayName } from '../useDisplayIdentity';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import type { SlideDeck, PresentationStudioStep } from '../../features/slides';
 import {
@@ -17,6 +18,7 @@ import { normalizeDeck } from '../../features/slides/gamma/content';
 import ScholarSidebar, { type ScholarSidebarProject } from '../../components/navigation/ScholarSidebar';
 import { useDeskSession } from '../useDeskSession';
 import { listProjects } from '../api/projectsApi';
+import { getMigratedDraftRealId } from '../ephemeralProjectStore';
 import GammaPlayer from '../../features/slides/gamma/GammaPlayer';
 import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 
@@ -52,29 +54,44 @@ export default function PresentationWorkspace({
   );
   // The sidebar shows the signed-in user's own projects and email, nothing else.
   const session = useDeskSession();
+  const sessionName = session.status === 'signed-in' ? session.name ?? null : null;
   const sessionEmail =
     session.status === 'signed-in' || session.status === 'email-verified' ? session.email : null;
+  const displayName = useDisplayName(sessionName, sessionEmail);
   const signedIn = session.status === 'signed-in' || session.status === 'email-verified';
   const [sidebarProjects, setSidebarProjects] = useState<ScholarSidebarProject[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(true);
   useEffect(() => {
     if (!signedIn) {
       setSidebarProjects([]);
+      setProjectsLoading(false);
       return;
     }
     let cancelled = false;
+    setProjectsLoading(true);
     listProjects()
       .then(({ items }) => {
         if (cancelled) return;
-        setSidebarProjects(
-          items.map((p) => ({
-            id: p.projectId,
+        // One row per project: a local draft that was saved to the server is the server's project.
+        const seen = new Set<string>();
+        const rows: ScholarSidebarProject[] = [];
+        for (const p of items) {
+          const id = getMigratedDraftRealId(p.projectId) ?? p.projectId;
+          if (seen.has(id)) continue;
+          seen.add(id);
+          rows.push({
+            id,
             title: p.title || p.answers?.title || 'Untitled project',
             type: p.outputTypeId === 'OT-22' ? 'presentation' : 'document',
-          }))
-        );
+          });
+        }
+        setSidebarProjects(rows);
       })
       .catch(() => {
         if (!cancelled) setSidebarProjects([]);
+      })
+      .finally(() => {
+        if (!cancelled) setProjectsLoading(false);
       });
     return () => {
       cancelled = true;
@@ -403,7 +420,8 @@ export default function PresentationWorkspace({
         onOpenAiAccess={onOpenAiAccess}
         onOpenAskScholar={() => setIsAskScholarOpen((prev) => !prev)}
         projects={sidebarProjects}
-        userName={sessionEmail ? sessionEmail.split('@')[0] : undefined}
+        projectsLoading={session.status === 'loading' || projectsLoading}
+        userName={displayName}
         userEmail={sessionEmail ?? undefined}
       />
 
@@ -412,7 +430,7 @@ export default function PresentationWorkspace({
         {/* Single studio header: back, title, steps, save state, assistants */}
         <PresentationHeader
           title={deck.title}
-          onTitleChange={(newTitle) => handleUpdateDeck({ ...deck, title: newTitle })}
+          onTitleChange={(newTitle) => handleUpdateDeck({ ...deck, title: newTitle, topic: newTitle })}
           currentStep={currentStep}
           onStepChange={(step) => setCurrentStep(step)}
           autosaveStatus={autosaveStatus}

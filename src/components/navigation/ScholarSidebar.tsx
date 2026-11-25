@@ -36,6 +36,8 @@ export interface ScholarSidebarProps {
   /** The signed-in user's own projects. Empty (the default) shows "No projects yet". */
   projects?: ScholarSidebarProject[];
   /** The signed-in user. Without one, no account card is shown. */
+  /** True until the project list has loaded, so it never reads "No projects yet" too early. */
+  projectsLoading?: boolean;
   userName?: string;
   userEmail?: string;
   className?: string;
@@ -53,6 +55,7 @@ export default function ScholarSidebar({
   onOpenSettings,
   onOpenAskScholar,
   projects = [],
+  projectsLoading = false,
   userName,
   userEmail,
   className = '',
@@ -243,7 +246,7 @@ export default function ScholarSidebar({
             <div className="flex-1 overflow-y-auto space-y-1 pr-1 pb-3 min-h-0 text-[13px]">
               {filteredProjects.length === 0 && (
                 <p className="px-2.5 py-2 text-xs text-neutral-500 dark:text-neutral-400" data-testid="sidebar-no-projects">
-                  {projects.length === 0 ? "No projects yet" : "No matching projects"}
+                  {projectsLoading ? "Loading projects…" : projects.length === 0 ? "No projects yet" : "No matching projects"}
                 </p>
               )}
               {filteredProjects.map((p) => (
