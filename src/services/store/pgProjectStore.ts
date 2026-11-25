@@ -23,6 +23,27 @@ export interface PgQueryable {
   query(text: string, params?: unknown[]): Promise<{ rows: Record<string, unknown>[] }>;
 }
 
+const LOOPBACK_HOSTS: ReadonlySet<string> = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+
+/**
+ * TLS settings for a Postgres connection string. Only a database on this
+ * machine (the URL's hostname is localhost, 127.0.0.1 or ::1) connects without
+ * TLS; every other host, and any string that does not parse as a URL, keeps
+ * full verification against Supabase's root CA. The decision reads the parsed
+ * hostname, never the raw string: a password, database name or remote host
+ * that merely contains "localhost" (db.localhost.example.com) must not switch
+ * TLS off.
+ */
+export function postgresSslFor(connectionString: string): undefined | { ca: string; rejectUnauthorized: true } {
+  let host = "";
+  try {
+    host = new URL(connectionString).hostname.toLowerCase();
+  } catch {
+    host = "";
+  }
+  return LOOPBACK_HOSTS.has(host) ? undefined : { ca: SUPABASE_ROOT_CA, rejectUnauthorized: true };
+}
+
 /**
  * Builds the real `pg.Pool` used at runtime. Reads DATABASE_URL directly
  * (rather than accepting it as a parameter) so every call site gets the
@@ -47,9 +68,7 @@ export function createPool(): Pool {
     // the common fix of `rejectUnauthorized: false` would have restored the
     // connection by no longer checking who answers it, on the link carrying
     // every user's documents.
-    ssl: connectionString.includes("localhost")
-      ? undefined
-      : { ca: SUPABASE_ROOT_CA, rejectUnauthorized: true },
+    ssl: postgresSslFor(connectionString),
   });
 
   // node-postgres emits 'error' on idle clients — a dropped connection, a
