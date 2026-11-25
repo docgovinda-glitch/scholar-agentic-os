@@ -17,8 +17,11 @@ import {
   type EvidenceMatrixItem,
   extractEvidenceFromPaper,
   exportEvidenceMatrixToLatex,
+  canPoolStudies,
 } from "../../services/evidence/evidenceExtractionService";
 import { type CitationGraphNode } from "../../services/discovery/snowballSamplingService";
+import { classifyResearchPrompt } from "../../config/askScholarConfig";
+import { frameworkForDiscipline, NOT_REPORTED_FIELD } from "../../domain/ask/evidenceFramework";
 import InteractiveForestPlot from "./InteractiveForestPlot";
 
 export interface EvidenceSynthesisWorkspaceProps {
@@ -28,6 +31,8 @@ export interface EvidenceSynthesisWorkspaceProps {
   onOpenLiteratureDiscovery?: () => void;
   onOpenPublishingExport?: (items: EvidenceMatrixItem[]) => void;
   onClose?: () => void;
+  /** The question that produced these sources; it picks the discipline's evidence frame. */
+  query?: string;
 }
 
 export default function EvidenceSynthesisWorkspace({
@@ -36,12 +41,17 @@ export default function EvidenceSynthesisWorkspace({
   onOpenLiteratureDiscovery,
   onOpenPublishingExport,
   onClose,
+  query,
 }: EvidenceSynthesisWorkspaceProps) {
+  const framework = useMemo(() => frameworkForDiscipline(query ? classifyResearchPrompt(query).discipline : "auto"), [query]);
+  // Without a question to read the field from, items that carry real effect sizes keep the quantitative layout.
+  const isClinical =
+    framework.id === "clinical" || (!query?.trim() && (initialItems ?? []).some((it) => typeof it.effectSize === "number"));
   // Initialize matrix items from seed papers if not provided
   const [matrixItems, setMatrixItems] = useState<EvidenceMatrixItem[]>(() => {
     if (initialItems && initialItems.length > 0) return initialItems;
     if (seedPapers && seedPapers.length > 0) {
-      return seedPapers.map((p, idx) => extractEvidenceFromPaper(p, idx));
+      return seedPapers.map((p, idx) => extractEvidenceFromPaper(p, idx, framework.id));
     }
     // Default empirical sample items
     return [
@@ -97,6 +107,7 @@ export default function EvidenceSynthesisWorkspace({
   });
 
   const [activeTab, setActiveTab] = useState<"matrix" | "forest">("matrix");
+  const poolingAvailable = (framework.supportsPooling || isClinical) && canPoolStudies(matrixItems);
   const [searchQuery, setSearchQuery] = useState("");
   const [designFilter, setDesignFilter] = useState<string>("all");
   const [metricFilter, setMetricFilter] = useState<string>("all");
@@ -233,9 +244,13 @@ export default function EvidenceSynthesisWorkspace({
             </button>
             <button
               type="button"
+              disabled={!poolingAvailable}
+              title={poolingAvailable ? undefined : "Pooling needs 2 or more studies reporting the same real effect metric"}
               onClick={() => setActiveTab("forest")}
               className={`px-3 py-1 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
-                activeTab === "forest"
+                !poolingAvailable
+                  ? "opacity-40 cursor-not-allowed text-neutral-500"
+                  : activeTab === "forest"
                   ? "bg-indigo-600 text-white font-semibold shadow-2xs"
                   : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
               }`}
@@ -310,7 +325,7 @@ export default function EvidenceSynthesisWorkspace({
 
       {/* Main Workspace Body */}
       <div className="flex-1 min-h-0 overflow-y-auto p-5 scholar-scrollbar">
-        {activeTab === "forest" ? (
+        {activeTab === "forest" && poolingAvailable ? (
           <div className="max-w-4xl mx-auto space-y-4">
             <InteractiveForestPlot items={filteredItems} />
           </div>
@@ -324,12 +339,20 @@ export default function EvidenceSynthesisWorkspace({
                     <th className="py-2.5 px-3 w-8">#</th>
                     <th className="py-2.5 px-3 min-w-[190px]">Study & Citation</th>
                     <th className="py-2.5 px-2.5 min-w-[90px]">Design</th>
-                    <th className="py-2.5 px-3 min-w-[130px]">Population (N)</th>
-                    <th className="py-2.5 px-3 min-w-[140px]">Intervention / Control</th>
-                    <th className="py-2.5 px-3 min-w-[140px]">Effect Size [95% CI]</th>
-                    <th className="py-2.5 px-2.5 min-w-[70px]">p-val</th>
-                    <th className="py-2.5 px-2.5 min-w-[80px]">Bias</th>
-                    <th className="py-2.5 px-3 min-w-[200px]">Verbatim Finding & Locator</th>
+                    {isClinical ? (
+                      <>
+                        <th className="py-2.5 px-3 min-w-[130px]">Population (N)</th>
+                        <th className="py-2.5 px-3 min-w-[140px]">Intervention / Control</th>
+                        <th className="py-2.5 px-3 min-w-[140px]">Effect Size [95% CI]</th>
+                        <th className="py-2.5 px-2.5 min-w-[70px]">p-val</th>
+                        <th className="py-2.5 px-2.5 min-w-[80px]">Bias</th>
+                      </>
+                    ) : (
+                      framework.columns.map((col) => (
+                        <th key={col.key} className="py-2.5 px-3 min-w-[150px]">{col.label}</th>
+                      ))
+                    )}
+                    <th className="py-2.5 px-3 min-w-[200px]">{isClinical ? "Key Finding" : "Source Excerpt"}</th>
                     <th className="py-2.5 px-2.5 text-right w-24">Verification</th>
                   </tr>
                 </thead>
@@ -376,6 +399,8 @@ export default function EvidenceSynthesisWorkspace({
                           </span>
                         </td>
 
+                        {isClinical ? (
+                          <>
                         {/* Population & N */}
                         <td className="py-3 px-3 text-[11px] text-neutral-700 dark:text-neutral-300 align-top">
                           <div>{item.population}</div>
@@ -433,10 +458,19 @@ export default function EvidenceSynthesisWorkspace({
                           </span>
                         </td>
 
+                          </>
+                        ) : (
+                          framework.columns.map((col) => (
+                            <td key={col.key} className="py-3 px-3 text-[11px] text-neutral-700 dark:text-neutral-300 align-top">
+                              {item.frameworkFields?.[col.key] || NOT_REPORTED_FIELD}
+                            </td>
+                          ))
+                        )}
+
                         {/* Verbatim Finding & Locator */}
                         <td className="py-3 px-3 text-[11px] text-neutral-600 dark:text-neutral-300 leading-relaxed align-top">
-                          <p className="line-clamp-2 italic font-serif">
-                            {item.verbatimQuote}
+                          <p className="line-clamp-3 italic font-serif">
+                            {item.verbatimQuote || item.findingsSummary}
                           </p>
                           {item.quoteLocator && (
                             <div className="text-[9.5px] font-mono text-neutral-400 mt-1">

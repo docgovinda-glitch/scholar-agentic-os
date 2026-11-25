@@ -112,7 +112,6 @@ export interface AgenticQueryResponse {
   verifiedSourcesCount?: number;
   peerReviewAudit?: {
     overallVerdict: string;
-    rigorScore: number;
     critiques: Array<{
       type: "methodology" | "bias" | "counter_argument" | "sample_size" | "generalizability";
       title: string;

@@ -3,6 +3,7 @@
  * person is told when no answer could be written.
  */
 
+import { cleanVenue, normalizeAuthorList, normalizeAuthorName } from "../../shared/authorNames";
 import type { LiveSearchResult } from "../../services/liveSearchService";
 import type { WebsiteAssistantMessage } from "./types";
 
@@ -28,10 +29,14 @@ export function liveSourcesAsCitations(sources?: LiveSearchResult[]): Citation[]
     title: s.title,
     url: s.url,
     snippet: s.snippet,
-    authors: s.authors,
-    author: s.authors?.[0],
+    authors: normalizeAuthorList(s.authors),
+    author: s.authors?.[0] ? normalizeAuthorName(s.authors[0]) : undefined,
+    venue: cleanVenue(s.venue || s.journal || s.publisher),
+    journal: cleanVenue(s.journal || s.venue),
+    publisher: cleanVenue(s.publisher),
     year: yearOf(s.publicationDate),
     doi: doiOf(s.url),
+    openAccessUrl: s.openAccessUrl,
     source: s.source,
     sourceType: s.source === "web" ? "web" : "scholarly",
   }));

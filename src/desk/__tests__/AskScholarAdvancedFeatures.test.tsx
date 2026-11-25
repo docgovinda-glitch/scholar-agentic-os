@@ -115,8 +115,7 @@ describe("Ask Scholar Advanced Features: Scite Stance, Citation Graph, and Peer 
         },
       ],
       peerReviewAudit: {
-        overallVerdict: "Empirical Rigor: High (92/100) — Methodological Framework Validated",
-        rigorScore: 92,
+        overallVerdict: "Methodological framework validated",
         critiques: [
           {
             type: "causal_inference",
@@ -180,7 +179,7 @@ describe("Ask Scholar Advanced Features: Scite Stance, Citation Graph, and Peer 
     expect(box.value).toContain("Inquire deeper into:");
   });
 
-  it("renders Peer Reviewer 2 Adversarial Rigor Stress-Test with score and critiques", async () => {
+  it("renders a model-verified Peer Reviewer 2 stress-test with critiques and no invented score", async () => {
     open();
     await ask("How does RL perform in financial markets?");
 
@@ -188,11 +187,10 @@ describe("Ask Scholar Advanced Features: Scite Stance, Citation Graph, and Peer 
     fireEvent.click(peerReviewTabBtn);
 
     await waitFor(() => {
-      expect(screen.getByText(/Peer Reviewer 2 Adversarial Stress-Test/i)).toBeInTheDocument();
-      expect(screen.getByText(/Empirical Rigor: 92\/100/i)).toBeInTheDocument();
+      expect(screen.getByText(/Peer Reviewer 2 stress-test \(model-verified\)/i)).toBeInTheDocument();
       expect(screen.getByText(/Simulated Backtesting vs. Live Slippage/i)).toBeInTheDocument();
-      expect(screen.getByText(/MEDIUM RISK/i)).toBeInTheDocument();
-      expect(screen.getByText(/Adaptive Market Hypothesis/i)).toBeInTheDocument();
+      expect(screen.getByText(/^MEDIUM$/i)).toBeInTheDocument();
+      expect(screen.queryByText(/\/100/)).toBeNull();
     });
   });
 });

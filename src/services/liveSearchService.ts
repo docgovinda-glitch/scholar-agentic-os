@@ -11,6 +11,9 @@
  *   "publication year not verifiable", "retracted") and tracks searched/read counts.
  */
 
+import { applyScholarFilters, yearRangeOf, type ScholarFilters } from "../domain/ask/scholarFilters";
+import { decomposeQuery, interleaveResults } from "../domain/ask/queryDecomposition";
+import { dedupeWorks } from "../shared/retrieval/identity";
 import { getSupabaseClient, isSupabaseConfigured } from "./supabaseClient";
 import {
   classifyResearchPrompt,
@@ -63,6 +66,8 @@ export interface LiveSearchOptions {
   /** The reader's chosen discipline ("auto" lets the question decide). */
   discipline?: AcademicDiscipline;
   signal?: AbortSignal;
+  /** Prompt-bar filters: year range and source scope. */
+  filters?: ScholarFilters;
 }
 
 export interface LiveSearchTelemetryResult {
@@ -135,6 +140,8 @@ export async function executeLiveSearchWithTelemetry(
   });
 
   if (!cleanQuery) return emptyTelemetry([]);
+  // "Knowledge Vault only": no outside search at all.
+  if (options.filters?.scopes.includes("vault_only")) return emptyTelemetry([]);
 
   const requestedLimit =
     options.limit && options.limit > 6 ? options.limit : budget.maxCited;
@@ -157,28 +164,55 @@ export async function executeLiveSearchWithTelemetry(
     }
   }
 
-  const res = await fetch("/api/search/live", {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      query: cleanQuery,
-      limit: requestedLimit,
-      candidateBudget: candidateTarget,
-      discipline: classification.discipline,
-      mode: options.mode ?? "all",
-    }),
-    signal: options.signal,
-  });
-  if (!res.ok) {
-    throw new Error(`Live search failed (${res.status}).`);
+  const decomposition = decomposeQuery(cleanQuery);
+  const fetchOne = async (q: string, limit: number) => {
+    const res = await fetch("/api/search/live", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        query: q,
+        limit,
+        candidateBudget: candidateTarget,
+        discipline: classification.discipline,
+        mode: options.mode ?? "all",
+      }),
+      signal: options.signal,
+    });
+    if (!res.ok) throw new Error(`Live search failed (${res.status}).`);
+    return (await res.json()) as {
+      results?: RawSourceInput[];
+      searchedCount?: number;
+      queriesExecuted?: string[];
+    };
+  };
+
+  // One focused search per concept, in parallel; a failed sub-search only loses its own results.
+  const perQueryLimit = decomposition.decomposed ? Math.max(8, Math.ceil(requestedLimit / 2)) : requestedLimit;
+  const settled = await Promise.allSettled(decomposition.queries.map((q) => fetchOne(q, perQueryLimit)));
+  const okResponses = settled.filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof fetchOne>>> => r.status === "fulfilled");
+  if (okResponses.length === 0) {
+    const first = settled[0] as PromiseRejectedResult;
+    throw first.reason instanceof Error ? first.reason : new Error("Live search failed.");
   }
-  const data = (await res.json()) as {
-    results?: RawSourceInput[];
-    searchedCount?: number;
-    queriesExecuted?: string[];
+  const lists = okResponses.map((r) => (Array.isArray(r.value.results) ? r.value.results : []));
+  const filterYears = options.filters ? yearRangeOf(options.filters) : {};
+  const yearFrom = filterYears.from ?? decomposition.yearFrom;
+  const yearOk = (r: RawSourceInput) => {
+    if (!yearFrom) return true;
+    const y = Number(String(r.year ?? r.publicationDate ?? r.publishedDate ?? "").slice(0, 4));
+    return !Number.isFinite(y) || y === 0 || y >= yearFrom;
+  };
+  // Keep the date filter only if it still leaves enough sources.
+  const filtered = lists.map((l) => l.filter(yearOk));
+  const useFiltered = filtered.reduce((n, l) => n + l.length, 0) >= Math.min(6, requestedLimit);
+  const merged = dedupeWorks(interleaveResults(useFiltered ? filtered : lists, Math.max(requestedLimit * 2, 15)) as never[]) as unknown as RawSourceInput[];
+  const data = {
+    results: merged,
+    searchedCount: okResponses.reduce((n, r) => n + (r.value.searchedCount ?? 0), 0),
+    queriesExecuted: okResponses.flatMap((r) => r.value.queriesExecuted ?? []),
   };
   const raw = Array.isArray(data.results) ? data.results : [];
-  const searchedCount = data.searchedCount ?? raw.length;
+  const searchedCount = data.searchedCount || raw.length;
 
   emitLiveSearchProgress({
     stage: "ranking",
@@ -189,7 +223,7 @@ export async function executeLiveSearchWithTelemetry(
   const enriched = await verifyAndEnrichDOIMetadataBatch(raw, { signal: options.signal, maxLookups: 5 });
   const { verified, verifiedRaw, excluded } = verifyAndDeduplicateSources(enriched);
 
-  const results: LiveSearchResult[] = verifiedRaw.slice(0, requestedLimit).map((r, idx) => {
+  const mappedAll: LiveSearchResult[] = verifiedRaw.map((r, idx) => {
     const csl = verified[idx];
     const provider = (r as { provider?: string }).provider;
     return {
@@ -214,6 +248,8 @@ export async function executeLiveSearchWithTelemetry(
       csl,
     };
   });
+
+  const results = (options.filters ? applyScholarFilters(mappedAll, options.filters) : mappedAll).slice(0, requestedLimit);
 
   emitLiveSearchProgress({
     stage: "verifying",

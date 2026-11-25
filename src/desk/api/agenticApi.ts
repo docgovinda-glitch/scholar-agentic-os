@@ -7,6 +7,14 @@ import type {
   PreFlightGateScorecard,
 } from "../workspace/types";
 
+/** Deep research failed after its sources were found; they are kept for the reader. */
+export class DeepResearchPartialError extends Error {
+  constructor(message: string, readonly retrieved: { citations: Array<Record<string, unknown>> }) {
+    super(message);
+    this.name = "DeepResearchPartialError";
+  }
+}
+
 export async function executeAgenticQuery(
   req: AgenticQueryRequest
 ): Promise<AgenticQueryResponse> {
@@ -47,12 +55,14 @@ export async function executeAgenticQuery(
   const isEventStream = Boolean(res.headers.get("content-type")?.includes("text/event-stream"));
   if (isEventStream && res.body) {
     // Set from inside the reader's callback.
-    const got: { payload: AgenticQueryResponse | null; error: string } = { payload: null, error: "" };
+    const got: { payload: AgenticQueryResponse | null; error: string; sources: Array<Record<string, unknown>> } = { payload: null, error: "", sources: [] };
     await readSse(res.body, (m) => {
       if (!m.json || !m.data || typeof m.data !== "object") return;
-      const parsed = m.data as { type?: string; status?: string; stage?: string; payload?: AgenticQueryResponse; message?: unknown };
+      const parsed = m.data as { type?: string; status?: string; stage?: string; payload?: AgenticQueryResponse; message?: unknown; citations?: Array<Record<string, unknown>> };
       if (parsed.type === "stage" && req.onStageUpdate) {
         req.onStageUpdate({ status: parsed.status, stage: parsed.stage } as Parameters<NonNullable<typeof req.onStageUpdate>>[0]);
+      } else if (parsed.type === "sources" && Array.isArray(parsed.citations)) {
+        got.sources = parsed.citations;
       } else if (parsed.type === "complete" && parsed.payload) {
         got.payload = parsed.payload;
       } else if (parsed.type === "error") {
@@ -69,7 +79,9 @@ export async function executeAgenticQuery(
       return finalPayload;
     }
     // The stream ended without a result: say why (its body is already read).
-    throw new Error(streamError || "Deep research stopped before it finished. Try again.");
+    const stopped = streamError || "Deep research stopped before it finished. Try again.";
+    if (got.sources.length > 0) throw new DeepResearchPartialError(stopped, { citations: got.sources });
+    throw new Error(stopped);
   }
 
   const data = await res.json();

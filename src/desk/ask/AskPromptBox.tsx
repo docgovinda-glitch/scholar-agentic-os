@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUp, FileText, Loader2, Paperclip, Square, X } from "lucide-react";
 import { PromptBarActionMenu, type PromptMode } from "../PromptBarActionMenu";
 import type { AgentAttachmentItem } from "../dashboard";
+import { ScholarFilterBar } from "./ScholarFilterBar";
+import type { ScholarFilters } from "../../domain/ask/scholarFilters";
 
 export interface AskPromptBoxProps {
   value: string;
@@ -28,6 +30,9 @@ export interface AskPromptBoxProps {
   /** Extra controls after the attach/mode menu (citation style, preferences, vault toggle…). */
   children?: React.ReactNode;
   className?: string;
+  /** When both are given, a Quick Scholar | Deep Research toggle and scholarly filter chips are shown. */
+  filters?: ScholarFilters;
+  onFiltersChange?: (filters: ScholarFilters) => void;
 }
 
 /**
@@ -57,6 +62,8 @@ export function AskPromptBox({
   inputRef,
   children,
   className = "",
+  filters,
+  onFiltersChange,
 }: AskPromptBoxProps) {
   const localRef = useRef<HTMLTextAreaElement | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -189,6 +196,12 @@ export function AskPromptBox({
         style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent", maxHeight: maxHeightPx } as React.CSSProperties}
         className="prompt-bare-input scholar-scrollbar w-full min-w-0 resize-none overflow-y-auto border-none bg-transparent px-1 text-base font-normal leading-relaxed text-neutral-900 shadow-none outline-none placeholder:text-neutral-500 focus:shadow-none focus:outline-none focus:ring-0 dark:text-neutral-100 dark:placeholder:text-neutral-400 sm:text-sm"
       />
+
+      {filters && onFiltersChange && (
+        <div className="mt-1.5 px-1">
+          <ScholarFilterBar mode={mode} onModeChange={onModeChange} filters={filters} onFiltersChange={onFiltersChange} />
+        </div>
+      )}
 
       <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 pt-1.5">
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">

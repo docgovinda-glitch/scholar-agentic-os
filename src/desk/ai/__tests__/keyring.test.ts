@@ -74,3 +74,11 @@ describe("assembleKeyring (shared by browser and server)", () => {
     expect(b[0].via).toBe("groq");
   });
 });
+
+describe("requestNextModelOnce", () => {
+  it("rotates so the next connection leads", async () => {
+    const { rotateKeyring } = await import("../keyring");
+    expect(rotateKeyring(["a", "b", "c"])).toEqual(["b", "c", "a"]);
+    expect(rotateKeyring(["a"])).toEqual(["a"]);
+  });
+});
