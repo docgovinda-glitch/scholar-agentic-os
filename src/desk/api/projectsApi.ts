@@ -87,40 +87,45 @@ export function cleanupProjectStorage(projectId: string): void {
 }
 
 export async function deleteProject(projectId: string): Promise<{ success: boolean; id: string }> {
-  if (isEphemeralProject(projectId)) {
-    deleteEphemeralProject(projectId);
-    cleanupProjectStorage(projectId);
-    return { success: true, id: projectId };
-  }
+  // A stale draft id deletes the server row it was migrated to.
+  const realId = getMigratedDraftRealId(projectId) || projectId;
+  const ids = Array.from(new Set([projectId, realId]));
 
-  cleanupProjectStorage(projectId);
-  try {
-    await deleteCachedProject(projectId);
-    await removePendingMutationsForProject(projectId);
-  } catch (err) {
-    console.warn("Non-fatal: offline cache cleanup failed for project", projectId, err);
+  // A draft that never reached the server only exists locally.
+  if (isEphemeralProject(realId)) {
+    for (const id of ids) {
+      deleteEphemeralProject(id);
+      cleanupProjectStorage(id);
+    }
+    return { success: true, id: projectId };
   }
 
   if (isSupabaseConfigured()) {
     const supabase = getSupabaseClient();
     if (supabase) {
-      const { error } = await supabase
-        .from("projects")
-        .delete()
-        .eq("project_id", projectId);
-
+      const { error } = await supabase.from("projects").delete().eq("project_id", realId);
       if (error) {
-        console.warn("Direct Supabase deletion error, falling back to server route:", error);
+        throw new Error(`Could not delete the project: ${error.message}`);
       }
     }
   }
 
-  try {
-    await authedFetch(`/api/projects/${encodeURIComponent(projectId)}`, {
-      method: "DELETE",
-    }).then((r) => json(r));
-  } catch (err) {
-    console.warn("Server DELETE /api/projects/:id response:", err);
+  const res = await authedFetch(`/api/projects/${encodeURIComponent(realId)}`, { method: "DELETE" });
+  // 404 means it is already gone.
+  if (!res.ok && res.status !== 404) {
+    throw new Error(`Could not delete the project (server answered ${res.status}).`);
+  }
+
+  // Only clear local copies once the server row is gone.
+  for (const id of ids) {
+    deleteEphemeralProject(id);
+    cleanupProjectStorage(id);
+    try {
+      await deleteCachedProject(id);
+      await removePendingMutationsForProject(id);
+    } catch (err) {
+      console.warn("Non-fatal: offline cache cleanup failed for project", id, err);
+    }
   }
 
   return { success: true, id: projectId };

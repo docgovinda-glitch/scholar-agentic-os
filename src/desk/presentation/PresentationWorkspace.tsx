@@ -18,7 +18,7 @@ import { normalizeDeck } from '../../features/slides/gamma/content';
 import ScholarSidebar, { type ScholarSidebarProject } from '../../components/navigation/ScholarSidebar';
 import { useDeskSession } from '../useDeskSession';
 import { listProjects } from '../api/projectsApi';
-import { getMigratedDraftRealId } from '../ephemeralProjectStore';
+import { normalizeProjectList } from '../sidebarProjects';
 import GammaPlayer from '../../features/slides/gamma/GammaPlayer';
 import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 
@@ -62,6 +62,11 @@ export default function PresentationWorkspace({
   const [sidebarProjects, setSidebarProjects] = useState<ScholarSidebarProject[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
   useEffect(() => {
+    if (session.status === 'loading') {
+      // Still resolving who is signed in: keep the loading state, never "No projects yet".
+      setProjectsLoading(true);
+      return;
+    }
     if (!signedIn) {
       setSidebarProjects([]);
       setProjectsLoading(false);
@@ -72,20 +77,14 @@ export default function PresentationWorkspace({
     listProjects()
       .then(({ items }) => {
         if (cancelled) return;
-        // One row per project: a local draft that was saved to the server is the server's project.
-        const seen = new Set<string>();
-        const rows: ScholarSidebarProject[] = [];
-        for (const p of items) {
-          const id = getMigratedDraftRealId(p.projectId) ?? p.projectId;
-          if (seen.has(id)) continue;
-          seen.add(id);
-          rows.push({
-            id,
-            title: p.title || p.answers?.title || 'Untitled project',
-            type: p.outputTypeId === 'OT-22' ? 'presentation' : 'document',
-          });
-        }
-        setSidebarProjects(rows);
+        // Same list as the projects screen: deduplicated, named alike, deleted ids hidden.
+        setSidebarProjects(
+          normalizeProjectList(items).map((row) => ({
+            id: row.id,
+            title: row.title,
+            type: row.project.outputTypeId === 'OT-22' ? 'presentation' : 'document',
+          }))
+        );
       })
       .catch(() => {
         if (!cancelled) setSidebarProjects([]);
@@ -96,7 +95,7 @@ export default function PresentationWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [signedIn]);
+  }, [signedIn, session.status]);
   const [showLivePlayer, setShowLivePlayer] = useState(false);
   const [playerStartIndex, setPlayerStartIndex] = useState(0);
   const [autosaveStatus, setAutosaveStatus] = useState<'saved' | 'saving' | 'idle' | 'error' | 'signed-out'>('saved');
