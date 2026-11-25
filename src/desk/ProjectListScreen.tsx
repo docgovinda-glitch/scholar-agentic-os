@@ -3619,10 +3619,11 @@ export default function ProjectListScreen({
 
                           {/* One Sources panel: references, sources found but not cited, excluded sources, answer checks, citation graph */}
                           {msg.sender === "assistant" &&
-                            !msg.error &&
-                            ((msg.citations && msg.citations.length > 0) ||
-                              (msg.liveSources && msg.liveSources.length > 0) ||
-                              (msg.excludedSources && msg.excludedSources.length > 0)) &&
+                            (msg.error
+                              ? Boolean(msg.liveSources && msg.liveSources.length > 0)
+                              : (msg.citations && msg.citations.length > 0) ||
+                                (msg.liveSources && msg.liveSources.length > 0) ||
+                                (msg.excludedSources && msg.excludedSources.length > 0)) &&
                             (() => {
                               const hasCitations = Boolean(msg.citations && msg.citations.length > 0);
                               const panelCitations = hasCitations ? msg.citations! : liveSourcesAsCitations(msg.liveSources) || [];
@@ -3643,7 +3644,9 @@ export default function ProjectListScreen({
                                   citedCount={msg.citedCount ?? (hasCitations ? msg.citations!.length : 0)}
                                   foundCount={msg.searchedCount ?? Math.max(msg.liveSources?.length ?? 0, panelCitations.length)}
                                   onOpenGraph={normalized.length > 0 ? () => handleOpenLiteratureDiscovery(toCitationGraphSeeds(normalized)) : undefined}
+                                  defaultOpen={Boolean(msg.error)}
                                 >
+                                  {!msg.error && (
                                   <SourceTransparencyPanel
                                     messageId={msg.id}
                                     citations={panelCitations}
@@ -3653,6 +3656,7 @@ export default function ProjectListScreen({
                                     readCount={msg.readCount}
                                     citedCount={msg.citedCount}
                                   />
+                                  )}
                                   {!hasCitations && msg.liveSources && msg.liveSources.length > 0 && (
                                     <LiveSourcesDrawer
                                       sources={msg.liveSources}
@@ -3662,6 +3666,7 @@ export default function ProjectListScreen({
                                       savedUrls={savedVaultSourceUrls}
                                     />
                                   )}
+                                  {!msg.error && (
                                   <AnswerReviewPanel
                                     prompt={askedText}
                                     answerText={msg.text || ""}
@@ -3669,6 +3674,7 @@ export default function ProjectListScreen({
                                     cited={toTelemetry(normalized)}
                                     audit={msg.peerReviewAudit}
                                   />
+                                  )}
                                 </SourcesPanel>
                               );
                             })()}
