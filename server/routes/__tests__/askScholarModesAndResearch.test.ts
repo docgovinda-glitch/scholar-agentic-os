@@ -47,6 +47,7 @@ describe("Ask Scholar 3-Mode Architecture, Source Authority & 7-Stage Deep Resea
   beforeEach(() => {
     vi.restoreAllMocks();
     mockExecuteWebSearch.mockReset();
+    mockSafeFetchHtml.mockClear();
     vi.spyOn(routerBridge, "aiAvailability").mockResolvedValue("server");
     app = express();
     app.use(express.json({ limit: "10mb" }));
@@ -171,8 +172,9 @@ In parallel, economic cooperation has expanded into cross-border retail digital 
       expect(res.body.citations).toHaveLength(2);
       expect(res.body.citations[0].url).toContain("mofa.gov.np");
       expect(res.body.citations[0].authorityBadge).toBe("Government / Official");
-      // The enrichment step ran on the fixture URLs, through the stub rather than the network.
-      expect(mockSafeFetchHtml).toHaveBeenCalled();
+      // Both fixtures carry an abstract, so no page is fetched for them (token budget: a page is
+      // fetched only for a source with no usable abstract).
+      expect(mockSafeFetchHtml).not.toHaveBeenCalled();
     });
   });
 
