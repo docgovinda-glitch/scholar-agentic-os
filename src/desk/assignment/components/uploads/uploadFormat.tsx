@@ -54,7 +54,7 @@ export function SourceFormatBadge({ type }: { type?: string }) {
     color = "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20";
   } else if (type === "spreadsheet") {
     label = "Spreadsheet / Dataset";
-    color = "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20";
+    color = "bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border-emerald-500/20";
   } else if (type === "image") {
     label = "Image / Scanned Figure";
     color = "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20";

@@ -147,46 +147,32 @@ describe("AccountSettingsScreen — editing profile fields", () => {
     expect(saveProfileFields.mock.calls[0][0]).not.toHaveProperty("email");
   });
 
-  it("refuses to save an invalid phone number without calling the server", async () => {
+  it("treats an empty phone as optional: no alert on open, and it saves", async () => {
+    getProfile.mockResolvedValue({ success: true, profile: { username: "scholar1", email: "ada@example.com", fullName: "Ada", phone: "", phoneCountryCode: "+1", phoneE164: "", affiliation: "", userType: "student", educationLevel: "undergraduate" } });
     render(<AccountSettingsScreen onClose={() => {}} />);
     await screen.findByLabelText("Full name");
-
-    fireEvent.change(screen.getByLabelText("Phone"), { target: { value: "" } });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(saveProfileFields).toHaveBeenCalledWith(expect.objectContaining({ phone: "" })));
+  });
 
-    expect(await screen.findByText(/phone number is required/i)).toBeInTheDocument();
+  it("reports an invalid number only after blur, then blocks saving until it is corrected", async () => {
+    render(<AccountSettingsScreen onClose={() => {}} />);
+    const phone = await screen.findByLabelText("Phone");
+    const save = screen.getByRole("button", { name: "Save changes" });
+
+    fireEvent.change(phone, { target: { value: "0" } });
+    expect(screen.queryByText(/valid phone number/i)).not.toBeInTheDocument();
+    fireEvent.blur(phone);
+    expect(screen.getByText(/valid phone number|phone number is required/i)).toBeInTheDocument();
+    expect(save).toBeDisabled();
     expect(saveProfileFields).not.toHaveBeenCalled();
+
+    fireEvent.change(phone, { target: { value: "5550199" } });
+    expect(screen.queryByText(/valid phone number|phone number is required/i)).not.toBeInTheDocument();
+    expect(save).toBeEnabled();
   });
 
-  it("disables Save changes while the phone number is invalid, live — not only after a click", async () => {
-    render(<AccountSettingsScreen onClose={() => {}} />);
-    await screen.findByLabelText("Full name");
-
-    fireEvent.change(screen.getByLabelText("Phone"), { target: { value: "" } });
-    expect(await screen.findByText(/phone number is required/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
-  });
-
-  it("clears the invalid-phone error once the field is corrected, without requiring another click", async () => {
-    // Regression test: the error used to be a snapshot taken at the moment
-    // Save was clicked, so fixing the phone number afterward left the old
-    // error message on screen — describing a field that no longer matched
-    // what was actually typed — until the user clicked Save again.
-    render(<AccountSettingsScreen onClose={() => {}} />);
-    await screen.findByLabelText("Full name");
-
-    fireEvent.change(screen.getByLabelText("Phone"), { target: { value: "" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
-    expect(await screen.findByText(/phone number is required/i)).toBeInTheDocument();
-
-    fireEvent.change(screen.getByLabelText("Phone"), { target: { value: "5550199" } });
-
-    expect(screen.queryByText(/phone number is required/i)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
-  });
-});
-
-describe("AccountSettingsScreen — institutional ID removal", () => {
   it("renders no institutional ID or document upload UI anywhere on the screen", async () => {
     render(<AccountSettingsScreen onClose={() => {}} />);
     await screen.findByLabelText("Full name");

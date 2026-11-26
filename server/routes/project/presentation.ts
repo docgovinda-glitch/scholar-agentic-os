@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { stripCourseCodes } from "../../../src/utils/briefExtractor.ts";
+import { isUntitledDeckTitle } from "../../../src/shared/presentationBrief.ts";
 import {
   VISUAL_TYPES,
   buildOutlineFromBrief,
@@ -805,9 +806,12 @@ router.put(
       return res.status(400).json({ error: "Missing or invalid slide deck payload." });
     }
 
+    // Renaming the deck renames the project, so project lists never keep the old name.
+    const deckTitle = typeof deck.title === "string" ? deck.title.trim().slice(0, 300) : "";
     const updatedAnswers = {
       ...(record.answers || {}),
       presentation_deck: deck,
+      ...(deckTitle && !isUntitledDeckTitle(deckTitle) ? { title: deckTitle } : {}),
     };
 
     const updated = await store.save({ ...record, answers: updatedAnswers });

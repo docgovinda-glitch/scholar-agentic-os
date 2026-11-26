@@ -69,6 +69,7 @@
 
   /* DAY MODE (Sand & Snow) */
   --bg-sidebar: #F7F5F0;      /* Warm sand */
+  --focus-ring: #0369A1;      /* Keyboard focus: blue, at least 3:1 on both themes */
   --bg-canvas: #F7F5F0;       /* Warm sand */
   --bg-card: #FFFFFF;         /* Pure white for elevated elements */
   --bg-button-primary: #171717; 
@@ -220,7 +221,8 @@
 
     /* NIGHT MODE (ChatGPT Style) */
     --bg-sidebar: #141414;      /* Elevated soft charcoal gray */
-    --bg-canvas: #171717;       /* Deep neutral gray */
+    --focus-ring: #38BDF8;
+  --bg-canvas: #171717;       /* Deep neutral gray */
     --bg-card: #212121;         /* Slightly lighter gray for elevated elements */
     --bg-button-primary: #FFFFFF; 
     --text-primary: #ECECEC;
@@ -286,6 +288,7 @@
 
   /* NIGHT MODE (ChatGPT Style) */
   --bg-sidebar: #141414;      /* Elevated soft charcoal gray */
+  --focus-ring: #38BDF8;
   --bg-canvas: #171717;       /* Deep neutral gray */
   --bg-card: #212121;         /* Slightly lighter gray for elevated elements */
   --bg-button-primary: #FFFFFF; 
@@ -350,6 +353,7 @@
 .dark {
   color-scheme: dark;
   --bg-sidebar: #1C1C1E;
+  --focus-ring: #38BDF8;
   --bg-canvas: #171717;
   --bg-card: #212121;
   --bg-button-primary: #FFFFFF;
@@ -588,9 +592,9 @@ h1, h2, h3, h4, h5, h6 {
   input:not(.border-0):not(.border-none):not(.bg-transparent):not([class*="border-none"]):not([class*="border-0"]):not(.prompt-bare-input):focus,
   select:not(.border-0):not(.border-none):not(.bg-transparent):not([class*="border-none"]):not([class*="border-0"]):not(.prompt-bare-input):focus,
   textarea:not(.border-0):not(.border-none):not(.bg-transparent):not([class*="border-none"]):not([class*="border-0"]):not(.prompt-bare-input):focus {
-    border-color: var(--accent);
+    border-color: var(--focus-ring);
     outline: none;
-    box-shadow: 0 0 0 3px var(--accent-subtle);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-ring) 22%, transparent);
   }
 }
 
@@ -626,7 +630,7 @@ button:disabled {
 
 /* Keyboard focus. Declared once — --accent clears 3:1 against every surface in both themes. */
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 

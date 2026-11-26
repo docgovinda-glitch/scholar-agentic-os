@@ -122,7 +122,7 @@ describe("Phase 1 — Unified Assignment Setup Box & Question-Specific Dynamic S
     fireEvent.change(textarea, { target: { value: questionA } });
 
     // 4. Primary trigger button is "Generate Structure"
-    const generateBtn = screen.getByRole("button", { name: /Generate Structure/i });
+    const generateBtn = screen.getByRole("button", { name: /Save & Build/i });
     expect(generateBtn).toBeInTheDocument();
     expect(generateBtn).not.toBeDisabled();
 
@@ -167,7 +167,7 @@ describe("Phase 1 — Unified Assignment Setup Box & Question-Specific Dynamic S
     // Wait for stage to render
     expect(await screen.findByText(/Phase 1: Understand the Assignment Brief/i)).toBeInTheDocument();
 
-    const generateBtn = screen.getByRole("button", { name: /Generate Structure/i });
+    const generateBtn = screen.getByRole("button", { name: /Save & Build/i });
     fireEvent.click(generateBtn);
 
     // Verify Question B generates Nepal-India specific sections
@@ -199,7 +199,7 @@ describe("Phase 1 — Unified Assignment Setup Box & Question-Specific Dynamic S
     render(<AssignmentWorkspace projectId="proj-edit-demo" initialStage="understand" />);
 
     expect(await screen.findByText(/Phase 1: Understand the Assignment Brief/i)).toBeInTheDocument();
-    const generateBtn = screen.getByRole("button", { name: /Generate Structure/i });
+    const generateBtn = screen.getByRole("button", { name: /Save & Build/i });
     fireEvent.click(generateBtn);
     fireEvent.click(await screen.findByRole("button", { name: /Start from a plain outline \(not AI\)/i }));
 
@@ -257,7 +257,7 @@ describe("Phase 1 — Unified Assignment Setup Box & Question-Specific Dynamic S
 
     expect(await screen.findByText(/Phase 1: Understand the Assignment Brief/i)).toBeInTheDocument();
 
-    const generateBtn = screen.getByRole("button", { name: /Generate Structure/i });
+    const generateBtn = screen.getByRole("button", { name: /Save & Build/i });
     fireEvent.click(generateBtn);
     fireEvent.click(await screen.findByRole("button", { name: /Start from a plain outline \(not AI\)/i }));
 
@@ -266,7 +266,7 @@ describe("Phase 1 — Unified Assignment Setup Box & Question-Specific Dynamic S
     });
 
     // Click "Confirm Structure & Proceed to Sources"
-    const proceedBtn = screen.getByRole("button", { name: /Confirm Structure & Proceed to Sources/i });
+    const proceedBtn = screen.getByRole("button", { name: /Approve outline & continue to Sources/i });
     expect(proceedBtn).not.toBeDisabled();
     fireEvent.click(proceedBtn);
 

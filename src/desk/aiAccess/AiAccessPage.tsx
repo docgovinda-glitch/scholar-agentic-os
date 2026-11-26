@@ -18,6 +18,7 @@ import LocalRunnerDetail from "./LocalRunnerDetail";
 import ManualHardwareForm from "./ManualHardwareForm";
 import { fetchLocalRunner } from "../../services/localNetworkFetch";
 import { DEFAULT_OLLAMA_ENDPOINT, FALLBACK_OLLAMA_ENDPOINT } from "../../services/ollamaService";
+import { canProbeUnprompted, setRunnerReach, useRunnerReach, type RunnerReach } from "../../services/localRunnerReachability";
 import { useAiAccess } from "./useAiAccess";
 import OnboardingProgress from "../setup/OnboardingProgress";
 import {
@@ -185,7 +186,7 @@ export default function AiAccessPage({
           </ul>
         </nav>
 
-        <main className="min-w-0">
+        <div className="min-w-0">
           <CredentialResetNotice className="mb-4" />
           {access.error && (
             <div
@@ -242,7 +243,7 @@ export default function AiAccessPage({
           )}
 
           <SectionPane access={access} section={activeSection} onOpen={setOpenProvider} onGo={go} />
-        </main>
+        </div>
       </div>
     </div>
   );
@@ -328,6 +329,26 @@ function SectionPane({
   }
 }
 
+/**
+ * What a saved connection really is. A cloud key works from the server; a local runner is only a preference until
+ * this browser has actually reached it, and the server can never reach it.
+ */
+function ConnectionBadge({ kind, reach }: { kind: "cloud" | "local"; reach: RunnerReach }) {
+  const ok = kind === "cloud" || reach === "reachable";
+  const label = kind === "cloud" ? "Connected" : reach === "reachable" ? "On this device" : reach === "unreachable" ? "Not reachable" : "Not checked";
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold border whitespace-nowrap ${
+        ok
+          ? "border-[color:var(--state-success)] bg-[color:var(--state-success-subtle)] text-[color:var(--state-success)]"
+          : "border-[color:var(--state-warning)] bg-[color:var(--state-warning-subtle)] text-[color:var(--state-warning)]"
+      }`}
+    >
+      {label}
+    </span>
+  );
+}
+
 function SectionHeading({ title, blurb }: { title: string; blurb: string }) {
   return (
     <div className="mb-5 text-left">
@@ -348,6 +369,7 @@ function OverviewSection({
   onGo: (s: SectionId) => void;
   onOpen: (id: string) => void;
 }) {
+  const runnerReach = useRunnerReach();
   const totalConnected = access.connected.length;
   const counts = useMemo(
     () => ({
@@ -370,11 +392,11 @@ function OverviewSection({
           onClick={() => onGo("providers")}
           className="group rounded-2xl border border-slate-200/90 dark:border-neutral-800 bg-white dark:bg-neutral-900/90 p-4 sm:p-5 text-left transition-all hover:border-slate-300 dark:hover:border-neutral-700 hover:shadow-xs flex flex-col justify-between gap-3 shadow-2xs cursor-pointer h-full"
         >
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">
               Providers
             </span>
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/60 whitespace-nowrap shrink-0">
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/60 whitespace-nowrap shrink-0">
               {totalConnected > 0 ? `${totalConnected} connected` : "None"}
             </span>
           </div>
@@ -388,7 +410,7 @@ function OverviewSection({
           onClick={() => onGo("subscription")}
           className="group rounded-2xl border border-slate-200/90 dark:border-neutral-800 bg-white dark:bg-neutral-900/90 p-4 sm:p-5 text-left transition-all hover:border-slate-300 dark:hover:border-neutral-700 hover:shadow-xs flex flex-col justify-between gap-3 shadow-2xs cursor-pointer h-full"
         >
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">
               Premium
             </span>
@@ -406,7 +428,7 @@ function OverviewSection({
           onClick={() => onGo("preferences")}
           className="group rounded-2xl border border-slate-200/90 dark:border-neutral-800 bg-white dark:bg-neutral-900/90 p-4 sm:p-5 text-left transition-all hover:border-slate-300 dark:hover:border-neutral-700 hover:shadow-xs flex flex-col justify-between gap-3 shadow-2xs cursor-pointer h-full"
         >
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">
               Preferences
             </span>
@@ -435,13 +457,13 @@ function OverviewSection({
               <span aria-hidden className="transition-transform group-hover:translate-x-0.5">→</span>
             </button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))] gap-3.5">
             {access.connected.map((p) => (
               <button
                 key={p.id}
                 type="button"
                 onClick={() => onOpen(p.id)}
-                className="group flex items-center justify-between gap-3.5 rounded-2xl border border-slate-200/90 dark:border-neutral-800 bg-white dark:bg-neutral-900/90 p-3.5 sm:p-4 text-left transition-all hover:border-slate-300 dark:hover:border-neutral-700 hover:shadow-xs focus:outline-hidden cursor-pointer shadow-2xs"
+                className="group flex flex-wrap items-center justify-between gap-x-3.5 gap-y-2 rounded-2xl border border-slate-200/90 dark:border-neutral-800 bg-white dark:bg-neutral-900/90 p-3.5 sm:p-4 text-left transition-all hover:border-slate-300 dark:hover:border-neutral-700 hover:shadow-xs focus:outline-hidden cursor-pointer shadow-2xs"
               >
                 <div className="flex items-center gap-3.5 min-w-0 flex-1">
                   <div
@@ -452,8 +474,8 @@ function OverviewSection({
                     {p.icon}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate text-sm font-bold text-slate-900 dark:text-white group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="break-words text-sm font-bold text-slate-900 dark:text-white group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">
                         {p.name}
                       </span>
                       {p.isDefault && (
@@ -467,11 +489,8 @@ function OverviewSection({
                     </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 whitespace-nowrap">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                    Connected
-                  </span>
+                <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+                  <ConnectionBadge kind={p.kind} reach={runnerReach(p.id)} />
                 </div>
               </button>
             ))}
@@ -511,6 +530,7 @@ function ProvidersSection({
   access: ReturnType<typeof useAiAccess>;
   onOpen: (id: string) => void;
 }) {
+  const runnerReach = useRunnerReach();
   const [filter, setFilter] = useState<"all" | "free" | "local" | "cloud" | "connected">("all");
   const [query, setQuery] = useState("");
 
@@ -577,6 +597,9 @@ function ProvidersSection({
     void loadHardwareProfile().then(setHardware);
     let cancelled = false;
     async function checkLocal() {
+      // Never probe on page load unless it should succeed: a blocked loopback request fills the console
+      // with CORS errors nobody asked for. "Test connection" on the runner is the person's way in.
+      if (!(await canProbeUnprompted("ollama"))) return;
       // The same loopback candidates and LNA fallback the Ollama diagnosis uses, so the
       // banner and "Test connection" never disagree about whether Ollama is there.
       for (const endpoint of [FALLBACK_OLLAMA_ENDPOINT, DEFAULT_OLLAMA_ENDPOINT]) {
@@ -585,12 +608,14 @@ function ProvidersSection({
           if (!res.ok) continue;
           const data = await res.json();
           const count = Array.isArray(data?.models) ? data.models.length : 0;
+          setRunnerReach("ollama", "reachable");
           if (!cancelled) setLocalDetected({ runnerId: "ollama", name: "Ollama", modelCount: count });
           return;
         } catch {
           /* Not active locally or CORS-restricted; try the next address. */
         }
       }
+      setRunnerReach("ollama", "unreachable");
     }
     void checkLocal();
     return () => {
@@ -721,9 +746,9 @@ function ProvidersSection({
                 key={provider.id}
                 type="button"
                 onClick={() => onOpen(provider.id)}
-                className="group flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-3.5 text-left transition-all hover:border-[color:var(--border-strong)] hover:shadow-2xs focus:outline-none focus:ring-2 focus:ring-[color:var(--accent-solid)] cursor-pointer"
+                className="group flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-3.5 text-left transition-all hover:border-[color:var(--border-strong)] hover:shadow-2xs focus:outline-none focus:ring-2 focus:ring-[color:var(--accent-solid)] cursor-pointer"
               >
-                <div className="flex items-center gap-3 min-w-0">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
                   <span
                     aria-hidden
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-sm)] bg-[color:var(--surface-canvas)] text-lg shadow-2xs"
@@ -731,20 +756,18 @@ function ProvidersSection({
                   >
                     {provider.icon}
                   </span>
-                  <span className="truncate text-sm font-medium text-[color:var(--text-primary)] group-hover:text-[color:var(--accent-solid)] transition-colors">
+                  <span className="min-w-0 break-words text-sm font-medium text-[color:var(--text-primary)] group-hover:text-[color:var(--accent-solid)] transition-colors">
                     {provider.name}
                   </span>
                 </div>
-                <div className="shrink-0 flex items-center gap-1.5">
-                  {isDefault && provider.connected && (
+                <div className="shrink-0 ml-auto flex items-center gap-1.5">
+                  {isDefault && provider.connected && (provider.kind === "cloud" || runnerReach(provider.id) === "reachable") && (
                     <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold border border-amber-400/40 bg-amber-500/10 text-amber-600 dark:text-amber-400 shadow-2xs">
                       ★ Primary
                     </span>
                   )}
                   {provider.connected ? (
-                    <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium border border-[color:var(--state-success)] bg-[color:var(--state-success-subtle)] text-[color:var(--state-success)]">
-                      Connected
-                    </span>
+                    <ConnectionBadge kind={provider.kind} reach={runnerReach(provider.id)} />
                   ) : (
                     <span
                       className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium border ${

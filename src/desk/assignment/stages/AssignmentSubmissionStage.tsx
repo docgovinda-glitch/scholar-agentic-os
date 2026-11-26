@@ -25,6 +25,10 @@ ChevronDown,
 Edit2
 } from "lucide-react";
 
+/** One look for every action that cannot be used yet on this stage. */
+const DISABLED =
+  "disabled:cursor-not-allowed disabled:opacity-100 disabled:shadow-none disabled:!bg-[color:var(--surface-inset)] disabled:!text-[color:var(--text-muted)]";
+
 export interface AssignmentSubmissionStageProps {
   onBack?: () => void;
 }
@@ -247,7 +251,7 @@ export function AssignmentSubmissionStage({
           </div>
           <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${
             citationCoverage.orphanedSources === 0
-              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+              ? "bg-emerald-500/10 text-emerald-800 dark:text-emerald-400"
               : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
           }`}>
             {citationCoverage.sourcesWithCitations}/{approvedSources.length} sources cited
@@ -368,7 +372,7 @@ export function AssignmentSubmissionStage({
             disabled={isExportingDocx || sectionsWritten === 0}
             title={sectionsWritten === 0 ? "Write at least one section first" : undefined}
             data-testid="export-docx-button"
-            className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 transition-opacity cursor-pointer inline-flex items-center gap-2 shadow-xs disabled:opacity-50"
+            className={`px-5 py-2.5 rounded-xl text-xs font-semibold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 transition-opacity cursor-pointer inline-flex items-center gap-2 shadow-xs  ${DISABLED}`}
           >
             <FileText className="w-4 h-4" />
             <span>{isExportingDocx ? "Compiling Word Doc..." : "Download Formatted Word Document (.docx)"}</span>
@@ -381,7 +385,7 @@ export function AssignmentSubmissionStage({
             disabled={isExportingPdf || sectionsWritten === 0}
             title={sectionsWritten === 0 ? "Write at least one section first" : undefined}
             data-testid="export-pdf-button"
-            className="disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2.5 rounded-xl text-xs font-semibold bg-[color:var(--surface-inset)] text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer inline-flex items-center gap-2"
+            className={`${DISABLED} px-4 py-2.5 rounded-xl text-xs font-semibold bg-[color:var(--surface-inset)] text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer inline-flex items-center gap-2`}
           >
             <Printer className="w-4 h-4" />
             <span>{isExportingPdf ? "Rendering PDF..." : "Download PDF Document"}</span>
@@ -392,7 +396,7 @@ export function AssignmentSubmissionStage({
             type="button"
             onClick={handleCopyMarkdown}
             disabled={sectionsWritten === 0}
-            className="disabled:opacity-50 disabled:cursor-not-allowed px-3.5 py-2.5 rounded-xl text-xs font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer inline-flex items-center gap-1.5"
+            className={`${DISABLED} px-3.5 py-2.5 rounded-xl text-xs font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer inline-flex items-center gap-1.5`}
             title="Copy clean markdown text to clipboard"
           >
             {copiedMarkdown ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
@@ -425,7 +429,7 @@ export function AssignmentSubmissionStage({
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[color:var(--border-subtle)] pb-5">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide uppercase bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide uppercase bg-emerald-500/10 text-emerald-800 dark:text-emerald-400">
                 Phase 05 · Submission & Review
               </span>
               <span className="text-xs text-[color:var(--text-muted)] font-mono">
@@ -445,7 +449,7 @@ export function AssignmentSubmissionStage({
               type="button"
               onClick={() => runSubmissionAudit?.()}
               disabled={isAuditingSubmission || !hasDraft}
-              className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer inline-flex items-center gap-2 disabled:opacity-50"
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer inline-flex items-center gap-2  ${DISABLED}`}
               title="Re-run Rubric & Citation Audit"
             >
               <RotateCw className={`w-3.5 h-3.5 ${isAuditingSubmission ? "animate-spin" : ""}`} />
@@ -489,7 +493,7 @@ export function AssignmentSubmissionStage({
             <span className="text-sm font-semibold text-[color:var(--text-primary)] tabular-nums">
               {currentWordCount.toLocaleString()} / {targetWordCount.toLocaleString()}
             </span>
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${isWordCountCompliant ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-amber-500/10 text-amber-600 dark:text-amber-400"}`}>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${isWordCountCompliant ? "bg-emerald-500/10 text-emerald-800 dark:text-emerald-400" : "bg-amber-500/10 text-amber-600 dark:text-amber-400"}`}>
               {Number(wordDiffPercentage) > 0 ? `+${wordDiffPercentage}%` : `${wordDiffPercentage}%`}
             </span>
             <span className="text-xs text-[color:var(--text-muted)]">against the brief; check your module's rules</span>

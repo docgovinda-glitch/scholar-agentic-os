@@ -14,7 +14,7 @@ export interface SourcesExitGateProps {
 export function SourcesExitGate({ approvedCount, handleContinue, handleReturn }: SourcesExitGateProps) {
   return (
     <>
-      {/* Phase 2 Exit Gate Banner & Actions */}
+      {/* Phase 03 exit gate */}
       <div className="rounded-2xl p-6 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-xs dark:shadow-none flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-5">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
@@ -22,7 +22,7 @@ export function SourcesExitGate({ approvedCount, handleContinue, handleReturn }:
               Evidence Grounding
             </h3>
             {approvedCount > 0 ? (
-              <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 flex items-center gap-1 border border-emerald-500/20">
+              <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-800 dark:text-emerald-400 flex items-center gap-1 border border-emerald-500/20">
                 <CheckCircle2 className="w-3 h-3" />
                 <span>{approvedCount} Approved</span>
               </span>
@@ -35,7 +35,7 @@ export function SourcesExitGate({ approvedCount, handleContinue, handleReturn }:
           </div>
           <p className="text-xs text-[color:var(--text-muted)]">
             {approvedCount >= 4
-              ? `You have approved ${approvedCount} sources. You are fully grounded to proceed to Phase 3 drafting.`
+              ? `You have approved ${approvedCount} sources. You are fully grounded to proceed to Phase 04 Drafting.`
               : approvedCount > 0
               ? `You have approved ${approvedCount} source${approvedCount === 1 ? "" : "s"} (${approvedCount}/4 recommended). You can continue approving or proceed to drafting anytime.`
               : `Citing sources is recommended (0/4 recommended) but optional. You can attach sources now or proceed directly to drafting.`}

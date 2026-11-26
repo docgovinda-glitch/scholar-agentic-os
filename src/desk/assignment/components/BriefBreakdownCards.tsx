@@ -95,7 +95,7 @@ export function SubQuestionsCard({ briefText, fallbackQuestions = [], totalWords
 
   return (
     <section className={card} aria-label="Key sub-questions" data-testid="sub-questions-card">
-      <h3 className={heading}>Key sub-questions your essay must answer</h3>
+      <h2 className={heading}>Key sub-questions your essay must answer</h2>
       <ul className="divide-y divide-[color:var(--border-subtle)]">
         {rows.map((row) => {
           const budget = targets[row.id];
@@ -155,7 +155,7 @@ export function SubQuestionsCard({ briefText, fallbackQuestions = [], totalWords
                   type="button"
                   onClick={() => setEditingWordsId(row.id)}
                   title="Click to set your own word count"
-                  aria-label={`Edit words for ${row.label}`}
+                  aria-label={`~${(budget?.words ?? 0).toLocaleString()} words, edit words for ${row.label}`}
                   className="py-1 shrink-0 font-mono text-xs text-emerald-700 dark:text-emerald-300 whitespace-nowrap hover:underline cursor-pointer"
                 >
                   ~{(budget?.words ?? 0).toLocaleString()} words
@@ -224,7 +224,7 @@ export function GradingCriteriaCard({ briefText, rubricText }: { briefText: stri
   if (rows.length === 0) return null;
   return (
     <section className={card} aria-label="Grading criteria" data-testid="grading-criteria-card">
-      <h3 className={heading}>Grading criteria</h3>
+      <h2 className={heading}>Grading criteria</h2>
       <div className="overflow-x-auto">
         <table className="w-full text-xs text-left">
           <thead>

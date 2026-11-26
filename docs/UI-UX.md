@@ -38,13 +38,16 @@ Defined in `src/index.css`:
 | Entry and routing | `src/desk/DeskApp.tsx`; auth gates in `src/desk/DeskAuthGate.tsx` |
 | Landing and signed-out home | `src/desk/ScholarCoreLanding.tsx` |
 | Projects list, Ask Scholar and project creation | `src/desk/ProjectListScreen.tsx`, `src/desk/dashboard/` (`OutputTypePicker.tsx`, `constants.ts`), `src/desk/ask/` (composer `AskPromptBox.tsx`, mode toggle `ScholarFilterBar.tsx`, per-answer `SourcesPanel.tsx`) |
-| Sidebar | `src/components/navigation/ScholarSidebar.tsx` |
+| Sidebar (one component for the main screen and Presentation Studio) | `src/components/navigation/ScholarSidebar.tsx`; theme switch `src/hooks/useTheme.ts` |
+| Document titles and unknown addresses | `src/desk/documentTitle.tsx` (workspaces publish the project name with `useProjectDocumentTitle`; nothing else writes `document.title` in the Desk app), `src/desk/NotFoundScreen.tsx` |
 | Generic project shell | `src/desk/DeskShell.tsx` with regions in `src/desk/regions/` (`Header`, `Rail`, `Primary`, `Aside`, `Tray`, `StatusBar`, `StudioPanel`, `GlobalSearchModal`) |
 | Workspaces | `src/desk/assignment/`, `src/desk/workspace/` (journal), `src/desk/thesis/`, `src/desk/proposal/`, `src/desk/presentation/` |
 | Account, Vault, AI Access | `src/desk/account/AccountSettingsScreen.tsx`, `src/desk/vault/`, `src/desk/aiAccess/` |
 | Admin | `src/admin/AdminApp.tsx` (lazy, `/admin/*`) |
 
 `src/hooks/useDeviceClass.ts` classifies `mobile` (< 768 px), `tablet` (768-1023 px) and `desktop` (>= 1024 px, demoted when the pointer is coarse) so components that cannot work on a phone (for example local-server AI options) are not mounted there.
+
+On a phone the address carries the bottom-bar tab: `/projects` is the project list (`components/PhoneProjectsList.tsx`) and `/projects?tab=ask` is the Ask Scholar home.
 
 Other hooks: `useBackToClose`, `useOnlineStatus`, `useVisualViewport`, `useUnsavedChangesGuard`.
 

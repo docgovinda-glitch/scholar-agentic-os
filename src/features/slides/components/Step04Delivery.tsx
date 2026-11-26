@@ -266,19 +266,19 @@ export default function Step04Delivery({ deck, onPrevStep, onStartPresentation }
 
       {/* Filmstrip */}
       {total > 0 && (
-        <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1" aria-label="All slides" data-testid="presentation-controller">
+        <div role="group" className="flex gap-3 overflow-x-auto pt-1 pb-3 px-6 scroll-px-6 [mask-image:linear-gradient(to_right,transparent,black_1.5rem,black_calc(100%-1.5rem),transparent)]" aria-label="All slides" data-testid="presentation-controller">
           {deck.slides.map((s, i) => (
             <button
               key={s.id}
               type="button"
               onClick={() => setIndex(i)}
-              aria-label={`Show slide ${i + 1}`}
               aria-current={i === index ? 'true' : undefined}
-              className={`shrink-0 w-[168px] rounded-[10px] cursor-pointer transition-shadow ${
+              className={`relative shrink-0 w-[168px] rounded-[10px] cursor-pointer transition-shadow ${
                 i === index ? 'ring-2 ring-neutral-900 dark:ring-neutral-100 ring-offset-2 ring-offset-[#F8F7F4] dark:ring-offset-[#171717]' : 'ring-1 ring-transparent hover:ring-neutral-900/20 dark:hover:ring-white/20'
               }`}
             >
-              <span className="block pointer-events-none">
+              <span className="sr-only">{`Show slide ${i + 1}`}</span>
+              <span aria-hidden="true" className="block pointer-events-none">
                 <GammaSlide slide={s} index={i} theme={theme} />
               </span>
             </button>

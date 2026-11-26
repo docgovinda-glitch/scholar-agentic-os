@@ -326,7 +326,7 @@ describe("Phase I Dynamic Structure & Cross-Phase Workflow", () => {
       expect(await screen.findByText(dynamicStructure.headings[0].title)).toBeInTheDocument();
 
       // Click Proceed to Sources
-      const proceedBtn = screen.getByRole("button", { name: /Proceed to Sources/i });
+      const proceedBtn = screen.getByRole("button", { name: /Approve outline & continue to Sources|Proceed to Sources/i });
       fireEvent.click(proceedBtn);
 
       await waitFor(() => {

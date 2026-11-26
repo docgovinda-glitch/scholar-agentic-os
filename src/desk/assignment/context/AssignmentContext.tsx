@@ -59,6 +59,8 @@ const OUTLINE_REWRITE_TIMEOUT_MS = 60_000;
 import { buildAssignmentProjectState,computePhaseStatuses } from "./assignmentState";
 import { readInternalSections,readRubricCriteria,readStructure,readSectionBudgets,readApprovedSourceIds,readWritingStyle } from "./answerReaders";
 
+const sameValue = (a: unknown, b: unknown): boolean => a === b || (a !== undefined && b !== undefined && JSON.stringify(a) === JSON.stringify(b));
+
 export interface AssignmentContextValue {
   projectId: string;
   project: ProjectView | null;
@@ -357,6 +359,10 @@ export function AssignmentProvider({
       }
 
       const baseAnswers = projectRef.current?.answers || project?.answers || {};
+      // Only real changes are saved: re-writing a stored value would send a PATCH and show "Saving" for nothing.
+      const stored = baseAnswers as Record<string, unknown>;
+      const unchanged = Object.keys(standardized).every((key) => sameValue(stored[key], standardized[key]));
+      if (unchanged && dirtyKeysRef.current.size === 0) return;
       // ProjectView types answers as strings, but Coursework keeps JSON values
       // (sources, sections, structure) in them too: cast once, here.
       const mergedAnswers = { ...baseAnswers, ...standardized } as ProjectView["answers"];
@@ -419,9 +425,11 @@ export function AssignmentProvider({
   const setPhase = useCallback(
     (phase: AssignmentPhaseId, options?: { replace?: boolean }) => {
       setActiveStage(phase);
-      saveAnswers({
-        assignment_current_phase: phase,
-      });
+      // The URL holds the phase being viewed. What is saved is how far the work has got, so looking back at an
+      // earlier phase writes nothing.
+      const order = (id: unknown) => ASSIGNMENT_PHASES.findIndex((p) => p.id === normalizeAssignmentPhase(id as string | undefined));
+      const reached = projectRef.current?.answers?.["assignment_current_phase"];
+      if (!reached || order(phase) > order(reached)) saveAnswers({ assignment_current_phase: phase });
       if (typeof onStageChangeCallback === "function") {
         onStageChangeCallback(phase, options);
       }

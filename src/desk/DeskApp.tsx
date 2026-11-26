@@ -14,12 +14,15 @@ OnboardingRoute
 import type { DeskShellView } from "./DeskShell";
 import type { ResearchStage } from "./workspace/types";
 import { STAGE_MAP } from "./workspace/types";
-import { getProject,UnauthenticatedError,getMigratedDraftRealId,createEphemeralProject } from "./api";
+import { getProject,UnauthenticatedError,getMigratedDraftRealId,createEphemeralProject,getEphemeralProject,isEphemeralProject } from "./api";
 import { useAiSetupStatus } from "./setup/useAiSetupStatus";
 import { useVaultSetupStatus } from "./setup/useVaultSetupStatus";
 import { useDeskSession } from "./useDeskSession";
 import { normalizeOutputTypeId } from "../app/atlas/legacyIds";
 import type { SectionId } from "./aiAccess/AiAccessPage";
+import { DocumentTitle, useProjectDocumentTitle } from "./documentTitle";
+import NotFoundScreen from "./NotFoundScreen";
+import { getProjectDisplayName } from "./projectNaming";
 import GlobalLoader from "./components/GlobalLoader";
 import SyncToast from "./components/SyncToast";
 import { LoadingProvider } from "./context/LoadingContext";
@@ -63,6 +66,8 @@ function isResearchStage(value: string | undefined): value is ResearchStage {
 /** Where to return to when closing Settings/Vault/AI Access — passed as router state on the way in, since these overlays aren't meant to grow their own history entries. */
 interface CameFrom {
   from?: string;
+  /** The page Settings was opened over: it stays mounted behind the dialog. */
+  backgroundLocation?: ReturnType<typeof useLocation>;
 }
 
 function returnTo(location: ReturnType<typeof useLocation>): string {
@@ -139,6 +144,7 @@ function OnboardingGate() {
  */
 function ProjectsIndexRoute() {
   const navigate = useNavigate();
+  const location = useLocation();
   const session = useDeskSession();
   const outletCtx = useOutletContext<OnboardingContext | null>();
   const justFinishedOnboarding = outletCtx?.justFinishedOnboarding ?? false;
@@ -153,8 +159,9 @@ function ProjectsIndexRoute() {
       initialView="projects"
       userId={effectiveUserId}
       userEmail={effectiveUserEmail}
+      sessionPending={session.status === "loading"}
       onOpen={(id) => navigate(`/projects/${id}`)}
-      onOpenAccountSettings={() => navigate("/settings", { state: { from: "/projects" } })}
+      onOpenAccountSettings={() => navigate("/settings", { state: { backgroundLocation: location } })}
       onOpenVault={() => navigate("/vault", { state: { from: "/projects" } })}
       onOpenAiAccess={() => navigate("/ai-access", { state: { from: "/projects" } })}
       showWelcome={justFinishedOnboarding}
@@ -168,6 +175,8 @@ function ProjectRoute() {
   const location = useLocation();
   const { projectId: urlProjectId, view } = useParams<{ projectId: string; view?: string }>();
   const [outputTypeId, setOutputTypeId] = useState<string | null>(null);
+  const [projectName, setProjectName] = useState("");
+  useProjectDocumentTitle(projectName);
   const [error, setError] = useState<string | null>(null);
 
   // Auto-resolve migrated draft IDs to permanent database IDs
@@ -204,7 +213,9 @@ function ProjectRoute() {
     if (targetId) {
       getProject(targetId)
         .then((p) => {
-          if (active) setOutputTypeId(normalizeOutputTypeId(p.outputTypeId));
+          if (!active) return;
+          setOutputTypeId(normalizeOutputTypeId(p.outputTypeId));
+          setProjectName(getProjectDisplayName(p));
         })
         .catch((e) => {
           if (active) {
@@ -219,7 +230,9 @@ function ProjectRoute() {
     return () => {
       active = false;
     };
-  }, [effectiveProjectId, urlProjectId, location.search, navigate]);
+    // Only a change of project reloads it: `navigate` and the query string change on every tab switch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveProjectId, urlProjectId]);
 
   const onDeskShellViewChange = useCallback(
     (next: DeskShellView, options?: { replace?: boolean }) => {
@@ -320,7 +333,7 @@ function ProjectRoute() {
         initialStage={isAssignmentStageId(view) ? normalizeAssignmentPhase(view) : null}
         onStageChange={onAssignmentStageChange}
         onClose={() => navigate("/projects")}
-        onOpenAccountSettings={() => navigate("/settings", { state: { from: location.pathname } })}
+        onOpenAccountSettings={() => navigate("/settings", { state: { backgroundLocation: location } })}
         onOpenVault={() => navigate("/vault", { state: { from: location.pathname } })}
         onOpenAiAccess={() => navigate("/ai-access", { state: { from: location.pathname } })}
       />
@@ -332,7 +345,7 @@ function ProjectRoute() {
       <ThesisWorkspace
         projectId={targetProjectId}
         onClose={() => navigate("/projects")}
-        onOpenAccountSettings={() => navigate("/settings", { state: { from: location.pathname } })}
+        onOpenAccountSettings={() => navigate("/settings", { state: { backgroundLocation: location } })}
         onOpenVault={() => navigate("/vault", { state: { from: location.pathname } })}
         onOpenAiAccess={() => navigate("/ai-access", { state: { from: location.pathname } })}
       />
@@ -344,7 +357,7 @@ function ProjectRoute() {
       <PresentationWorkspace
         projectId={targetProjectId}
         onClose={() => navigate("/projects")}
-        onOpenAccountSettings={() => navigate("/settings", { state: { from: location.pathname } })}
+        onOpenAccountSettings={() => navigate("/settings", { state: { backgroundLocation: location } })}
         onOpenVault={() => navigate("/vault", { state: { from: location.pathname } })}
         onOpenAiAccess={() => navigate("/ai-access", { state: { from: location.pathname } })}
       />
@@ -358,7 +371,7 @@ function ProjectRoute() {
         initialStage={isResearchStage(view) ? view : null}
         onStageChange={onResearchStageChange}
         onClose={() => navigate("/projects")}
-        onOpenAccountSettings={() => navigate("/settings", { state: { from: location.pathname } })}
+        onOpenAccountSettings={() => navigate("/settings", { state: { backgroundLocation: location } })}
         onOpenVault={() => navigate("/vault", { state: { from: location.pathname } })}
         onOpenAiAccess={() => navigate("/ai-access", { state: { from: location.pathname } })}
       />
@@ -371,7 +384,7 @@ function ProjectRoute() {
       view={isDeskShellView(view) ? view : null}
       onViewChange={onDeskShellViewChange}
       onClose={() => navigate("/projects")}
-      onOpenAccountSettings={() => navigate("/settings", { state: { from: location.pathname } })}
+      onOpenAccountSettings={() => navigate("/settings", { state: { backgroundLocation: location } })}
       onOpenVault={() => navigate("/vault", { state: { from: location.pathname } })}
       onOpenAiAccess={() => navigate("/ai-access", { state: { from: location.pathname } })}
     />
@@ -382,9 +395,11 @@ function ProjectRoute() {
 function SettingsRoute() {
   const navigate = useNavigate();
   const location = useLocation();
+  const background = (location.state as CameFrom | null)?.backgroundLocation;
   return (
     <AccountSettingsScreen
-      onClose={() => navigate(returnTo(location))}
+      // Over a page, closing goes back to it exactly as it was; opened by URL, to the projects.
+      onClose={() => (background ? navigate(-1) : navigate(returnTo(location)))}
     />
   );
 }
@@ -392,6 +407,7 @@ function SettingsRoute() {
 /** Knowledge Vault route: global cross-project literature repository. */
 function VaultRoute() {
   const navigate = useNavigate();
+  const location = useLocation();
   const session = useDeskSession();
   const isLocalhost = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
   if (session.status !== "signed-in" && !isLocalhost) return null;
@@ -403,7 +419,7 @@ function VaultRoute() {
       userId={userId}
       userEmail={userEmail}
       onOpen={(id) => navigate(`/projects/${id}`)}
-      onOpenAccountSettings={() => navigate("/settings", { state: { from: "/vault" } })}
+      onOpenAccountSettings={() => navigate("/settings", { state: { backgroundLocation: location } })}
       onOpenVault={() => {}}
       onOpenAiAccess={() => navigate("/ai-access", { state: { from: "/vault" } })}
     />
@@ -430,9 +446,38 @@ function AiAccessRoute() {
       aiAccessSection={activeSection}
       onAiAccessSectionChange={(next) => navigate(next === "overview" ? "/ai-access" : `/ai-access/${next}`)}
       onOpen={(id) => navigate(`/projects/${id}`)}
-      onOpenAccountSettings={() => navigate("/settings", { state: { from: location.pathname } })}
+      onOpenAccountSettings={() => navigate("/settings", { state: { backgroundLocation: location } })}
       onOpenVault={() => navigate("/vault", { state: { from: location.pathname } })}
       onOpenAiAccess={() => {}}
+    />
+  );
+}
+
+const NEW_DECK_KEY = "scholar_new_presentation_draft";
+
+/**
+ * /presentation: a new deck. Signed in, it is a local draft that becomes a project the first time it is saved or
+ * uses AI. Signed out, it stays in the tab and nothing is asked of the server.
+ */
+function NewPresentationRoute() {
+  const session = useDeskSession();
+  const signedIn = session.status === "signed-in";
+  const [draftId, setDraftId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!signedIn) return;
+    const kept = sessionStorage.getItem(NEW_DECK_KEY);
+    const id = kept && isEphemeralProject(kept) && getEphemeralProject(kept) ? kept : createEphemeralProject("OT-22", "Untitled presentation").projectId;
+    sessionStorage.setItem(NEW_DECK_KEY, id);
+    setDraftId(id);
+  }, [signedIn]);
+
+  if (session.status === "loading" || (signedIn && !draftId)) return <GlobalLoader />;
+  return (
+    <PresentationWorkspace
+      projectId={signedIn ? draftId ?? undefined : undefined}
+      initialStep="understand"
+      onClose={() => window.location.assign("/projects")}
     />
   );
 }
@@ -441,11 +486,13 @@ function AiAccessRoute() {
  * Root route tree for Desk application components.
  */
 export default function DeskApp() {
+  const location = useLocation();
+  const background = location.pathname === "/settings" ? (location.state as CameFrom | null)?.backgroundLocation : undefined;
   return (
     <div className="min-h-screen w-full bg-ink-850 text-neutral-200">
       <LoadingProvider>
         <Suspense fallback={<GlobalLoader />}>
-          <Routes>
+          <Routes location={background ?? location}>
             <Route path="/" element={<RootOrProjectsRoute />} />
             <Route path="/signin" element={<RootOrProjectsRoute />} />
             <Route path="/signup" element={<RootOrProjectsRoute />} />
@@ -461,34 +508,11 @@ export default function DeskApp() {
               }
             />
             <Route path="/verify-email" element={<VerifyEmailRoute />} />
-            <Route
-              path="/presentation"
-              element={
-                <PresentationWorkspace
-                  projectId="demo-presentation"
-                  initialStep="understand"
-                  onClose={() => {
-                    if (typeof window !== "undefined") window.location.href = "/projects";
-                  }}
-                />
-              }
-            />
+            <Route path="/presentation" element={<NewPresentationRoute />} />
             <Route path="/*" element={<RequireAuth />}>
               <Route path="onboarding" element={<OnboardingRoute />} />
               <Route element={<RequireOnboarding />}>
                 <Route element={<OnboardingGate />}>
-                  <Route
-                    path="presentation"
-                    element={
-                      <PresentationWorkspace
-                        projectId="demo-presentation"
-                        initialStep="understand"
-                        onClose={() => {
-                          if (typeof window !== "undefined") window.location.href = "/projects";
-                        }}
-                      />
-                    }
-                  />
                   <Route path="projects" element={<ProjectsIndexRoute />} />
                   <Route path="projects/:projectId" element={<ProjectRoute />} />
                   <Route path="projects/:projectId/:view" element={<ProjectRoute />} />
@@ -497,11 +521,13 @@ export default function DeskApp() {
                   <Route path="ai-access" element={<AiAccessRoute />} />
                   <Route path="ai-access/:section" element={<AiAccessRoute />} />
                   <Route path="agents" element={<Navigate to="/projects" replace />} />
-                  <Route path="*" element={<Navigate to="/projects" replace />} />
+                  <Route path="*" element={<NotFoundScreen />} />
                 </Route>
               </Route>
             </Route>
           </Routes>
+          {background && <SettingsRoute />}
+          <DocumentTitle />
           <SyncToast />
           <LiveAiStatusDock />
           <AiUnavailableHost />

@@ -61,7 +61,7 @@ export function UploadedSourcesList({ activeInspectTabs, assignmentQuestion, cit
                           </h3>
                           <SourceFormatBadge type={doc.sourceType} />
                           {/* Processed Status Badge */}
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border border-emerald-500/20">
                             <CheckCircle2 className="w-3 h-3 text-emerald-500" />
                             <span>Processed</span>
                           </span>
@@ -130,7 +130,7 @@ export function UploadedSourcesList({ activeInspectTabs, assignmentQuestion, cit
                         <span className="text-xs px-2 py-0.5 rounded-md bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] text-[color:var(--text-secondary)] font-mono">
                           {formatBytes(doc.fileSize)}
                         </span>
-                        <span className="text-xs px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-medium border border-emerald-500/20">
+                        <span className="text-xs px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 font-medium border border-emerald-500/20">
                           ✓ Processed
                         </span>
                       </div>
@@ -188,7 +188,7 @@ export function UploadedSourcesList({ activeInspectTabs, assignmentQuestion, cit
                             <Target className="w-3 h-3 text-emerald-500" />
                             <span>3. Used in Assignment</span>
                           </span>
-                          <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded-full border border-emerald-500/25">
+                          <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded-full border border-emerald-500/25">
                             Active
                           </span>
                         </div>
@@ -414,7 +414,7 @@ export function UploadedSourcesList({ activeInspectTabs, assignmentQuestion, cit
                                 >
                                   <div className="flex items-center justify-between gap-2">
                                     {p.targetSection ? (
-                                      <span className="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                                      <span className="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border border-emerald-500/20">
                                         Section: {p.targetSection}
                                       </span>
                                     ) : <span />}

@@ -26,6 +26,9 @@ const chip = (on: boolean) =>
 /** Quick Scholar | Deep Research toggle and compact scholarly filters, shown above the prompt box controls. */
 export function ScholarFilterBar({ mode, onModeChange, filters, onFiltersChange }: ScholarFilterBarProps) {
   const deep = mode === "deep_research";
+  const inverted = filters.yearFrom !== undefined && filters.yearTo !== undefined && filters.yearFrom > filters.yearTo;
+  // Checked when the person leaves a year box, not while they are still typing it.
+  const [yearsChecked, setYearsChecked] = useState(false);
   const [customOpen, setCustomOpen] = useState(filters.yearPreset === "custom");
   const set = (patch: Partial<ScholarFilters>) => onFiltersChange({ ...filters, ...patch });
   // On phones the six filter chips would wrap over several rows; they sit behind one
@@ -84,19 +87,29 @@ export function ScholarFilterBar({ mode, onModeChange, filters, onFiltersChange 
       </button>
       {customOpen && (
         <span className="flex items-center gap-1 text-[11px] text-neutral-500">
-          <input aria-label="From year" type="number" min={1900} max={2100} value={filters.yearFrom ?? ""} onChange={(e) => set({ yearPreset: "custom", yearFrom: e.target.value ? Number(e.target.value) : undefined })} className="w-16 rounded-md border border-neutral-200 bg-transparent px-1.5 py-0.5 dark:border-white/10" />
+          <input aria-label="From year" name="yearFrom" aria-invalid={yearsChecked && inverted} onBlur={() => setYearsChecked(true)} type="number" min={1900} max={2100} value={filters.yearFrom ?? ""} onChange={(e) => set({ yearPreset: "custom", yearFrom: e.target.value ? Number(e.target.value) : undefined })} className="w-16 rounded-md border border-neutral-200 bg-transparent px-1.5 py-0.5 dark:border-white/10" />
           –
-          <input aria-label="To year" type="number" min={1900} max={2100} value={filters.yearTo ?? ""} onChange={(e) => set({ yearPreset: "custom", yearTo: e.target.value ? Number(e.target.value) : undefined })} className="w-16 rounded-md border border-neutral-200 bg-transparent px-1.5 py-0.5 dark:border-white/10" />
+          <input aria-label="To year" name="yearTo" aria-invalid={yearsChecked && inverted} onBlur={() => setYearsChecked(true)} type="number" min={1900} max={2100} value={filters.yearTo ?? ""} onChange={(e) => set({ yearPreset: "custom", yearTo: e.target.value ? Number(e.target.value) : undefined })} className="w-16 rounded-md border border-neutral-200 bg-transparent px-1.5 py-0.5 dark:border-white/10" />
+          {yearsChecked && inverted && (
+            <span role="alert" className="flex items-center gap-1 text-[color:var(--state-danger)]">
+              “From” is after “To”.
+              <button type="button" className="underline cursor-pointer" onClick={() => set({ yearFrom: filters.yearTo, yearTo: filters.yearFrom })}>
+                Swap
+              </button>
+            </span>
+          )}
         </span>
       )}
 
       <span className="mx-0.5 hidden h-4 w-px bg-neutral-200 sm:inline-block dark:bg-white/10" aria-hidden="true" />
 
-      {SCOPES.map((s) => (
-        <button key={s.id} type="button" aria-pressed={filters.scopes.includes(s.id)} className={chip(filters.scopes.includes(s.id))} onClick={() => toggleScope(s.id)}>
-          {s.label}
-        </button>
-      ))}
+      <span role="group" aria-label="Source scope" className="flex flex-wrap items-center gap-1.5 sm:flex-nowrap">
+        {SCOPES.map((s) => (
+          <button key={s.id} type="button" aria-pressed={filters.scopes.includes(s.id)} className={chip(filters.scopes.includes(s.id))} onClick={() => toggleScope(s.id)}>
+            {s.label}
+          </button>
+        ))}
+      </span>
       {(filters.yearPreset !== "any" || filters.scopes.length > 0) && (
         <button type="button" className="cursor-pointer text-[11px] text-neutral-500 underline" onClick={() => { setCustomOpen(false); onFiltersChange(DEFAULT_SCHOLAR_FILTERS); }}>
           Clear

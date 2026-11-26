@@ -141,7 +141,8 @@ export default function AssignmentUnderstandStage({
     const curType = assignmentType || localType || "essay";
     const rawTone = project?.answers?.["writing_tone"] || writingTone || localTone;
     const toneStr = (tonePresetOf(rawTone) || "").toLowerCase();
-    if (curType === "essay" && (toneStr === "analytical" || !toneStr || toneStr === "default")) {
+    // Only an unset tone is given the essay default; a saved choice is the student's.
+    if (!project?.answers?.["writing_tone"] && curType === "essay" && (toneStr === "analytical" || !toneStr || toneStr === "default")) {
       const targetTone = "formal_academic";
       setLocalTone(targetTone);
       saveAnswers({
@@ -1034,7 +1035,6 @@ export default function AssignmentUnderstandStage({
                 type="button"
                 disabled={isGeneratingStructure || buildRunning}
                 onClick={() => void handleRegenerateOutline()}
-                aria-label="Regenerate Outline (Generate Structure)"
                 className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-[color:var(--border-default)] hover:bg-[color:var(--surface-hover)] text-xs font-semibold text-[color:var(--text-primary)] transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
               >
                 {isGeneratingStructure ? (
@@ -1055,7 +1055,6 @@ export default function AssignmentUnderstandStage({
                 disabled={!canProceedToSources || isGeneratingStructure || buildRunning || !hasOutline(localStructure)}
                 onClick={handleProceedToSources}
                 title={hasOutline(localStructure) ? "Approves this thesis and outline; you can still change them later" : "Your outline comes first"}
-                aria-label="Proceed (Approve Outline & Proceed / Confirm Structure & Proceed to Sources / Proceed to Sources)"
                 className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 active:scale-[0.99] font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <span>Approve outline &amp; continue to Sources</span>

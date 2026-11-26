@@ -341,7 +341,7 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
                     className="px-3.5 py-1.5 rounded-full border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] text-xs font-semibold text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5"
                   >
                     <Globe className="w-3.5 h-3.5 text-sky-500" />
-                    <span>+ Add Web Link</span>
+                    <span>Add Web Link</span>
                   </button>
                   <button
                     type="button"

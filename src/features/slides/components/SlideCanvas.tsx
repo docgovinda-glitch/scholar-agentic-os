@@ -186,7 +186,7 @@ export default function SlideCanvas({
           </p>
         </div>
       ) : activeSlide.layoutType === 'cover' || (theme?.layoutArchetype === 'swiss-editorial' && currentSlideIndex === 0) ? (
-        <main
+        <div
           className="max-w-5xl w-full aspect-[16/9] min-h-[520px] transition-all duration-300 relative overflow-hidden"
           data-testid="slide-card-active"
         >
@@ -196,9 +196,9 @@ export default function SlideCanvas({
             totalSlides={totalSlides}
             theme={theme}
           />
-        </main>
+        </div>
       ) : activeSlide.layoutType === 'metrics' || (theme?.layoutArchetype === 'swiss-editorial' && currentSlideIndex === 1) ? (
-        <main
+        <div
           className="max-w-5xl w-full aspect-[16/9] min-h-[520px] transition-all duration-300 relative overflow-hidden"
           data-testid="slide-card-active"
         >
@@ -208,9 +208,9 @@ export default function SlideCanvas({
             totalSlides={totalSlides}
             theme={theme}
           />
-        </main>
+        </div>
       ) : activeSlide.layoutType === 'categories' || (theme?.layoutArchetype === 'swiss-editorial' && currentSlideIndex === 2) ? (
-        <main
+        <div
           className="max-w-5xl w-full aspect-[16/9] min-h-[520px] transition-all duration-300 relative overflow-hidden"
           data-testid="slide-card-active"
         >
@@ -220,10 +220,10 @@ export default function SlideCanvas({
             totalSlides={totalSlides}
             theme={theme}
           />
-        </main>
+        </div>
       ) : (
         // Active Slide Card
-        <main
+        <div
           className={`max-w-5xl w-full aspect-[16/9] min-h-[520px] rounded-2xl p-10 md:p-14 flex flex-col justify-between border shadow-2xl transition-all duration-300 relative overflow-hidden ${
             theme
               ? `${theme.cardClass} ${theme.cardBorder}`
@@ -337,7 +337,7 @@ export default function SlideCanvas({
               </div>
             )}
           </footer>
-        </main>
+        </div>
       )}
 
       {/* Floating Presentation Controller */}

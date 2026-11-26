@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { setLiveModelsFetch, clearLiveModelState } from "../liveModels";
 import express from "express";
 import request from "supertest";
-import { aiRouteDecorator, configureRouterBridge, keyringFromRequest } from "../routerBridge";
+import { aiRouteDecorator, cloudFailureReason, configureRouterBridge, keyringFromRequest, RouterExhaustedError, serverCannotUseLocal } from "../routerBridge";
 import { callOpenRouterText, streamOpenRouterJSON } from "../../../utils/llm";
 import { requestCompleter } from "../browserHandoff";
 import { CircuitBreaker, MemoryBreakerStore } from "../../../../src/platform/router/circuitBreaker";
@@ -157,5 +157,17 @@ describe("existing AI steps through the router", () => {
     const out = await requestCompleter(req)({ taskClass: "drafting", userPrompt: "p", onToken: (t) => tokens.push(t) });
     expect(out.text).toBe("ok from good-1");
     expect(tokens.join("")).toContain("ok from good-1");
+  });
+});
+
+describe("a local model after failed cloud connections", () => {
+  it("reports the cloud failure instead of only saying the server cannot reach the computer", () => {
+    const err = serverCannotUseLocal("gpt failed: Key was rejected");
+    expect(err).toBeInstanceOf(RouterExhaustedError);
+    expect(err.message).toContain("Key was rejected");
+  });
+  it("keeps the local-only message when there was no cloud connection to try", () => {
+    expect(serverCannotUseLocal("").name).toBe("LocalModelUnreachableError");
+    expect(cloudFailureReason({}, "Runs on your device")).toBe("");
   });
 });

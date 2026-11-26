@@ -20,7 +20,7 @@
  */
 import { createHash } from "node:crypto";
 import express from "express";
-import { aiAvailability } from "../../../src/services/scholarBrain.ts";
+import { aiAvailability, cloudFailureReason, serverCannotUseLocal } from "../../../src/services/scholarBrain.ts";
 import { AI_PROVIDER_REQUIRED_MESSAGE, LOCAL_MODEL_UNREACHABLE_MESSAGE, LocalModelUnreachableError, NoClientAiProviderError, UnusableAiResponseError } from "../../../src/ai/aiRouteErrors.ts";
 import { openSse } from "../../../src/utils/sse.ts";
 import { cleanAnswerString, extractStandardizedInstructions } from "../../../../src/desk/assignment/types.ts";
@@ -75,7 +75,8 @@ router.post("/build", async (req: Req, res: express.Response) => {
   // The build runs on the server's AI connections: say so now, while a status can still be sent.
   const where = await aiAvailability(req, "reasoning");
   if (where === "none") return res.status(400).json({ error: AI_PROVIDER_REQUIRED_MESSAGE, code: "ai_provider_required" });
-  if (where === "browser") return res.status(400).json({ error: LOCAL_MODEL_UNREACHABLE_MESSAGE, code: "ai_local_model_unreachable" });
+  // A cloud connection that was skipped (dead key, unlisted models) is the real reason, so name it.
+  if (where === "browser") return res.status(400).json({ error: cloudFailureReason(req) ? serverCannotUseLocal(cloudFailureReason(req)).message : LOCAL_MODEL_UNREACHABLE_MESSAGE, code: "ai_local_model_unreachable" });
 
   const hash = buildHash(a);
   const previous = safeParseObject<BuildState>(a["assignment_build"]);

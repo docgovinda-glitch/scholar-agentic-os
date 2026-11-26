@@ -84,7 +84,7 @@ describe("Unified Assignment Brief & 2-Step Outline Review Progression", () => {
     fireEvent.change(toneSelect, { target: { value: "persuasive" } });
 
     // Primary action button: Save & Build Outline
-    const buildOutlineBtn = screen.getByRole("button", { name: /Save & Build Outline/i });
+    const buildOutlineBtn = screen.getByRole("button", { name: /Save & Build/i });
     expect(buildOutlineBtn).toBeInTheDocument();
     expect(buildOutlineBtn).not.toBeDisabled();
 
@@ -112,7 +112,7 @@ describe("Unified Assignment Brief & 2-Step Outline Review Progression", () => {
     expect(regenBtns.length).toBeGreaterThan(0);
 
     // Check Phase Completion Gate button exists
-    const approveBtn = screen.getByRole("button", { name: /Approve Outline & Proceed/i });
+    const approveBtn = screen.getByRole("button", { name: /Approve outline & continue to Sources/i });
     expect(approveBtn).toBeInTheDocument();
     expect(approveBtn).not.toBeDisabled();
 
@@ -159,7 +159,7 @@ describe("Unified Assignment Brief & 2-Step Outline Review Progression", () => {
     render(<AssignmentWorkspace projectId="proj-edit-toggle" initialStage="understand" />);
 
     // Generate outline
-    const buildBtn = await screen.findByRole("button", { name: /Save & Build Outline/i });
+    const buildBtn = await screen.findByRole("button", { name: /Save & Build/i });
     fireEvent.click(buildBtn);
 
     await waitFor(() => {
@@ -174,11 +174,11 @@ describe("Unified Assignment Brief & 2-Step Outline Review Progression", () => {
     expect(screen.getByPlaceholderText(/Paste your assignment prompt, essay title, or question here/i)).toBeInTheDocument();
 
     // Return to outline review
-    const rebuildBtn = screen.getByRole("button", { name: /Save & Build Outline/i });
+    const rebuildBtn = screen.getByRole("button", { name: /Save & Build/i });
     fireEvent.click(rebuildBtn);
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /Approve Outline & Proceed/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Approve outline & continue to Sources|^Proceed to Sources$/i })).toBeInTheDocument();
     });
   });
 });

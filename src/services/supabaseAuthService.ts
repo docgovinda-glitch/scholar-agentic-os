@@ -923,7 +923,7 @@ export interface RequestProfileUpdateResult extends ServiceResult {
 }
 
 export const PROFILE_UPDATE_DISABLED_USER_MESSAGE =
-  "Email and username change requests requiring administrator verification are temporarily unavailable during a security upgrade (TICKET-SEC-01). You can still update your Full Name, Phone Number, and Institution directly in Account Settings.";
+  "Email and username change requests requiring administrator verification are temporarily unavailable during a security upgrade. You can still update your Full Name, Phone Number, and Institution directly in Account Settings.";
 
 /**
  * Invokes the `request-profile-update` Edge Function.

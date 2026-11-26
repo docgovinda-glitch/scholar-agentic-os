@@ -540,7 +540,49 @@ export function layoutForceDirectedGraph(
     }
   }
 
+  separateLabels(positioned, width, height);
   return positioned;
+}
+
+/** Space a node needs so its circle and "Surname (Year)" label never sit on a neighbour's. */
+const LABEL_WIDTH = 112;
+const LABEL_HEIGHT = 72;
+
+/** Pushes overlapping boxes apart, growing past the canvas (which pans and zooms) when there are many nodes. */
+function separateLabels(nodes: CitationGraphNode[], width: number, height: number): void {
+  for (let pass = 0; pass < 200; pass++) {
+    let moved = false;
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i];
+        const b = nodes[j];
+        const dx = (b.x ?? 0) - (a.x ?? 0);
+        const dy = (b.y ?? 0) - (a.y ?? 0);
+        const overlapX = LABEL_WIDTH - Math.abs(dx);
+        const overlapY = LABEL_HEIGHT - Math.abs(dy);
+        if (overlapX <= 0 || overlapY <= 0) continue;
+        moved = true;
+        // Separate along the cheaper axis; identical points part by their order.
+        if (overlapX / LABEL_WIDTH < overlapY / LABEL_HEIGHT) {
+          const push = (overlapX / 2 + 0.5) * (dx === 0 ? 1 : Math.sign(dx));
+          a.x = (a.x ?? 0) - push;
+          b.x = (b.x ?? 0) + push;
+        } else {
+          const push = (overlapY / 2 + 0.5) * (dy === 0 ? 1 : Math.sign(dy));
+          a.y = (a.y ?? 0) - push;
+          b.y = (b.y ?? 0) + push;
+        }
+      }
+    }
+    // Keep to the canvas while there is room for everyone.
+    if (nodes.length * LABEL_WIDTH * LABEL_HEIGHT < width * height * 0.5) {
+      for (const n of nodes) {
+        n.x = Math.max(60, Math.min(width - 60, n.x ?? width / 2));
+        n.y = Math.max(40, Math.min(height - 50, n.y ?? height / 2));
+      }
+    }
+    if (!moved) return;
+  }
 }
 
 /**

@@ -153,7 +153,7 @@ describe("phone home: Ask Scholar first", () => {
     it("keeps the header uncluttered: theme switch, no duplicate Ask button", () => {
       renderHome();
       expect(screen.getByRole("button", { name: /Switch to (light|dark) mode/ })).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /Toggle Scholar Core AI Assistant/i })).toBeNull();
+      expect(screen.queryByRole("button", { name: /Ask Scholar panel/i })).toBeNull();
     });
 
   });
@@ -253,5 +253,44 @@ describe("phone home: Ask Scholar first", () => {
       fireEvent.click(resume);
       expect(await screen.findByRole("button", { name: "Back" })).toBeInTheDocument();
     });
+  });
+});
+
+describe("phone Projects tab", () => {
+  afterEach(() => {
+    cleanup();
+    vi.mocked(api.listProjects).mockResolvedValue({ items: [] } as never);
+  });
+
+  const at = (url: string, onOpen = vi.fn()) =>
+    render(
+      <MemoryRouter initialEntries={[url]}>
+        <ProjectListScreen onOpen={onOpen} userEmail="researcher@university.edu" />
+      </MemoryRouter>
+    );
+  const tab = (name: string) => within(screen.getByRole("navigation", { name: "Main" })).getByRole("button", { name });
+
+  it("shows the list at /projects with that tab highlighted, and Ask switches to the Ask home", async () => {
+    vi.mocked(api.listProjects).mockResolvedValue({
+      items: [{ projectId: "p1", outputTypeId: "OT-01", title: "Climate essay", answers: {}, authors: [], intakeCompleteness: 0.4, hasDocument: false, hasJournalRequirements: false, gates: [] }],
+    } as never);
+    const onOpen = vi.fn();
+    at("/projects", onOpen);
+    expect(tab("Projects")).toHaveAttribute("aria-current", "page");
+    expect(tab("Ask Scholar")).not.toHaveAttribute("aria-current");
+    fireEvent.click(await within(screen.getByTestId("phone-projects")).findByRole("button", { name: /Climate essay/ }));
+    expect(onOpen).toHaveBeenCalledWith("p1");
+    fireEvent.click(tab("Ask Scholar"));
+    expect(screen.queryByTestId("phone-projects")).toBeNull();
+    expect(screen.getByRole("region", { name: "Ask Scholar" })).toBeInTheDocument();
+    expect(tab("Ask Scholar")).toHaveAttribute("aria-current", "page");
+    fireEvent.click(tab("Projects"));
+    expect(screen.getByTestId("phone-projects")).toBeInTheDocument();
+  });
+
+  it("opens the Ask home directly from its own address", () => {
+    at("/projects?tab=ask");
+    expect(screen.getByRole("region", { name: "Ask Scholar" })).toBeInTheDocument();
+    expect(tab("Ask Scholar")).toHaveAttribute("aria-current", "page");
   });
 });

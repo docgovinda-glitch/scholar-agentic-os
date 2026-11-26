@@ -129,7 +129,7 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
 
             {/* Academic Credibility Badge */}
             {source.isVerifiedAcademic && (
-              <span className="px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+              <span className="px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
                 <ShieldCheck className="w-2.5 h-2.5" />
                 <span>ACADEMIC</span>
               </span>
@@ -157,7 +157,7 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
 
             {/* In Assignment Status Badge */}
             {isApproved && (
-              <span className="px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+              <span className="px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-800 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
                 <Check className="w-2.5 h-2.5" />
                 <span>IN ASSIGNMENT</span>
               </span>

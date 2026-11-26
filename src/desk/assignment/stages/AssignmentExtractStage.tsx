@@ -158,7 +158,13 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
   const appliedScopeRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     const patch: Record<string, unknown> = {};
+    // Reopening a brief that is already saved must not rewrite settings: only a setting with no saved value is
+    // filled then. A brief being typed or pasted fills them as before.
+    const saved = (project?.answers ?? {}) as Record<string, unknown>;
+    const reopened = cleanAnswerString(saved["assignment_brief"]).trim() === scopeText.trim();
     const once = (key: string) => {
+      const answerKey = { level: "academic_level", type: "assignment_type", style: "citation_style", words: "word_limit", discipline: "assignment_discipline" }[key.split(":")[0]];
+      if (reopened && answerKey && saved[answerKey]) return false;
       if (appliedScopeRef.current.has(key)) return false;
       appliedScopeRef.current.add(key);
       return true;
@@ -170,8 +176,11 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
     if (scope.assignmentType && scope.assignmentType !== localType && once(`type:${scope.assignmentType}`)) {
       const tone = resolveMappedTone(scope.assignmentType as AssignmentType);
       setLocalType(scope.assignmentType as AssignmentType);
-      setLocalTone(tone);
-      Object.assign(patch, { assignment_type: scope.assignmentType, assignmentType: scope.assignmentType, writing_tone: tone, writingTone: tone });
+      Object.assign(patch, { assignment_type: scope.assignmentType, assignmentType: scope.assignmentType });
+      if (!(reopened && saved["writing_tone"])) {
+        setLocalTone(tone);
+        Object.assign(patch, { writing_tone: tone, writingTone: tone });
+      }
     }
     if (scope.citationStyle && scope.citationStyle !== localCitation && once(`style:${scope.citationStyle}`)) {
       setLocalCitation(scope.citationStyle);
@@ -184,7 +193,9 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
     if (scope.discipline && !localDiscipline && once(`discipline:${scope.discipline}`)) {
       Object.assign(patch, { assignment_discipline: scope.discipline });
     }
-    if (Object.keys(patch).length) saveAnswers(patch);
+    if (scope.discipline && patch.assignment_discipline) setLocalDiscipline(scope.discipline);
+    // Looking at a brief that is already saved fills the form but writes nothing: Save & Build saves every setting.
+    if (!reopened && Object.keys(patch).length) saveAnswers(patch);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- react to what the brief says
   }, [scope]);
 
@@ -216,7 +227,8 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
     const curType = assignmentType || localType || "essay";
     const rawTone = project?.answers?.["writing_tone"] || writingTone || localTone;
     const toneStr = (tonePresetOf(rawTone) || "").toLowerCase();
-    if (curType === "essay" && (toneStr === "analytical" || !toneStr || toneStr === "default")) {
+    // Only an unset tone is given the essay default; a saved choice is the student's.
+    if (!project?.answers?.["writing_tone"] && curType === "essay" && (toneStr === "analytical" || !toneStr || toneStr === "default")) {
       const targetTone = resolveMappedTone("essay");
       setLocalTone(targetTone);
       saveAnswers({
@@ -320,6 +332,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
         word_limit: localWordCount,
         citation_style: localCitation,
         writing_tone: localTone,
+        ...(localDiscipline ? { assignment_discipline: localDiscipline } : {}),
       };
       const parsedCriteria = parseRubricCriteria(markingRubricText);
       if (parsedCriteria.length > 0) updates.rubric_criteria = parsedCriteria;
@@ -513,7 +526,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                 </span>
               )}
               {uploadedFileName && (
-                <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1.5 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+                <span className="text-xs text-emerald-800 dark:text-emerald-400 font-medium flex items-center gap-1.5 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
                   <FileText className="w-3.5 h-3.5" />
                   <span>{uploadedFileName}</span>
                 </span>
@@ -976,7 +989,6 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
             id="save_and_build_outline_btn"
             disabled={!canGenerate || isGeneratingStructure || uploadingBrief}
             onClick={handleGenerateStructure}
-            aria-label="Save & Build Outline (Save & Build / Generate Structure / Analyze Assignment Brief)"
             className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 active:scale-[0.99] font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-xs flex items-center justify-center gap-2 cursor-pointer"
           >
             {isGeneratingStructure ? (
@@ -995,9 +1007,10 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
           {/* Companion proceed button for backward-compatibility with tests expecting Proceed to Sources */}
           <button
             type="button"
+            // Reached only by name in tests: never a stop for the keyboard, since nobody can see it.
+            tabIndex={-1}
             disabled={!canGenerate || isGeneratingStructure || uploadingBrief}
             onClick={handleGenerateStructure}
-            aria-label="Proceed to Sources (Confirm Structure & Proceed to Sources / Approve Outline & Proceed)"
             className="sr-only"
           >
             Proceed to Sources

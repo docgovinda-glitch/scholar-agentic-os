@@ -15,7 +15,11 @@ export const DEFAULT_SCHOLAR_FILTERS: ScholarFilters = { yearPreset: "any", scop
 
 export function yearRangeOf(f: ScholarFilters): { from?: number; to?: number } {
   if (f.yearPreset === "2020-2026") return { from: 2020, to: 2026 };
-  if (f.yearPreset === "custom") return { from: f.yearFrom, to: f.yearTo };
+  if (f.yearPreset === "custom") {
+    // An inverted range means the two years were swapped, not that nothing was wanted.
+    const inverted = f.yearFrom !== undefined && f.yearTo !== undefined && f.yearFrom > f.yearTo;
+    return inverted ? { from: f.yearTo, to: f.yearFrom } : { from: f.yearFrom, to: f.yearTo };
+  }
   return {};
 }
 

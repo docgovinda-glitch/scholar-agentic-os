@@ -86,13 +86,16 @@ export default function AssignmentStageNavigation({
   };
 
   return (
+    // Container queries: the stepper and the word meter share a row only when both fit whole, so
+    // neither end of the stepper is ever cut off.
     <nav
-      className={`w-full bg-[color:var(--surface-raised)] border-b border-[color:var(--border-subtle)] px-3 pt-1 pb-2.5 sm:px-6 flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-4 gap-y-2 shrink-0 transition-colors z-10 ${className}`}
+      className={`@container w-full bg-[color:var(--surface-raised)] border-b border-[color:var(--border-subtle)] shrink-0 transition-colors z-10 ${className}`}
       aria-label="Assignment Workflow Phases"
     >
+     <div className="flex flex-wrap @min-[72rem]:flex-nowrap items-center justify-between gap-x-4 gap-y-2 px-3 sm:px-6 pt-1 pb-2.5">
       {/* Horizontal Progress Stepper. Below 640px it takes the whole row and the other
           stages shrink to their number, so all five fit on a phone without hidden scrolling. */}
-      <div className="flex w-full sm:w-auto items-center justify-between sm:justify-start gap-1 sm:gap-2 overflow-x-auto no-scrollbar py-0.5 min-w-0">
+      <div className="flex w-full @min-[72rem]:w-auto items-center justify-between @min-[48rem]:justify-center @min-[72rem]:justify-start gap-1 @min-[56rem]:gap-2 overflow-x-auto no-scrollbar py-0.5 min-w-0">
         {visiblePhases.map((phase, idx) => {
           const isActive = currentPhase === phase.id;
           const status = phaseStatuses?.[phase.id] || (isActive ? "active" : "upcoming");
@@ -104,7 +107,7 @@ export default function AssignmentStageNavigation({
             <React.Fragment key={phase.id}>
               {idx > 0 && (
                 <div
-                  className="hidden sm:flex items-center text-neutral-300 dark:text-neutral-600 px-0.5 select-none"
+                  className="hidden @min-[48rem]:flex items-center text-neutral-300 dark:text-neutral-600 px-0.5 select-none"
                   aria-hidden="true"
                 >
                   <ChevronRight className="w-3.5 h-3.5" />
@@ -118,11 +121,10 @@ export default function AssignmentStageNavigation({
                   onSelectPhase?.(phase.id);
                   onSelectStage?.();
                 }}
-                aria-label={`Phase ${phase.number}: ${phase.shortLabel}`}
                 title={fact ? `${phase.shortLabel}: ${fact}` : phase.shortLabel}
                 ref={isActive ? activeStepRef : undefined}
                 aria-current={isActive ? "step" : undefined}
-                className={`group flex items-center ${isActive ? "gap-2 px-3" : "gap-1 px-1.5 sm:gap-2 sm:px-3"} py-1.5 rounded-full text-xs font-medium transition-all shrink-0 cursor-pointer ${
+                className={`group flex items-center ${isActive ? "gap-2 px-3" : "gap-1 px-1.5 @min-[48rem]:gap-1.5 @min-[48rem]:px-2 @min-[56rem]:px-3"} py-1.5 rounded-full text-xs font-medium transition-all shrink-0 cursor-pointer ${
                   isActive
                     ? "bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] shadow-xs font-semibold"
                     : isCompleted
@@ -136,25 +138,28 @@ export default function AssignmentStageNavigation({
                     isActive
                       ? "bg-white/20 text-white dark:bg-black/10 dark:text-neutral-900 font-bold"
                       : isCompleted
-                      ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold"
+                      ? "bg-emerald-500/15 text-emerald-800 dark:text-emerald-400 font-bold"
                       : "bg-[color:var(--surface-sunken)]/70 text-[color:var(--text-muted)]"
                   }`}
                 >
                   <span>{formattedNumber}</span>
-                </div>
+                </div>{" "}
 
                 {/* Phase Icon */}
-                <span className={isActive ? "text-white" : "hidden sm:inline text-[color:var(--text-muted)] group-hover:text-current"}>
+                <span className={isActive ? "text-white" : "hidden @min-[56rem]:inline text-[color:var(--text-muted)] group-hover:text-current"}>
                   {renderIcon(phase.iconKey, isActive)}
                 </span>
 
                 {/* Title & Percentage */}
-                <div className={`${isActive ? "flex" : "hidden sm:flex"} items-center gap-1.5 truncate max-w-[130px] sm:max-w-none`}>
-                  <span className="truncate">{phase.shortLabel}</span>
+                <div className={`${isActive ? "flex" : "hidden @min-[48rem]:flex"} items-center gap-1.5 whitespace-nowrap`}>
+                  <span>{phase.shortLabel}</span>
                   {isCompleted && <Check className="w-3 h-3 stroke-[2.5] shrink-0" aria-label="done" />}
                   {/* The current stage shows its fact; the others keep it in their tooltip, so the bar fits. */}
-                  {fact && isActive && <span className="hidden md:inline text-xs tabular-nums opacity-90">{fact}</span>}
+                  {fact && isActive && <span className="hidden @min-[64rem]:inline text-xs tabular-nums opacity-90">{fact}</span>}
                 </div>
+
+                {/* The name is what is on screen, plus the phase said in words. */}
+                <span className="sr-only">{` (Phase ${phase.number}: ${phase.shortLabel})`}</span>
 
                 {/* Active Pulse Dot */}
                 {isActive && (
@@ -167,7 +172,7 @@ export default function AssignmentStageNavigation({
       </div>
 
       {/* Right-Aligned Live Word Budget Progress Indicator */}
-      <div className="flex w-full sm:w-auto items-center justify-between sm:justify-start gap-3 shrink-0 sm:ml-auto sm:pl-2 sm:border-l border-[color:var(--border-subtle)]">
+      <div className="flex w-full @min-[72rem]:w-auto items-center justify-between @min-[48rem]:justify-center gap-3 shrink-0 @min-[72rem]:ml-auto @min-[72rem]:pl-2 @min-[72rem]:border-l border-[color:var(--border-subtle)]">
         <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2.5 text-right sm:text-left">
           <div className="flex items-center gap-1.5 text-xs tabular-nums">
             <span className="font-semibold text-[color:var(--text-primary)]">
@@ -199,13 +204,14 @@ export default function AssignmentStageNavigation({
             isOverLimit
               ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
               : isOptimal
-              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+              ? "bg-emerald-500/10 text-emerald-800 dark:text-emerald-400"
               : "bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]"
           }`}
         >
           {wordCountPercentage}%
         </span>
       </div>
+     </div>
     </nav>
   );
 }

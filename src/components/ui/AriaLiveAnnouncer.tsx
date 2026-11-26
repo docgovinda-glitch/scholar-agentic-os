@@ -18,6 +18,11 @@ export function announcePolite(message: string): void {
   });
 }
 
+/** Empties the live region, so a message about the page just left is not read (or left) on the next one. */
+export function clearAnnouncements(): void {
+  listeners.forEach((listener) => listener(""));
+}
+
 /**
  * Screen Reader Accessible Live Announcer Component.
  * Mounts a visually-hidden live region that notifies assistive technologies
@@ -34,6 +39,7 @@ export function AriaLiveAnnouncer(): React.ReactElement {
       // Clear briefly so identical consecutive messages still trigger screen reader updates
       setAnnouncement("");
       if (timer) clearTimeout(timer);
+      if (!msg) return;
       timer = setTimeout(() => {
         timer = undefined;
         setAnnouncement(msg);

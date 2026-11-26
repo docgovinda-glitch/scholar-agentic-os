@@ -117,7 +117,7 @@ export function QuickStart({ onOpen }: { onOpen: (id: string) => void }) {
                   {i === 0 ? "Recommended: " : ""}
                   {name}
                 </span>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/60 shrink-0">{q.badge}</span>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/60 shrink-0">{q.badge}</span>
               </div>
               <p className="text-xs text-slate-500 dark:text-neutral-400 flex-1">{description}</p>
               <p className="text-[11px] text-slate-500 dark:text-neutral-400">{q.time}</p>

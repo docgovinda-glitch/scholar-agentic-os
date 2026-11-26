@@ -8,6 +8,7 @@
  * dropped a partial answer), `fullText` (the final, cleaned text), `fallback`,
  * `error`; then `[DONE]`.
  */
+import { truncateAtWord } from "../../../src/shared/truncateAtWord.ts";
 import {
   AI_PROVIDER_REQUIRED_MESSAGE,
   BrowserAiRequiredError,
@@ -46,7 +47,7 @@ export function scaffoldReason(err: unknown): string {
   const plain = "No AI provider could answer right now.";
   if (err instanceof Error && err.name === "RouterExhaustedError" && err.message.trim()) {
     const text = err.message.trim().replace(/\s+/g, " ");
-    return text.length > 400 ? `${text.slice(0, 397)}...` : text;
+    return truncateAtWord(text, 399);
   }
   return plain;
 }

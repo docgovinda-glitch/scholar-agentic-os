@@ -166,19 +166,18 @@ function ThemeCard({
       data-testid={testId}
       onClick={onSelect}
       aria-pressed={selected}
-      aria-label={`${theme.name} theme`}
       className={`group text-left rounded-2xl p-2 cursor-pointer transition-all ${
         selected
           ? 'bg-white dark:bg-[#212121] ring-2 ring-neutral-900 dark:ring-neutral-100'
           : 'bg-white/60 dark:bg-white/[0.03] ring-1 ring-neutral-900/[0.07] dark:ring-white/[0.07] hover:ring-neutral-900/20 dark:hover:ring-white/20 hover:bg-white dark:hover:bg-[#212121]'
       }`}
     >
-      <div className="rounded-xl overflow-hidden pointer-events-none">
+      <div aria-hidden="true" className="rounded-xl overflow-hidden pointer-events-none">
         <GammaSlide slide={cover} index={0} theme={theme} rounded={false} />
       </div>
       <div className="flex items-start justify-between gap-3 px-1.5 pt-3 pb-1.5">
         <div className="min-w-0">
-          <div className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{theme.name}</div>
+          <div className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{theme.name}<span className="sr-only"> theme</span></div>
           <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 line-clamp-2">{theme.description}</p>
         </div>
         <div className="flex items-center gap-1 shrink-0 pt-0.5" aria-hidden>
@@ -365,7 +364,7 @@ export default function Step02Design({ deck, onUpdateDeck, onPrevStep, onNextSte
                 <h2 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Your deck in {deckTheme.name}</h2>
                 <span className="text-xs text-neutral-500">{deck.slides.length} cards</span>
               </div>
-              <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 snap-x">
+              <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 snap-x" role="group" tabIndex={0} aria-label="Slide previews">
                 {deck.slides.map((s, i) => (
                   <div key={s.id} className="w-[260px] shrink-0 snap-start">
                     <GammaSlide slide={s} index={i} theme={deckTheme} />

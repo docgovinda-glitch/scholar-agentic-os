@@ -350,7 +350,7 @@ describe("dual-pane AI agent interface & navigation sidebar", () => {
     expect(container.querySelector(".fixed.inset-0.z-40.bg-black\\/40")).not.toBeInTheDocument();
   });
 
-  it("applies flex-shrink-0 to aside, scholar-scrollbar to main, and supports toggle from top-left main header", async () => {
+  it("applies flex-shrink-0 to aside, scholar-scrollbar to main, and keeps one collapse control and reopens from the main header", async () => {
     listProjects.mockResolvedValue({ items: [] });
     const { container } = renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
 
@@ -363,12 +363,12 @@ describe("dual-pane AI agent interface & navigation sidebar", () => {
     expect(main).toHaveClass("scholar-scrollbar");
     expect(main).toHaveClass("overflow-hidden");
 
-    // Click toggle button in the top-left of the main header to collapse
-    const toggleBtn = screen.getByRole("button", { name: "Toggle sidebar" });
-    fireEvent.click(toggleBtn);
+    // While the sidebar is open its own « button is the only toggle: the header adds no second one.
+    expect(screen.queryByRole("button", { name: "Toggle sidebar" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Expand sidebar" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Collapse sidebar" }));
     expect(aside).toHaveClass("w-0");
 
-    // Toggle button now has Expand sidebar label; click to expand
     const expandBtn = screen.getByRole("button", { name: "Expand sidebar" });
     fireEvent.click(expandBtn);
     expect(aside).toHaveClass("w-[260px]");
@@ -711,7 +711,7 @@ describe("minimal website assistant", () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
-    const toggleBtn = screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i });
+    const toggleBtn = screen.getByRole("button", { name: /Ask Scholar panel/i });
     fireEvent.click(toggleBtn);
 
     // Assistant container exists in the slide-in sidebar with clean header and single one-liner above the 4 cards
@@ -755,7 +755,7 @@ describe("minimal website assistant", () => {
 
     renderScreen(<ProjectListScreen onOpen={onOpen} userEmail="scholar@research.edu" />);
 
-    const toggleBtn = screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i });
+    const toggleBtn = screen.getByRole("button", { name: /Ask Scholar panel/i });
     fireEvent.click(toggleBtn);
 
     const input = screen.getByPlaceholderText(/Ask a research question/i);
@@ -783,7 +783,7 @@ describe("minimal website assistant", () => {
     executeAgenticLLM.mockResolvedValueOnce("A browser-side answer about essay structure.");
 
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
-    fireEvent.click(screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Ask Scholar panel/i }));
     fireEvent.change(screen.getByPlaceholderText(/Ask a research question/i), { target: { value: "write an essay on biology" } });
     fireEvent.click(screen.getByRole("button", { name: "Send question" }));
 
@@ -797,7 +797,7 @@ describe("minimal website assistant", () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
-    const toggleBtn = screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i });
+    const toggleBtn = screen.getByRole("button", { name: /Ask Scholar panel/i });
     fireEvent.click(toggleBtn);
 
     const input = screen.getByPlaceholderText(/Ask a research question/i);
@@ -810,7 +810,7 @@ describe("minimal website assistant", () => {
 
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
-    const toggleBtn = screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i });
+    const toggleBtn = screen.getByRole("button", { name: /Ask Scholar panel/i });
     fireEvent.click(toggleBtn);
 
     const input = screen.getByPlaceholderText(/Ask a research question/i);
@@ -829,7 +829,7 @@ describe("minimal website assistant", () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
 
-    const toggleBtn = screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i });
+    const toggleBtn = screen.getByRole("button", { name: /Ask Scholar panel/i });
     fireEvent.click(toggleBtn);
 
     const input = screen.getByPlaceholderText(/Ask a research question/i);
@@ -848,7 +848,7 @@ describe("minimal website assistant", () => {
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
     // 1. Initially closed: toggle button is visible in top navigation and has title="Ask Scholar" tooltip
-    const toggleBtn = screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i });
+    const toggleBtn = screen.getByRole("button", { name: /Ask Scholar panel/i });
     expect(toggleBtn).toBeInTheDocument();
     expect(toggleBtn).toHaveAttribute("title", "Ask Scholar");
 
@@ -857,12 +857,12 @@ describe("minimal website assistant", () => {
     expect(await screen.findByRole("heading", { name: "Ask Scholar" })).toBeInTheDocument();
 
     // 3. Conditional rendering: toggle button completely disappears from top navigation
-    expect(screen.queryByRole("button", { name: /Toggle Scholar Core AI Assistant/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Ask Scholar panel/i })).not.toBeInTheDocument();
 
     // 4. Close assistant: toggle button reappears in top navigation
     const closeBtn = screen.getByRole("button", { name: "Close Assistant" });
     fireEvent.click(closeBtn);
-    expect(screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Ask Scholar panel/i })).toBeInTheDocument();
   });
 
   it("toggles the Ask Scholar assistant sidebar both open and closed on click from left sidebar navigation", async () => {
@@ -1215,7 +1215,7 @@ describe("prompt isolation & rich markdown rendering", () => {
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
     // Open the sidebar
-    const toggleBtn = screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i });
+    const toggleBtn = screen.getByRole("button", { name: /Ask Scholar panel/i });
     fireEvent.click(toggleBtn);
 
     const mainTextarea = screen.getByPlaceholderText(/Ask a question, paste your brief, or drop files/i) as HTMLTextAreaElement;

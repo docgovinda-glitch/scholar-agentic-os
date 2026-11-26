@@ -547,7 +547,7 @@ export default function RefereeRebuttalMode() {
                         <span
                           className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
                             isResolved
-                              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
+                              ? "bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border border-emerald-500/30"
                               : "bg-[color:var(--surface-sunken)] text-[color:var(--text-secondary)] border border-[color:var(--border-control)]"
                           }`}
                         >

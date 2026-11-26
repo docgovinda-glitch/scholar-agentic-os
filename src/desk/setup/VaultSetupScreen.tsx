@@ -364,8 +364,8 @@ function SecondaryButton({ onClick, children }: { onClick: () => void; children:
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-[color:var(--surface-canvas)] px-4 py-10">
+    <main className="min-h-screen bg-[color:var(--surface-canvas)] px-4 py-10">
       <div className="mx-auto w-full max-w-lg">{children}</div>
-    </div>
+    </main>
   );
 }
