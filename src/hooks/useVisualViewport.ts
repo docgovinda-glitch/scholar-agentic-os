@@ -5,7 +5,7 @@
  * layout viewport (`100dvh` stays the same), so a composer pinned to the bottom
  * of a `100dvh` container ends up hidden behind the keyboard. Reading
  * `window.visualViewport` lets the caller size the container to what is visible
- * and hide chrome (e.g. the bottom nav) while the keyboard is open.
+ * while the keyboard is open.
  *
  * Only active when `enabled`; otherwise returns `{ height: null, keyboardOpen: false }`
  * and attaches no listeners.

@@ -23,58 +23,64 @@ const chip = (on: boolean) =>
       : "border-neutral-200 text-neutral-600 hover:bg-neutral-100 dark:border-white/10 dark:text-neutral-300 dark:hover:bg-white/10"
   }`;
 
-/** Quick Scholar | Deep Research toggle and compact scholarly filters, shown above the prompt box controls. */
-export function ScholarFilterBar({ mode, onModeChange, filters, onFiltersChange }: ScholarFilterBarProps) {
+/** How many filters are on (a year range counts once, each source scope once). */
+export function activeFilterCount(filters: ScholarFilters): number {
+  return (filters.yearPreset !== "any" ? 1 : 0) + filters.scopes.length;
+}
+
+/**
+ * The one answer-mode choice: Quick Scholar | Deep Research. `compact` (phones) shows the first word of each;
+ * the full name stays the button's accessible name.
+ */
+export function AnswerModeToggle({
+  mode,
+  onModeChange,
+  compact = false,
+}: {
+  mode: PromptMode;
+  onModeChange: (mode: PromptMode) => void;
+  compact?: boolean;
+}) {
   const deep = mode === "deep_research";
+  return (
+    <div role="group" aria-label="Answer mode" className="flex shrink-0 rounded-full border border-neutral-200 p-0.5 dark:border-white/10">
+      {([
+        ["auto", "Quick Scholar", "Quick"],
+        ["deep_research", "Deep Research", "Deep"],
+      ] as const).map(([id, label, short]) => {
+        const active = id === "deep_research" ? deep : !deep;
+        return (
+          <button
+            key={id}
+            type="button"
+            aria-pressed={active}
+            aria-label={compact ? label : undefined}
+            title={compact ? label : undefined}
+            onClick={() => onModeChange(id)}
+            className={`cursor-pointer rounded-full font-semibold transition-colors ${compact ? "min-h-9 px-3 text-xs" : "px-2.5 py-1 text-[11px]"} ${
+              active ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900" : "text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-white"
+            }`}
+          >
+            {compact ? short : label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Year range and source scope chips, with Clear. Inline from 640px; on a phone they sit behind a toggle. */
+export function ScholarFilterOptions({ filters, onFiltersChange }: { filters: ScholarFilters; onFiltersChange: (filters: ScholarFilters) => void }) {
   const inverted = filters.yearFrom !== undefined && filters.yearTo !== undefined && filters.yearFrom > filters.yearTo;
   // Checked when the person leaves a year box, not while they are still typing it.
   const [yearsChecked, setYearsChecked] = useState(false);
   const [customOpen, setCustomOpen] = useState(filters.yearPreset === "custom");
   const set = (patch: Partial<ScholarFilters>) => onFiltersChange({ ...filters, ...patch });
-  // On phones the six filter chips would wrap over several rows; they sit behind one
-  // "Filters" toggle there (and stay inline from 640px up).
-  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-  const activeFilterCount = (filters.yearPreset !== "any" ? 1 : 0) + filters.scopes.length;
   const toggleScope = (id: SourceScope) =>
     set({ scopes: filters.scopes.includes(id) ? filters.scopes.filter((s) => s !== id) : [...filters.scopes, id] });
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5" data-testid="scholar-filter-bar">
-      <div role="group" aria-label="Answer mode" className="flex rounded-full border border-neutral-200 p-0.5 dark:border-white/10">
-        {([
-          ["auto", "Quick Scholar"],
-          ["deep_research", "Deep Research"],
-        ] as const).map(([id, label]) => {
-          const active = id === "deep_research" ? deep : !deep;
-          return (
-            <button
-              key={id}
-              type="button"
-              aria-pressed={active}
-              onClick={() => onModeChange(id)}
-              className={`cursor-pointer rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-                active ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900" : "text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-white"
-              }`}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
-
-      <button
-        type="button"
-        data-testid="scholar-filters-toggle"
-        aria-expanded={mobileFiltersOpen}
-        aria-controls="scholar-filter-options"
-        onClick={() => setMobileFiltersOpen((v) => !v)}
-        className={`${chip(mobileFiltersOpen || activeFilterCount > 0)} inline-flex items-center gap-1 sm:hidden`}
-      >
-        <SlidersHorizontal className="h-3 w-3" aria-hidden="true" />
-        Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
-      </button>
-
-      <div id="scholar-filter-options" data-testid="scholar-filter-options" className={`${mobileFiltersOpen ? "flex w-full flex-wrap items-center gap-1.5" : "hidden"} sm:contents`}>
+    <>
       <span className="mx-0.5 hidden h-4 w-px bg-neutral-200 sm:inline-block dark:bg-white/10" aria-hidden="true" />
 
       {(["any", "2020-2026"] as const).map((preset) => (
@@ -115,6 +121,35 @@ export function ScholarFilterBar({ mode, onModeChange, filters, onFiltersChange 
           Clear
         </button>
       )}
+    </>
+  );
+}
+
+/** Quick Scholar | Deep Research toggle and compact scholarly filters, shown above the prompt box controls. */
+export function ScholarFilterBar({ mode, onModeChange, filters, onFiltersChange }: ScholarFilterBarProps) {
+  // On phones the six filter chips would wrap over several rows; they sit behind one
+  // "Filters" toggle there (and stay inline from 640px up).
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const count = activeFilterCount(filters);
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5" data-testid="scholar-filter-bar">
+      <AnswerModeToggle mode={mode} onModeChange={onModeChange} />
+
+      <button
+        type="button"
+        data-testid="scholar-filters-toggle"
+        aria-expanded={mobileFiltersOpen}
+        aria-controls="scholar-filter-options"
+        onClick={() => setMobileFiltersOpen((v) => !v)}
+        className={`${chip(mobileFiltersOpen || count > 0)} inline-flex items-center gap-1 sm:hidden`}
+      >
+        <SlidersHorizontal className="h-3 w-3" aria-hidden="true" />
+        Filters{count > 0 ? ` (${count})` : ""}
+      </button>
+
+      <div id="scholar-filter-options" data-testid="scholar-filter-options" className={`${mobileFiltersOpen ? "flex w-full flex-wrap items-center gap-1.5" : "hidden"} sm:contents`}>
+        <ScholarFilterOptions filters={filters} onFiltersChange={onFiltersChange} />
       </div>
     </div>
   );

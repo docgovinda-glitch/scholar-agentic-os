@@ -76,6 +76,8 @@ const SAMPLE_PROJECT = {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  // The collapsed-sidebar choice is remembered on the device; each test starts without one.
+  localStorage.removeItem("scholar.sidebar.collapsed");
 });
 
 async function openChooser() {
@@ -321,11 +323,14 @@ describe("dual-pane AI agent interface & navigation sidebar", () => {
     const collapseBtn = screen.getByRole("button", { name: "Collapse sidebar" });
     fireEvent.click(collapseBtn);
 
-    // Sidebar has collapsed to w-0
-    expect(aside).toHaveClass("w-0");
+    // The sidebar folds to its 64px icon rail, which keeps the main places one click away
+    expect(aside).toHaveClass("w-16");
+    expect(within(aside!).getByRole("button", { name: "Ask Scholar" })).toBeInTheDocument();
+    expect(within(aside!).getByRole("button", { name: "Knowledge Vault" })).toBeInTheDocument();
+    expect(within(aside!).getByRole("button", { name: "AI Access" })).toBeInTheDocument();
 
-    // Expand button is now visible in main header
-    const expandBtn = screen.getByRole("button", { name: "Expand sidebar" });
+    // The rail has its own Expand button
+    const expandBtn = within(aside!).getByRole("button", { name: "Expand sidebar" });
     expect(expandBtn).toBeInTheDocument();
 
     // Click to re-expand sidebar
@@ -350,7 +355,7 @@ describe("dual-pane AI agent interface & navigation sidebar", () => {
     expect(container.querySelector(".fixed.inset-0.z-40.bg-black\\/40")).not.toBeInTheDocument();
   });
 
-  it("applies flex-shrink-0 to aside, scholar-scrollbar to main, and keeps one collapse control and reopens from the main header", async () => {
+  it("applies flex-shrink-0 to aside, scholar-scrollbar to main, and keeps one collapse control and reopens from the rail", async () => {
     listProjects.mockResolvedValue({ items: [] });
     const { container } = renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
 
@@ -367,11 +372,25 @@ describe("dual-pane AI agent interface & navigation sidebar", () => {
     expect(screen.queryByRole("button", { name: "Toggle sidebar" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Expand sidebar" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Collapse sidebar" }));
-    expect(aside).toHaveClass("w-0");
+    expect(aside).toHaveClass("w-16");
 
-    const expandBtn = screen.getByRole("button", { name: "Expand sidebar" });
+    // One Expand control, in the rail (the header adds none)
+    expect(screen.getAllByRole("button", { name: "Expand sidebar" })).toHaveLength(1);
+    const expandBtn = within(aside!).getByRole("button", { name: "Expand sidebar" });
     fireEvent.click(expandBtn);
     expect(aside).toHaveClass("w-[260px]");
+  });
+
+  it("remembers the collapsed rail on this device", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    const first = renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
+    fireEvent.click(screen.getByRole("button", { name: "Collapse sidebar" }));
+    first.unmount();
+
+    const { container } = renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
+    expect(container.querySelector("aside")).toHaveClass("w-16");
+    fireEvent.click(screen.getByRole("button", { name: "Expand sidebar" }));
+    expect(container.querySelector("aside")).toHaveClass("w-[260px]");
   });
 });
 

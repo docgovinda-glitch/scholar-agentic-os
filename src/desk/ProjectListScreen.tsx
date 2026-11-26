@@ -44,6 +44,7 @@ import { syncActiveSessionToRegistry } from "../services/auth/multiAccountServic
 import type { OutputTypeSummary, ProjectView } from "./types";
 import ScholarCoreLogo from "../components/ScholarCoreLogo";
 import ScholarSidebar, { type ScholarSidebarAction, type ScholarSidebarProject } from "../components/navigation/ScholarSidebar";
+import { readSidebarCollapsed, saveSidebarCollapsed } from "../components/navigation/sidebarPreference";
 import { applyTheme, useTheme } from "../hooks/useTheme";
 import { showAppToast } from "../components/ui/FeedbackSystem";
 import UserAccountMenu from "./components/UserAccountMenu";
@@ -63,19 +64,17 @@ import {
   X,
   Lightbulb,
   Database,
-  Sliders,
   Pencil,
   Trash2,
   FileText,
-  Sun,
-  Moon,
   Paperclip,
   Loader2,
   Sparkles,
   Copy,
-  ChevronDown,
+  ChevronRight,
   Clock,
-  PanelLeftOpen,
+  Menu as MenuIcon,
+  MessageSquare,
 } from "lucide-react";
 import LiteratureDiscoveryWorkspace from "./discovery/LiteratureDiscoveryWorkspace";
 import LiveResearchTrajectoryVisualizer from "./components/LiveResearchTrajectoryVisualizer";
@@ -359,14 +358,19 @@ export default function ProjectListScreen({
   const [welcomeVisible, setWelcomeVisible] = useState(() => showWelcome ?? false);
   const [searchQuery, setSearchQuery] = useState("");
   // Below 1024px the permanent 260px sidebar leaves too little room for the page (tablet portrait), so start collapsed.
-  const [isSidebarOpen, setIsSidebarOpen] = useState(() => typeof window === "undefined" || window.innerWidth >= 1024);
+  // Wide screens: the full panel, or the icon rail when collapsed. The user's last choice wins over the width default.
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    if (typeof window === "undefined") return true;
+    const collapsed = readSidebarCollapsed();
+    return collapsed === null ? window.innerWidth >= 1024 : !collapsed;
+  });
   const [isAiSidebarOpen, setIsAiSidebarOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  // Phones get an Ask-first home: Ask Scholar at the top, compact workspace
-  // tiles below, and a bottom bar for the main places.
+  // Phones get an Ask-first home (Ask Scholar, one-tap workspaces, recent work); the main places
+  // (Ask, Projects, Vault, AI Access) are in the sidebar's icon rail.
   const { isMobile: isPhone } = useDeviceClass();
   // Keyboard-aware sizing on phones (iOS keeps 100dvh when the keyboard opens).
-  const { height: visualViewportHeight, keyboardOpen } = useVisualViewport(isPhone);
+  const { height: visualViewportHeight } = useVisualViewport(isPhone);
   const drawerRef = useRef<HTMLElement | null>(null);
 
   // Phone: Back closes the chat / drawer instead of leaving the app.
@@ -609,8 +613,6 @@ export default function ProjectListScreen({
   const [streamingGuideText, setStreamingGuideText] = useState("");
   const askAbortRef = useRef<boolean>(false);
   const [activeResearchStage, setActiveResearchStage] = useState<ResearchStageTelemetry | null>(null);
-  const [isMobileWorkspaceMenuOpen, setIsMobileWorkspaceMenuOpen] = useState(false);
-  const mobileWorkspaceMenuRef = useRef<HTMLDivElement>(null);
   const chatCanvasRef = useRef<HTMLDivElement | null>(null);
   // What Ask Scholar is doing for the current question: searching (with live stage detail), then writing.
   const [askPhase, setAskPhase] = useState<{ step: "searching" | "writing"; found?: number; detail?: string } | null>(null);
@@ -778,27 +780,6 @@ export default function ProjectListScreen({
     if (typeof canvas.scrollTo === "function") canvas.scrollTo({ top: next, behavior: "auto" });
     else canvas.scrollTop = next;
   }, [streamingGuideText, isGuideThinking, askPhase?.step, askPhase?.detail, guideMessages.length, scrollMessageToTop]);
-
-  // Handle outside clicks to close the mobile academic workspace dropdown
-  useEffect(() => {
-    if (!isMobileWorkspaceMenuOpen) return;
-    const handleClick = (e: Event) => {
-      if (mobileWorkspaceMenuRef.current && !mobileWorkspaceMenuRef.current.contains(e.target as Node)) {
-        setIsMobileWorkspaceMenuOpen(false);
-      }
-    };
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setIsMobileWorkspaceMenuOpen(false);
-    };
-    document.addEventListener("mousedown", handleClick);
-    document.addEventListener("touchstart", handleClick, { passive: true });
-    document.addEventListener("keydown", handleKey);
-    return () => {
-      document.removeEventListener("mousedown", handleClick);
-      document.removeEventListener("touchstart", handleClick);
-      document.removeEventListener("keydown", handleKey);
-    };
-  }, [isMobileWorkspaceMenuOpen]);
 
   // Sync active Ask Scholar thread to multi-thread history in localStorage and server
   useEffect(() => {
@@ -2045,26 +2026,32 @@ export default function ProjectListScreen({
           },
         }
       : null;
-  const resumeChatRow = (extraClass = "") =>
+  // One row of the "Recent" list (the chat and recent projects share it), or a card of its own on wider screens.
+  const recentRowClass =
+    "w-full min-h-14 flex items-center gap-3 px-3 py-2.5 text-left cursor-pointer transition-colors hover:bg-neutral-50 dark:hover:bg-white/5 active:bg-neutral-100 dark:active:bg-white/10 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sky-500";
+  const resumeChatRow = (variant: "row" | "card" = "row") =>
     resumeTarget ? (
       <button
         type="button"
         data-testid="mobile-resume-chat"
         onClick={resumeTarget.open}
-        className={`w-full min-h-14 flex items-center gap-3 px-3.5 py-2 rounded-2xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-left cursor-pointer active:scale-[0.99] transition-transform focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 ${extraClass}`}
+        className={`${recentRowClass} ${variant === "card" ? "rounded-2xl border border-neutral-200/90 dark:border-white/10 bg-white dark:bg-ink-750 shadow-2xs" : ""}`}
       >
-        <span className="min-w-0 flex-1">
-          <span className="block text-[11px] font-semibold uppercase tracking-wider opacity-70">Resume chat</span>
-          <span className="block text-[13px] font-medium truncate">{resumeTarget.title}</span>
+        <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-neutral-100 dark:bg-white/10 text-neutral-700 dark:text-neutral-200">
+          <MessageSquare className="w-4 h-4" aria-hidden="true" />
         </span>
-        <ArrowRight className="w-4 h-4 shrink-0" aria-hidden="true" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-medium text-neutral-900 dark:text-white truncate">{resumeTarget.title}</span>
+          <span className="block text-xs text-neutral-600 dark:text-neutral-400">Resume chat</span>
+        </span>
+        <ChevronRight className="w-4 h-4 shrink-0 text-neutral-400" aria-hidden="true" />
       </button>
     ) : null;
 
-  // Up to two most recent projects for the phone landing's "Continue" rows.
+  // Up to three most recent projects for the phone landing's "Recent" list.
   const landingRecents = (projects ?? []).length === 0 || !userEmail
     ? []
-    : recentProjectsList.slice(0, 2).flatMap((item) => {
+    : recentProjectsList.slice(0, 3).flatMap((item) => {
         const project = (projects ?? []).find((p) => p.projectId === item.projectId);
         if (!project) return [];
         return [{
@@ -2076,11 +2063,11 @@ export default function ProjectListScreen({
       });
 
   // A returning user has something to pick up, so the newcomer content (tagline, FAQ chips) steps aside
-  // and the whole landing fits one phone screen without scrolling. One "continue" row is enough next to Resume.
+  // and the whole landing fits one phone screen without scrolling: at most three Recent rows.
   const hasReturningContent = Boolean(resumeTarget) || landingRecents.length > 0;
-  const visibleRecents = landingRecents.slice(0, resumeTarget ? 1 : 2);
+  const visibleRecents = landingRecents.slice(0, resumeTarget ? 2 : 3);
 
-  // Shared by the phone Workspaces menu and the "Start a workspace" cards.
+  // The phone landing's one-tap "Start a project" buttons.
   const handleMobileTilePick = (tile: (typeof FORMAT_TILES)[number]) => {
     if (creating) return;
     if (!userEmail) {
@@ -2089,6 +2076,36 @@ export default function ProjectListScreen({
     }
     handleCreate(tile.id);
   };
+
+  // New Project (sidebar and the chat's "Academic workspaces"): the workspace chooser, after sign-in.
+  const startNewProject = () => {
+    setMobileMenuOpen(false);
+    setActiveView("projects");
+    if (!userEmail) {
+      openAuth("signin", "Sign in or create an account to start a new research project.");
+      return;
+    }
+    setChoosing(true);
+  };
+
+  // Phones: the rail's Ask and Projects items. The address carries which one is showing.
+  const openPhoneAsk = () => {
+    setMobileMenuOpen(false);
+    setActiveView("projects");
+    navigate("/projects?tab=ask");
+    setChoosing(false);
+    if (hasStartedChatting) setIsAiSidebarOpen(true);
+    else window.setTimeout(() => guideTextareaRef.current?.focus(), 300);
+  };
+  const openPhoneProjects = () => {
+    setMobileMenuOpen(false);
+    setActiveView("projects");
+    navigate("/projects");
+    setChoosing(false);
+    setIsAiSidebarOpen(false);
+  };
+  const phoneActiveItem =
+    activeView !== "projects" ? activeView : choosing ? undefined : phoneProjectsOpen ? "projects" : "ask";
 
   const mainPromptForm = (
     <AskPromptBox
@@ -2105,12 +2122,13 @@ export default function ProjectListScreen({
       filters={askFilters}
       onFiltersChange={setAskFilters}
       isThinking={isGuideThinking}
-      placeholder={isPhone ? "Ask a research question or paste your brief…" : "Ask a question, paste your brief, or drop files…"}
+      placeholder={isPhone ? "Ask a question or paste a brief…" : "Ask a question, paste your brief, or drop files…"}
       ariaLabel="Research instructions or assignment guidelines"
       sendLabel="Send message"
       inputId="main-research-instruction-input"
       inputName="researchInstructions"
-      minRows={isPhone ? 2 : 1}
+      minRows={1}
+      compact={isPhone}
       maxHeightPx={120}
       inputRef={guideTextareaRef}
     >
@@ -2148,9 +2166,16 @@ export default function ProjectListScreen({
         mobileOpen={mobileMenuOpen}
         onCloseMobile={() => setMobileMenuOpen(false)}
         isCollapsed={!isSidebarOpen}
-        onToggle={() => setIsSidebarOpen(false)}
-        activeItem={activeView}
-        hideNavLinks={isPhone}
+        onToggle={() => {
+          setIsSidebarOpen(false);
+          saveSidebarCollapsed(true);
+        }}
+        onExpand={() => {
+          setIsSidebarOpen(true);
+          saveSidebarCollapsed(false);
+        }}
+        activeItem={isPhone ? phoneActiveItem : activeView}
+        onOpenProjects={isPhone ? openPhoneProjects : undefined}
         onHome={() => {
           setMobileMenuOpen(false);
           setChoosing(false);
@@ -2158,15 +2183,7 @@ export default function ProjectListScreen({
           navigate("/");
           scrollToProjects();
         }}
-        onNewProject={() => {
-          setMobileMenuOpen(false);
-          setActiveView("projects");
-          if (!userEmail) {
-            openAuth("signin", "Sign in or create an account to start a new research project.");
-            return;
-          }
-          setChoosing(true);
-        }}
+        onNewProject={startNewProject}
         onOpenVault={() => {
           setMobileMenuOpen(false);
           if (!userEmail) {
@@ -2185,11 +2202,16 @@ export default function ProjectListScreen({
           setActiveView("ai-access");
           onOpenAiAccess?.();
         }}
-        onOpenAskScholar={() => {
-          setMobileMenuOpen(false);
-          toggleAskScholar();
-        }}
-        askScholarExpanded={isAiSidebarOpen}
+        onOpenAskScholar={
+          isPhone
+            ? openPhoneAsk
+            : () => {
+                setMobileMenuOpen(false);
+                toggleAskScholar();
+              }
+        }
+        // A phone's Ask item goes to a place; only the wide-screen one opens and closes a panel.
+        askScholarExpanded={isPhone ? undefined : isAiSidebarOpen}
         onOpenSettings={
           onOpenAccountSettings
             ? () => {
@@ -2242,6 +2264,16 @@ export default function ProjectListScreen({
             variant="sidebar"
           />
         }
+        railFooter={
+          <UserAccountMenu
+            userEmail={userEmail}
+            onOpenAccountSettings={onOpenAccountSettings}
+            onOpenVault={onOpenVault}
+            onOpenAiAccess={onOpenAiAccess}
+            onOpenAuth={openAuth}
+            variant="rail"
+          />
+        }
       />
 
       {/* Main Content Area (Center Pane) */}
@@ -2250,39 +2282,52 @@ export default function ProjectListScreen({
         : "flex-1 flex flex-col h-dvh w-full bg-paper-cool dark:bg-ink-850 overflow-hidden text-neutral-900 dark:text-white scholar-scrollbar relative transition-all duration-300 ease-in-out"
         }`}>
         {/* Sticky Top Bar for Sidebar Toggle on Desktop & Mobile */}
-        <div className="apple-glass-header sticky top-0 z-20 px-4 sm:px-6 py-3 flex items-center justify-between bg-paper-cool/85 dark:bg-ink-850/85 backdrop-blur-md border-b border-neutral-200 dark:border-white/10 shrink-0">
+        {/* Phones: a slim bar (the rail's menu button and the AI in use). Wider screens: AI status and the Ask Scholar button. */}
+        <div
+          className={`apple-glass-header sticky top-0 z-20 flex items-center justify-between bg-paper-cool/85 dark:bg-ink-850/85 backdrop-blur-md shrink-0 ${
+            isPhone ? "px-2 py-1.5" : "px-4 sm:px-6 py-3 border-b border-neutral-200 dark:border-white/10"
+          }`}
+        >
           <div className="flex items-center gap-3">
-            {/* Mobile Drawer Trigger Button */}
+            {/* Opens the navigation rail (phones and narrow windows) */}
             <button
               type="button"
               onClick={() => setMobileMenuOpen(true)}
-              className={`${isPhone ? "" : "md:hidden"} p-2 rounded-xl border border-neutral-200 dark:border-white/10 bg-neutral-900/5 dark:bg-white/5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-900/10 dark:hover:bg-white/10 cursor-pointer`}
+              className={`${isPhone ? "" : "md:hidden"} w-11 h-11 rounded-full flex items-center justify-center text-neutral-700 dark:text-neutral-200 hover:bg-neutral-900/5 dark:hover:bg-white/10 active:bg-neutral-900/10 dark:active:bg-white/15 cursor-pointer transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500`}
               aria-label="Open navigation"
             >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
+              <MenuIcon className="w-5 h-5" aria-hidden="true" />
             </button>
 
-            {/* Reopens a collapsed sidebar. While it is open, its own « button is the one control. */}
-            {!isPhone && !isSidebarOpen && (
-              <button
-                type="button"
-                onClick={() => setIsSidebarOpen(true)}
-                className="hidden md:flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-neutral-200 dark:border-white/10 bg-neutral-900/5 dark:bg-white/5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-900/10 dark:hover:bg-white/10 text-xs font-medium cursor-pointer transition-all animate-in fade-in"
-                title="Expand sidebar"
-                aria-label="Expand sidebar"
-              >
-                <PanelLeftOpen className="w-4 h-4" aria-hidden="true" />
-                <span aria-hidden="true">Expand sidebar</span>
-              </button>
-            )}
+            {/* A collapsed sidebar is the icon rail, which has its own Expand button. */}
           </div>
 
           {/* Top Bar Right: AI Assistant Toggle & Active Provider Status */}
           <div className="flex items-center gap-2.5">
             {/* One AI status: the server-verified connection. Models are chosen in AI Access. */}
-            {userEmail ? (
+            {userEmail && isPhone ? (
+              <button
+                type="button"
+                data-testid="mobile-ai-status"
+                aria-label={`${aiPillLabel}, AI status`}
+                onClick={() => {
+                  if (onOpenAiAccess) onOpenAiAccess();
+                  else setActiveView("ai-access");
+                }}
+                className={`mr-1.5 inline-flex items-center gap-1.5 min-h-9 max-w-[60vw] px-3 rounded-full text-xs font-medium border cursor-pointer active:scale-95 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 ${aiStatus?.connected
+                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-400"
+                  : "border-neutral-200 dark:border-white/10 bg-white dark:bg-white/5 text-neutral-600 dark:text-neutral-300"
+                  }`}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${aiStatus?.connected ? "bg-emerald-500" : aiStatusResolved ? "bg-amber-500" : "bg-neutral-400 animate-pulse"}`}
+                />
+                <span className="truncate" role="status" aria-live="polite">
+                  {aiPillLabel}
+                </span>
+              </button>
+            ) : userEmail ? (
               <button
                 type="button"
                 onClick={() => {
@@ -2307,7 +2352,7 @@ export default function ProjectListScreen({
               <button
                 type="button"
                 onClick={() => openAuth("signin", "Sign in to configure your personal AI provider.")}
-                className="inline-flex items-center gap-1.5 min-h-9 sm:min-h-0 px-3.5 sm:px-3 py-1 rounded-full text-xs sm:text-[11px] font-medium transition-colors border border-neutral-200 dark:border-white/10 bg-neutral-900/5 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-900/10 dark:hover:bg-white/10 cursor-pointer shadow-2xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
+                className={`${isPhone ? "mr-1.5 " : ""}inline-flex items-center gap-1.5 min-h-9 sm:min-h-0 px-3.5 sm:px-3 py-1 rounded-full text-xs sm:text-[11px] font-medium transition-colors border border-neutral-200 dark:border-white/10 bg-neutral-900/5 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-900/10 dark:hover:bg-white/10 cursor-pointer shadow-2xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500`}
                 title="Sign in to access AI"
               >
                 <span className="hidden sm:inline-block w-1.5 h-1.5 rounded-full bg-slate-400" />
@@ -2316,19 +2361,7 @@ export default function ProjectListScreen({
               </button>
             )}
 
-            {/* Phones: theme switch lives in the header (the sidebar one is a swipe away) */}
-            {isPhone && (
-              <button
-                type="button"
-                onClick={toggleTheme}
-                aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-                className="w-11 h-11 rounded-full flex items-center justify-center cursor-pointer border bg-white dark:bg-white/5 border-neutral-200/90 dark:border-white/10 text-neutral-600 dark:text-neutral-300 active:scale-95 transition-transform focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
-              >
-                {theme === "dark" ? <Sun className="w-5 h-5 text-amber-400" aria-hidden="true" /> : <Moon className="w-5 h-5" aria-hidden="true" />}
-              </button>
-            )}
-
-            {/* AI Assistant Toggle Button. On a phone it only appears once a chat exists: before that the whole screen is Ask Scholar, so the button had nothing to open. */}
+            {/* Ask Scholar panel button (wider screens; a phone's Ask Scholar is the page itself). The theme switch is in the sidebar. */}
             {!isAiSidebarOpen && !isPhone && (
               <button
                 type="button"
@@ -2401,7 +2434,8 @@ export default function ProjectListScreen({
           <>
             {/* Scrollable / Flexible Center Area */}
             <div className="flex-1 flex flex-col items-center justify-start md:justify-center px-4 sm:px-6 overflow-y-auto scholar-scrollbar">
-              <div className={`w-full max-w-5xl flex flex-col items-center gap-6 pb-4 ${isPhone ? "pt-3" : "my-auto"}`}>
+              {/* Centred in the space between the header and the question box; scrolls when it does not fit. */}
+              <div className={`w-full max-w-5xl flex flex-col items-center gap-6 my-auto pb-4 ${isPhone ? "pt-6" : ""}`}>
                 {/* Onboarding welcome banner */}
                 {welcomeVisible && (
                   <div
@@ -2450,173 +2484,115 @@ export default function ProjectListScreen({
                   </div>
                 )}
 
-                {/* Mobile Landing View: Clean, focused AskScholar chat interface with Workspaces in dropdown */}
+                {/* Phone landing: a greeting, one-tap workspaces, then what to pick up. The question box is pinned below. */}
                 {isPhone && !isAiSidebarOpen ? (
-                  <>
-                    <section aria-label="Ask Scholar" className="w-full">
-                      <div className="flex flex-col gap-3 mb-3">
-                        <h1 className="text-2xl font-semibold tracking-tight text-neutral-900 dark:text-white flex items-center gap-2.5">
-                          <span className="w-8 h-8 rounded-xl bg-neutral-100 dark:bg-white/10 text-neutral-700 dark:text-neutral-200 flex items-center justify-center">
-                            <Lightbulb className="w-4 h-4 stroke-[2.1]" aria-hidden="true" />
-                          </span>
-                          Ask Scholar
-                        </h1>
+                  <section aria-label="Ask Scholar" className="w-full max-w-md mx-auto flex flex-col items-center">
+                    <span className="w-11 h-11 rounded-2xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 flex items-center justify-center shadow-xs" aria-hidden="true">
+                      <ScholarCoreLogo size="md" className="text-white dark:text-neutral-900" />
+                    </span>
+                    <h1 className="mt-4 text-[22px] leading-tight font-semibold tracking-tight text-neutral-900 dark:text-white text-center">
+                      What are you researching?
+                    </h1>
+                    {!hasReturningContent && (
+                      <p className="mt-1.5 text-sm text-neutral-600 dark:text-neutral-400 text-center leading-snug">
+                        Research, write and cite: essays, papers, slides.
+                      </p>
+                    )}
 
-                        <div className="flex items-center gap-2 min-w-0">
-                          {/* Clean Mobile Workspaces Dropdown (anchored to the button's left edge so it never leaves the viewport) */}
-                          <div className="relative shrink-0" ref={mobileWorkspaceMenuRef}>
+                    {/* One tap starts a workspace. The visible word is the first of the workspace's name. */}
+                    <div role="group" aria-label="Start a project" className="mt-6 w-full grid grid-cols-3 gap-2">
+                      {FORMAT_TILES.map((tile) => {
+                        const tileTheme = getFormatTileTheme(tile.id);
+                        const booting = creatingFormatId === tile.id;
+                        return (
+                          <button
+                            key={tile.id}
+                            type="button"
+                            onClick={() => handleMobileTilePick(tile)}
+                            disabled={creating && !booting}
+                            aria-label={`${tile.label}, new project`}
+                            className="min-h-[4.75rem] flex flex-col items-center justify-center gap-1.5 px-1.5 py-2.5 rounded-2xl bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/10 cursor-pointer active:scale-[0.97] transition-transform disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
+                          >
+                            <span className={`w-8 h-8 rounded-xl flex items-center justify-center ${tileTheme.badgeBg}`}>
+                              {booting ? (
+                                <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+                              ) : (
+                                <FormatIcon id={tile.id} className="w-4 h-4" />
+                              )}
+                            </span>
+                            <span className="text-xs font-medium text-neutral-800 dark:text-neutral-200">{tile.label.split(" ")[0]}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {!hasReturningContent && (
+                      <div
+                        role="group"
+                        aria-label="Suggested questions"
+                        className="mt-5 self-stretch -mx-4 px-4 scroll-pl-4 flex gap-2 overflow-x-auto scrollbar-hide snap-x snap-proximity overscroll-x-contain [mask-image:linear-gradient(to_right,black_calc(100%-2.5rem),transparent)]"
+                      >
+                        {WEBSITE_ASSISTANT_FAQS.map((faq, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => {
+                              setIsAiSidebarOpen(true);
+                              handleSendGuideMessage(faq.question);
+                            }}
+                            className="snap-start inline-flex items-center gap-1.5 min-h-9 rounded-full bg-white dark:bg-white/5 border border-neutral-200/80 dark:border-white/10 text-neutral-700 dark:text-neutral-300 px-3.5 text-xs font-medium whitespace-nowrap cursor-pointer shrink-0 active:scale-95 transition-transform"
+                          >
+                            <Sparkles className="w-3 h-3 text-neutral-400" aria-hidden="true" />
+                            {faq.shortLabel}
+                          </button>
+                        ))}
+                        <span aria-hidden="true" className="shrink-0 w-4" />
+                      </div>
+                    )}
+
+                    {hasReturningContent && (
+                      <div className="mt-7 w-full" data-testid="mobile-continue">
+                        <div className="mb-1.5 flex items-center justify-between px-1">
+                          <h2 className="text-[13px] font-semibold text-neutral-600 dark:text-neutral-400">Recent</h2>
+                          {landingRecents.length > 0 && (
                             <button
                               type="button"
-                              onClick={() => setIsMobileWorkspaceMenuOpen((prev) => !prev)}
-                              className="inline-flex items-center gap-1.5 min-h-9 px-3 rounded-full text-xs font-semibold bg-neutral-100 dark:bg-white/10 text-neutral-800 dark:text-neutral-200 border border-neutral-200/80 dark:border-white/10 cursor-pointer shadow-2xs hover:bg-neutral-200/60 dark:hover:bg-white/15 active:scale-95 transition-all"
-                              aria-expanded={isMobileWorkspaceMenuOpen}
-                              aria-haspopup="menu"
-                              aria-label="Academic Workspaces"
+                              onClick={openPhoneProjects}
+                              className="-mr-2 min-h-9 px-2 inline-flex items-center gap-0.5 rounded-lg text-[13px] font-medium text-neutral-700 dark:text-neutral-300 cursor-pointer active:bg-neutral-900/5 dark:active:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-500"
                             >
-                              <FolderOpen className="w-3.5 h-3.5 text-sky-500" />
-                              <span>Workspaces</span>
-                              <ChevronDown className={`w-3 h-3 opacity-60 transition-transform duration-150 ${isMobileWorkspaceMenuOpen ? "rotate-180" : ""}`} />
-                            </button>
-                            {isMobileWorkspaceMenuOpen && (
-                              <div
-                                role="menu"
-                                aria-label="Workspaces"
-                                className="absolute left-0 top-full mt-2 w-[min(18rem,calc(100vw-2rem))] p-1.5 rounded-2xl bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/15 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-150 space-y-0.5"
-                              >
-                                <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-                                  Academic Workspaces
-                                </div>
-                                {FORMAT_TILES.map((tile) => {
-                                  const tileTheme = getFormatTileTheme(tile.id);
-                                  const length = (tile.specs || tile.footer).split(" · ").pop();
-                                  return (
-                                    <button
-                                      key={tile.id}
-                                      type="button"
-                                      role="menuitem"
-                                      onClick={() => {
-                                        setIsMobileWorkspaceMenuOpen(false);
-                                        handleMobileTilePick(tile);
-                                      }}
-                                      className="w-full min-h-12 flex items-center gap-3 px-2.5 py-2 rounded-xl text-left hover:bg-neutral-100 dark:hover:bg-white/5 active:bg-neutral-100 dark:active:bg-white/10 transition-colors cursor-pointer group"
-                                    >
-                                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${tileTheme.badgeBg}`}>
-                                        <FormatIcon id={tile.id} className="w-4 h-4" />
-                                      </div>
-                                      <div className="min-w-0 flex-1">
-                                        <span className="block text-[13px] font-semibold text-neutral-900 dark:text-neutral-100 truncate group-hover:text-sky-600 dark:group-hover:text-sky-400">
-                                          {tile.label}
-                                        </span>
-                                        {length && (
-                                          <span className="block text-[11px] text-neutral-600 dark:text-neutral-400">
-                                            {length}
-                                          </span>
-                                        )}
-                                      </div>
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-
-                          {userEmail && (
-                            <button
-                              type="button"
-                              data-testid="mobile-ai-status"
-                              aria-label={`${aiPillLabel}, AI status`}
-                              onClick={() => {
-                                if (onOpenAiAccess) onOpenAiAccess();
-                                else setActiveView("ai-access");
-                              }}
-                              className={`inline-flex items-center gap-1.5 min-h-9 min-w-[8.5rem] max-w-full px-3 rounded-full text-xs font-medium border cursor-pointer active:scale-95 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 ${aiStatus?.connected
-                                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-400"
-                                : "border-neutral-200 dark:border-white/10 bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-300"
-                                }`}
-                            >
-                              <span
-                                aria-hidden="true"
-                                className={`w-1.5 h-1.5 rounded-full shrink-0 ${aiStatus?.connected ? "bg-emerald-500" : aiStatusResolved ? "bg-amber-500" : "bg-neutral-400 animate-pulse"}`}
-                              />
-                              <span className="truncate" role="status" aria-live="polite">
-                                {aiPillLabel}
-                              </span>
+                              All projects
+                              <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
                             </button>
                           )}
                         </div>
+                        <ul className="overflow-hidden rounded-2xl bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/10 divide-y divide-neutral-100 dark:divide-white/5">
+                          {resumeTarget && <li>{resumeChatRow()}</li>}
+                          {visibleRecents.map((item) => {
+                            const tileTheme = getFormatTileTheme(item.outputTypeId);
+                            return (
+                              <li key={item.projectId}>
+                                <button type="button" onClick={() => onOpen(item.projectId)} className={recentRowClass}>
+                                  <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${tileTheme.badgeBg}`}>
+                                    <FormatIcon id={item.outputTypeId} className="w-4 h-4" />
+                                  </span>
+                                  <span className="min-w-0 flex-1">
+                                    <span className="block text-sm font-medium text-neutral-900 dark:text-white truncate">{item.title}</span>
+                                    {item.typeLabel && (
+                                      <span className="block text-xs text-neutral-600 dark:text-neutral-400">{item.typeLabel}</span>
+                                    )}
+                                  </span>
+                                  <ChevronRight className="w-4 h-4 shrink-0 text-neutral-400" aria-hidden="true" />
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
                       </div>
-                      {!hasReturningContent && (
-                        <p className="mb-3 text-sm text-neutral-600 dark:text-neutral-400 leading-snug">
-                          Research, write and cite: essays, papers, slides.
-                        </p>
-                      )}
-
-                      {visibleRecents.length === 0 && resumeChatRow("mb-4")}
-
-                      {!hasReturningContent && (
-                      <div className="mt-4">
-                        <div
-                          role="group"
-                          aria-label="Suggested questions"
-                          className="-mx-4 px-4 scroll-pl-4 flex gap-2 overflow-x-auto scrollbar-hide snap-x snap-proximity overscroll-x-contain [mask-image:linear-gradient(to_right,black_calc(100%-2.5rem),transparent)]"
-                        >
-                          {WEBSITE_ASSISTANT_FAQS.map((faq, idx) => (
-                            <button
-                              key={idx}
-                              type="button"
-                              onClick={() => {
-                                setIsAiSidebarOpen(true);
-                                handleSendGuideMessage(faq.question);
-                              }}
-                              className="snap-start inline-flex items-center gap-1.5 min-h-9 rounded-full bg-white dark:bg-white/5 border border-neutral-200/80 dark:border-white/10 text-neutral-700 dark:text-neutral-300 px-3.5 text-xs font-medium whitespace-nowrap cursor-pointer shrink-0 active:scale-95 transition-transform"
-                            >
-                              <Sparkles className="w-3 h-3 text-neutral-400" aria-hidden="true" />
-                              {faq.shortLabel}
-                            </button>
-                          ))}
-                          <span aria-hidden="true" className="shrink-0 w-4" />
-                        </div>
-                      </div>
-                      )}
-
-                      {visibleRecents.length > 0 && (
-                        <div className={hasReturningContent ? "mt-1" : "mt-6"} data-testid="mobile-continue">
-                          <h2 className="px-0.5 mb-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">
-                            Continue where you left off
-                          </h2>
-                          <ul className="space-y-2">
-                            {resumeTarget && <li>{resumeChatRow()}</li>}
-                            {visibleRecents.map((item) => {
-                              const tileTheme = getFormatTileTheme(item.outputTypeId);
-                              return (
-                                <li key={item.projectId}>
-                                  <button
-                                    type="button"
-                                    onClick={() => onOpen(item.projectId)}
-                                    className="w-full min-h-14 flex items-center gap-3 px-3 py-2 rounded-2xl bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/10 text-left cursor-pointer active:scale-[0.99] transition-transform focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
-                                  >
-                                    <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${tileTheme.badgeBg}`}>
-                                      <FormatIcon id={item.outputTypeId} className="w-4 h-4" />
-                                    </span>
-                                    <span className="min-w-0 flex-1">
-                                      <span className="block text-[13px] font-semibold text-neutral-900 dark:text-white truncate">{item.title}</span>
-                                      {item.typeLabel && (
-                                        <span className="block text-[11px] text-neutral-600 dark:text-neutral-400">{item.typeLabel}</span>
-                                      )}
-                                    </span>
-                                    <ArrowRight className="w-4 h-4 shrink-0 text-neutral-400" aria-hidden="true" />
-                                  </button>
-                                </li>
-                              );
-                            })}
-                          </ul>
-                        </div>
-                      )}
-                    </section>
-                  </>
+                    )}
+                  </section>
                 ) : !isAiSidebarOpen ? (
                   <>
-                    {resumeTarget && <div className="w-full max-w-xl mx-auto">{resumeChatRow("mb-2")}</div>}
+                    {resumeTarget && <div className="w-full max-w-xl mx-auto mb-2">{resumeChatRow("card")}</div>}
                     <div className="text-center mb-6 flex flex-col items-center">
                       <h1 className="text-2xl sm:text-[32px] font-semibold text-neutral-900 dark:text-white tracking-tight leading-tight">
                         Where will your research begin?
@@ -2727,7 +2703,8 @@ export default function ProjectListScreen({
                 className={
                   isAiSidebarOpen
                     ? "hidden"
-                    : "sticky bottom-0 z-20 w-full relative pointer-events-none flex flex-col justify-start bg-gradient-to-t from-paper-cool dark:from-ink-850 via-paper-cool/95 dark:via-ink-850/95 to-transparent px-4 sm:px-6 pb-3.5"
+                    : // Nothing sits below the box any more, so it keeps clear of the home indicator itself.
+                      "sticky bottom-0 z-20 w-full relative pointer-events-none flex flex-col justify-start bg-gradient-to-t from-paper-cool dark:from-ink-850 via-paper-cool/95 dark:via-ink-850/95 to-transparent px-4 sm:px-6 pb-[max(0.875rem,env(safe-area-inset-bottom))]"
                 }
               >
                 <div className="w-full max-w-4xl mx-auto relative pointer-events-auto flex flex-col items-center">
@@ -2737,79 +2714,6 @@ export default function ProjectListScreen({
           </>
         )}
 
-        {/* Phone bottom bar: the main places, one tap each */}
-        {isPhone && !keyboardOpen && (
-          <nav aria-label="Main" className="shrink-0 grid grid-cols-4 border-t border-neutral-200 dark:border-white/10 bg-paper-cool/95 dark:bg-ink-850/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
-            {[
-              {
-                label: "Ask",
-                fullName: "Ask Scholar",
-                icon: Lightbulb,
-                active: activeView === "projects" && !choosing && !phoneProjectsOpen,
-                onClick: () => {
-                  setActiveView("projects");
-                  navigate("/projects?tab=ask");
-                  setChoosing(false);
-                  if (hasStartedChatting) setIsAiSidebarOpen(true);
-                  else setTimeout(() => guideTextareaRef.current?.focus(), 300);
-                },
-              },
-              {
-                label: "Projects",
-                fullName: "Projects",
-                icon: FolderOpen,
-                active: activeView === "projects" && !choosing && phoneProjectsOpen,
-                onClick: () => {
-                  setActiveView("projects");
-                  navigate("/projects");
-                  setChoosing(false);
-                  setIsAiSidebarOpen(false);
-                },
-              },
-              {
-                label: "Vault",
-                fullName: "Knowledge Vault",
-                icon: Database,
-                active: activeView === "vault",
-                onClick: () => {
-                  if (!userEmail) {
-                    openAuth("signin", "Sign in to access your Knowledge Vault references.");
-                    return;
-                  }
-                  setActiveView("vault");
-                  onOpenVault?.();
-                },
-              },
-              {
-                label: "AI",
-                fullName: "AI Access",
-                icon: Sliders,
-                active: activeView === "ai-access",
-                onClick: () => {
-                  if (!userEmail) {
-                    openAuth("signin", "Sign in to configure AI provider keys and models.");
-                    return;
-                  }
-                  setActiveView("ai-access");
-                  onOpenAiAccess?.();
-                },
-              },
-            ].map((item) => (
-              <button
-                key={item.label}
-                type="button"
-                onClick={item.onClick}
-                aria-label={item.fullName}
-                aria-current={item.active ? "page" : undefined}
-                className={`flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-medium cursor-pointer ${item.active ? "text-neutral-900 dark:text-white" : "text-neutral-600 dark:text-neutral-400"
-                  }`}
-              >
-                <item.icon className="w-5 h-5" aria-hidden="true" />
-                {item.label}
-              </button>
-            ))}
-          </nav>
-        )}
       </main>
 
       {/* Secondary View (Right Panel / Full-Screen Landing Chat): Module 3.2 AI Assistant */}
@@ -2873,22 +2777,6 @@ export default function ProjectListScreen({
                           <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
                         </svg>
                       </button>
-                      {!isSidebarOpen && (
-                        <button
-                          type="button"
-                          onClick={() => setIsSidebarOpen(true)}
-                          className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 dark:border-white/10 bg-neutral-900/5 dark:bg-white/5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-900/10 dark:hover:bg-white/10 text-xs font-medium cursor-pointer transition-all"
-                          title="Expand sidebar"
-                          aria-label="Expand sidebar"
-                        >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                            <rect x="3" y="3" width="18" height="18" rx="2" strokeWidth="1.5" />
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 3v18" />
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M13 15l3-3-3-3" />
-                          </svg>
-                          <span>Open Sidebar</span>
-                        </button>
-                      )}
                     </>
                   )}
                   <div className="relative hidden sm:flex items-center justify-center">
@@ -3123,7 +3011,10 @@ export default function ProjectListScreen({
                       </p>
                       <button
                         type="button"
-                        onClick={() => setIsMobileWorkspaceMenuOpen(true)}
+                        onClick={() => {
+                          setIsAiSidebarOpen(false);
+                          startNewProject();
+                        }}
                         className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/10 text-xs font-semibold text-neutral-800 dark:text-neutral-200 shadow-2xs active:scale-95 transition-all"
                       >
                         <FolderOpen className="w-4 h-4 text-sky-500" />

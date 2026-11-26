@@ -45,40 +45,67 @@ function renderHome(onOpenAiAccess = vi.fn(), onOpenVault = vi.fn(), userEmail =
   );
 }
 
+/** Opens the phone's navigation (the icon rail) and returns its list of places. */
+function openRail() {
+  fireEvent.click(screen.getByRole("button", { name: "Open navigation" }));
+  const drawer = screen.getByLabelText("Workspace navigation", { selector: "aside" });
+  return { drawer, places: within(drawer).getByRole("navigation", { name: "Workspace" }) };
+}
+
 describe("phone home: Ask Scholar first", () => {
   afterEach(() => {
     cleanup();
     device.isMobile = true;
   });
 
-  it("puts Ask Scholar, with the AI in use and the question box, with accessible academic workspaces", async () => {
+  it("puts Ask Scholar, with the AI in use in the header, the question box, and one-tap workspaces", async () => {
     renderHome();
     const ask = screen.getByRole("region", { name: "Ask Scholar" });
+    expect(within(ask).getByRole("heading", { level: 1 })).toHaveTextContent("What are you researching?");
     // The question box is pinned to the bottom of the screen, outside the Ask region.
     const promptBar = screen.getByTestId("main-prompt-bar-wrapper");
     expect(within(promptBar).getByRole("textbox", { name: /Research instructions/i })).toBeInTheDocument();
-    expect(await within(ask).findByTestId("mobile-ai-status")).toHaveTextContent("AI: Google Gemini");
+    // The AI in use is shown once, in the slim header, not in the page body.
+    const status = await screen.findByTestId("mobile-ai-status");
+    expect(status).toHaveTextContent("AI: Google Gemini");
+    expect(ask.contains(status)).toBe(false);
+    expect(screen.getAllByTestId("mobile-ai-status")).toHaveLength(1);
 
-    const workspacesBtn = screen.getByRole("button", { name: "Academic Workspaces" });
-    expect(workspacesBtn).toBeInTheDocument();
-    fireEvent.click(workspacesBtn);
-
-    const menu = screen.getByRole("menu", { name: "Workspaces" });
-    expect(within(menu).getByRole("menuitem", { name: /Coursework & Essays/ })).toBeInTheDocument();
-    expect(within(menu).getByRole("menuitem", { name: /Journal Article/ })).toBeInTheDocument();
+    // Each workspace is one tap: a short visible word, the full name for assistive tech. No dropdown.
+    const start = within(ask).getByRole("group", { name: "Start a project" });
+    const buttons = within(start).getAllByRole("button");
+    expect(buttons.map((b) => b.textContent)).toEqual(["Coursework", "Journal", "Slides"]);
+    expect(within(start).getByRole("button", { name: /^Coursework & Essays/ })).toBeInTheDocument();
+    expect(within(start).getByRole("button", { name: /^Journal Article/ })).toBeInTheDocument();
+    expect(within(start).getByRole("button", { name: /^Slides & Keynotes/ })).toBeInTheDocument();
+    expect(screen.queryByRole("menu", { name: "Workspaces" })).toBeNull();
   });
 
-  it("has a bottom bar for Ask, Projects, Vault and AI", async () => {
+  it("asks a signed-out visitor to sign in before a workspace starts", async () => {
+    renderHome(vi.fn(), vi.fn(), "");
+    fireEvent.click(screen.getByRole("button", { name: /^Coursework & Essays/ }));
+    expect(await screen.findByText(/Sign in to boot your Coursework & Essays workspace/i)).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(api.createProject).not.toHaveBeenCalled();
+  });
+
+  it("has no bottom bar: Ask, Projects, Vault and AI are icons in the navigation rail", async () => {
     const onOpenAiAccess = vi.fn();
     const onOpenVault = vi.fn();
     renderHome(onOpenAiAccess, onOpenVault);
-    const nav = screen.getByRole("navigation", { name: "Main" });
-    // Short visible labels; the accessible names are the same words used everywhere else for these places.
-    expect(within(nav).getAllByRole("button").map((b) => b.textContent)).toEqual(["Ask", "Projects", "Vault", "AI"]);
-    expect(within(nav).getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual(["Ask Scholar", "Projects", "Knowledge Vault", "AI Access"]);
-    fireEvent.click(within(nav).getByRole("button", { name: "AI Access" }));
+    expect(screen.queryByRole("navigation", { name: "Main" })).toBeNull();
+
+    const { drawer, places } = openRail();
+    // Icons only: nothing visible to read, so each control carries its name.
+    const buttons = within(places).getAllByRole("button");
+    expect(buttons.map((b) => b.getAttribute("aria-label"))).toEqual(["Ask Scholar", "Projects", "Knowledge Vault", "AI Access"]);
+    expect(buttons.map((b) => b.textContent)).toEqual(["", "", "", ""]);
+    expect(within(drawer).getByRole("button", { name: "New Project" })).toBeInTheDocument();
+    expect(drawer).toHaveClass("w-16");
+
+    fireEvent.click(within(places).getByRole("button", { name: "AI Access" }));
     expect(onOpenAiAccess).toHaveBeenCalled();
-    fireEvent.click(within(nav).getByRole("button", { name: "Knowledge Vault" }));
+    fireEvent.click(within(openRail().places).getByRole("button", { name: "Knowledge Vault" }));
     expect(onOpenVault).toHaveBeenCalled();
   });
 
@@ -135,24 +162,38 @@ describe("phone home: Ask Scholar first", () => {
       const onOpen = vi.fn();
       renderHome(vi.fn(), vi.fn(), "researcher@university.edu", onOpen);
       const section = await screen.findByTestId("mobile-continue");
-      fireEvent.click(within(section).getAllByRole("button")[0]);
+      expect(within(section).getByRole("heading", { name: "Recent" })).toBeInTheDocument();
+      expect(screen.queryByRole("group", { name: "Suggested questions" })).toBeNull();
+      fireEvent.click(within(section).getByRole("button", { name: /Climate essay/ }));
       expect(onOpen).toHaveBeenCalledWith("p1");
     });
 
-    it("does not repeat the bottom bar's places or the theme switch inside the drawer", () => {
+    it("links Recent to the full project list", async () => {
+      vi.mocked(api.listProjects).mockResolvedValue({
+        items: [{ projectId: "p1", outputTypeId: "OT-01", title: "Climate essay", answers: {}, authors: [], intakeCompleteness: 0.4, hasDocument: false, hasJournalRequirements: false, gates: [] }],
+      } as never);
       renderHome();
-      const drawer = screen.getByLabelText("Workspace navigation", { selector: "aside" });
-      expect(within(drawer).queryByRole("button", { name: "Knowledge Vault" })).toBeNull();
-      expect(within(drawer).queryByRole("button", { name: "Manage AI Access" })).toBeNull();
-      expect(within(drawer).queryByRole("button", { name: "Ask Scholar" })).toBeNull();
-      expect(within(drawer).queryByRole("button", { name: "Toggle theme" })).toBeNull();
-      expect(within(drawer).queryByText("⌘K")).toBeNull();
-      expect(screen.getAllByRole("button", { name: /Switch to (light|dark) mode|Toggle theme/ })).toHaveLength(1);
+      const section = await screen.findByTestId("mobile-continue");
+      fireEvent.click(within(section).getByRole("button", { name: "All projects" }));
+      expect(screen.getByTestId("phone-projects")).toBeInTheDocument();
     });
 
-    it("keeps the header uncluttered: theme switch, no duplicate Ask button", () => {
+    it("keeps the rail to icons: one theme switch, no project list, search or account card", () => {
       renderHome();
-      expect(screen.getByRole("button", { name: /Switch to (light|dark) mode/ })).toBeInTheDocument();
+      const { drawer } = openRail();
+      expect(within(drawer).getByRole("button", { name: /Switch to (light|dark) mode/ })).toBeInTheDocument();
+      expect(screen.getAllByRole("button", { name: /Switch to (light|dark) mode|Toggle theme/ })).toHaveLength(1);
+      expect(within(drawer).queryByText("⌘K")).toBeNull();
+      expect(within(drawer).queryByRole("textbox", { name: "Search projects" })).toBeNull();
+      expect(within(drawer).queryByText("researcher@university.edu")).toBeNull();
+      expect(within(drawer).getByRole("button", { name: /^Account/ })).toBeInTheDocument();
+    });
+
+    it("keeps the header to the menu and the AI in use: no theme switch, no duplicate Ask button", () => {
+      renderHome();
+      const main = document.querySelector("main")!;
+      expect(within(main).getByRole("button", { name: "Open navigation" })).toBeInTheDocument();
+      expect(within(main).queryByRole("button", { name: /Switch to (light|dark) mode/ })).toBeNull();
       expect(screen.queryByRole("button", { name: /Ask Scholar panel/i })).toBeNull();
     });
 
@@ -268,29 +309,36 @@ describe("phone Projects tab", () => {
         <ProjectListScreen onOpen={onOpen} userEmail="researcher@university.edu" />
       </MemoryRouter>
     );
-  const tab = (name: string) => within(screen.getByRole("navigation", { name: "Main" })).getByRole("button", { name });
+  /** Whether the rail marks a place as the current one (opens the rail to look, then closes it). */
+  const isCurrent = (name: string) => {
+    const current = within(openRail().places).getByRole("button", { name }).getAttribute("aria-current") === "page";
+    fireEvent.keyDown(document, { key: "Escape" });
+    return current;
+  };
+  /** Goes to a place from the rail (choosing a place closes the rail). */
+  const goTo = (name: string) => fireEvent.click(within(openRail().places).getByRole("button", { name }));
 
-  it("shows the list at /projects with that tab highlighted, and Ask switches to the Ask home", async () => {
+  it("shows the list at /projects with that place current in the rail, and Ask switches to the Ask home", async () => {
     vi.mocked(api.listProjects).mockResolvedValue({
       items: [{ projectId: "p1", outputTypeId: "OT-01", title: "Climate essay", answers: {}, authors: [], intakeCompleteness: 0.4, hasDocument: false, hasJournalRequirements: false, gates: [] }],
     } as never);
     const onOpen = vi.fn();
     at("/projects", onOpen);
-    expect(tab("Projects")).toHaveAttribute("aria-current", "page");
-    expect(tab("Ask Scholar")).not.toHaveAttribute("aria-current");
+    expect(isCurrent("Projects")).toBe(true);
+    expect(isCurrent("Ask Scholar")).toBe(false);
     fireEvent.click(await within(screen.getByTestId("phone-projects")).findByRole("button", { name: /Climate essay/ }));
     expect(onOpen).toHaveBeenCalledWith("p1");
-    fireEvent.click(tab("Ask Scholar"));
+    goTo("Ask Scholar");
     expect(screen.queryByTestId("phone-projects")).toBeNull();
     expect(screen.getByRole("region", { name: "Ask Scholar" })).toBeInTheDocument();
-    expect(tab("Ask Scholar")).toHaveAttribute("aria-current", "page");
-    fireEvent.click(tab("Projects"));
+    expect(isCurrent("Ask Scholar")).toBe(true);
+    goTo("Projects");
     expect(screen.getByTestId("phone-projects")).toBeInTheDocument();
   });
 
   it("opens the Ask home directly from its own address", () => {
     at("/projects?tab=ask");
     expect(screen.getByRole("region", { name: "Ask Scholar" })).toBeInTheDocument();
-    expect(tab("Ask Scholar")).toHaveAttribute("aria-current", "page");
+    expect(isCurrent("Ask Scholar")).toBe(true);
   });
 });

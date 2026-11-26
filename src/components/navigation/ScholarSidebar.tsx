@@ -1,23 +1,30 @@
 /**
  * The one workspace sidebar: the main screen (projects, Vault, AI Access) and Presentation Studio both render
  * this component, so navigation, project rows, search and the account area cannot drift apart.
+ *
+ * Two shapes: the full 260px panel (project list, search, account card) and a 64px icon rail. Wide screens show
+ * the rail when the panel is collapsed. On a phone the drawer is always the rail and is the app's one navigation:
+ * Ask, Projects, Vault and AI Access, plus New project, the theme switch, Settings and the account.
  */
 import { useEffect, useRef, useState, type ReactNode, type Ref } from "react";
 import {
-  ChevronsLeft,
   Database,
   FileText,
+  FolderOpen,
   FolderPlus,
   Lightbulb,
   MoreVertical,
   Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
   Pencil,
   Pin,
+  Plus,
   Presentation,
   Search,
   Settings,
   Share2,
-  Sliders,
+  Sparkles,
   Sun,
   Trash2,
   X,
@@ -40,14 +47,19 @@ export interface ScholarSidebarProps {
   isCollapsed?: boolean;
   /** Collapses the column (the « button). */
   onToggle?: () => void;
+  /** Wide screens: opens the full panel from the icon rail. */
+  onExpand?: () => void;
   /** Phones show the sidebar as a drawer over the page instead of a column. */
   isPhone?: boolean;
   mobileOpen?: boolean;
   onCloseMobile?: () => void;
   asideRef?: Ref<HTMLElement>;
+  /** The current place: "ask", "projects", "vault", "ai-access" or "presentation". */
   activeItem?: string;
-  /** Phones reach Vault, AI and Ask from the bottom bar, so the drawer leaves them out. */
+  /** Leaves Ask, Projects, Vault and AI Access out of the navigation. */
   hideNavLinks?: boolean;
+  /** Phones: the project list is its own screen, reached from the rail. Without this the rail has no Projects item. */
+  onOpenProjects?: () => void;
   onHome?: () => void;
   onNewProject: () => void;
   onOpenVault: () => void;
@@ -70,6 +82,8 @@ export interface ScholarSidebarProps {
   onProjectAction?: (action: ScholarSidebarAction, project: ScholarSidebarProject) => void;
   /** Bottom of the sidebar (the account menu). */
   footer?: ReactNode;
+  /** Bottom of the icon rail: a compact account control (an avatar), since the card does not fit. */
+  railFooter?: ReactNode;
 }
 
 const navClass = (active: boolean) =>
@@ -91,15 +105,47 @@ const rowActionReveal =
 const menuItem =
   "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-neutral-700 dark:text-neutral-300 hover:bg-neutral-900/5 dark:hover:bg-white/5 hover:text-neutral-900 dark:hover:text-neutral-100 cursor-pointer text-left";
 
+/** Rail buttons: 40px with a mouse, 44px on a phone (touch target). */
+const railButton = (opts: { active?: boolean; primary?: boolean; touch?: boolean } = {}) =>
+  `${opts.touch ? "w-11 h-11" : "w-10 h-10"} rounded-xl flex items-center justify-center cursor-pointer transition-colors ${
+    opts.primary
+      ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 shadow-sm"
+      : opts.active
+        ? "bg-neutral-900/10 dark:bg-white/10 text-neutral-900 dark:text-white"
+        : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-900/5 dark:hover:bg-white/10"
+  }`;
+
+/**
+ * One rail control with its name shown beside it on hover or keyboard focus. The control carries the
+ * accessible name itself (aria-label); the tooltip is visual only. Touch screens have no hover, so no tooltip.
+ */
+function RailItem({ label, tooltip, children }: { label: string; tooltip: boolean; children: ReactNode }) {
+  return (
+    <div className="relative group/tip">
+      {children}
+      {tooltip && (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 whitespace-nowrap rounded-md bg-neutral-900 dark:bg-white px-2 py-1 text-xs font-medium text-white dark:text-neutral-900 shadow-lg opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 group-focus-within/tip:opacity-100 [@media(hover:none)]:hidden"
+        >
+          {label}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export default function ScholarSidebar({
   isCollapsed = false,
   onToggle,
+  onExpand,
   isPhone = false,
   mobileOpen = false,
   onCloseMobile,
   asideRef,
   activeItem,
   hideNavLinks = false,
+  onOpenProjects,
   onHome,
   onNewProject,
   onOpenVault,
@@ -117,6 +163,7 @@ export default function ScholarSidebar({
   onSelectProject,
   onProjectAction,
   footer,
+  railFooter,
 }: ScholarSidebarProps) {
   const { theme, toggleTheme } = useTheme();
   const [menuFor, setMenuFor] = useState<string | null>(null);
@@ -143,8 +190,114 @@ export default function ScholarSidebar({
     onProjectAction?.(action, project);
   };
 
-  // Off-screen is not the same as unreachable: inert keeps Tab and screen readers out of a closed sidebar.
-  const closed = isPhone ? !mobileOpen : isCollapsed;
+  // A phone's drawer is always the rail; a wide screen shows it when the panel is collapsed.
+  const rail = isPhone || (isCollapsed && !mobileOpen);
+  // Off-screen is not the same as unreachable: inert keeps Tab and screen readers out of a closed drawer.
+  // On a wide screen the sidebar is never closed, only folded to the rail.
+  const closed = isPhone && !mobileOpen;
+  const tooltip = !isPhone;
+  const touch = isPhone;
+
+  // Ask is the current place on the phone's Ask home, and on a wide screen while its panel is open.
+  const askActive = activeItem === "ask" || Boolean(askScholarExpanded);
+  const themeLabel = theme === "dark" ? "Switch to light mode" : "Switch to dark mode";
+
+  const railBody = (
+    <div className="flex h-full w-16 flex-col items-center gap-1.5 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      {isPhone ? (
+        onCloseMobile && (
+          <button type="button" onClick={onCloseMobile} aria-label="Close navigation" className={railButton({ touch })}>
+            <X className="w-5 h-5" aria-hidden="true" />
+          </button>
+        )
+      ) : (
+        <>
+          <RailItem label="Scholar Core home" tooltip={tooltip}>
+            <button
+              type="button"
+              onClick={onHome}
+              aria-label="Scholar Core home"
+              className="w-10 h-10 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 flex items-center justify-center cursor-pointer shadow-xs hover:opacity-85 transition-opacity"
+            >
+              <ScholarCoreLogo size="sm" className="text-white dark:text-neutral-900" />
+            </button>
+          </RailItem>
+          {onExpand && (
+            <RailItem label="Expand sidebar" tooltip={tooltip}>
+              <button type="button" onClick={onExpand} aria-label="Expand sidebar" data-testid="expand-sidebar-btn" className={railButton()}>
+                <PanelLeftOpen className="w-5 h-5" aria-hidden="true" />
+              </button>
+            </RailItem>
+          )}
+        </>
+      )}
+
+      <span aria-hidden="true" className="my-1 h-px w-8 bg-neutral-200 dark:bg-white/10" />
+
+      <RailItem label="New Project" tooltip={tooltip}>
+        <button type="button" onClick={onNewProject} aria-label="New Project" className={railButton({ primary: true, touch })}>
+          <Plus className="w-5 h-5" aria-hidden="true" />
+        </button>
+      </RailItem>
+      {onOpenCommandPalette && !isPhone && (
+        <RailItem label="Search  ⌘K" tooltip={tooltip}>
+          <button type="button" onClick={onOpenCommandPalette} aria-label="Search projects" aria-keyshortcuts="Meta+K" className={railButton()}>
+            <Search className="w-5 h-5" aria-hidden="true" />
+          </button>
+        </RailItem>
+      )}
+
+      {!hideNavLinks && (
+        <nav aria-label="Workspace" className="mt-1 flex flex-col items-center gap-1.5">
+          <RailItem label="Ask Scholar" tooltip={tooltip}>
+            <button
+              type="button"
+              onClick={onOpenAskScholar}
+              aria-label="Ask Scholar"
+              aria-expanded={askScholarExpanded}
+              aria-current={activeItem === "ask" ? "page" : undefined}
+              className={railButton({ active: askActive, touch })}
+            >
+              <Lightbulb className="w-5 h-5" aria-hidden="true" />
+            </button>
+          </RailItem>
+          {onOpenProjects && (
+            <RailItem label="Projects" tooltip={tooltip}>
+              <button type="button" onClick={onOpenProjects} aria-label="Projects" aria-current={activeItem === "projects" ? "page" : undefined} className={railButton({ active: activeItem === "projects", touch })}>
+                <FolderOpen className="w-5 h-5" aria-hidden="true" />
+              </button>
+            </RailItem>
+          )}
+          <RailItem label="Knowledge Vault" tooltip={tooltip}>
+            <button type="button" onClick={onOpenVault} aria-label="Knowledge Vault" aria-current={activeItem === "vault" ? "page" : undefined} className={railButton({ active: activeItem === "vault", touch })}>
+              <Database className="w-5 h-5" aria-hidden="true" />
+            </button>
+          </RailItem>
+          <RailItem label="AI Access" tooltip={tooltip}>
+            <button type="button" onClick={onOpenAiAccess} aria-label="AI Access" aria-current={activeItem === "ai-access" ? "page" : undefined} className={railButton({ active: activeItem === "ai-access", touch })}>
+              <Sparkles className="w-5 h-5" aria-hidden="true" />
+            </button>
+          </RailItem>
+        </nav>
+      )}
+
+      <span className="flex-1" aria-hidden="true" />
+
+      <RailItem label={theme === "dark" ? "Light mode" : "Dark mode"} tooltip={tooltip}>
+        <button type="button" onClick={toggleTheme} aria-label={themeLabel} className={railButton({ touch })}>
+          {theme === "dark" ? <Sun className="w-5 h-5 text-amber-400" aria-hidden="true" /> : <Moon className="w-5 h-5" aria-hidden="true" />}
+        </button>
+      </RailItem>
+      {onOpenSettings && (
+        <RailItem label="Settings" tooltip={tooltip}>
+          <button type="button" onClick={onOpenSettings} aria-label="Settings" className={railButton({ touch })}>
+            <Settings className="w-5 h-5" aria-hidden="true" />
+          </button>
+        </RailItem>
+      )}
+      {railFooter && <div className="mt-1 flex justify-center">{railFooter}</div>}
+    </div>
+  );
 
   return (
     <aside
@@ -153,11 +306,11 @@ export default function ScholarSidebar({
       data-testid="scholar-sidebar"
       aria-label="Workspace navigation"
       className={`fixed inset-y-0 left-0 z-50 ${isPhone ? "" : "md:relative md:z-30"} h-full flex flex-col justify-between border-r border-neutral-200 dark:border-white/10 bg-white dark:bg-ink-750 text-neutral-700 dark:text-neutral-300 flex-shrink-0 select-none transition-all duration-300 ease-in-out ${
-        mobileOpen
-          ? "translate-x-0 w-[260px] shadow-2xl"
-          : `-translate-x-full ${isPhone ? "" : "md:translate-x-0"} ${isCollapsed ? "w-0 border-r-0 overflow-hidden" : "w-[260px]"}`
-      }`}
+        rail ? "w-16" : "w-[260px]"
+      } ${mobileOpen ? "translate-x-0 shadow-2xl" : `-translate-x-full ${isPhone ? "" : "md:translate-x-0"}`}`}
     >
+      {rail ? railBody : (
+      <>
       <div className="flex flex-col flex-shrink-0 w-[260px]">
         <div className="p-4 pb-3 flex items-center justify-between border-b border-neutral-200 dark:border-white/10">
           <button
@@ -175,13 +328,13 @@ export default function ScholarSidebar({
             </span>
           </button>
 
-          {onToggle && !isPhone && (
+          {onToggle && (
             <button type="button" onClick={onToggle} className={`${iconButton} hidden md:flex`} title="Collapse sidebar" aria-label="Collapse sidebar" data-testid="collapse-sidebar-btn">
-              <ChevronsLeft className="w-4 h-4" aria-hidden="true" />
+              <PanelLeftClose className="w-4 h-4" aria-hidden="true" />
             </button>
           )}
           {onCloseMobile && (
-            <button type="button" onClick={onCloseMobile} className={`${iconButton} ${isPhone ? "" : "md:hidden"}`} title="Close navigation" aria-label="Close navigation">
+            <button type="button" onClick={onCloseMobile} className={`${iconButton} md:hidden`} title="Close navigation" aria-label="Close navigation">
               <X className="w-4 h-4" aria-hidden="true" />
             </button>
           )}
@@ -207,7 +360,7 @@ export default function ScholarSidebar({
               <span>Knowledge Vault</span>
             </button>
             <button type="button" onClick={onOpenAiAccess} aria-label="Manage AI Access" className={navClass(activeItem === "ai-access")}>
-              <Sliders className={navIcon} aria-hidden="true" />
+              <Sparkles className={navIcon} aria-hidden="true" />
               <span>AI Access</span>
             </button>
             <button type="button" onClick={onOpenAskScholar} aria-expanded={askScholarExpanded} className={navClass(Boolean(askScholarExpanded))}>
@@ -240,8 +393,7 @@ export default function ScholarSidebar({
                   <X className="w-3.5 h-3.5" aria-hidden="true" />
                 </button>
               ) : (
-                onOpenCommandPalette &&
-                !isPhone && (
+                onOpenCommandPalette && (
                   <button
                     type="button"
                     onClick={onOpenCommandPalette}
@@ -338,23 +490,22 @@ export default function ScholarSidebar({
               <span>Settings</span>
             </button>
           )}
-          {/* A phone has its theme switch in the page header. */}
-          {!isPhone && (
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className="p-2 rounded-lg hover:bg-neutral-900/5 dark:hover:bg-white/5 cursor-pointer text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors border border-neutral-200 dark:border-white/10 flex-shrink-0"
-              aria-label="Toggle theme"
-              title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-            >
-              <span className="block w-4 h-4 transition-transform duration-200 rotate-0 dark:-rotate-90">
-                {theme === "dark" ? <Sun className="w-4 h-4 text-amber-400" aria-hidden="true" /> : <Moon className="w-4 h-4" aria-hidden="true" />}
-              </span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="p-2 rounded-lg hover:bg-neutral-900/5 dark:hover:bg-white/5 cursor-pointer text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors border border-neutral-200 dark:border-white/10 flex-shrink-0"
+            aria-label="Toggle theme"
+            title={themeLabel}
+          >
+            <span className="block w-4 h-4 transition-transform duration-200 rotate-0 dark:-rotate-90">
+              {theme === "dark" ? <Sun className="w-4 h-4 text-amber-400" aria-hidden="true" /> : <Moon className="w-4 h-4" aria-hidden="true" />}
+            </span>
+          </button>
         </div>
         {footer}
       </div>
+      </>
+      )}
     </aside>
   );
 }

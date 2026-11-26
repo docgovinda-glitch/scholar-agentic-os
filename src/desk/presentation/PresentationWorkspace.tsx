@@ -16,6 +16,7 @@ import { DEFAULT_DECK_THEME_ID } from '../../features/slides/gamma/theme';
 import { composeDeckFromText, composeDeckFromTopic } from '../../features/slides/gamma/composer';
 import { normalizeDeck } from '../../features/slides/gamma/content';
 import ScholarSidebar, { type ScholarSidebarProject } from '../../components/navigation/ScholarSidebar';
+import { readSidebarCollapsed, saveSidebarCollapsed } from '../../components/navigation/sidebarPreference';
 import { useDeviceClass } from '../../hooks/useDeviceClass';
 import { useDeskSession } from '../useDeskSession';
 import { useProjectDocumentTitle } from '../documentTitle';
@@ -54,10 +55,17 @@ export default function PresentationWorkspace({
     initialStep ?? (initialDeck || (initialCourseworkText && initialCourseworkText.trim()) ? 'studio' : 'understand');
   const [currentStep, setCurrentStep] = useState<PresentationStudioStep>(computedInitialStep);
   const { isMobile: isPhone } = useDeviceClass();
-  // Below 1024px the studio needs the full width, so the navigation starts closed.
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(
-    () => typeof window !== 'undefined' && window.innerWidth < 1024
-  );
+  // Phones: the navigation drawer starts closed. Wider screens: the user's last choice (panel or icon rail),
+  // else the rail below 1024px, where the studio needs the width.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    if (isPhone) return true;
+    return readSidebarCollapsed() ?? window.innerWidth < 1024;
+  });
+  const setSidebarCollapsedByUser = (collapsed: boolean) => {
+    setSidebarCollapsed(collapsed);
+    if (!isPhone) saveSidebarCollapsed(collapsed);
+  };
   const [sidebarSearch, setSidebarSearch] = useState('');
   // The sidebar shows the signed-in user's own projects and email, nothing else.
   const session = useDeskSession();
@@ -430,8 +438,11 @@ export default function PresentationWorkspace({
         mobileOpen={isPhone && !sidebarCollapsed}
         onCloseMobile={() => setSidebarCollapsed(true)}
         isCollapsed={sidebarCollapsed}
-        onToggle={() => setSidebarCollapsed(true)}
+        onToggle={() => setSidebarCollapsedByUser(true)}
+        onExpand={() => setSidebarCollapsedByUser(false)}
         activeItem="presentation"
+        // Phones: the rail is the only navigation, so it needs its own way to the project list.
+        onOpenProjects={isPhone ? () => goTo('/projects') : undefined}
         onHome={handleNavigateBack}
         onNewProject={() => goTo('/projects?new=1')}
         onOpenVault={() => (onOpenVault ? onOpenVault() : goTo('/vault'))}
@@ -457,6 +468,18 @@ export default function PresentationWorkspace({
             </div>
           ) : null
         }
+        railFooter={
+          sessionEmail ? (
+            <span
+              role="img"
+              aria-label={`Signed in as ${displayName || sessionEmail}`}
+              title={sessionEmail}
+              className="w-10 h-10 rounded-full bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 flex items-center justify-center text-xs font-bold"
+            >
+              {(displayName || sessionEmail).slice(0, 2).toUpperCase()}
+            </span>
+          ) : null
+        }
       />
 
       {/* Main Workspace Column */}
@@ -478,7 +501,8 @@ export default function PresentationWorkspace({
           }}
           onNavigateBack={handleNavigateBack}
           isSidebarCollapsed={sidebarCollapsed}
-          onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
+          // Wider screens reopen the panel from the rail's own button; only a phone needs one in the header.
+          onToggleSidebar={isPhone ? () => setSidebarCollapsed(!sidebarCollapsed) : undefined}
           onOpenQaSimulator={() => {
             if (projectId) setIsQaSimulatorOpen(true);
             else showAppToast('Sign in to rehearse audience questions.', 'info', 4000);

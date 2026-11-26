@@ -381,14 +381,15 @@ Multi-agent verification delivers 100% citation accuracy across 5,000 tested ref
     expect(screen.queryByRole("button", { name: "Slides & Keynotes" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Ask Scholar" })).toBeInTheDocument();
 
-    // Collapse toggle button («) collapses sidebar
+    // Collapse toggle button folds the sidebar to its icon rail
     const collapseBtn = screen.getByTestId("collapse-sidebar-btn");
     fireEvent.click(collapseBtn);
-    expect(sidebar.className).toContain("w-0");
+    expect(sidebar.className).toContain("w-16");
+    expect(within(sidebar).getByRole("button", { name: "Ask Scholar" })).toBeInTheDocument();
 
-    // In header, expand button (») appears
+    // The rail carries the one Expand button (the studio header adds none on wide screens)
     const expandBtn = screen.getByTestId("expand-sidebar-btn");
-    expect(expandBtn).toBeInTheDocument();
+    expect(sidebar.contains(expandBtn)).toBe(true);
 
     // Clicking expand restores sidebar
     fireEvent.click(expandBtn);

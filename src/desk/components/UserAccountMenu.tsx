@@ -20,7 +20,8 @@ export interface UserAccountMenuProps {
   onOpenHelp?: () => void;
   onOpenAuth?: (mode: "signin" | "signup") => void;
   dropUp?: boolean;
-  variant?: "bar" | "sidebar";
+  /** "rail": an avatar for the icon-only sidebar; its menu opens beside the rail. */
+  variant?: "bar" | "sidebar" | "rail";
 }
 
 export default function UserAccountMenu({
@@ -111,6 +112,21 @@ export default function UserAccountMenu({
   const secondaryIdentifier = userEmail || (username ? `@${username}` : "Scholar Profile");
   const initial = (fullName ? fullName.charAt(0) : (userEmail ? userEmail.charAt(0) : "U")).toUpperCase();
 
+  if (!userEmail && variant === "rail") {
+    return (
+      <button
+        type="button"
+        onClick={() => onOpenAuth?.("signin")}
+        aria-label="Sign in"
+        className="w-10 h-10 rounded-full flex items-center justify-center border border-[var(--border-default)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors cursor-pointer"
+      >
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        </svg>
+      </button>
+    );
+  }
+
   if (!userEmail) {
     return (
       <div className="relative w-full">
@@ -144,9 +160,20 @@ export default function UserAccountMenu({
   }
 
   return (
-    <div className="relative w-full" ref={menuRef}>
+    <div className={variant === "rail" ? "relative" : "relative w-full"} ref={menuRef}>
       {/* Trigger Button */}
-      {variant === "sidebar" ? (
+      {variant === "rail" ? (
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          aria-label={`Account: ${displayName}`}
+          aria-expanded={open}
+          title={secondaryIdentifier}
+          className="w-10 h-10 rounded-full bg-[var(--theme-fg)] text-[var(--theme-bg)] flex items-center justify-center font-bold text-sm shadow-2xs cursor-pointer hover:opacity-85 transition-opacity"
+        >
+          {initial}
+        </button>
+      ) : variant === "sidebar" ? (
         <button
           type="button"
           onClick={() => setOpen(!open)}
@@ -212,7 +239,7 @@ export default function UserAccountMenu({
       {open && (
         <div
           className={`absolute ${
-            dropUp ? "bottom-full left-0 mb-2 w-full" : "right-0 mt-2 w-72"
+            variant === "rail" ? "left-full bottom-0 ml-3 w-64" : dropUp ? "bottom-full left-0 mb-2 w-full" : "right-0 mt-2 w-72"
           } rounded-2xl bg-[var(--theme-bg)] border border-[var(--theme-fg)]/15 shadow-xl p-2 z-50 text-xs animate-in fade-in duration-150`}
         >
           {error && (

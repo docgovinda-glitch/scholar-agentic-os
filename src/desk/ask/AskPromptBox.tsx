@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowUp, FileText, Loader2, Paperclip, Square, X } from "lucide-react";
+import React, { useCallback, useEffect, useId, useRef, useState } from "react";
+import { ArrowUp, FileText, Loader2, Paperclip, SlidersHorizontal, Square, X } from "lucide-react";
 import { PromptBarActionMenu, type PromptMode } from "../PromptBarActionMenu";
 import type { AgentAttachmentItem } from "../dashboard";
-import { ScholarFilterBar } from "./ScholarFilterBar";
+import { activeFilterCount, AnswerModeToggle, ScholarFilterBar, ScholarFilterOptions } from "./ScholarFilterBar";
 import type { ScholarFilters } from "../../domain/ask/scholarFilters";
 
 export interface AskPromptBoxProps {
@@ -33,6 +33,11 @@ export interface AskPromptBoxProps {
   /** When both are given, a Quick Scholar | Deep Research toggle and scholarly filter chips are shown. */
   filters?: ScholarFilters;
   onFiltersChange?: (filters: ScholarFilters) => void;
+  /**
+   * Phones: one row of controls (attach, Quick | Deep, options, send). The filters and `children`
+   * (citation style, preferences) open from the options button instead of taking rows of their own.
+   */
+  compact?: boolean;
 }
 
 /**
@@ -64,9 +69,12 @@ export function AskPromptBox({
   className = "",
   filters,
   onFiltersChange,
+  compact = false,
 }: AskPromptBoxProps) {
   const localRef = useRef<HTMLTextAreaElement | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const optionsId = useId();
   const canSend = (value.trim().length > 0 || attachments.length > 0) && !isUploading;
 
   const setRefs = useCallback(
@@ -102,6 +110,42 @@ export function AskPromptBox({
   };
 
   const stopping = isThinking && Boolean(onStop);
+  const withFilters = filters && onFiltersChange ? { filters, onFiltersChange } : null;
+  const filterCount = filters ? activeFilterCount(filters) : 0;
+  const hasOptions = Boolean(withFilters) || Boolean(children);
+
+  const sendControl = (
+    <div className="relative group shrink-0">
+      {stopping ? (
+        <button
+          type="button"
+          onClick={onStop}
+          title="Stop generating"
+          aria-label="Stop generating"
+          className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-neutral-900 text-white shadow-xs transition-all duration-200 hover:opacity-90 active:scale-95 dark:bg-white dark:text-neutral-900 sm:h-8 sm:w-8"
+        >
+          <Square className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
+        </button>
+      ) : (
+        <button
+          type="submit"
+          disabled={!canSend || isThinking}
+          title={`${sendLabel} (Enter)`}
+          aria-label={sendLabel}
+          className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-neutral-900 text-white shadow-xs transition-all duration-200 hover:bg-neutral-800 active:scale-95 disabled:cursor-not-allowed disabled:bg-neutral-200/80 disabled:text-neutral-400 disabled:shadow-none dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200 dark:disabled:bg-white/10 dark:disabled:text-neutral-500 sm:h-8 sm:w-8"
+        >
+          {isThinking ? (
+            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true" />
+          ) : (
+            <ArrowUp className="h-4 w-4 stroke-[2.25]" aria-hidden="true" />
+          )}
+        </button>
+      )}
+      <span className="pointer-events-none absolute bottom-full right-0 z-30 mb-2 hidden whitespace-nowrap rounded bg-neutral-900 px-2 py-1 text-[11px] text-white shadow-md group-hover:block dark:bg-neutral-800">
+        {stopping ? "Stop generating" : `${sendLabel} (Enter)`}
+      </span>
+    </div>
+  );
 
   return (
     <form
@@ -197,49 +241,66 @@ export function AskPromptBox({
         className="prompt-bare-input scholar-scrollbar w-full min-w-0 resize-none overflow-y-auto border-none bg-transparent px-1 text-base font-normal leading-relaxed text-neutral-900 shadow-none outline-none placeholder:text-neutral-500 focus:shadow-none focus:outline-none focus:ring-0 dark:text-neutral-100 dark:placeholder:text-neutral-400 sm:text-sm"
       />
 
-      {filters && onFiltersChange && (
-        <div className="mt-1.5 px-1">
-          <ScholarFilterBar mode={mode} onModeChange={onModeChange} filters={filters} onFiltersChange={onFiltersChange} />
-        </div>
-      )}
-
-      <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 pt-1.5">
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-          <PromptBarActionMenu onAttachFiles={onAttachFiles} />
-          {children}
-        </div>
-
-        <div className="relative group shrink-0">
-          {stopping ? (
-            <button
-              type="button"
-              onClick={onStop}
-              title="Stop generating"
-              aria-label="Stop generating"
-              className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-neutral-900 text-white shadow-xs transition-all duration-200 hover:opacity-90 active:scale-95 dark:bg-white dark:text-neutral-900 sm:h-8 sm:w-8"
+      {compact ? (
+        <>
+          {hasOptions && (
+            <div
+              id={optionsId}
+              data-testid="ask-options-panel"
+              className={optionsOpen ? "mt-2 flex flex-wrap items-center gap-1.5 border-t border-neutral-100 px-1 pt-2.5 dark:border-white/5" : "hidden"}
             >
-              <Square className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
-            </button>
-          ) : (
-            <button
-              type="submit"
-              disabled={!canSend || isThinking}
-              title={`${sendLabel} (Enter)`}
-              aria-label={sendLabel}
-              className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-neutral-900 text-white shadow-xs transition-all duration-200 hover:bg-neutral-800 active:scale-95 disabled:cursor-not-allowed disabled:bg-neutral-200/80 disabled:text-neutral-400 disabled:shadow-none dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200 dark:disabled:bg-white/10 dark:disabled:text-neutral-500 sm:h-8 sm:w-8"
-            >
-              {isThinking ? (
-                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true" />
-              ) : (
-                <ArrowUp className="h-4 w-4 stroke-[2.25]" aria-hidden="true" />
-              )}
-            </button>
+              {withFilters && <ScholarFilterOptions {...withFilters} />}
+              {children}
+            </div>
           )}
-          <span className="pointer-events-none absolute bottom-full right-0 z-30 mb-2 hidden whitespace-nowrap rounded bg-neutral-900 px-2 py-1 text-[11px] text-white shadow-md group-hover:block dark:bg-neutral-800">
-            {stopping ? "Stop generating" : `${sendLabel} (Enter)`}
-          </span>
-        </div>
-      </div>
+          <div className="mt-1.5 flex items-center gap-1">
+            <PromptBarActionMenu onAttachFiles={onAttachFiles} />
+            {withFilters && <AnswerModeToggle mode={mode} onModeChange={onModeChange} compact />}
+            {hasOptions && (
+              <button
+                type="button"
+                data-testid="ask-options-toggle"
+                onClick={() => setOptionsOpen((v) => !v)}
+                aria-expanded={optionsOpen}
+                aria-controls={optionsId}
+                aria-label={filterCount > 0 ? `Answer options, ${filterCount} filters on` : "Answer options"}
+                title="Filters, referencing style and preferences"
+                className={`relative flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 ${
+                  optionsOpen
+                    ? "bg-neutral-900/10 text-neutral-900 dark:bg-white/10 dark:text-white"
+                    : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white"
+                }`}
+              >
+                <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+                {filterCount > 0 && (
+                  <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-neutral-900 px-1 text-[10px] font-semibold text-white dark:bg-white dark:text-neutral-900">
+                    {filterCount}
+                  </span>
+                )}
+              </button>
+            )}
+            <span className="flex-1" aria-hidden="true" />
+            {sendControl}
+          </div>
+        </>
+      ) : (
+        <>
+          {filters && onFiltersChange && (
+            <div className="mt-1.5 px-1">
+              <ScholarFilterBar mode={mode} onModeChange={onModeChange} filters={filters} onFiltersChange={onFiltersChange} />
+            </div>
+          )}
+
+          <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 pt-1.5">
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+              <PromptBarActionMenu onAttachFiles={onAttachFiles} />
+              {children}
+            </div>
+
+            {sendControl}
+          </div>
+        </>
+      )}
     </form>
   );
 }

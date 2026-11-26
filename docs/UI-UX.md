@@ -47,7 +47,9 @@ Defined in `src/index.css`:
 
 `src/hooks/useDeviceClass.ts` classifies `mobile` (< 768 px), `tablet` (768-1023 px) and `desktop` (>= 1024 px, demoted when the pointer is coarse) so components that cannot work on a phone (for example local-server AI options) are not mounted there.
 
-On a phone the address carries the bottom-bar tab: `/projects` is the project list (`components/PhoneProjectsList.tsx`) and `/projects?tab=ask` is the Ask Scholar home.
+The sidebar has two shapes: the full 260 px panel (project list, search, account card) and a 64 px icon rail (New Project, Ask Scholar, Projects on a phone, Knowledge Vault, AI Access, then theme, Settings and the account avatar; each icon carries its name as `aria-label`, with a tooltip on hover). On wide screens collapsing the panel folds it to the rail, and the choice is remembered on the device (`components/navigation/sidebarPreference.ts`, shared with Presentation Studio). On a phone there is no bottom bar: the header's menu button opens the rail as a drawer, and it is the app's one navigation.
+
+On a phone the address carries which place is showing: `/projects` is the project list (`components/PhoneProjectsList.tsx`) and `/projects?tab=ask` is the Ask Scholar home. The Ask home is a centred greeting, one tap per workspace ("Start a project"), suggested questions for a newcomer or a "Recent" list (the last chat and up to three projects, with "All projects") for a returning user, and the question box pinned to the bottom. The header shows only the menu button and the AI in use. On a phone the question box keeps one row of controls (attach, Quick | Deep, options, send); filters, referencing style and preferences open from the options button.
 
 Other hooks: `useBackToClose`, `useOnlineStatus`, `useVisualViewport`, `useUnsavedChangesGuard`.
 

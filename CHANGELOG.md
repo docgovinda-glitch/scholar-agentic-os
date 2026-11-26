@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-11-17
 
+### Phone navigation and Ask Scholar home
+- **Icon-only sidebar, no bottom bar.** On phones the bottom bar (Ask, Projects, Vault, AI) is gone; those places, New Project, the theme switch, Settings and the account are icons in a 64 px rail that the header's menu button opens. On wide screens collapsing the sidebar folds it to the same rail instead of hiding it, and the choice is remembered on the device (also in Presentation Studio).
+- **Calmer Ask home on phones.** A centred greeting replaces the large "Ask Scholar" heading; the Workspaces dropdown became three one-tap "Start a project" buttons; the black "Resume chat" card and "Continue where you left off" became one light "Recent" list (last chat and up to three projects, with "All projects"). The AI in use is shown once, in the header; the theme switch moved to the rail. The question box has one row of controls (attach, Quick | Deep, options, send), with filters, referencing style and preferences behind the options button, and keeps clear of the iPhone home indicator.
+
 ### Login and signup audit
 - **One identifier rule.** Username, email and mobile detection and the uniform sign-in error now live in `src/domain/auth/identifier.ts`, used by both the browser service and `POST /api/auth/login`. They had been two copies of the same regular expressions.
 - **Dead signup CAPTCHA route removed.** `POST /api/auth/verify-signup` had no caller, and its server-side Turnstile check would spend the single-use token before Supabase Auth could verify it. Signup still relies on Supabase's CAPTCHA check.
