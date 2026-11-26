@@ -466,14 +466,10 @@ export default function AuditExportMode() {
           template: layoutMode === "2-column-camera" ? "ieee" : "apa7",
           citationStyle,
           authors: namedAuthors.map((a) => ({ name: fullName(a), affiliation: a.affiliation, email: a.email, isCorresponding: a.isCorresponding })),
-          abstract: answers["abstract"] || "",
-          keywords: keywords.split(",").map((s) => s.trim()),
-          sections: [
-            {
-              section: "Manuscript Content",
-              content: exportText,
-            },
-          ],
+          // The abstract goes in the front matter once; the rest keeps the manuscript's own headings.
+          abstract: exportParts(exportText).abstract || answers["abstract"] || "",
+          keywords: keywords.split(",").map((s) => s.trim()).filter(Boolean),
+          sections: [{ section: "", content: exportParts(exportText).body }],
           declarations: {
             dataAvailability: dataAvailabilityStatement,
             conflictOfInterest: competingInterestsStatement,

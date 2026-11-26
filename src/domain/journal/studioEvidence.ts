@@ -4,7 +4,7 @@
  * list built from the [CITE:id] tokens in the text. Pure; no React, no I/O.
  */
 import { safeParseAnswerField } from "../../shared/projectStateSchema";
-import { citedIds, formatEntry, styleKey } from "./citationStyles";
+import { citedIds, formatEntry, isNumeric, styleKey } from "./citationStyles";
 import type { ReferenceRecord } from "./references";
 import { recordsForSources } from "./referenceAudit";
 
@@ -78,8 +78,9 @@ export function evidenceFor(all: StudioEvidence[], unitId: string, sectionId: st
 
 /**
  * References for every [CITE:id] token in the text, in the project's citation
- * style (the same formatter Delivery and export use), alphabetical, plus the
- * ids that match no source. A saved registry record wins over what was typed.
+ * style (the same formatter Delivery and export use), plus the ids that match
+ * no source. Alphabetical, except in numbered styles (IEEE, Vancouver), where
+ * the list follows first citation so its numbers match the in-text ones. A saved registry record wins over what was typed.
  */
 export function citedReferences(
   text: string,
@@ -96,7 +97,7 @@ export function citedReferences(
     if (e) entries.push({ evidence: e, reference: formatEntry(records[e.id], style) });
     else unknownTokens.push(`[CITE:${id}]`);
   }
-  entries.sort((a, b) => a.reference.localeCompare(b.reference));
+  if (!isNumeric(style)) entries.sort((a, b) => a.reference.localeCompare(b.reference));
   return { entries, unknownTokens };
 }
 

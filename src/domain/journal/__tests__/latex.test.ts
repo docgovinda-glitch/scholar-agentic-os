@@ -129,3 +129,35 @@ describe("bodyLatex: the Studio's own heading layout", () => {
     expect(tex).toContain("\\subsubsection{C}");
   });
 });
+
+describe("buildLatex adds nothing the author didn't write", () => {
+  const base = { style: "ieee" as const, journal: "Journal of Sleep", declarations: [], records: {} };
+
+  it("has no stand-in author, abstract, declarations or bibliography", () => {
+    for (const template of ["article", "ieeetran", "elsarticle", "sn-jnl"] as const) {
+      const { tex, bib } = buildLatex({ ...base, template, title: "Sleep and memory", authors: [], body: "## Introduction\n\nSleep supports memory." });
+      expect(tex, template).toContain("Sleep supports memory.");
+      expect(bib, template).toBe("");
+      for (const invented of ["Author Name", "University", "Declarations", "No specific grant", "Available on request", "\\bibliography{", "\\begin{abstract}"]) {
+        expect(tex, `${template}: ${invented}`).not.toContain(invented);
+      }
+    }
+  });
+
+  it("keeps the author's own abstract and declarations, and escapes special characters", () => {
+    const { tex } = buildLatex({
+      ...base,
+      template: "article",
+      title: "Sleep & memory: 50% gains",
+      authors: [{ name: "Ada Lovelace", affiliation: "UCL" }],
+      abstract: "We tested recall.",
+      body: "## Methods\n\nCost was $5 for R&D_2.",
+      declarations: [{ label: "Funding", text: "Wellcome grant 123." }],
+    });
+    expect(tex).toContain("\\begin{abstract}\nWe tested recall.\n\\end{abstract}");
+    expect(tex).toContain("\\section*{Funding}\nWellcome grant 123.");
+    expect(tex).toContain("Sleep \\& memory: 50\\% gains");
+    expect(tex).toContain("Cost was \\$5 for R\\&D\\_2.");
+    expect(tex).not.toContain("Conflict of Interest");
+  });
+});

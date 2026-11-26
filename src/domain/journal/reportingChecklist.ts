@@ -40,7 +40,7 @@ export const checklistById = (id: string): ReportingChecklist | undefined => REP
 export function suggestChecklist(...descriptions: Array<string | undefined>): ReportingChecklist["id"] | null {
   const s = descriptions.filter(Boolean).join(" ").toLowerCase();
   if (/systematic review|meta-analys|scoping review/.test(s)) return "prisma";
-  if (/randomi[sz]ed|randomi[sz]ation|\brct\b|clinical trial/.test(s)) return "consort";
+  if (/randomi[sz]ed|randomi[sz]ation|\brcts?\b|clinical trials?/.test(s)) return "consort";
   if (/\b(mice|mouse|rats?|zebrafish|rodents?|animal model|in vivo)\b/.test(s)) return "arrive";
   if (/cohort|case[- ]control|cross[- ]sectional|observational/.test(s)) return "strobe";
   return null;

@@ -45,6 +45,11 @@ describe("suggestChecklist", () => {
     expect(suggestChecklist("", "A prospective cohort of 2,000 adults")).toBe("strobe");
     expect(suggestChecklist("Essay on epistemology")).toBeNull();
   });
+
+  it("recognises plural trial wording (RCTs, clinical trials)", () => {
+    expect(suggestChecklist("Pooled RCTs of sleep hygiene")).toBe("consort");
+    expect(suggestChecklist("Phase II clinical trials in adults")).toBe("consort");
+  });
 });
 
 describe("progress and the completed file", () => {

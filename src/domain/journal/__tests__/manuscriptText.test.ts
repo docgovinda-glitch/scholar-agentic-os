@@ -58,4 +58,17 @@ describe("citedReferences", () => {
     const ieee = citedReferences("A [CITE:s1].", evidence, { citationStyle: "IEEE" });
     expect(ieee.entries[0].reference).not.toBe(apa.entries[0].reference);
   });
+
+  it("lists numbered styles in order of first citation and the others alphabetically", () => {
+    const two = studioEvidence({
+      approved_vault_sources: JSON.stringify([
+        { id: "z", title: "Zeta results", authors: ["Zhang, Q."], year: 2020 },
+        { id: "a", title: "Alpha results", authors: ["Adams, B."], year: 2021 },
+      ]),
+    });
+    const text = "First [CITE:z], then [CITE:a].";
+    expect(citedReferences(text, two, { citationStyle: "IEEE" }).entries.map((e) => e.evidence.id)).toEqual(["z", "a"]);
+    expect(citedReferences(text, two, { citationStyle: "Vancouver" }).entries.map((e) => e.evidence.id)).toEqual(["z", "a"]);
+    expect(citedReferences(text, two, { citationStyle: "APA 7" }).entries.map((e) => e.evidence.id)).toEqual(["a", "z"]);
+  });
 });
