@@ -57,6 +57,8 @@ export interface WebsiteAssistantMessage {
       | "synthesizing"
       | "report_ready";
     subQuestions: string[];
+    /** Who wrote the plan: the model ("ai"), the built-in starter (no model available), or the researcher. */
+    planSource?: "loading" | "ai" | "starter" | "edited";
     /** Sources found for the plan; the researcher pins or excludes them before the run. */
     previewSources?: PreviewSource[];
     previewStatus?: "loading" | "ready" | "failed";

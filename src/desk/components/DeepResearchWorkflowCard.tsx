@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import {
   classifyResearchPrompt,
-  resolveSourceBudget,
   generateQueryVariations,
 } from "../../config/askScholarConfig";
 
@@ -53,7 +52,6 @@ export interface ProposedDeepResearchPlan {
 
 export function buildProposedDeepResearchPlan(question: string): ProposedDeepResearchPlan {
   const classification = classifyResearchPrompt(question, "deep_research");
-  const budget = resolveSourceBudget("deep_research");
   const variations = generateQueryVariations(question, classification);
 
   const subQuestions = [
@@ -68,7 +66,8 @@ export function buildProposedDeepResearchPlan(question: string): ProposedDeepRes
     disciplineLabel: classification.disciplineProfile.label,
     subQuestions,
     sourceTypes: classification.disciplineProfile.preferredSourceTypes,
-    budgetLabel: `${budget.minCandidates}–${budget.maxCandidates} candidates retrieved · ${budget.minCited}–${budget.maxCited}+ read & cited`,
+    // What the server actually does (deepResearchEngine: DEEP_REPORT_MAX_SOURCES), not a target it never reaches.
+    budgetLabel: "Up to 40 sources go into the report",
   };
 }
 
@@ -91,7 +90,16 @@ export interface DeepResearchWorkflowCardProps {
   onSetSourceChoice?: (index: number, choice: SourceChoice) => void;
   onApprovePlan: (approvedPlanOrQuestions: any) => void;
   onCancel?: () => void;
+  /** Who wrote the sub-questions shown: the model, the built-in starter, or the researcher. */
+  planSource?: "loading" | "ai" | "starter" | "edited";
 }
+
+const PLAN_SOURCE_NOTE: Record<NonNullable<DeepResearchWorkflowCardProps["planSource"]>, string> = {
+  loading: "Asking the AI for a research plan…",
+  ai: "Drafted by AI from your question. Edit before starting.",
+  starter: "Starter plan, not written by AI (no AI could draft one). Edit it to fit your question.",
+  edited: "Your edited plan.",
+};
 
 export function DeepResearchWorkflowCard({
   state,
@@ -104,6 +112,7 @@ export function DeepResearchWorkflowCard({
   onSetSourceChoice,
   onApprovePlan,
   onCancel,
+  planSource,
 }: DeepResearchWorkflowCardProps) {
   const effectiveState: DeepResearchWorkflowState = state || phase || "plan_proposed";
   const resolvedPlan: ProposedDeepResearchPlan =
@@ -226,6 +235,11 @@ export function DeepResearchWorkflowCard({
           <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">
             Research Sub-Questions (Edit or add before starting)
           </label>
+          {planSource && (
+            <p data-testid="deep-research-plan-source" role="status" className="text-[11px] text-neutral-500 dark:text-neutral-400">
+              {PLAN_SOURCE_NOTE[planSource]}
+            </p>
+          )}
           <div className="space-y-1.5">
             {editableSubQuestions.map((sq, idx) => (
               <div key={idx} className="flex items-center gap-1.5">

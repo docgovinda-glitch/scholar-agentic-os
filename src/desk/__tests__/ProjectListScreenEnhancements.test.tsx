@@ -22,6 +22,7 @@ vi.mock("../api", () => ({
   deleteProject: (...a: unknown[]) => deleteProject(...a),
   saveIntakeAnswers: (...a: unknown[]) => saveIntakeAnswers(...a),
   executeAgenticLLM: (...a: unknown[]) => executeAgenticLLM(...a),
+  fetchDeepResearchPlan: vi.fn().mockResolvedValue({ fromModel: false, subQuestions: [] }),
   executeAgenticQuery: (...a: unknown[]) => executeAgenticQuery(...a),
   getAiOperationalStatus: (...a: unknown[]) => getAiOperationalStatus(...a),
   parseFileForAgent: (...a: unknown[]) => parseFileForAgent(...a),

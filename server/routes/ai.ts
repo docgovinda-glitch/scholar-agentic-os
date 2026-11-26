@@ -7,7 +7,7 @@ import { BrowserAiRequiredError, InvalidLlmChallengeError, LocalModelUnreachable
 import { aiAvailability, answeredByLabel } from "../src/ai/routerBridge.ts";
 import type { ResearchLlm } from "../src/research/deepResearchEngine.ts";
 import { executeWebSearch, formatSearchResultsForPrompt, type SearchResultItem } from "../src/research/webSearchEngine.ts";
-import { executeDeepResearch, DeepResearchBrowserHandOffError } from "../src/research/deepResearchEngine.ts";
+import { executeDeepResearch, formulateResearchPlan, DeepResearchBrowserHandOffError } from "../src/research/deepResearchEngine.ts";
 import { safeFetchHtml } from "../utils/ssrfGuard.ts";
 import { validateAndRefineCitations } from "../src/research/citationValidator.ts";
 import type { CitationStyleRegistry } from "../../src/citation_compliance/formattingEngine.ts";
@@ -27,6 +27,7 @@ import type { VerifiedSourceItem } from "../src/utils/citationLockScrubber.ts";
 import { countExactWords } from "../src/utils/wordBudgetAllocator.ts";
 import { evaluateBurstiness } from "../src/utils/scholarlyVoiceGuard.ts";
 import { chunkAndRerankEvidence } from "../src/services/semanticRagEngine.ts";
+import { z } from "zod";
 import { decideAskMode } from "../../src/shared/askRouting.ts";
 import { buildConversationContext, normalizeAskHistory } from "../../src/shared/askConversation.ts";
 import { ASK_BASE_IDENTITY, askStyleDescription, platformFactsFor } from "../../src/shared/askPrompts.ts";
@@ -305,6 +306,29 @@ export function registerAIRoutes(
     const limit = aiAbuseLimit;
     router.use((req, res, next) => (/^\/threads(\/|$)/.test(req.path) ? next() : limit(req, res, next)));
   }
+
+  /**
+   * POST /api/ai/deep-research/plan  { question }
+   * The model's own research plan, shown for the student to edit and approve before a Deep Research
+   * run. `fromModel: false` means no model could write it (the browser then keeps its starter plan,
+   * labelled as not written by AI); nothing is presented as AI-written unless it was.
+   */
+  const planBody = z.object({ question: z.string().trim().min(3).max(2000) });
+  router.post("/deep-research/plan", requireAuth, async (req: Request, res: Response) => {
+    const parsed = planBody.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "A question of 3 to 2,000 characters is required." });
+    const where = await aiAvailability(req, "reasoning").catch(() => "server" as const);
+    if (where !== "server") return res.json({ fromModel: false, subQuestions: [] });
+    try {
+      const plan = await formulateResearchPlan(parsed.data.question, researchLlm(req));
+      return res.json({
+        fromModel: Boolean(plan.fromModel),
+        subQuestions: plan.fromModel ? plan.subQuestions.map((q) => q.question) : [],
+      });
+    } catch {
+      return res.json({ fromModel: false, subQuestions: [] });
+    }
+  });
 
   /**
    * POST /api/ai/agent
