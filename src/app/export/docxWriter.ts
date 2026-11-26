@@ -353,8 +353,22 @@ export async function renderDocx(
     0
   );
 
-  // Extract abstract if present
+  // Extract abstract if present: given in the options, written as an "Abstract:" block, or an
+  // Abstract heading with the paragraphs under it (how a manuscript's own abstract arrives).
+  // Whatever is used on the abstract page is left out of the body, so it is never printed twice.
   let abstractText = academicOptions?.abstractText || "";
+  const abstractBlockIds = new Set<string>();
+  const isHeading = (b: { kind?: string }) => String(b.kind ?? "").startsWith("heading");
+  const headingAt = document.blocks.findIndex((b) => isHeading(b) && /^abstract$/i.test((b.text ?? "").trim()));
+  if (headingAt >= 0) {
+    const body: string[] = [];
+    abstractBlockIds.add(document.blocks[headingAt].id);
+    for (let i = headingAt + 1; i < document.blocks.length && !isHeading(document.blocks[i]); i++) {
+      abstractBlockIds.add(document.blocks[i].id);
+      if (document.blocks[i].text) body.push(document.blocks[i].text as string);
+    }
+    if (!abstractText) abstractText = body.join(" ").trim();
+  }
   if (!abstractText) {
     const abstractBlock = document.blocks.find(
       (b) =>
@@ -554,23 +568,22 @@ export async function renderDocx(
   // PAGE 2: ABSTRACT & KEYWORDS
   // ==========================================================================
 
-  children.push(
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      heading: HeadingLevel.HEADING_1,
-      spacing: { before: 180, after: 180 },
-      children: [
-        new TextRun({
-          text: "Abstract",
-          font: fontName,
-          bold: true,
-          size: 28, // 14pt
-        }),
-      ],
-    })
-  );
-
   if (abstractText) {
+    children.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        heading: HeadingLevel.HEADING_1,
+        spacing: { before: 180, after: 180 },
+        children: [
+          new TextRun({
+            text: "Abstract",
+            font: fontName,
+            bold: true,
+            size: 28, // 14pt
+          }),
+        ],
+      })
+    );
     children.push(
       new Paragraph({
         alignment: AlignmentType.JUSTIFIED,
@@ -628,7 +641,8 @@ export async function renderDocx(
   const bodyStart = children.length;
 
   for (const block of document.blocks) {
-    // Skip abstract block in main body since it's already rendered on page 2
+    // Skip the abstract in the main body since it's already rendered on page 2
+    if (abstractBlockIds.has(block.id)) continue;
     if (
       block.text &&
       (block.text.toLowerCase().startsWith("abstract:") ||
