@@ -45,11 +45,8 @@ describe("Vault Server API Routes (/api/vault)", () => {
       ["post", "/api/vault/lookup-doi"],
       ["post", "/api/lookup-doi"],
       ["post", "/api/vault/search-semantic"],
-      ["post", "/api/vault/zotero/sync"],
-      ["post", "/api/vault/mendeley/sync"],
       ["get", "/api/vault/drive/files"],
       ["get", "/api/vault/onedrive/files"],
-      ["post", "/api/vault/reset"],
     ])("returns 401 on %s %s when unauthenticated", async (method, path) => {
       const res = await (request(app) as any)[method](path).send({});
       expect(res.status).toBe(401);
@@ -127,42 +124,6 @@ describe("Vault Server API Routes (/api/vault)", () => {
     });
   });
 
-  describe("POST /api/vault/mendeley/sync", () => {
-    it("returns 400 if neither bibtex nor accessToken is provided", async () => {
-      const res = await request(app).post("/api/vault/mendeley/sync").set(AUTH_HEADER).send({});
-      expect(res.status).toBe(400);
-      expect(res.body.error).toBe("Provide bibtex string or Mendeley accessToken");
-    });
-
-    it("parses valid BibTeX entries into Vault items", async () => {
-      const bibtex = `
-@article{test2024,
-  title={Advanced Agentic Workflows},
-  author={Smith, John and Doe, Jane},
-  journal={Journal of AI Research},
-  year={2024},
-  doi={10.1234/test.5678}
-}
-      `;
-      const res = await request(app).post("/api/vault/mendeley/sync").set(AUTH_HEADER).send({ bibtex });
-      expect(res.status).toBe(200);
-      expect(res.body.success).toBe(true);
-      expect(res.body.count).toBe(1);
-      expect(res.body.items[0].title).toBe("Advanced Agentic Workflows");
-      expect(res.body.items[0].authors).toEqual(["Smith, John", "Doe, Jane"]);
-      expect(res.body.items[0].year).toBe("2024");
-      expect(res.body.items[0].doi).toBe("10.1234/test.5678");
-    });
-  });
-
-  describe("POST /api/vault/zotero/sync", () => {
-    it("returns 400 when apiKey or userId is missing", async () => {
-      const res = await request(app).post("/api/vault/zotero/sync").set(AUTH_HEADER).send({});
-      expect(res.status).toBe(400);
-      expect(res.body.error).toBe("Missing required Zotero apiKey or userId");
-    });
-  });
-
   describe("POST /api/vault/parse-file", () => {
     it("returns 400 when no file is uploaded", async () => {
       const res = await request(app).post("/api/vault/parse-file").set(AUTH_HEADER);
@@ -198,13 +159,6 @@ describe("Vault Server API Routes (/api/vault)", () => {
       expect(res.body.filename).toBe("findings.pdf");
       expect(typeof res.body.text).toBe("string");
       expect(res.body.text.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe("POST /api/vault/reset", () => {
-    it("returns 401 when unauthenticated", async () => {
-      const res = await request(app).post("/api/vault/reset").send({});
-      expect(res.status).toBe(401);
     });
   });
 

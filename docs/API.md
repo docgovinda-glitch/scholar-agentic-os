@@ -40,17 +40,14 @@ Every endpoint registered by `server.ts` (modules in `server/routes/`). All path
 | PATCH | `/api/projects/:id/intake` | Merge `{ answers }` into the project's answers (also how coursework state is saved) |
 | DELETE | `/api/projects/:id` | Delete |
 | PUT | `/api/projects/:id/authors` | Replace authors |
-| GET, POST, DELETE | `/api/user/saved-authors[/:authorId]` | Saved author library |
 | GET, PUT | `/api/projects/:id/document` | Canonical document (PUT recomputes the rubric) |
 | GET | `/api/projects/:id/rubric` | Rubric report; POST `/rubric/waive` waives a rule |
 | GET, PUT | `/api/projects/:id/journal-requirements` | Target-journal requirements; POST `/journal-requirements/extract` extracts them with AI |
 | POST | `/api/projects/:id/sync` | Apply queued offline `mutations` (such as `approve_source`) plus optional `document` and `answers` |
 | POST | `/api/projects/:id/draft` | Save a draft `document` and merge `answers` |
-| POST | `/api/projects/:id/sources/approve`, `/sources/reject` | Approve or reject a source |
 | DELETE | `/api/projects/:id/sources/:sourceId` | Remove a source |
 | GET | `/api/projects/:id/sources/:sourceId/claims` | Claims for a source |
 | POST | `/api/projects/:id/gates/G2/accept-smaller-corpus` | Accept a smaller corpus at G2 |
-| PUT | `/api/projects/:id/editor/gaps/:gapId`, `/editor/evidence/:evidenceId`, `/editor/claims/:claimId` | Editor-side edits |
 
 ### 5.1 Gates, manuscript and export (`server/routes/project/core/manuscriptAndGateRoutes.ts`)
 
@@ -70,12 +67,11 @@ Export formats: `docx`, `odt`, `pdf`, `latex`, `typst`, `camera_ready_pdf`, `mar
 
 | Mount (under `/api/projects/:id`) | Endpoints |
 | :--- | :--- |
-| `/claims` | POST `/`; POST `/:claimId/evidence`; POST `/:claimId/mark-unsupported`; GET `/`, `/unsupported`, `/conflicts` |
+| `/claims` | POST `/`; POST `/:claimId/evidence`; GET `/`, `/unsupported`, `/conflicts` |
 | `/evidence`, `/evidence-ledger` | GET `/`; POST `/sources`, `/discover`, `/sources/:sourceId/extract`, `/items/:evidenceId/verify`, `/propose`, `/approve`, `/reject` |
 | `/activity` | GET `/` |
 | `/files` | GET `/`; POST `/`; GET `/:fileId/signed-url` |
 | `/parse-file` | POST `/` (multipart), `/url`, `/text` |
-| `/compliance` | GET `/`, `/journal-compliance-report` |
 | `/submissions` | GET, POST `/`; PATCH, DELETE `/:submissionId` |
 | `/mesh` | GET `/agents`; POST `/run` |
 
@@ -139,7 +135,7 @@ GET `/status`; POST `/connections` (tier `local` or `byok`); DELETE `/connection
 | GET | `/api/search?q=` | Searches the user's projects and sources |
 | POST, GET | `/api/search/live` | Live scholarly search (every `/api/search/*` route is `requireAuth`) |
 
-`/api/vault/*` (`requireAuth`): POST `/parse-file` (multipart), `/parse-url` (SSRF-guarded), `/lookup-doi`, `/search-semantic`, `/zotero/sync`, `/mendeley/sync`, `/reset`; GET `/drive/files`, `/onedrive/files`; GET, POST `/cloud/connections`; DELETE `/cloud/connections/:provider`. `POST /api/lookup-doi` is an alias of `/api/vault/lookup-doi`.
+`/api/vault/*` (`requireAuth`): POST `/parse-file` (multipart), `/parse-url` (SSRF-guarded), `/lookup-doi`, `/search-semantic`; GET `/drive/files`, `/onedrive/files`; GET, POST `/cloud/connections`; DELETE `/cloud/connections/:provider`. `POST /api/lookup-doi` is an alias of `/api/vault/lookup-doi`.
 
 ## 8. Presentations library (`/api/presentations`, all `requireAuth`)
 

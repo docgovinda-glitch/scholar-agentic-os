@@ -61,7 +61,7 @@ Registered in `server.ts` in this order: health, admin, auth, `/api/ai/run` and 
 | `aiRun.ts` | `POST /api/ai/run`, `GET /api/ai/models` |
 | `ai.ts` | `/api/ai/*`: status, search, agent (chat, grounded search, deep research), threads |
 | `studio.ts` | `/api/studio/*` (voice profile, refine, consent, restrict, egress audit) |
-| `project.ts` | `/api/projects/*` and `/api/atlas/output-types`, `/api/user/saved-authors`; mounts the sub-routers in `server/routes/project/` |
+| `project.ts` | `/api/projects/*` and `/api/atlas/output-types`; mounts the sub-routers in `server/routes/project/` |
 | `aiAccess.ts` | `/api/ai-access/*` |
 | `search.ts` | `/api/search/*` |
 | `vault.ts` | `/api/vault/*` and `POST /api/lookup-doi` |
