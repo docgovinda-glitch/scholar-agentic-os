@@ -12,14 +12,19 @@ import { draftingSources, studioEvidence } from "../../../../src/domain/journal/
 
 export const draftingRoutes = express.Router({ mergeParams: true });
 
+/** The largest manuscript target the budget allocator is asked for. */
+const MAX_TARGET_TOTAL_WORDS = 100_000;
+
 // POST /api/projects/:id/agentic/allocate-budget
 draftingRoutes.post("/allocate-budget", async (req: express.Request<{ id: string }>, res: express.Response) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
 
+  // A positive, finite target, capped so a typo cannot ask for a million-word budget.
+  const requestedWords = req.body?.targetTotalWords;
   const targetTotalWords =
-    typeof req.body?.targetTotalWords === "number" && req.body.targetTotalWords > 0
-      ? req.body.targetTotalWords
+    typeof requestedWords === "number" && Number.isFinite(requestedWords) && requestedWords > 0
+      ? Math.min(MAX_TARGET_TOTAL_WORDS, Math.round(requestedWords))
       : 6000;
 
   const rawTemplate = req.body?.template;
@@ -30,14 +35,13 @@ draftingRoutes.post("/allocate-budget", async (req: express.Request<{ id: string
 
   const blueprint = allocateWordBudget(project.projectId, targetTotalWords, template);
 
-  // Persist wordBudgetBlueprint inside project state
-  project.answers = {
-    ...project.answers,
+  // Only these three keys are written, merged into the stored record: saving the
+  // whole project would overwrite manuscript text the studio saved in the meantime.
+  await getProjectStore().patchAnswers(project.projectId, {
     word_budget_blueprint: JSON.stringify(blueprint),
     target_word_count: String(targetTotalWords),
     manuscript_template: template,
-  };
-  await getProjectStore().save(project);
+  });
 
   res.json({
     ok: true,
@@ -115,10 +119,15 @@ draftingRoutes.post("/copilot-chat", async (req: express.Request<{ id: string }>
   const project = await getProjectSafe(req, res);
   if (!project) return;
 
-  const { stage, message, history = [] } = req.body || {};
+  const { stage, message: rawMessage, history: rawHistory } = req.body || {};
+  const message = typeof rawMessage === "string" ? rawMessage.trim() : "";
   if (!message) {
     return res.status(400).json({ error: "Message is required." });
   }
+  // Only well-formed turns reach the prompt: anything else in `history` is dropped.
+  const history = (Array.isArray(rawHistory) ? rawHistory : []).filter(
+    (m): m is { role: string; content: string } => !!m && typeof m === "object" && typeof (m as { content?: unknown }).content === "string"
+  );
 
   // 1. Stage-Scoped Context Engine
   let scopedContext: Record<string, unknown> = {};
@@ -166,10 +175,8 @@ draftingRoutes.post("/copilot-chat", async (req: express.Request<{ id: string }>
     if (!result) return;
     res.json({ ok: true, response: result });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    if (message === "RequireFrontendLLMException") return;
-    if (!res.headersSent) {
-      res.status(500).json({ error: message });
-    }
+    // The 426 hand-off to the browser's model was already sent.
+    if (err instanceof Error && err.message === "RequireFrontendLLMException") return;
+    sendAiFailure(res, err, "Copilot reply");
   }
 });

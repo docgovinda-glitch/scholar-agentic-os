@@ -199,6 +199,32 @@ describe("Stage 23: Discourse-Level Humanized Copy-Editing (/final-editor)", () 
     expect(updated?.answers?.["manuscript_draft"]).toBe("");
   });
 
+  it("does not overwrite a manuscript the author changed while the polish ran", async () => {
+    const projectId = await createStageProject();
+    const store = getProjectStore();
+    const real = await store.get(projectId);
+    const loaded = real?.answers?.["manuscript_markdown"];
+    expect(String(loaded ?? "").trim()).not.toBe("");
+    // The route loads the project first, then checks again before saving: the second read sees newer text.
+    const realGet = store.get.bind(store);
+    let reads = 0;
+    vi.spyOn(store, "get").mockImplementation(async (id: string) => {
+      const p = await realGet(id);
+      reads += 1;
+      return reads >= 2 && p ? { ...p, answers: { ...p.answers, manuscript_markdown: `${loaded}\n\nNew paragraph typed meanwhile.` } } : p;
+    });
+
+    const res = await request(app).post(`/api/projects/${projectId}/agentic/final-editor`).send({ dialect: "en-GB" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.saved).toBe(false);
+    expect(res.body.styleCorrections.join(" ")).toMatch(/changed while it was being polished/);
+    vi.restoreAllMocks();
+    const after = await realGet(projectId);
+    expect(after?.answers?.["manuscript_markdown"]).toBe(loaded);
+    expect(after?.answers?.["final_editor_telemetry"]).toBeUndefined();
+  });
+
   it("polishes a passage (text) and returns it at the top level without saving anything", async () => {
     const projectId = await createStageProject();
     const before = await getProjectStore().get(projectId);

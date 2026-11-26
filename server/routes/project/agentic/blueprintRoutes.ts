@@ -14,9 +14,8 @@ import {
 } from "../../../../src/domain/journal/blueprintFunnel.ts";
 import { outlineFromAi, outlinePrompt, outlineUserPrompt } from "../../../../src/domain/journal/aiOutline.ts";
 import { ARTICLE_TYPES } from "../../../../src/domain/journal/blueprintFunnel.ts";
-import { getProjectStore } from "../../../../src/services/store/projectStore.ts";
 import type { WordBudgetBlueprint } from "../../../../src/desk/workspace/types.ts";
-import { getProjectSafe } from "./helpers.ts";
+import { getProjectSafe, patchProjectAnswers } from "./helpers.ts";
 
 export const blueprintRoutes = express.Router({ mergeParams: true });
 
@@ -161,12 +160,10 @@ blueprintRoutes.post("/blueprint/outline", async (req: express.Request<{ id: str
     if (!blueprint) {
       return res.status(502).json({ error: "The AI's answer had no usable outline. Nothing was changed; try again.", code: "ai_unusable" });
     }
-    project.answers = {
-      ...project.answers,
+    await patchProjectAnswers(project, {
       word_budget_blueprint: JSON.stringify(blueprint),
       target_word_count: String(blueprint.targetTotalWords),
-    };
-    await getProjectStore().save(project);
+    });
     return res.json({ blueprint });
   } catch (err) {
     return sendAiFailure(res, err, "Outline");

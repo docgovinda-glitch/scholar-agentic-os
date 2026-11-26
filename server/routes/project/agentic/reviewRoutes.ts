@@ -17,6 +17,7 @@ import type { AcademicTemplate } from "../../../../src/app/export/academicPdfCom
 import { getSupabaseRestConfig, SupabaseTable } from "../../../src/supabaseRest.ts";
 import {
   getProjectSafe,
+  patchProjectAnswers,
   buildRebuttalMatrixFromCritiques,
   reconcileManuscriptCitations,
   manuscriptToCanonicalDocument,
@@ -102,14 +103,12 @@ reviewRoutes.post("/peer-review", async (req: express.Request<{ id: string }>, r
     }
 
     // Always persist into project answers so it is retained even if Supabase is offline
-    const nextAnswers = {
-      ...project.answers,
+    await patchProjectAnswers(project, {
       peer_review_critiques: JSON.stringify(critiquesData),
       peer_review_completed: "true",
       peer_review_status: "ready",
       peer_review_sealed_at: new Date().toISOString(),
-    };
-    await getProjectStore().save({ ...project, answers: nextAnswers });
+    });
 
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: critiquesData })}\n\n`);
     res.end();
@@ -194,15 +193,13 @@ reviewRoutes.post("/rebuttal-matrix", async (req: express.Request<{ id: string }
       }));
 
     // Persist in project answers
-    const nextAnswers = {
-      ...project.answers,
+    await patchProjectAnswers(project, {
       rebuttal_matrix: JSON.stringify(matrix),
       peer_review_critiques: JSON.stringify(critiques),
       revision_patches: JSON.stringify(patches),
       rebuttal_completed: "true",
       rebuttal_sealed_at: new Date().toISOString(),
-    };
-    await getProjectStore().save({ ...project, answers: nextAnswers });
+    });
 
     res.json({
       ok: true,
@@ -353,22 +350,32 @@ reviewRoutes.post("/final-editor", async (req: express.Request<{ id: string }>, 
   };
 
   // 4. A whole-manuscript polish is saved; a passage is only returned (the studio applies it once the author accepts it).
+  // The AI call above can take a while. Only the keys this polish changes are written (merged into the
+  // stored record, never the whole project loaded before the call), and a manuscript the author changed
+  // meanwhile is kept: the polish of the older text is returned unsaved instead of replacing it.
+  let saved = false;
   if (scope === "manuscript") {
-    const nextAnswers = {
-      ...project.answers,
-      ...manuscriptAnswerPatch(polished, project.answers),
-      final_editor_telemetry: JSON.stringify(telemetry),
-      final_editor_completed: "true",
-      final_editor_status: "approved",
-      final_editor_word_count: wordCountAfter.toString(),
-      final_editor_saved_at: new Date().toISOString(),
-    };
-    await getProjectStore().save({ ...project, answers: nextAnswers });
+    const polishedStored = !manuscript?.trim();
+    const current = polishedStored ? await getProjectStore().get(project.projectId) : null;
+    const changedMeanwhile = polishedStored && current !== undefined && current !== null && readManuscriptMarkdown(current.answers) !== textToPolish;
+    if (changedMeanwhile) {
+      notes.push("Your manuscript changed while it was being polished, so the polished copy was not saved. Polish again to apply it to the latest text.");
+    } else {
+      await getProjectStore().patchAnswers(project.projectId, {
+        ...manuscriptAnswerPatch(polished, current?.answers ?? project.answers),
+        final_editor_telemetry: JSON.stringify(telemetry),
+        final_editor_completed: "true",
+        final_editor_status: "approved",
+        final_editor_word_count: wordCountAfter.toString(),
+        final_editor_saved_at: new Date().toISOString(),
+      });
+      saved = true;
+    }
   }
 
   const payload = {
     scope,
-    saved: scope === "manuscript",
+    saved,
     polishedText: polished,
     burstinessBefore,
     burstinessAfter,
@@ -633,16 +640,13 @@ reviewRoutes.post("/publication-readiness", async (req: express.Request<{ id: st
   };
 
   // Persist scorecard
-  const nextAnswers = {
-    ...project.answers,
+  await patchProjectAnswers(project, {
     publication_readiness: JSON.stringify(scorecard),
     publication_readiness_completed: "true",
     publication_readiness_status: overallStatus,
     publication_readiness_score: score.toString(),
     publication_readiness_sealed_at: scorecard.certifiedAt,
-  };
-
-  await getProjectStore().save({ ...project, answers: nextAnswers });
+  });
 
   res.json({ ok: true, data: scorecard });
 });
@@ -733,8 +737,7 @@ reviewRoutes.post("/export", async (req: express.Request<{ id: string }>, res) =
   }
 
   // Persist export state
-  const updatedAnswers = {
-    ...project.answers,
+  await patchProjectAnswers(project, {
     export_completed: "true",
     export_template: template,
     export_format: format,
@@ -742,8 +745,7 @@ reviewRoutes.post("/export", async (req: express.Request<{ id: string }>, res) =
     export_timestamp: new Date().toISOString(),
     workspace_all_stages_completed: "true",
     workspace_status: "completed",
-  };
-  await getProjectStore().save({ ...project, answers: updatedAnswers });
+  });
 
   const downloadUrl = `/api/projects/${project.projectId}/export/${format}?template=${template}`;
 
@@ -765,7 +767,7 @@ reviewRoutes.post("/export", async (req: express.Request<{ id: string }>, res) =
       rebuttalLetterUrl: `/api/projects/${project.projectId}/export/rebuttal-letter`,
       formatsAvailable: ["pdf", "docx", "latex", "typst", "markdown", "rebuttal-letter"],
       hasRebuttalAppendix: Boolean(includeRebuttalAppendix),
-      generatedAt: updatedAnswers.export_timestamp,
+      generatedAt: project.answers["export_timestamp"],
     },
   });
 });

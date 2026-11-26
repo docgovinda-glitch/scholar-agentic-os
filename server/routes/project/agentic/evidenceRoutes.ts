@@ -1,10 +1,9 @@
 import express from "express";
-import { getProjectStore } from "../../../../src/services/store/projectStore.ts";
 import { getSupabaseRestConfig, SupabaseTable } from "../../../src/supabaseRest.ts";
 import { normalizeUnicodeNFC } from "../../../src/utils/scholarlyVoiceGuard.ts";
 import { safeParseAnswerField } from "../../../../src/shared/projectStateSchema.ts";
 import { parseDocument } from "../../../../src/document_intelligence/index.ts";
-import { getProjectSafe, userUpload } from "./helpers.ts";
+import { getProjectSafe, patchProjectAnswers, userUpload } from "./helpers.ts";
 import type { UserDatasetRecord } from "./types.ts";
 
 export const evidenceRoutes = express.Router({ mergeParams: true });
@@ -123,12 +122,7 @@ evidenceRoutes.post(
       existingDatasets.unshift(datasetItem);
 
       // Persist in project answers
-      project.answers = {
-        ...project.answers,
-        user_datasets: JSON.stringify(existingDatasets),
-      };
-
-      await getProjectStore().save(project);
+      await patchProjectAnswers(project, { user_datasets: JSON.stringify(existingDatasets) });
 
       // Also if Supabase is configured, sync into project_evidence
       const config = getSupabaseRestConfig();
@@ -198,11 +192,7 @@ evidenceRoutes.put(
     }
 
     datasets[index] = existing;
-    project.answers = {
-      ...project.answers,
-      user_datasets: JSON.stringify(datasets),
-    };
-    await getProjectStore().save(project);
+    await patchProjectAnswers(project, { user_datasets: JSON.stringify(datasets) });
 
     res.json({ ok: true, dataset: existing });
   }
