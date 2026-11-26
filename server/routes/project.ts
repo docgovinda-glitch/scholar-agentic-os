@@ -25,7 +25,6 @@ import { agenticRouter } from "./project/agentic";
 import assignmentRouter from "./project/assignment";
 import thesisRouter from "./project/thesis";
 import presentationRouter from "./project/presentation";
-import { journalComplianceRouter } from "./project/journal_compliance";
 import parseRouter from "./project/parse";
 import { activityRouter } from "./project/activity";
 import { filesRouter } from "./project/files";
@@ -39,7 +38,6 @@ import { countWords, MIN_GUIDELINES_WORDS } from "../../src/domain/journal/types
 import type { JournalRequirements } from "../../src/domain/journal/types.ts";
 import { isOutputTypeEnabled, MAINTENANCE_MESSAGE } from "./outputTypeAccess.ts";
 import { extractJournalRequirements } from "../../src/app/journal/extract.ts";
-import { getSupabaseRestConfig, SupabaseTable } from "../src/supabaseRest.ts";
 import { summarize } from "../../src/app/conductor/conductor.ts";
 
 import {
@@ -74,7 +72,6 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
   router.use("/:id/thesis", thesisRouter);
   router.use("/:id/presentation", presentationRouter);
   router.use("/:id/parse-file", parseRouter);
-  router.use("/:id/compliance", journalComplianceRouter(projectLimit));
   router.use("/:id/mesh", meshRouter);
 
   router.get("/:id/sources/:sourceId/claims", projectLimit, asyncRoute(async (req, res) => {
@@ -115,55 +112,6 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     res.json(projectView(updated));
   }));
   
-  // Manual Human Editor Routes for relational data overrides
-  function pickAllowedFields(body: unknown, allowedKeys: readonly string[]): Record<string, unknown> {
-    if (!body || typeof body !== "object" || Array.isArray(body)) return {};
-    const src = body as Record<string, unknown>;
-    const out: Record<string, unknown> = {};
-    for (const key of allowedKeys) {
-      if (Object.prototype.hasOwnProperty.call(src, key) && src[key] !== undefined) {
-        out[key] = src[key];
-      }
-    }
-    return out;
-  }
-
-  router.put("/:id/editor/gaps/:gapId", projectLimit, asyncRoute(async (req, res) => {
-    const record = await loadOwnedProject(store, req, res);
-    if (!record) return;
-    const config = getSupabaseRestConfig();
-    if (!config) return res.status(500).json({ error: "Supabase config missing" });
-    const patch = pickAllowedFields(req.body, ["state", "quote", "locator", "proposed_claim_id", "history"]);
-    if (Object.keys(patch).length === 0) return res.status(400).json({ error: "No valid fields to update" });
-    const table = new SupabaseTable(config, "project_evidence_items");
-    await table.update(`evidence_id=eq.${encodeURIComponent(req.params.gapId)}&project_id=eq.${encodeURIComponent(record.projectId)}`, patch);
-    res.json({ ok: true });
-  }));
-
-  router.put("/:id/editor/evidence/:evidenceId", projectLimit, asyncRoute(async (req, res) => {
-    const record = await loadOwnedProject(store, req, res);
-    if (!record) return;
-    const config = getSupabaseRestConfig();
-    if (!config) return res.status(500).json({ error: "Supabase config missing" });
-    const patch = pickAllowedFields(req.body, ["state", "quote", "locator", "proposed_claim_id", "history"]);
-    if (Object.keys(patch).length === 0) return res.status(400).json({ error: "No valid fields to update" });
-    const table = new SupabaseTable(config, "project_evidence_items");
-    await table.update(`evidence_id=eq.${encodeURIComponent(req.params.evidenceId)}&project_id=eq.${encodeURIComponent(record.projectId)}`, patch);
-    res.json({ ok: true });
-  }));
-
-  router.put("/:id/editor/claims/:claimId", projectLimit, asyncRoute(async (req, res) => {
-    const record = await loadOwnedProject(store, req, res);
-    if (!record) return;
-    const config = getSupabaseRestConfig();
-    if (!config) return res.status(500).json({ error: "Supabase config missing" });
-    const patch = pickAllowedFields(req.body, ["text", "draft_span_id", "status", "unsupported_reason", "unsupported_actor"]);
-    if (Object.keys(patch).length === 0) return res.status(400).json({ error: "No valid fields to update" });
-    const table = new SupabaseTable(config, "project_claims");
-    await table.update(`claim_id=eq.${encodeURIComponent(req.params.claimId)}&project_id=eq.${encodeURIComponent(record.projectId)}`, patch);
-    res.json({ ok: true });
-  }));
-
   // Offline Sync Queue & Mutation Replay Endpoints
   router.post("/:id/sync", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
@@ -254,46 +202,6 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     }
     const saved = await store.save(updated);
     res.json({ success: true, project: projectView(saved) });
-  }));
-
-  router.post("/:id/sources/approve", projectLimit, asyncRoute(async (req, res) => {
-    const record = await loadOwnedProject(store, req, res);
-    if (!record) return;
-    const { sourceId, evidenceId, actor = currentUserId(req) } = req.body ?? {};
-    const targetId = evidenceId || sourceId;
-    if (!targetId) {
-      return res.status(400).json({ error: "Missing required field: sourceId or evidenceId" });
-    }
-    let evidenceLedger = record.evidenceLedger;
-    if (evidenceLedger.items.some((i) => i.id === targetId || i.sourceId === targetId)) {
-      const item = evidenceLedger.items.find((i) => i.id === targetId || i.sourceId === targetId)!;
-      try {
-        evidenceLedger = approveEvidence(evidenceLedger, item.id, actor);
-      } catch (_) {}
-    }
-    const gates = recomputeG2({ ...record, evidenceLedger });
-    const updated = await store.save({ ...record, evidenceLedger, gates });
-    res.json({ success: true, project: projectView(updated) });
-  }));
-
-  router.post("/:id/sources/reject", projectLimit, asyncRoute(async (req, res) => {
-    const record = await loadOwnedProject(store, req, res);
-    if (!record) return;
-    const { sourceId, evidenceId, actor = currentUserId(req) } = req.body ?? {};
-    const targetId = evidenceId || sourceId;
-    if (!targetId) {
-      return res.status(400).json({ error: "Missing required field: sourceId or evidenceId" });
-    }
-    let evidenceLedger = record.evidenceLedger;
-    if (evidenceLedger.items.some((i) => i.id === targetId || i.sourceId === targetId)) {
-      const item = evidenceLedger.items.find((i) => i.id === targetId || i.sourceId === targetId)!;
-      try {
-        evidenceLedger = rejectEvidence(evidenceLedger, item.id, actor, req.body?.reason || "Rejected by user");
-      } catch (_) {}
-    }
-    const gates = recomputeG2({ ...record, evidenceLedger });
-    const updated = await store.save({ ...record, evidenceLedger, gates });
-    res.json({ success: true, project: projectView(updated) });
   }));
 
   app.use("/api/projects", router);
@@ -448,52 +356,6 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     }
   }));
 
-  const userSavedAuthorsMap = new Map<string, any[]>();
-
-    app.get("/api/user/saved-authors", requireAuth, projectLimit, asyncRoute(async (req, res) => {
-    const userId = currentUserId(req);
-    const authors = userSavedAuthorsMap.get(userId) || [];
-    res.json({ authors });
-  }));
-
-    app.post("/api/user/saved-authors", requireAuth, projectLimit, asyncRoute(async (req, res) => {
-    const userId = currentUserId(req);
-    const { author } = req.body ?? {};
-    if (!author) {
-      return res.status(400).json({ error: "Missing author object" });
-    }
-    const current = userSavedAuthorsMap.get(userId) || [];
-    const normalizedEmail = (author.email || "").trim().toLowerCase();
-    const normalizedName = `${author.firstName || ""} ${author.surname || ""}`.trim().toLowerCase();
-
-    const existingIdx = current.findIndex((a) => {
-      if (author.id && a.id === author.id) return true;
-      if (normalizedEmail && a.email && a.email.trim().toLowerCase() === normalizedEmail) return true;
-      if (normalizedName) {
-        const aName = `${a.firstName || ""} ${a.surname || ""}`.trim().toLowerCase();
-        if (aName === normalizedName) return true;
-      }
-      return false;
-    });
-
-    if (existingIdx >= 0) {
-      current[existingIdx] = { ...current[existingIdx], ...author };
-    } else {
-      current.unshift(author);
-    }
-    userSavedAuthorsMap.set(userId, current);
-    res.json({ ok: true, authors: current });
-  }));
-
-    app.delete("/api/user/saved-authors/:authorId", requireAuth, projectLimit, asyncRoute(async (req, res) => {
-    const userId = currentUserId(req);
-    const { authorId } = req.params;
-    const current = userSavedAuthorsMap.get(userId) || [];
-    const next = current.filter((a) => a.id !== authorId && a.email !== authorId);
-    userSavedAuthorsMap.set(userId, next);
-    res.json({ ok: true, authors: next });
-  }));
-
     app.put("/api/projects/:id/authors", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
@@ -507,28 +369,6 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     if (corresponding.length > 1) {
       return res.status(400).json({ error: "Exactly one author can be designated as the corresponding author." });
     }
-
-    // Automatically synchronize valid authors into user's saved author pool
-    const userId = currentUserId(req);
-    const userCurrent = userSavedAuthorsMap.get(userId) || [];
-    for (const a of authors) {
-      if (a && (a.firstName?.trim() || a.surname?.trim() || a.email?.trim())) {
-        const normEmail = (a.email || "").trim().toLowerCase();
-        const normName = `${a.firstName || ""} ${a.surname || ""}`.trim().toLowerCase();
-        const idx = userCurrent.findIndex((ex) => {
-          if (a.id && ex.id === a.id) return true;
-          if (normEmail && ex.email && ex.email.trim().toLowerCase() === normEmail) return true;
-          if (normName && `${ex.firstName || ""} ${ex.surname || ""}`.trim().toLowerCase() === normName) return true;
-          return false;
-        });
-        if (idx >= 0) {
-          userCurrent[idx] = { ...userCurrent[idx], ...a };
-        } else {
-          userCurrent.push(a);
-        }
-      }
-    }
-    userSavedAuthorsMap.set(userId, userCurrent);
 
     const updated = await store.save({ ...record, authors });
     res.json(projectView(updated));

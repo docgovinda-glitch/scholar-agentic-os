@@ -181,7 +181,6 @@ export type DiscoveryMethod =
   | "vault"
   | "manual";
 
-
 export interface DiscoveredSource {
   id: string;
   title: string;
@@ -319,17 +318,6 @@ export interface StudioRefineResult {
   contentChangeCount: number;
   languageChangeCount: number;
   usage?: StudioRefineUsage;
-}
-
-/** Thrown-shaped, not a real Error — matches the 428/403 bodies studio.ts sends. */
-export interface StudioConsentRequired {
-  kind: "consent_required";
-  reason: string;
-  provider?: string;
-}
-export interface StudioDenied {
-  kind: "denied";
-  reason: string;
 }
 
 /** Intake field tier — drives UI treatment (docs 14 §5). */

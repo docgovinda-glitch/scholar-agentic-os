@@ -1,11 +1,4 @@
-export type ThesisStage =
-  | "proposal_framing"
-  | "literature_matrix"
-  | "methodology_design"
-  | "empirical_findings"
-  | "discussion_contributions"
-  | "conclusion_directions"
-  | "viva_defense";
+
 
 export interface ThesisProjectData {
   projectId: string;

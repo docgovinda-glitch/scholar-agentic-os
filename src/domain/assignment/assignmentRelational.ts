@@ -205,20 +205,6 @@ export function normalizePhase(value: unknown): AssignmentPhase {
   return LEGACY_PHASE[key] ?? "extract";
 }
 
-/** Valid phase transitions in the coursework workflow. */
-const VALID_TRANSITIONS: Record<AssignmentPhase, readonly AssignmentPhase[]> = {
-  extract: ["understand"],
-  understand: ["sources"],
-  sources: ["drafting"],
-  drafting: ["submission"],
-  submission: [],
-};
-
-/** Check if a transition from one phase to another is allowed. */
-export function isValidPhaseTransition(from: AssignmentPhase, to: AssignmentPhase): boolean {
-  return VALID_TRANSITIONS[from]?.includes(to) ?? false;
-}
-
 interface SectionLike {
   id?: string;
   title?: string;

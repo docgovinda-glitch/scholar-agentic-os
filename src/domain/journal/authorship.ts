@@ -21,7 +21,6 @@ export const CREDIT_ROLES = [
   "Writing – original draft",
   "Writing – review & editing",
 ] as const;
-export type CreditRole = (typeof CREDIT_ROLES)[number];
 
 export interface ManuscriptAuthor {
   id: string;

@@ -225,20 +225,6 @@ export function buildCitationMap(
 }
 
 /**
- * Detect orphaned sources: sources that are approved but never cited.
- */
-export function findOrphanedSources(
-  sections: CitedSection[],
-  approvedSources: DiscoveredSource[]
-): DiscoveredSource[] {
-  const citationMap = buildCitationMap(sections, approvedSources);
-  return approvedSources.filter((source) => {
-    const anchors = citationMap.get(source.id);
-    return !anchors || anchors.length === 0;
-  });
-}
-
-/**
  * Get citation coverage statistics.
  */
 export function getCitationCoverage(

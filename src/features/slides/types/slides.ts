@@ -7,14 +7,6 @@
 import type { SlideThemeId, CustomTheme } from './themes';
 import type { SlideLayoutId, StatTrend } from '../../../domain/presentation/slideSchema';
 
-export type SlideBlockType =
-  | 'action-header'
-  | 'metric-callout'
-  | 'bullet-list'
-  | 'two-column'
-  | 'quote-evidence'
-  | 'image';
-
 /**
  * Gamma-style card layouts rendered by src/features/slides/gamma. The same
  * content reflows into any of them, on the web canvas and in .pptx export.
@@ -132,16 +124,6 @@ export type SlideBlock =
 
 export type NarrativeFramework = 'Standard-Narrative' | 'SCR' | 'WhatIsCouldBe' | 'ABT' | 'visual-storytelling' | (string & {});
 
-export type PresentationStyleId =
-  | 'narrative'
-  | 'problem-solution'
-  | 'case-study'
-  | 'executive-pitch'
-  | 'visual-storytelling'
-  | 'Standard-Narrative'
-  | 'SCR'
-  | 'WhatIsCouldBe';
-
 export interface PresentationStyleProfile {
   id: 'narrative' | 'problem-solution' | 'case-study' | 'executive-pitch' | 'visual-storytelling' | 'presentation_slides';
   label: string;
@@ -154,12 +136,6 @@ export interface PresentationStyleProfile {
   };
   narrativeScaffolding: 'SCR' | 'WhatIsCouldBe' | 'EmpiricalCase' | 'Standard-Narrative' | 'VisualNarrative';
   systemInstruction: string;
-}
-
-export interface PresentationScopeBoundaries {
-  summaryBanner: string;
-  covers: string[];
-  avoids: string[];
 }
 
 export type SlideOutlinePhase =
@@ -265,32 +241,6 @@ export interface SlideDeck {
 }
 
 export type SlideViewMode = 'stage' | 'standalone';
-
-export interface PresentationControlsState {
-  isFullscreen: boolean;
-  isPresenterOpen: boolean;
-  elapsedSeconds: number;
-  isTimerRunning: boolean;
-  viewMode: SlideViewMode;
-}
-
-/**
- * Backward compatibility alias for any existing references
- */
-export type KeynoteControlsState = PresentationControlsState;
-
-export interface CopilotMutationRequest {
-  deckId: string;
-  slideIndex: number;
-  prompt: string;
-  currentSlide: SlideCard;
-}
-
-export interface CopilotMutationResponse {
-  success: boolean;
-  mutatedSlide: SlideCard;
-  appliedPrompt: string;
-}
 
 export type PresentationStudioStep =
   | 'understand'

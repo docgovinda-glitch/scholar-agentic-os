@@ -669,27 +669,6 @@ export function composeDeckFromPlan(plan: TalkPlan): SlideDeck {
 }
 
 /**
- * Converts a legacy block-based deck (e.g. a curated case-study deck) into
- * Gamma cards, choosing varied layouts and dropping any figure that does not
- * appear in `sourceText`.
- */
-export function legacyDeckToGamma(deck: SlideDeck, sourceText = ''): SlideDeck {
-  const haystack = sourceText.toLowerCase();
-  const raw = deck.slides.map((s, i) => {
-    const c = getCardContent(s);
-    const stats = c.stats.filter((st) => haystack.includes(st.value.toLowerCase().replace('−', '-')) || haystack.includes(st.value.toLowerCase()));
-    const content: CardContent = { ...c, stats };
-    return { slide: s, content, layout: i === 0 ? ('title' as GammaLayout) : inferLayout(content, i) };
-  });
-  const layouts = diversify(raw.map((r) => r.layout));
-  return {
-    ...deck,
-    // Keep the curated one-line outline summaries.
-    slides: raw.map((r, i) => ({ ...writeCardContent(r.slide, r.content, layouts[i]), summary: r.slide.summary ?? r.content.lede })),
-  };
-}
-
-/**
  * Auto-design: choose a layout for every card from its content (numbers →
  * big numbers, ordered steps → timeline, two sides → comparison, quotes →
  * quote, 3-6 short points → bento) and avoid runs of the same layout. Text is

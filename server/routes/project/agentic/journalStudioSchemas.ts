@@ -35,7 +35,6 @@ export const draftSubSectionBodySchema = z.object({
   /** Excerpts of sections already written. */
   writtenSections: z.string().max(12000).optional(),
 });
-export type DraftSubSectionBody = z.infer<typeof draftSubSectionBodySchema>;
 
 export const finalEditorBodySchema = z
   .object({
@@ -47,4 +46,3 @@ export const finalEditorBodySchema = z
     lockedTerms: z.array(z.string().max(200)).max(500).optional(),
   })
   .refine((b) => !(b.text && b.manuscript), { message: "Send either a passage (text) or a manuscript, not both." });
-export type FinalEditorBody = z.infer<typeof finalEditorBodySchema>;

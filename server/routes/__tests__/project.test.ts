@@ -398,48 +398,6 @@ describe("G4 (Draft gate), recomputed from the document and claim-graph routes",
   });
 });
 
-describe("POST /api/projects/:id/claims/:claimId/mark-unsupported", () => {
-  beforeEach(() => {
-    __resetProjectStoreForTests();
-    __resetRateLimitStore();
-  });
-
-  it("404s for an unknown claim", async () => {
-    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
-    const res = await request(app)
-      .post(`/api/projects/${created.body.projectId}/claims/no-such-claim/mark-unsupported`)
-      .send({ reason: "x", actor: "u1" });
-    expect(res.status).toBe(404);
-  });
-
-  it("400s without a reason or an actor", async () => {
-    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
-    const projectId = created.body.projectId;
-    await request(app).post(`/api/projects/${projectId}/claims`).send({ claim: { id: "c1", text: "A claim." } });
-
-    const noReason = await request(app).post(`/api/projects/${projectId}/claims/c1/mark-unsupported`).send({ actor: "u1" });
-    expect(noReason.status).toBe(400);
-    const noActor = await request(app).post(`/api/projects/${projectId}/claims/c1/mark-unsupported`).send({ reason: "Definitional." });
-    expect(noActor.status).toBe(400);
-  });
-
-  it("marks the claim, clears G4's claims criterion, but leaves it in the Rubric's compliance-grade unsupportedClaims list", async () => {
-    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
-    const projectId = created.body.projectId;
-    await request(app).put(`/api/projects/${projectId}/document`).send({ document: compliantOT01Document() });
-    await request(app).post(`/api/projects/${projectId}/claims`).send({ claim: { id: "c1", text: "A definitional claim." } });
-
-    const res = await request(app).post(`/api/projects/${projectId}/claims/c1/mark-unsupported`).send({ reason: "Definitional, needs no citation.", actor: "u1" });
-    expect(res.status).toBe(200);
-    expect(res.body.claimGraph.claims[0].explicitlyUnsupported.reason).toBe("Definitional, needs no citation.");
-    const g4 = res.body.gates.find((g: { gate: string }) => g.gate === "G4");
-    expect(g4.outstandingBlocking.some((d: string) => d.includes("c1"))).toBe(false);
-
-    const unsupported = await request(app).get(`/api/projects/${projectId}/claims/unsupported`);
-    expect(unsupported.body.claims.map((c: { id: string }) => c.id)).toContain("c1");
-  });
-});
-
 describe("G7 (Export gate), recomputed from the document endpoint alongside G6", () => {
   beforeEach(() => {
     __resetProjectStoreForTests();

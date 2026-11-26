@@ -169,7 +169,6 @@ export class TXTParser implements Parser {
     return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   }
 
-
   /**
    * Estimate pages based on content length.
    */
@@ -218,9 +217,3 @@ export class TXTParser implements Parser {
     };
   }
 }
-
-// ============================================================================
-// Export
-// ============================================================================
-
-export const createTXTParser = (): Parser => new TXTParser();

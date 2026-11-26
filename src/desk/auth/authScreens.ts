@@ -45,43 +45,6 @@ export interface SignUpFields {
   password: string;
 }
 
-/**
- * Plain single-input fields, rendered with AuthLayout's <Field>. Phone (a
- * composite country-code + number control) and User Type / Level of
- * Education (dropdowns) are NOT here — they need their own components
- * (PhoneField/SelectField) and are rendered directly in SignUpScreen.
- *
- * `required` defaults to true when omitted; Institution is the one optional
- * field (not every user belongs to one) and says so explicitly.
- */
-export const SIGN_UP_FIELDS: ReadonlyArray<{
-  key: keyof Pick<SignUpFields, "fullName" | "username" | "email" | "affiliation" | "password">;
-  label: string;
-  type: string;
-  autoComplete: string;
-  hint?: string;
-  required?: boolean;
-}> = [
-  { key: "fullName", label: "Full name", type: "text", autoComplete: "name" },
-  {
-    key: "username",
-    label: "Username",
-    type: "text",
-    autoComplete: "username",
-    hint: "You will sign in with this, not your email.",
-  },
-  { key: "email", label: "Email", type: "email", autoComplete: "email" },
-  {
-    key: "affiliation",
-    label: "Institution",
-    type: "text",
-    autoComplete: "organization",
-    hint: "University, department, or organisation — leave blank if this doesn't apply to you.",
-    required: false,
-  },
-  { key: "password", label: "Password", type: "password", autoComplete: "new-password" },
-];
-
 export const EMPTY_SIGN_UP: SignUpFields = {
   username: "",
   fullName: "",

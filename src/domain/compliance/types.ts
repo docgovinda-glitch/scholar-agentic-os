@@ -25,9 +25,6 @@ export interface RuleSource {
   confidence: number;
 }
 
-/** The deterministic evaluator kinds implemented so far (docs 31 §5.1's "immediate/fast" tier). */
-export type EvaluatorKind = "word_count" | "structural_presence" | "metadata_presence" | "claim_support" | "readability" | "position_in_text";
-
 export interface WordCountParams {
   max?: number;
   min?: number;

@@ -279,25 +279,3 @@ export function rateLimit(options: RateLimitOptions) {
     next();
   };
 }
-
-/**
- * Endpoint categories
- * Note: These are defaults; server.ts wires more granular per-endpoint configs below.
- */
-export const authRateLimit = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  limitBy: "ip",
-});
-
-export const aiRateLimit = rateLimit({
-  windowMs: 60 * 1000,
-  max: 20,
-  limitBy: "ip",
-});
-
-export const defaultRateLimit = rateLimit({
-  windowMs: 60 * 1000,
-  max: 100,
-  limitBy: "ip",
-});

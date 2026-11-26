@@ -1,23 +1,4 @@
-/**
- * Document Parser Service
- * Provides client-side file reading, size & type validation,
- * metadata extraction, and safe sanitization for brief documents.
- */
 
-import {
-  extractWordCountFromText,
-  extractLevelFromText,
-  extractCitationStyleFromText,
-  stripCircularReferences,
-} from "../utils/briefExtractor";
-
-export interface BriefMetadataResult {
-  text: string;
-  detectedWordCount?: number;
-  detectedLevel?: "undergraduate" | "postgraduate";
-  detectedCitation?: string;
-  lineCount: number;
-}
 
 export interface FileValidationResult {
   valid: boolean;
@@ -72,42 +53,4 @@ export function validateBriefFile(
   }
 
   return { valid: true };
-}
-
-/**
- * Parses client-side metadata from extracted brief text safely.
- */
-export function parseBriefMetadata(text: string): BriefMetadataResult {
-  const sanitizedText = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
-  const lines = sanitizedText.split("\n").filter((l) => l.trim().length > 0);
-
-  const detectedWordCount = extractWordCountFromText(sanitizedText);
-  const detectedLevel = extractLevelFromText(sanitizedText);
-  const detectedCitation = extractCitationStyleFromText(sanitizedText);
-
-  const result: BriefMetadataResult = {
-    text: sanitizedText,
-    detectedWordCount,
-    detectedLevel,
-    detectedCitation,
-    lineCount: lines.length,
-  };
-
-  return stripCircularReferences(result);
-}
-
-/**
- * Reads plain text directly in the browser if file is a .txt file.
- */
-export async function readPlainTextFile(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      resolve(typeof reader.result === "string" ? reader.result : "");
-    };
-    reader.onerror = () => {
-      reject(new Error("Could not read document file."));
-    };
-    reader.readAsText(file);
-  });
 }

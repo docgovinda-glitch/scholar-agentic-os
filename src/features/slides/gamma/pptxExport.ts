@@ -11,7 +11,7 @@ import type PptxGenJS from 'pptxgenjs';
 import { xmlText } from '../../../shared/xmlText';
 import type { SlideDeck } from '../types/slides';
 import { getCardContent, resolveLayout } from './content';
-import { CANVAS_W, computeCardGeometry, type CardElement } from './geometry';
+import { computeCardGeometry, type CardElement } from './geometry';
 import { PPTX_FONTS, resolveDeckTheme, type DeckTheme } from './theme';
 import { iconDataUrl } from './icons';
 
@@ -165,5 +165,3 @@ export async function exportDeckToPptx(deck: SlideDeck): Promise<string> {
   await pptx.writeFile({ fileName });
   return fileName;
 }
-
-export const PPTX_CANVAS_INCHES = { w: CANVAS_W / PX_PER_IN, h: 720 / PX_PER_IN };

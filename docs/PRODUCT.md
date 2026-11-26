@@ -43,7 +43,7 @@ Workspace ids match the catalog: the Thesis workspace is `OT-07`. Projects saved
 
 **Coursework** (`OT-01`/`OT-02`): five stages (Extract, Understand, Sources, Drafting, Submission) derived only from the student's brief. Brief upload (`.pdf`, `.docx`, `.txt`, `.md`), marks-derived sub-questions and word targets, keyword-based multi-provider source discovery, outline and section drafting within budget, an offline scaffold when every AI provider is out of credit, a references card, a 10-point rubric audit, citation reconciliation, `.docx`/PDF export. Four stage copilots (Advisor, Librarian, Scribe, Examiner, defined in `src/desk/assignment/types.ts`).
 
-**Journal article** (`OT-10`): 25 stages in five phases (Foundation, Evidence, Drafting, Review, Publication; `src/desk/workspace/types.ts`). Gap finding, title selection and lock, Vault and external source approval, evidence extraction and analysis, journal discovery and requirements, drafting, citation audit, originality check, peer-review simulation, revision and rebuttal matrix, final editor, publication readiness, cover letter, anonymization and export.
+**Journal article** (`OT-10`): 25 stages in five phases (Foundation, Evidence, Drafting, Review, Publication; `src/desk/workspace/types.ts`). Gap finding, title selection and lock, Vault and external source approval, evidence extraction and analysis, journal discovery and requirements, drafting, citation audit, originality check, peer-review simulation, revision and rebuttal matrix, final editor, publication readiness, cover letter and export.
 
 **Thesis** (`OT-07`): chapter editor, research questions, literature matrix, references, LaTeX and document export, chapter audit and gate status, Viva Voce simulator.
 

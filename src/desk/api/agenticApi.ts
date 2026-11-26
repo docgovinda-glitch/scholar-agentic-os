@@ -4,7 +4,6 @@ import type { AgenticQueryRequest, AgenticQueryResponse } from "./types";
 import type {
   WordBudgetBlueprint,
   UserDatasetItem,
-  PreFlightGateScorecard,
 } from "../workspace/types";
 
 /** Deep research failed after its sources were found; they are kept for the reader. */
@@ -389,59 +388,6 @@ export async function generateProjectRebuttalMatrix(
   return res.json();
 }
 
-export async function runPreFlightComplianceAudit(projectId: string): Promise<{
-  ok: boolean;
-  data: PreFlightGateScorecard;
-}> {
-  const res = await authedFetch(`/api/projects/${encodeURIComponent(projectId)}/agentic/publication-readiness`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({}),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as { error?: string }).error || "Failed to execute pre-flight compliance audit");
-  }
-  return res.json();
-}
-
-export async function exportProjectManuscript(
-  projectId: string,
-  payload: {
-    format: string;
-    template?: string;
-    citationStyle?: string;
-    includeRebuttalAppendix?: boolean;
-    manuscript?: string;
-  }
-): Promise<{
-  ok: boolean;
-  data: {
-    success: boolean;
-    filename: string;
-    downloadUrl: string;
-    pdfUrl?: string;
-    docxUrl?: string;
-    rebuttalLetterUrl?: string;
-    latexUrl?: string;
-    typstUrl?: string;
-    byteSize: number;
-    formatsAvailable: string[];
-    generatedAt: string;
-  };
-}> {
-  const res = await authedFetch(`/api/projects/${encodeURIComponent(projectId)}/agentic/export`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as { error?: string }).error || "Failed to compile export package");
-  }
-  return res.json();
-}
-
 export async function downloadProjectExportBlob(
   projectId: string,
   format: string,
@@ -632,7 +578,6 @@ export async function auditThesisChapters(
     auditedAt: new Date().toISOString(),
   };
 }
-
 
 /** The model's own Deep Research plan for a question; `fromModel: false` when no model could write one. */
 export async function fetchDeepResearchPlan(question: string): Promise<{ fromModel: boolean; subQuestions: string[] }> {

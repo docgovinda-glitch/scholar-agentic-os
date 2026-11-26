@@ -10,8 +10,6 @@ import { manualRouting } from "../../platform/router/privacyPolicy";
 import { ROUTING_HEADER, ROUTING_MANUAL } from "../../platform/router/taskAffinity";
 
 export type { KeyringEntry } from "../../platform/router/keyringAssemble";
-/** Models the user picked in AI Access, plus their known limits when the catalog had them. */
-export interface ModelChoice { model: string; contextWindow?: number; maxOutputTokens?: number }
 
 /**
  * Every AI connection on this device, primary first (see `assembleKeyring`, shared

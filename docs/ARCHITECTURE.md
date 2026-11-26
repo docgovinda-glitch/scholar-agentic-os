@@ -61,7 +61,7 @@ Registered in `server.ts` in this order: health, admin, auth, `/api/ai/run` and 
 | `aiRun.ts` | `POST /api/ai/run`, `GET /api/ai/models` |
 | `ai.ts` | `/api/ai/*`: status, search, agent (chat, grounded search, deep research), threads |
 | `studio.ts` | `/api/studio/*` (voice profile, refine, consent, restrict, egress audit) |
-| `project.ts` | `/api/projects/*` and `/api/atlas/output-types`, `/api/user/saved-authors`; mounts the sub-routers in `server/routes/project/` |
+| `project.ts` | `/api/projects/*` and `/api/atlas/output-types`; mounts the sub-routers in `server/routes/project/` |
 | `aiAccess.ts` | `/api/ai-access/*` |
 | `search.ts` | `/api/search/*` |
 | `vault.ts` | `/api/vault/*` and `POST /api/lookup-doi` |
@@ -77,7 +77,6 @@ Project sub-routers (`server/routes/project/`): `agentic/` (journal pipeline, sp
 | `auth.ts` | `requireAuth`: verifies the Supabase access token with a direct GoTrue call (no supabase-js client), bounded in-memory token cache; 401 for bad tokens, 503 when verification cannot be performed |
 | `requireAdmin.ts` | Admin roster check, `MAIN_ADMIN_EMAIL` super-admin, scope enforcement (`requireScope`, `requireScopeInline`) |
 | `rateLimit.ts` | Fixed-window in-memory limiter, keyed by client IP (Cloudflare-aware; only trusts `CF-Connecting-IP` when the peer is a Cloudflare address) |
-| `captchaVerify.ts` | Turnstile token verification for sign-up |
 | `rejectClientCredentials.ts` | Rejects provider credentials in request bodies on AI routes |
 | `uploadGuard.ts` | Multer memory storage, `MAX_UPLOAD_MB` (default and hard ceiling 10), heavy-parser detection |
 | `errorHandler.ts`, `asyncHandler.ts` | Uniform error responses |
@@ -124,7 +123,7 @@ The server imports from `src/` (citation formatters, `document_intelligence`, me
 | :--- | :--- |
 | `src/desk/` | UI by feature: assignment, thesis, journal, workspace (journal studio), proposal, presentation, vault, aiAccess, ai, auth, account, admin, dashboard, intake, setup, claims, evidence, gates, discovery, export, manuscript, editor |
 | `src/desk/api/` | Typed client: `client.ts` (authenticated fetch, transient `x-ai-*` headers on AI routes via `routeUsesClientAi`, offline queue), `projectsApi.ts`, `agenticApi.ts`, `claimEvidenceApi.ts`, `studioGenerationApi.ts` |
-| `src/app/` | Client engines: `atlas` (output-type catalog), `conductor` (gates), `mesh` (agent registry and executor), `citation`, `manuscript`, `review`, `coherence`, `rubric`, `studio`, `journal`, `anonymization`, `coverLetter`, `export` |
+| `src/app/` | Client engines: `atlas` (output-type catalog), `conductor` (gates), `mesh` (agent registry and executor), `citation`, `manuscript`, `review`, `coherence`, `rubric`, `studio`, `journal`, `coverLetter`, `export` |
 | `src/domain/` | Pure models and zod schemas; no React and no I/O |
 | `src/features/` | `slides` (Presentation Studio and Gamma card engine), `coursework` (style engine, legacy coursework components), `drafting`, `sources`, `understand` |
 | `src/platform/` | `router/` (the one AI engine: adapters, failover, key rotation, circuit breaker, model listing and curation, SSE bridge), `completion.ts` (the `Completer` app modules use), `warden/` (egress policy, used by the mesh agents) |

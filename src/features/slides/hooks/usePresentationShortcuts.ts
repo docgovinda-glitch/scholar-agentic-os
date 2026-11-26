@@ -14,11 +14,6 @@ export interface UsePresentationShortcutsOptions {
 }
 
 /**
- * Backward compatibility alias
- */
-export type UseKeynoteShortcutsOptions = UsePresentationShortcutsOptions;
-
-/**
  * usePresentationShortcuts:
  * Global keyboard event listener for presentation and stage delivery control.
  *

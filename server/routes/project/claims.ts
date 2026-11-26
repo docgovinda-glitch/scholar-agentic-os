@@ -5,14 +5,12 @@ import {
   getSharedStore, 
   projectView, 
   saveClaimGraphChange, 
-  recomputeG4 
 } from "./core/projectHelpers.ts";
 import { 
   addClaim, 
   bindEvidence, 
   unsupportedClaims, 
   findConflicts, 
-  markClaimUnsupported, 
   ClaimGraphError 
 } from "../../../src/domain/claim/graph.ts";
 import { ClaimSchema, ClaimEvidenceBindingSchema } from "../../../src/domain/schemas/projectSchemas.ts";
@@ -72,34 +70,6 @@ export function claimsRouter(projectLimit: express.RequestHandler): express.Rout
     } catch (err) {
       if (err instanceof ClaimGraphError) {
         return res.status(400).json({ error: err.message });
-      }
-      if (err instanceof GateTransitionError) {
-        return res.status(409).json({ error: err.message });
-      }
-      throw err;
-    }
-  }));
-
-  router.post("/:claimId/mark-unsupported", projectLimit, asyncRoute(async (req, res) => {
-    const record = await loadOwnedProject(store, req, res);
-    if (!record) return;
-    const { reason, actor } = req.body ?? {};
-    if (typeof reason !== "string" || reason.trim().length === 0) {
-      return res.status(400).json({ error: "Missing required field: reason" });
-    }
-    if (typeof actor !== "string" || actor.length === 0) {
-      return res.status(400).json({ error: "Missing required field: actor" });
-    }
-    try {
-      const claimGraph = markClaimUnsupported(record.claimGraph, req.params.claimId, reason, actor);
-      const gates = recomputeG4({ ...record, claimGraph }, record.document);
-      const updated = await store.save({ ...record, claimGraph, gates });
-      const updatedClaim = updated.claimGraph.claims.find(c => c.id === req.params.claimId);
-      if (updatedClaim) await syncClaimToRelational(updated.projectId, updatedClaim);
-      res.json({ ...projectView(updated), claimGraph: updated.claimGraph });
-    } catch (err) {
-      if (err instanceof ClaimGraphError) {
-        return res.status(404).json({ error: err.message });
       }
       if (err instanceof GateTransitionError) {
         return res.status(409).json({ error: err.message });

@@ -34,8 +34,6 @@ import { COHERENCE_DIMENSIONS } from "../../../../src/domain/coherence/types.ts"
 import { runPeerReview } from "../../../../src/app/review/peerReview.ts";
 import { REVIEW_LENSES } from "../../../../src/domain/review/types.ts";
 import { generateCoverLetter } from "../../../../src/app/coverLetter/generateCoverLetter.ts";
-import { proposeAnonymization } from "../../../../src/app/anonymization/proposeAnonymization.ts";
-import { applyAnonymization, AnonymizationApplyError } from "../../../../src/app/anonymization/applyAnonymization.ts";
 import { resolveCitations, isKnownCitationStyle, knownCitationStyleIds } from "../../../../src/app/citation/resolveCitations.ts";
 import { withProjectLock } from "../../../src/concurrency/projectLock.ts";
 import { readManuscriptMarkdown } from "../../../../src/domain/journal/manuscriptText.ts";
@@ -408,88 +406,6 @@ export function registerManuscriptAndGateRoutes(
       return res.status(404).json({ error: `Project "${req.params.id}" has no cover letter generated yet.` });
     }
     res.json(record.coverLetter);
-  }));
-
-  /**
-   * Propose anonymization redactions (docs 33-EXPORT-ARCHITECTURE.md §7.1)
-   * over the project's document — author names/affiliations,
-   * acknowledgements, funding statements naming the team, and
-   * identity-revealing self-citations. Proposals only: nothing here is
-   * applied to any document. Overwrites any previous proposal report
-   * (domain/anonymization — one report per project, superseded on
-   * regeneration, same as coverLetter). Body: { provider?, apiKey?,
-   * model?? }, same BYOK-vs-Premium shape as every other
-   * AI-backed route here.
-   */
-  app.post("/api/projects/:id/anonymization/propose", projectLimit, asyncRoute(async (req, res) => {
-    const record = await loadOwnedProject(store, req, res);
-    if (!record) return;
-    if (!record.document) {
-      return res.status(400).json({ error: "Cannot propose anonymization for a project with no document submitted yet." });
-    }
-    const document = record.document;
-
-
-    try {
-      const anonymizationReport = await proposeAnonymization({
-        document,
-        complete: requestCompleter(req),
-      });
-      const updated = await store.save({ ...record, anonymizationReport });
-      return res.json({ anonymizationReport: updated.anonymizationReport });
-    } catch (err) {
-      return sendAiFailure(res, err, "This step");
-    }
-  }));
-
-  /** The most recent anonymization proposal report and the anonymized document (if one has been produced), both null until they exist. */
-  app.get("/api/projects/:id/anonymization", projectLimit, asyncRoute(async (req, res) => {
-    const record = await loadOwnedProject(store, req, res);
-    if (!record) return;
-    res.json({ report: record.anonymizationReport ?? null, anonymizedDocument: record.anonymizedDocument ?? null });
-  }));
-
-  /**
-   * Apply a human-accepted subset of the most recent anonymization
-   * proposals (docs 33 §7.1: "Every change is shown for review before the
-   * anonymised file is produced") — deterministic, no model call. Body:
-   * { acceptedIndexes: number[] }, each an index into the most recent
-   * anonymizationReport.proposals. Writes the result to
-   * `anonymizedDocument`, a separate field from `document` — the source
-   * document is never overwritten by an anonymized copy. 409s if a
-   * proposal's original text is no longer present (the document changed
-   * since the proposal was generated — re-run propose first).
-   */
-  app.post("/api/projects/:id/anonymization/apply", projectLimit, asyncRoute(async (req, res) => {
-    const record = await loadOwnedProject(store, req, res);
-    if (!record) return;
-    if (!record.document) {
-      return res.status(400).json({ error: "Cannot apply anonymization to a project with no document submitted yet." });
-    }
-    if (!record.anonymizationReport || record.anonymizationReport.proposals.length === 0) {
-      return res.status(400).json({ error: "No anonymization proposals to apply — run POST .../anonymization/propose first." });
-    }
-    const { acceptedIndexes } = req.body ?? {};
-    const proposals = record.anonymizationReport.proposals;
-    if (
-      !Array.isArray(acceptedIndexes) ||
-      acceptedIndexes.length === 0 ||
-      !acceptedIndexes.every((i) => typeof i === "number" && Number.isInteger(i) && i >= 0 && i < proposals.length)
-    ) {
-      return res.status(400).json({ error: `Missing or invalid field: acceptedIndexes (array of integers, each 0–${proposals.length - 1}).` });
-    }
-
-    const accepted = (acceptedIndexes as number[]).map((i) => proposals[i]);
-    try {
-      const anonymizedDocument = applyAnonymization(record.document, accepted);
-      const updated = await store.save({ ...record, anonymizedDocument });
-      res.json({ anonymizedDocument: updated.anonymizedDocument });
-    } catch (err) {
-      if (err instanceof AnonymizationApplyError) {
-        return res.status(409).json({ error: err.message });
-      }
-      throw err;
-    }
   }));
 
   /**

@@ -15,7 +15,3 @@ export function resolveDisplayName({ fullName, name, email }: IdentityInput): st
   const picked = clean(fullName) || clean(name) || clean(email).split("@")[0];
   return picked || null;
 }
-
-export function displayInitial(identity: IdentityInput): string {
-  return (resolveDisplayName(identity) ?? clean(identity.email) ?? "U").charAt(0).toUpperCase() || "U";
-}

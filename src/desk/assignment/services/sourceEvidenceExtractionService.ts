@@ -361,34 +361,6 @@ export async function parseProjectUrl(
   };
 }
 
-/**
- * Backend API Client: Process pasted text notes
- */
-export async function parseProjectText(
-  projectId: string,
-  text: string,
-  title?: string
-): Promise<ParsedSourcePayload> {
-  const res = await authedJsonFetch(
-    `/api/projects/${encodeURIComponent(projectId)}/parse-file/text`,
-    "POST",
-    { text, title }
-  );
-
-  if (!res.ok) {
-    const errorBody = await res.json().catch(() => ({}));
-    throw new Error(errorBody.error || "Failed to process text input");
-  }
-
-  const data = await res.json();
-  return {
-    title: data.title || "Pasted Lecture Notes",
-    sourceType: "text",
-    text: data.text || "",
-    metadata: data.metadata,
-  };
-}
-
 export interface DerivedTraceability {
   abstract: string;
   keyFindings: string[];

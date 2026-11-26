@@ -35,15 +35,6 @@ export interface MarkdownLink {
   type: "link" | "image";
 }
 
-/**
- * Generated document outline.
- */
-export interface MarkdownOutline {
-  heading: string;
-  level: number;
-  position: number;
-}
-
 // ============================================================================
 // Markdown Parser
 // ============================================================================
@@ -275,7 +266,6 @@ export class MarkdownParser implements Parser {
     return blocks;
   }
 
-
   /**
    * Extract links and images from text.
    */
@@ -375,9 +365,3 @@ export class MarkdownParser implements Parser {
     };
   }
 }
-
-// ============================================================================
-// Export
-// ============================================================================
-
-export const createMarkdownParser = (): Parser => new MarkdownParser();

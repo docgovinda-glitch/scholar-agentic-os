@@ -57,12 +57,9 @@ vi.mock("../../../services/vault/cloudDriveService", () => ({
 
 const { default: AssignmentWorkspace } = await import("../AssignmentWorkspace");
 
-import {
-  extractBriefInquiriesAndConcepts,
-  buildBriefSpecificSpecs,
-  adjustHeadingWordCount,
-  autoBalanceStructure,
-} from "../services/outlineService";
+import { extractBriefInquiriesAndConcepts } from "../services/briefSemantics";
+import { buildBriefSpecificSpecs } from "../services/briefOutlineSpecs";
+import { adjustHeadingWordCount, autoBalanceStructure } from "../services/outlineEditing";
 
 beforeEach(() => {
   window.matchMedia =

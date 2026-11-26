@@ -141,11 +141,8 @@ describe("Hotfix Containment (Part A & Part A2): Authz, IDOR, 10MB Limit, Concur
       ["post", "/api/vault/lookup-doi"],
       ["post", "/api/lookup-doi"],
       ["post", "/api/vault/search-semantic"],
-      ["post", "/api/vault/zotero/sync"],
-      ["post", "/api/vault/mendeley/sync"],
       ["get", "/api/vault/drive/files"],
       ["get", "/api/vault/onedrive/files"],
-      ["post", "/api/vault/reset"],
       ["get", "/api/search?q=test"],
       ["get", "/api/search/live?q=test"],
       ["post", "/api/search/live"],
@@ -153,9 +150,6 @@ describe("Hotfix Containment (Part A & Part A2): Authz, IDOR, 10MB Limit, Concur
       ["post", "/api/projects/p-1/assignment/build"],
       ["post", "/api/projects/p-1/assignment/outline/section"],
       ["post", "/api/projects/p-1/assignment/thesis/refine"],
-      ["get", "/api/user/saved-authors"],
-      ["post", "/api/user/saved-authors"],
-      ["delete", "/api/user/saved-authors/auth-1"],
     ];
 
     it.each(PROTECTED_ROUTES)("rejects unauthenticated %s %s with 401", async (method, path) => {
@@ -207,21 +201,6 @@ describe("Hotfix Containment (Part A & Part A2): Authz, IDOR, 10MB Limit, Concur
           request(app)
             .get(`/api/projects/${aliceProjectId}/activity`)
             .set(asBob()),
-        () =>
-          request(app)
-            .put(`/api/projects/${aliceProjectId}/editor/gaps/gap-1`)
-            .set(asBob())
-            .send({ status: "modified" }),
-        () =>
-          request(app)
-            .put(`/api/projects/${aliceProjectId}/editor/evidence/ev-1`)
-            .set(asBob())
-            .send({ quote: "tampered" }),
-        () =>
-          request(app)
-            .put(`/api/projects/${aliceProjectId}/editor/claims/cl-1`)
-            .set(asBob())
-            .send({ text: "tampered" }),
         () =>
           request(app)
             .post(`/api/projects/${aliceProjectId}/parse-file`)

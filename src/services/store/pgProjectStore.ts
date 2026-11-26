@@ -109,8 +109,6 @@ function rowToRecord(row: Record<string, unknown>): ProjectRecord {
     generationJob: (row.generation_job as ProjectRecord["generationJob"] | null) ?? undefined,
     peerReviewHistory: (row.peer_review_history as ProjectRecord["peerReviewHistory"] | null) ?? emptyPeerReviewHistory(),
     coverLetter: (row.cover_letter as ProjectRecord["coverLetter"] | null) ?? undefined,
-    anonymizationReport: (row.anonymization_report as ProjectRecord["anonymizationReport"] | null) ?? undefined,
-    anonymizedDocument: (row.anonymized_document as ProjectRecord["anonymizedDocument"] | null) ?? undefined,
     sourceCountOverride: (row.source_count_override as ProjectRecord["sourceCountOverride"] | null) ?? undefined,
   };
 
@@ -197,8 +195,8 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
 
       const result = await db.query(
         `insert into public.projects
-           (project_id, version, owner_id, output_type_id, answers, authors, gates, document, rubric_report, claim_graph, waivers, submissions, journal_requirements, evidence_ledger, generation_job, peer_review_history, cover_letter, anonymization_report, anonymized_document, source_count_override, updated_at)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, now())
+           (project_id, version, owner_id, output_type_id, answers, authors, gates, document, rubric_report, claim_graph, waivers, submissions, journal_requirements, evidence_ledger, generation_job, peer_review_history, cover_letter, source_count_override, updated_at)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, now())
          on conflict (project_id) do update set
            version = excluded.version,
            output_type_id = excluded.output_type_id,
@@ -215,11 +213,9 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
            generation_job = excluded.generation_job,
            peer_review_history = excluded.peer_review_history,
            cover_letter = excluded.cover_letter,
-           anonymization_report = excluded.anonymization_report,
-           anonymized_document = excluded.anonymized_document,
            source_count_override = excluded.source_count_override,
            updated_at = now()
-         where public.projects.version = $21
+         where public.projects.version = $19
          returning project_id`,
         [
           record.projectId,
@@ -239,8 +235,6 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
           record.generationJob ? JSON.stringify(record.generationJob) : null,
           JSON.stringify(record.peerReviewHistory),
           record.coverLetter ? JSON.stringify(record.coverLetter) : null,
-          record.anonymizationReport ? JSON.stringify(record.anonymizationReport) : null,
-          record.anonymizedDocument ? JSON.stringify(record.anonymizedDocument) : null,
           record.sourceCountOverride ? JSON.stringify(record.sourceCountOverride) : null,
           record.version,
         ]

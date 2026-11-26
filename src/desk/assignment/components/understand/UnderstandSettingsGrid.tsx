@@ -18,7 +18,6 @@ export interface UnderstandSettingsGridProps {
   handleTargetWordCountChange: (newCount: number) => void;
   handleToneChange: (newTone: string) => void;
   handleTypeChange: (t: AssignmentType) => void;
-  handleWordCountChange: (newCount: number) => void;
   localCitation: string;
   localLevel: "high_school" | "undergraduate" | "postgraduate" | "doctoral";
   localTone: string;
@@ -28,7 +27,7 @@ export interface UnderstandSettingsGridProps {
   toneSectionRef: React.RefObject<HTMLDivElement | null>;
 }
 
-export function UnderstandSettingsGrid({ dispatchToneAssistantSuggestions, handleCitationChange, handleLevelChange, handleTargetWordCountChange, handleToneChange, handleTypeChange, handleWordCountChange, localCitation, localLevel, localTone, localType, localWordCount, setLocalWordCount, toneSectionRef }: UnderstandSettingsGridProps) {
+export function UnderstandSettingsGrid({ dispatchToneAssistantSuggestions, handleCitationChange, handleLevelChange, handleTargetWordCountChange, handleToneChange, handleTypeChange, localCitation, localLevel, localTone, localType, localWordCount, setLocalWordCount, toneSectionRef }: UnderstandSettingsGridProps) {
   return (
     <>
           {/* Academic Level, Assignment Type, Citation, Tone, and Target Word Count */}

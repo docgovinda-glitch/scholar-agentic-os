@@ -3,16 +3,10 @@ import { describe, it, expect, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
-import {
-  generateDynamicAssignmentStructure,
-  isGenericPlaceholderTitle,
-  sanitizeOutlineHeadings,
-  assignmentStructureToOutlineTree,
-  outlineTreeToAssignmentStructure,
-  addTargetFramework,
-  removeTargetFramework,
-  updateTargetFrameworks,
-} from "../services/outlineService";
+import { generateDynamicAssignmentStructure } from "../services/dynamicStructure";
+import { isGenericPlaceholderTitle } from "../services/briefSemantics";
+import { sanitizeOutlineHeadings, assignmentStructureToOutlineTree, outlineTreeToAssignmentStructure } from "../services/outlineTree";
+import { addTargetFramework, removeTargetFramework, updateTargetFrameworks } from "../services/outlineEditing";
 import { DynamicStructurePlanner } from "../components/DynamicStructurePlanner";
 import type { AssignmentStructure, AskScholarOutlineResponse } from "../types";
 

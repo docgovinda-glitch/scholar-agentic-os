@@ -2235,8 +2235,6 @@ export default function ProjectListScreen({
           <UserAccountMenu
             userEmail={userEmail}
             onOpenAccountSettings={onOpenAccountSettings}
-            onOpenVault={onOpenVault}
-            onOpenAiAccess={onOpenAiAccess}
             onOpenAuth={openAuth}
             dropUp={true}
             variant="sidebar"

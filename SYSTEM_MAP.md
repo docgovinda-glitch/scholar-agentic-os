@@ -13,7 +13,7 @@ A navigational map of the repository: where things live and where to start when 
 | `ml-style-engine/` | Offline Python corpus, training scripts and exported model |
 | `e2e/` | Playwright specs and the stand-in AI server (`stub-ai/`) |
 | `scripts/` | Verification, operations and migration scripts |
-| `public/`, `index.html`, `manifest.json`, `sw.js` | Static assets, SPA shell (with the hashed inline theme script), PWA manifest and legacy service worker |
+| `public/`, `index.html` | Static assets (logo, PWA `manifest.json`) and the SPA shell (with the hashed inline theme script) |
 | `.github/workflows/` | `ci.yml`, `e2e.yml`, `slide-parity.yml`, `deploy.yml`, `uptime.yml` |
 | `.claude/`, `.agents/`, `.husky/` | Agent definitions and skills (single-brain guardian), an IDE assistant rule file, the pre-commit hook (`npm run lint`) |
 | `Dockerfile`, `render.yaml` | Container build and Render service |
@@ -31,7 +31,7 @@ A navigational map of the repository: where things live and where to start when 
 | `server/src/ai/` | `routerBridge` (request chain), `browserHandoff`, `accountAi`, `liveModels`, `serverLocalAccess`, `aiEndpointGuard`, `aiRouteErrors` |
 | `server/src/services/` | `scholarBrain.ts` (the only AI brain), `sectionDrafter.ts`, `semanticRagEngine.ts`, `prompts/` (all workspace prompt text) |
 | `server/src/research/`, `server/src/discovery/` | Web search, deep research, citation validation, scholarly retrieval, live search, blueprint scout |
-| `server/src/middleware/` | `auth`, `requireAdmin`, `rateLimit`, `captchaVerify`, `rejectClientCredentials`, `uploadGuard`, `errorHandler`, `asyncHandler` |
+| `server/src/middleware/` | `auth`, `requireAdmin`, `rateLimit`, `rejectClientCredentials`, `uploadGuard`, `errorHandler`, `asyncHandler` |
 | `server/src/utils/` | `citationLock`, `citationLockScrubber`, `scholarlyVoiceGuard`, `sectionBudget`, `sectionContract`, `sectionScaffold`, `sectionStream`, `wordBudgetAllocator` |
 | `server/src/supabaseRest.ts`, `syncRelational.ts`, `concurrency/projectLock.ts` | Data API client, relational mirroring, per-project lock |
 
@@ -41,7 +41,7 @@ A navigational map of the repository: where things live and where to start when 
 | :--- | :--- |
 | `main.tsx` | SPA entry: `/admin/*` (lazy) and `/*` (`DeskApp`) |
 | `desk/` | UI by feature; `DeskApp.tsx` routes, `DeskShell.tsx` generic shell, `ProjectListScreen.tsx`, workspaces `assignment/`, `thesis/`, `workspace/` (journal studio), `journal/`, `presentation/`, plus `vault/`, `aiAccess/`, `ai/`, `auth/`, `account/`, `admin/`, `dashboard/`, `setup/`, `regions/`, `api/` (typed client) |
-| `app/` | Engines: `atlas` (output-type catalog), `conductor` (project store and gates), `mesh`, `citation`, `manuscript`, `review`, `coherence`, `rubric`, `studio`, `journal`, `anonymization`, `coverLetter`, `export` |
+| `app/` | Engines: `atlas` (output-type catalog), `conductor` (project store and gates), `mesh`, `citation`, `manuscript`, `review`, `coherence`, `rubric`, `studio`, `journal`, `coverLetter`, `export` |
 | `domain/` | Pure models and zod schemas |
 | `features/` | `slides` (Gamma engine, Presentation Studio steps), `coursework` (style engine, legacy components), `drafting`, `sources`, `understand` |
 | `platform/` | `router/` (the one AI engine), `completion.ts`, `warden/` |
@@ -57,15 +57,15 @@ A navigational map of the repository: where things live and where to start when 
 
 - `schema.sql`, `schema_ai_engine.sql`, `schema_store.sql`, `schema_user_settings.sql`: base schemas.
 - `migrations/`: timestamped SQL, applied in order; see [`docs/DATA-MODEL.md`](docs/DATA-MODEL.md).
-- `functions/`: `search-proxy`, `arxiv-proxy`, `who-proxy`, `imf-proxy`, `request-profile-update`, shared helpers in `_shared/`.
+- `functions/`: `search-proxy`, `arxiv-proxy`, `request-profile-update`, shared helpers in `_shared/`.
 
 ## 5. Scripts (`scripts/`)
 
 | Group | Files |
 | :--- | :--- |
 | Lint gates | `verify-contrast.mjs`, `verify-csp-hash.mjs`, `verify-no-pure-black.mjs`, `verify-no-raw-hex-classes.mjs` |
-| Build | `verify-chunk-budget.mjs`, `slide-parity/`, `verify-scholar-presentation-mega.mjs` |
-| Database | `db/replay-migrations.sh`, `db/schema-diff.sh`, `db/schema-fingerprint.sql`, `db/supabase-stub.sql`, `verify-local-supabase.sh`, `apply-*-migration.ts`, `migrate-jsonb-to-relational.ts`, `create_bucket.ts` |
+| Build | `verify-chunk-budget.mjs`, `slide-parity/` |
+| Database | `db/replay-migrations.sh`, `db/schema-diff.sh`, `db/schema-fingerprint.sql`, `db/supabase-stub.sql`, `verify-local-supabase.sh`, `migrate-jsonb-to-relational.ts`, `create_bucket.ts` |
 | Operations | `smoke-prod.mjs`, `smoke-prod.sh`, `verify-deployment-readiness.sh`, `rewrap-user-keys.ts`, `reset-all-vaults.ts`, `migrate-users-to-supabase.ts`, `seedAiRegistry.ts`, `e2e-setup.mjs` |
 
 ## 6. Where to start

@@ -117,8 +117,6 @@ export class DOCXParser implements Parser {
     return header === "504b0304"; // PK..
   }
 
-
-
   /**
    * Extract pages from text.
    * DOCX doesn't have explicit pages, so we estimate based on content breaks.
@@ -252,9 +250,3 @@ export class DOCXParser implements Parser {
     return undefined;
   }
 }
-
-// ============================================================================
-// Export
-// ============================================================================
-
-export const createDOCXParser = (): Parser => new DOCXParser();

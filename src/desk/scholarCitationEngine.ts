@@ -9,7 +9,6 @@
  * Strictly forbids placeholder authors or dates ("Contributors", "Unknown", "Anonymous", "n.d.").
  */
 
-import type { ReferenceAuthor, ReferenceKind } from "../citation_compliance/model/reference";
 import { venueOrEmpty } from "../shared/retrieval/venue";
 import {
   verifyAndConvertToCSL,
@@ -24,7 +23,6 @@ import {
   exportCSLToRIS,
   parseReferenceImportText,
   normalizeDoi,
-  isBannedAuthorString,
   type CSLItem,
   type ExcludedSourceRecord,
   type SupportedCSLStyle,
@@ -188,61 +186,6 @@ export function extractDoi(str?: string): string | undefined {
 }
 
 /**
- * Splits a full name string into structured ReferenceAuthor parts.
- * Returns empty lastName if the name is a banned placeholder.
- */
-export function splitAuthorName(fullName: string, order = 1): ReferenceAuthor {
-  const clean = (fullName || "").trim().replace(/^by\s+/i, "");
-  if (!clean || isBannedAuthorString(clean)) {
-    return { firstName: "", lastName: "", order };
-  }
-
-  if (clean.includes(",")) {
-    const [last, first] = clean.split(",").map((s) => s.trim());
-    if (!last || isBannedAuthorString(last)) {
-      return { firstName: "", lastName: "", order };
-    }
-    return { firstName: first || "", lastName: last, order };
-  }
-
-  const parts = clean.split(/\s+/);
-  if (parts.length <= 1) {
-    return { firstName: "", lastName: parts[0], order };
-  }
-
-  return {
-    firstName: parts.slice(0, -1).join(" "),
-    lastName: parts[parts.length - 1],
-    order,
-  };
-}
-
-/**
- * Infers ReferenceKind from citation metadata.
- */
-export function inferReferenceKind(item: WebsiteCitationItem): ReferenceKind {
-  const type = (item.sourceType || "").toLowerCase();
-  const domain = (item.domain || item.url || "").toLowerCase();
-
-  if (type.includes("government") || type === "official" || domain.endsWith(".gov") || domain.includes("who.int") || domain.includes("un.org")) {
-    return "GovernmentPublication";
-  }
-  if (type.includes("preprint") || domain.includes("arxiv.org") || domain.includes("biorxiv.org")) {
-    return "Preprint";
-  }
-  if (type.includes("conference")) {
-    return "ConferencePaper";
-  }
-  if (type.includes("book")) {
-    return "Book";
-  }
-  if (type === "scholarly" || type.includes("peer-reviewed") || extractDoi(item.url) || extractDoi(item.doi)) {
-    return "JournalArticle";
-  }
-  return "Website";
-}
-
-/**
  * Converts a WebsiteCitationItem into a verified CSLItem, or returns null if verification fails.
  */
 export function citationItemToCSL(item: WebsiteCitationItem, index = 0): CSLItem | null {
@@ -311,48 +254,6 @@ export interface FormattedBibliographyEntry {
   authorityBadge?: string;
   sourceTypeLabel?: string;
   credibilityLevel?: string;
-}
-
-/**
- * Formats a single bibliography item using the deterministic CSL-JSON Engine.
- * Returns null if the item fails verification (no verifiable author/year or retracted).
- */
-export function formatAskScholarBibliographyEntry(
-  item: WebsiteCitationItem,
-  index: number,
-  styleId: string
-): FormattedBibliographyEntry | null {
-  const style = normalizeCSLStyle(styleId);
-  const csl = citationItemToCSL(item, index);
-  if (!csl) return null;
-
-  const formatted = formatCSLBibliographyEntry(csl, style, index + 1);
-  const yearStr = String(csl.issued["date-parts"][0][0]);
-
-  // Numbered styles: the list marker is the in-text marker, from the one engine.
-  const marker = NUMBERED_STYLES.has(style) ? formatCSLInTextSingle(csl, style, index + 1) : undefined;
-
-  const doi = csl.DOI;
-  const directUrl = doi ? (doi.startsWith("http") ? doi : `https://doi.org/${doi}`) : csl.URL;
-
-  return {
-    originalIndex: index + 1,
-    displayIndex: index + 1,
-    formattedText: formatted.plainText,
-    markdownText: formatted.markdownText,
-    htmlText: formatted.htmlText,
-    rawCitation: { ...item, csl },
-    csl,
-    marker,
-    doi: doi ? (doi.startsWith("http") ? doi : `https://doi.org/${doi}`) : undefined,
-    url: directUrl,
-    openAccessUrl: csl.openAccessUrl || item.openAccessUrl,
-    year: yearStr,
-    publisher: csl["container-title"] || csl.publisher || item.publisher || item.venue,
-    authorityBadge: csl.sourceTypeLabel || item.authorityBadge || "peer-reviewed article",
-    sourceTypeLabel: csl.sourceTypeLabel,
-    credibilityLevel: csl.credibilityLevel,
-  };
 }
 
 /**

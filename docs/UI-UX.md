@@ -59,4 +59,4 @@ Other hooks: `useBackToClose`, `useOnlineStatus`, `useVisualViewport`, `useUnsav
 
 ## 6. Offline and service worker
 
-`public/sw.js` (cache-first static assets, network-first navigation, never caches `/api/*` or non-GET) and `manifest.json` (standalone display) exist, but `src/main.tsx` unregisters any registered service worker and clears Cache Storage on load so every visit gets fresh assets. `warmServer()` (`src/services/serverWarmup.ts`) pings the server early to absorb free-plan cold starts. User-visible offline behaviour comes from the client offline queue in `src/desk/api/client.ts` and `src/services/offline/`.
+`public/manifest.json` (standalone display) exists, but there is no service worker (`server.ts` answers `/sw.js` in production with a script that unregisters old ones), and `src/main.tsx` unregisters any registered service worker and clears Cache Storage on load so every visit gets fresh assets. `warmServer()` (`src/services/serverWarmup.ts`) pings the server early to absorb free-plan cold starts. User-visible offline behaviour comes from the client offline queue in `src/desk/api/client.ts` and `src/services/offline/`.

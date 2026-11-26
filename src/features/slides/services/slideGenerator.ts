@@ -191,8 +191,6 @@ export interface DecomposeInput {
   audienceLevel?: string;
 }
 
-export type SlideGeneratorInput = DecomposeInput;
-
 const PASSIVE_LABELS: Record<string, string> = {
   overview: 'Strategic Overview of Current Paradigms',
   introduction: 'Foundational Shift in Theoretical Research',
@@ -281,7 +279,6 @@ function generateSlidesForTopic(
   styleInput?: string
 ): SlideCard[] {
   const cleanTopic = topic.trim() || 'Autonomous Knowledge Grounding';
-
 
   // Generate natural slide headlines for general topics
   const title1 = generateNaturalSlideTitle('', cleanTopic, 0);

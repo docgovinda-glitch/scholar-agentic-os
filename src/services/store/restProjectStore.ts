@@ -68,8 +68,6 @@ interface ProjectRow {
   generation_job: ProjectRecord["generationJob"] | null;
   peer_review_history: ProjectRecord["peerReviewHistory"] | null;
   cover_letter: ProjectRecord["coverLetter"] | null;
-  anonymization_report: ProjectRecord["anonymizationReport"] | null;
-  anonymized_document: ProjectRecord["anonymizedDocument"] | null;
   source_count_override: ProjectRecord["sourceCountOverride"] | null;
 }
 
@@ -95,8 +93,6 @@ function rowToRecord(row: ProjectRow): ProjectRecord {
     generationJob: row.generation_job ?? undefined,
     peerReviewHistory: row.peer_review_history ?? emptyPeerReviewHistory(),
     coverLetter: row.cover_letter ?? undefined,
-    anonymizationReport: row.anonymization_report ?? undefined,
-    anonymizedDocument: row.anonymized_document ?? undefined,
     sourceCountOverride: row.source_count_override ?? undefined,
   };
 }
@@ -120,8 +116,6 @@ function recordToRow(record: ProjectRecord): ProjectRow {
     generation_job: record.generationJob ?? null,
     peer_review_history: record.peerReviewHistory,
     cover_letter: record.coverLetter ?? null,
-    anonymization_report: record.anonymizationReport ?? null,
-    anonymized_document: record.anonymizedDocument ?? null,
     source_count_override: record.sourceCountOverride ?? null,
   };
 }

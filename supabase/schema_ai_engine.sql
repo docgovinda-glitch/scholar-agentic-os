@@ -56,66 +56,14 @@ create table if not exists public.ai_providers (
   updated_at timestamptz not null default now()
 );
 
-create table if not exists public.ai_models (
-  -- "<provider_id>:<model_id>", stable and human-readable in logs/ledgers.
-  id text primary key,
-  provider_id text not null references public.ai_providers(id) on delete cascade,
-  model_id text not null,
-  display_name text not null,
-  context_window integer,
-  -- {vision, audio, tool_calling, reasoning, coding}: bool per key. Kept as
-  -- jsonb rather than one column per capability so a new capability doesn't
-  -- need a migration to record.
-  capabilities jsonb not null default '{}'::jsonb,
-  modalities text[] not null default array['text'],
-  speed_class text check (speed_class in ('fast', 'balanced', 'slow')),
-  cost_class text check (cost_class in ('free', 'low', 'medium', 'high')),
-  premium_eligible boolean not null default false,
-  free_eligible boolean not null default false,
-  enabled boolean not null default true,
-  last_verified_at timestamptz,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create index if not exists ai_models_provider_id_idx on public.ai_models(provider_id);
-
--- ============================================================================
--- STATUS (2026-08-13 AI configuration layer refactor): ai_models' rich
--- columns above — capabilities, context_window, modalities, speed_class,
--- cost_class, premium_eligible, free_eligible — are not read by any live
--- server code path as of this refactor. They were written by
--- src/services/aiRegistry.ts, a client-side registry reader that turned out
--- to be imported only by its own test (confirmed by repo-wide search) and
--- has been deleted. The structured, capability-aware model data those
--- columns were meant to hold now lives in src/config/modelCatalog.ts
--- instead — a static, isomorphic file (same reasoning as
--- providerCatalog.ts's own header: it must render the AI Access model
--- dropdown synchronously, with no DB round trip, so the settings page never
--- blocks on or fails because of a database read).
---
--- These columns and this table are NOT being dropped here — ai_providers.id
--- stays live as user_ai_connections' FK anchor, scripts/seedAiRegistry.ts
--- still projects providerCatalog.ts/localRunnerCatalog.ts into these tables
--- for the admin dashboard, and a schema deletion is a separate, higher-risk
--- change than this refactor's scope. If a real "disable this model for
--- everyone" admin feature is ever built against ai_models.enabled, that is
--- a deliberate follow-up, not an accidental side effect of reading this
--- comment.
--- ============================================================================
-
 -- Public catalog: every signed-in and anonymous visitor can read what
 -- providers/models exist (needed to render the AI Access page and setup
 -- guide before sign-in). Writes are admin-only, done through server routes
 -- with the service-role key, so no insert/update/delete policy exists here.
 alter table public.ai_providers enable row level security;
-alter table public.ai_models enable row level security;
 
 drop policy if exists ai_providers_select_all on public.ai_providers;
 create policy ai_providers_select_all on public.ai_providers for select using (true);
-
-drop policy if exists ai_models_select_all on public.ai_models;
-create policy ai_models_select_all on public.ai_models for select using (true);
 
 -- ============================================================================
 -- USER CONNECTIONS (metadata only — never a credential)

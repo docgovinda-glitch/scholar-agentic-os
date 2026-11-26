@@ -316,10 +316,6 @@ export const DEFAULT_DECK_THEME_ID = 'scholar-paper';
 
 const BY_ID = new Map(DECK_THEMES.map((t) => [t.id, t]));
 
-export function isCuratedDeckTheme(id?: string | null): boolean {
-  return !!id && BY_ID.has(id);
-}
-
 /* ------------------------------------------------------------------------ */
 /* Colour helpers                                                            */
 /* ------------------------------------------------------------------------ */

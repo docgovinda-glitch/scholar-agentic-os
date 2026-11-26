@@ -39,30 +39,6 @@ export function generateBatchBibliography(
 }
 
 /**
- * Generates an open-standard JSON representation of the items
- */
-export function generateBatchJSON(items: VaultItem[]): string {
-  return JSON.stringify(
-    items.map((item) => ({
-      id: item.id,
-      title: item.title,
-      authors: item.authors || [],
-      year: item.year || null,
-      journal: item.journal || null,
-      citation: item.citation || null,
-      sourceType: item.sourceType || "file",
-      externalReference: item.externalReference || null,
-      keyPoints: item.metadata?.keyPoints || item.metadata?.notes?.keyPoints || [],
-      tags: item.tags || [],
-      projects: item.projects || item.metadata?.projects || (item.collection ? [item.collection] : []),
-      createdAt: item.createdAt,
-    })),
-    null,
-    2
-  );
-}
-
-/**
  * Triggers a browser file download without server requests
  */
 export function downloadTextFile(content: string, filename: string, mimeType = "text/plain;charset=utf-8"): void {

@@ -19,7 +19,6 @@ export type RefName = z.infer<typeof refNameSchema>;
  * unknown: never checked, or the registry could not be reached.
  */
 export const integrityStatusSchema = z.enum(["clean", "retracted", "concern", "corrected", "unknown"]);
-export type IntegrityStatus = z.infer<typeof integrityStatusSchema>;
 
 export const referenceRecordSchema = z.object({
   id: z.string().min(1),

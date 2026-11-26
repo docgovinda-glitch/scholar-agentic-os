@@ -252,7 +252,6 @@ export interface AdminWhoAmI {
 export const getAdminWhoAmI = (): Promise<AdminWhoAmI> =>
   api<AdminWhoAmI>("/api/admin/ai/whoami").catch(() => ({ isAdmin: false, isMainAdmin: false, scopes: [] }));
 
-
 export interface AdminRosterEntry {
   userId: string;
   grantedBy: string | null;
@@ -328,8 +327,6 @@ export interface AccountKey {
   apiKey: string;
   updatedAt: string;
 }
-
-export const listAccountKeys = () => api<{ keys: AccountKeySummary[] }>("/api/ai-access/keys", { cache: "no-store" });
 export const pullAccountKeys = () => api<{ keys: AccountKey[] }>("/api/ai-access/keys/sync", { cache: "no-store", retries: 0 });
 export const saveAccountKey = (providerId: string, key: string) =>
   api<AccountKeySummary>(`/api/ai-access/keys/${encodeURIComponent(providerId)}`, { method: "PUT", body: JSON.stringify({ key }), cache: "no-store" });

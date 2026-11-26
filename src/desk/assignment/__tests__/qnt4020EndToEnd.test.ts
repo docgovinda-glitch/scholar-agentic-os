@@ -5,7 +5,9 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { generateDynamicAssignmentStructure, autoBalanceStructure, formatAcademicTopicTitle } from "../services/outlineService";
+import { generateDynamicAssignmentStructure } from "../services/dynamicStructure";
+import { autoBalanceStructure } from "../services/outlineEditing";
+import { formatAcademicTopicTitle } from "../services/briefSemantics";
 import { structureToInternalSections, stripSectionNumber } from "../types";
 import { applyMarksBudget } from "../../../domain/assignment/outlineBudget";
 import { structureFromAi } from "../../../domain/assignment/aiAssignmentOutline";

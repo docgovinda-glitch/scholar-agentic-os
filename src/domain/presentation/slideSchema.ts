@@ -73,10 +73,6 @@ export const SLIDE_LAYOUTS: SlideLayoutSpec[] = [
 const LAYOUT_SET = new Set<string>(SLIDE_LAYOUT_IDS);
 const ALIAS_TO_ID = new Map<string, SlideLayoutId>(SLIDE_LAYOUTS.map((l) => [l.alias, l.id]));
 
-export function isSlideLayoutId(value: unknown): value is SlideLayoutId {
-  return typeof value === 'string' && LAYOUT_SET.has(value);
-}
-
 /** Accepts a layout id or its descriptive alias ("grid-3-column" → "grid3"). */
 export function toSlideLayoutId(value: unknown): SlideLayoutId | undefined {
   if (typeof value !== 'string') return undefined;
@@ -269,8 +265,6 @@ export const slideCardSchema = z.object({
     .transform((v) => (v && v.text ? v : undefined)),
   takeaway: optionalCopy('takeaway', 'One-sentence takeaway.'),
 });
-
-export type SlideCardAst = z.output<typeof slideCardSchema>;
 
 /** Layouts that are built from `items` and cannot render without them. */
 export const ITEM_LAYOUTS: ReadonlySet<SlideLayoutId> = new Set<SlideLayoutId>(['bento', 'grid3', 'grid4', 'timeline', 'pyramid', 'takeaways']);
