@@ -55,7 +55,7 @@ export default function CitationStylePicker({
         phone
           ? `${PHONE_SHEET_CLASSES} rounded-2xl bg-white dark:bg-ink-700 border border-neutral-200 dark:border-white/15 p-2 animate-in fade-in duration-150`
           : `absolute ${
-              direction === "up" ? "left-0 bottom-full mb-2" : "right-0 top-full mt-1.5"
+              direction === "up" ? "right-0 bottom-full mb-2" : "right-0 top-full mt-1.5"
             } w-72 max-w-[calc(100vw-2rem)] rounded-xl bg-white dark:bg-ink-700 border border-neutral-200 dark:border-white/15 shadow-2xl z-50 p-1.5 animate-in fade-in ${
               direction === "up" ? "slide-in-from-bottom-2" : "slide-in-from-top-2"
             } duration-150`
