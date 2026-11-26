@@ -13,7 +13,7 @@ A navigational map of the repository: where things live and where to start when 
 | `ml-style-engine/` | Offline Python corpus, training scripts and exported model |
 | `e2e/` | Playwright specs and the stand-in AI server (`stub-ai/`) |
 | `scripts/` | Verification, operations and migration scripts |
-| `public/`, `index.html`, `manifest.json`, `sw.js` | Static assets, SPA shell (with the hashed inline theme script), PWA manifest and legacy service worker |
+| `public/`, `index.html` | Static assets (logo, PWA `manifest.json`) and the SPA shell (with the hashed inline theme script) |
 | `.github/workflows/` | `ci.yml`, `e2e.yml`, `slide-parity.yml`, `deploy.yml`, `uptime.yml` |
 | `.claude/`, `.agents/`, `.husky/` | Agent definitions and skills (single-brain guardian), an IDE assistant rule file, the pre-commit hook (`npm run lint`) |
 | `Dockerfile`, `render.yaml` | Container build and Render service |
@@ -57,15 +57,15 @@ A navigational map of the repository: where things live and where to start when 
 
 - `schema.sql`, `schema_ai_engine.sql`, `schema_store.sql`, `schema_user_settings.sql`: base schemas.
 - `migrations/`: timestamped SQL, applied in order; see [`docs/DATA-MODEL.md`](docs/DATA-MODEL.md).
-- `functions/`: `search-proxy`, `arxiv-proxy`, `who-proxy`, `imf-proxy`, `request-profile-update`, shared helpers in `_shared/`.
+- `functions/`: `search-proxy`, `arxiv-proxy`, `request-profile-update`, shared helpers in `_shared/`.
 
 ## 5. Scripts (`scripts/`)
 
 | Group | Files |
 | :--- | :--- |
 | Lint gates | `verify-contrast.mjs`, `verify-csp-hash.mjs`, `verify-no-pure-black.mjs`, `verify-no-raw-hex-classes.mjs` |
-| Build | `verify-chunk-budget.mjs`, `slide-parity/`, `verify-scholar-presentation-mega.mjs` |
-| Database | `db/replay-migrations.sh`, `db/schema-diff.sh`, `db/schema-fingerprint.sql`, `db/supabase-stub.sql`, `verify-local-supabase.sh`, `apply-*-migration.ts`, `migrate-jsonb-to-relational.ts`, `create_bucket.ts` |
+| Build | `verify-chunk-budget.mjs`, `slide-parity/` |
+| Database | `db/replay-migrations.sh`, `db/schema-diff.sh`, `db/schema-fingerprint.sql`, `db/supabase-stub.sql`, `verify-local-supabase.sh`, `migrate-jsonb-to-relational.ts`, `create_bucket.ts` |
 | Operations | `smoke-prod.mjs`, `smoke-prod.sh`, `verify-deployment-readiness.sh`, `rewrap-user-keys.ts`, `reset-all-vaults.ts`, `migrate-users-to-supabase.ts`, `seedAiRegistry.ts`, `e2e-setup.mjs` |
 
 ## 6. Where to start
