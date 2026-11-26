@@ -64,3 +64,15 @@ describe("checkStatistics", () => {
     expect(formatP(0.0362)).toBe(".036");
   });
 });
+
+describe("checkStatistics: results that cannot be recomputed", () => {
+  it("skips a result with zero degrees of freedom instead of reporting a false conclusion change", () => {
+    expect(checkStatistics("t(0) = 2.2, p = .05")).toEqual([]);
+    expect(checkStatistics("F(0, 10) = 3.1, p = .05")).toEqual([]);
+    expect(checkStatistics("χ2(0) = 3, p = .08")).toEqual([]);
+  });
+
+  it("still reads a result written without spaces", () => {
+    expect(checkStatistics("t(28)=2.20,p=.036")).toHaveLength(1);
+  });
+});

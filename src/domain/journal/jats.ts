@@ -7,6 +7,7 @@
  */
 import type { ReferenceRecord } from "./references";
 import { citedIds } from "./citationStyles";
+import { headingDepthOf } from "./manuscriptText";
 import { figureFile, numberFigures, type ManuscriptFigure, type Numbering } from "./figures";
 
 export interface JatsInput {
@@ -52,6 +53,7 @@ function bodyXml(markdown: string, known: Set<string>): string {
   const out: string[] = [];
   let depth = 0; // open <sec> elements
   let n = 0;
+  const depthOf = headingDepthOf(markdown);
   const close = (to: number) => {
     while (depth > to) {
       out.push("</sec>");
@@ -62,7 +64,8 @@ function bodyXml(markdown: string, known: Set<string>): string {
     const lines = b.split("\n");
     const h = lines.length === 1 ? lines[0].match(/^(#{1,6})\s+(?:§\s*)?(.+)$/) : null;
     if (h) {
-      const level = h[1].length >= 4 ? 2 : 1;
+      // Never deeper than one below the sections that are open: a sub-heading with no parent opens a top-level <sec>.
+      const level = Math.min(depthOf(h[1].length) + 1, depth + 1);
       close(level - 1);
       out.push(`<sec id="sec${++n}"><title>${inline(h[2].replace(/^\d+(\.\d+)*\.?\s+/, ""), known)}</title>`);
       depth = level;

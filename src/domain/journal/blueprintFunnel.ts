@@ -7,6 +7,7 @@
  * index does not record (word limits, citation style) is guessed. Pure.
  */
 import { z } from "zod";
+import { stripTags } from "../../shared/markupText";
 
 // ── Papers the scout found ───────────────────────────────────────────────
 
@@ -44,7 +45,7 @@ export const decodeEntities = (s: string | undefined) =>
     .replace(/&amp;/g, "&");
 
 /** Crossref abstracts are JATS XML; this keeps the text. */
-export const stripJats = (s: string | undefined) => decodeEntities((s ?? "").replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+export const stripJats = (s: string | undefined) => decodeEntities(stripTags(s ?? "")).replace(/\s+/g, " ").trim();
 
 const norm = (s: string) =>
   s

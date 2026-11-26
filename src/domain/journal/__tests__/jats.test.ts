@@ -54,3 +54,19 @@ describe("buildJats", () => {
     expect(bare).not.toMatch(/<contrib-group|<abstract|<kwd-group|<back>/);
   });
 });
+
+describe("buildJats: section nesting", () => {
+  const build = (body: string) => buildJats({ title: "T", authors: [], body, declarations: [], records: {} });
+  const balanced = (xml: string) => (xml.match(/<sec[ >]/g) ?? []).length === (xml.match(/<\/sec>/g) ?? []).length;
+
+  it("nests ### § sub-sections inside their ## section", () => {
+    const xml = build("## Methods\n\nA.\n\n### § Participants\n\nB.\n\n## Results\n\nC.");
+    expect(xml).toMatch(/<sec id="sec1"><title>Methods<\/title>\s*<p>A\.<\/p>\s*<sec id="sec2"><title>Participants<\/title>\s*<p>B\.<\/p>\s*<\/sec>\s*<\/sec>\s*<sec id="sec3"><title>Results/);
+    expect(balanced(xml)).toBe(true);
+  });
+
+  it("never closes more sections than it opened when a sub-heading has no parent", () => {
+    const xml = build("#### Orphan\n\nA.\n\n### Next\n\nB.");
+    expect(balanced(xml)).toBe(true);
+  });
+});

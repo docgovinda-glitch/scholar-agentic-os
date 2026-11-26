@@ -92,6 +92,7 @@ describe("helpers", () => {
     expect(abstractFromInvertedIndex({ AI: [0], helps: [1], doctors: [2] })).toBe("AI helps doctors");
     expect(abstractFromInvertedIndex(null)).toBe("");
     expect(stripJats("<jats:p>Hello <jats:i>world</jats:i></jats:p>")).toBe("Hello world");
+    expect(stripJats("<jats:p>Reduces CO<jats:sub>2</jats:sub> by 5%.</jats:p><jats:p>Methods</jats:p>")).toBe("Reduces CO2 by 5%. Methods");
     expect(decodeEntities("AI &amp; SOCIETY &#8211; &lt;x&gt;")).toBe("AI & SOCIETY – <x>");
     expect(spellingFromGuidelines("Manuscripts must use British English spelling.")).toMatch(/British/);
     expect(spellingFromGuidelines("Use US English.")).toBe("US English");

@@ -114,3 +114,18 @@ describe("exportParts and suggestTemplate", () => {
     expect(suggestTemplate("PLOS ONE")).toBe("article");
   });
 });
+
+describe("bodyLatex: the Studio's own heading layout", () => {
+  it("nests ### § sub-sections under their ## section", () => {
+    const tex = bodyLatex("## Methods\n\nIntro.\n\n### § Participants\n\nWho.\n\n### § Materials\n\nWhat.\n\n## Results\n\nFound.", cite);
+    expect(tex).toContain("\\section{Methods}");
+    expect(tex).toContain("\\subsection{Participants}");
+    expect(tex).toContain("\\subsection{Materials}");
+    expect(tex).toContain("\\section{Results}");
+  });
+
+  it("goes one level deeper again for a third heading level", () => {
+    const tex = bodyLatex("## A\n\n### § B\n\n#### C", cite);
+    expect(tex).toContain("\\subsubsection{C}");
+  });
+});

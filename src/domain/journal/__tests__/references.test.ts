@@ -123,3 +123,15 @@ describe("parseReferenceRecords", () => {
     expect(parseReferenceRecords(undefined)).toEqual({});
   });
 });
+
+describe("recordFromCrossref: markup in titles", () => {
+  it("keeps sub- and superscripts and italics inside their words", () => {
+    const rec = recordFromCrossref({ title: ["Capture of CO<sub>2</sub> by <jats:italic>E. coli</jats:italic> in H<sub>2</sub>O"], type: "journal-article" }, "x", "10.1000/x");
+    expect(rec.title).toBe("Capture of CO2 by E. coli in H2O");
+  });
+
+  it("still separates paragraph-level tags with a space", () => {
+    const rec = recordFromCrossref({ title: ["First<br/>Second"], type: "journal-article" }, "x", "10.1000/x");
+    expect(rec.title).toBe("First Second");
+  });
+});

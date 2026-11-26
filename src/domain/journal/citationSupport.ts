@@ -48,10 +48,13 @@ const clean = (s: string) =>
 /** Sentences that cite a source, one pair per (sentence, source), in text order. */
 export function citingSentences(markdown: string): Array<{ sentence: string; citeId: string }> {
   const out: Array<{ sentence: string; citeId: string }> = [];
+  // Headings are not claims, but the text typed right under one (no blank line) is: only the heading lines go.
   const paragraphs = markdown
     .replace(/\r\n/g, "\n")
     .split(/\n{2,}/)
-    .filter((p) => !/^\s*#{1,6}\s/.test(p) && !/^\s*\|/.test(p));
+    .filter((p) => !/^\s*\|/.test(p))
+    .map((p) => p.split("\n").filter((l) => !/^\s*#{1,6}\s/.test(l)).join("\n"))
+    .filter((p) => p.trim());
   for (const p of paragraphs) {
     // Split after . ? ! followed by space and a capital or a citation-free start; keep tokens with their sentence.
     const sentences = p.replace(/\n/g, " ").split(/(?<=[.?!])\s+(?=[A-Z(\[])/);

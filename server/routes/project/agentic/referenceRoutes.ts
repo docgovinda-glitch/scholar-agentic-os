@@ -7,7 +7,7 @@ import {
   sourceIdForDoi,
   type ReferenceRecord,
 } from "../../../../src/domain/journal/references.ts";
-import { fetchCrossrefMessage, fetchDataCiteAttributes } from "../../../../src/shared/retrieval/providers.ts";
+import { fetchCrossrefMessage, fetchDataCiteAttributes, stripMarkup } from "../../../../src/shared/retrieval/providers.ts";
 import { getProjectSafe } from "./helpers.ts";
 
 export const referenceRoutes = express.Router({ mergeParams: true });
@@ -49,7 +49,7 @@ referenceRoutes.post("/references/lookup", async (req: express.Request<{ id: str
   if (cr.ok) {
     const message = cr.message;
     const record: ReferenceRecord = { ...recordFromCrossref(message, id, doi), integrity: integrityFromCrossref(message, now) };
-    return res.json({ record, abstract: typeof message.abstract === "string" ? message.abstract.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() : "" });
+    return res.json({ record, abstract: typeof message.abstract === "string" ? stripMarkup(message.abstract) : "" });
   }
   const dc = await datacite(doi);
   if (dc.ok) {
@@ -57,7 +57,7 @@ referenceRoutes.post("/references/lookup", async (req: express.Request<{ id: str
     // DataCite does not carry retraction notices; say so rather than "clean".
     const record: ReferenceRecord = { ...recordFromDataCite(attrs, id, doi), integrity: { status: "unknown", checkedAt: now } };
     const desc = Array.isArray(attrs.descriptions) ? (attrs.descriptions as Json[])[0]?.description : undefined;
-    return res.json({ record, abstract: typeof desc === "string" ? desc.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() : "" });
+    return res.json({ record, abstract: typeof desc === "string" ? stripMarkup(desc) : "" });
   }
   if (cr.notFound && dc.notFound) {
     return res.status(404).json({ error: `No record for ${doi} at Crossref or DataCite. Check the DOI.`, code: "doi_not_found" });

@@ -63,6 +63,29 @@ describe("checkNumbering", () => {
   });
 });
 
+describe("checkNumbering: plural references and ranges", () => {
+  it("counts every number in 'Figures 1 and 2' and 'Tables 1-3'", () => {
+    const out = checkNumbering("Figures 1 and 2 show it. Tables 1\u20133 list the data, and Table 4 closes.");
+    expect(out).toEqual([
+      { kind: "Figure", order: [1, 2], missing: [], outOfOrder: [] },
+      { kind: "Table", order: [1, 2, 3, 4], missing: [], outOfOrder: [] },
+    ]);
+  });
+
+  it("does not call a figure missing when only a plural reference names it", () => {
+    const out = checkNumbering("Figure 1 first, then Figure 3, and Figures 2 and 4 together.");
+    expect(out[0].missing).toEqual([]);
+    expect(out[0].order).toEqual([1, 3, 2, 4]);
+  });
+
+  it("reads a list of chapter-numbered figures, and leaves a trailing count alone", () => {
+    const out = checkNumbering("Figures 2.1, 2.2 and 2.3 show it. Figure 2, 3 participants.");
+    const chapter2 = out.find((f) => f.chapter === 2)!;
+    expect(chapter2.order).toEqual([1, 2, 3]);
+    expect(out.find((f) => f.chapter === undefined)?.order).toEqual([2]);
+  });
+});
+
 describe("flaggedPhrases", () => {
   it("counts phrases reviewers associate with AI text", () => {
     expect(flaggedPhrases("We delve into it. It is important to note that we delve again.")).toEqual([
