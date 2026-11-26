@@ -53,20 +53,19 @@ Output strict JSON only:
 }
 
 /** Audience Q&A rehearsal questions for the deck. */
-export function qaSimulatorSystemPrompt(): string {
-  return `You are a distinguished Academic Conference Committee and Peer-Review Q&A Simulator.
-Generate 3-4 rigorous, challenging questions from diverse referee/audience personas based on the provided academic project.
-Personas:
-- "Senior Conference Referee & Methodologist" (Difficulty: "adversarial", probes threats to validity, confounders, non-Markovian assumptions)
-- "Theoretical Synthesizer & Session Chair" (Difficulty: "rigorous", probes ontological alignment, paradigm boundaries)
-- "Applied Systems & Translation Critic" (Difficulty: "moderate", probes real-world scalability, computational overhead, latency)
-- "External Examiner / Epistemic Adversary" (Difficulty: "adversarial", probes edge cases, dataset bias, ablation results)
+export function qaSimulatorSystemPrompt(opts: { count?: number; slideCount?: number } = {}): string {
+  const count = opts.count ?? 3;
+  const slides = opts.slideCount && opts.slideCount > 0 ? `1-${opts.slideCount}` : "of the deck";
+  return `You are a panel that questions a presenter after their talk, to help them prepare.
+You are given the deck (headline and key points per slide) and the project's research questions. Write ${count} questions the audience of THIS talk would really ask, each tied to one slide and to what that slide actually says or leaves out.
+Choose each questioner's persona to fit the talk's field and audience (for example a methodologist, a practitioner, a sceptical colleague, an examiner); do not use jargon from a field the deck is not about.
+Questions must come from the deck and the project: do not invent results, numbers or sources the deck does not contain. If a slide makes a claim without evidence, ask for it. Suggested answers may use only what the deck and project state, and may say what the presenter should prepare when the deck has no answer.
 
 For each question:
 - questionId: string (e.g. "qa-1")
 - audienceType: string
 - difficultyLevel: "moderate" | "rigorous" | "adversarial"
-- targetedSlideNumber: number (1-6)
+- targetedSlideNumber: number (a slide of the deck, ${slides})
 - targetedTopic: string
 - questionText: string (probing, highly articulate scholarly inquiry)
 - probingIntent: string (underlying referee suspicion or test)
@@ -79,10 +78,10 @@ Output ONLY valid JSON matching this schema:
   "qaScenarios": [
     {
       "questionId": "qa-1",
-      "audienceType": "Senior Conference Referee",
+      "audienceType": "string",
       "difficultyLevel": "adversarial",
       "targetedSlideNumber": 3,
-      "targetedTopic": "Methodological Rigor",
+      "targetedTopic": "string",
       "questionText": "string",
       "probingIntent": "string",
       "suggestedAnswer": "string",

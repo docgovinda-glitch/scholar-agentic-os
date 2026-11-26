@@ -105,7 +105,7 @@ export default function AudienceQaSimulator({
         if (Array.isArray(rawList) && rawList.length > 0) {
           const formatted: AudienceQaQuestion[] = rawList.map((q: any, i: number) => ({
             id: q.id || q.questionId || `qa-${i + 1}`,
-            persona: q.persona || q.audienceType || 'Conference Referee',
+            persona: q.persona || q.audienceType || 'Audience member',
             difficulty: q.difficulty || q.difficultyLevel || 'rigorous',
             targetSlideNumber: q.targetSlideNumber || q.targetedSlideNumber || 1,
             question: q.question || q.questionText || '',
