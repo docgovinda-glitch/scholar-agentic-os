@@ -40,6 +40,13 @@ function resolveCloudTokenEncryptionKey(): Buffer | null {
   return null;
 }
 
+/** A readable citation line for an imported record, from the fields it really has (no "Unknown Author" or "n.d."). */
+function plainImportedCitation(r: { authors: string[]; year?: string | number | null; title: string; venue?: string | null; doi?: string | null }): string {
+  const who = r.authors.length > 2 ? `${r.authors[0]} et al.` : r.authors.join(" & ");
+  const head = [who, r.year ? `(${r.year})` : ""].filter(Boolean).join(" ");
+  return [head ? `${head}.` : "", `${r.title}.`, r.venue ? `${r.venue}.` : "", r.doi ? `https://doi.org/${r.doi}` : ""].filter(Boolean).join(" ");
+}
+
 export function encryptCloudToken(plaintext: string): string | null {
   const key = resolveCloudTokenEncryptionKey();
   if (!key) return null;
@@ -388,7 +395,7 @@ router.post("/lookup-doi", async (req: Request, res: Response) => {
 
     const authorStr = authors.length > 2 ? `${authors[0]} et al.` : authors.join(" & ");
     // With no named author the title leads, as the styles do; no placeholder author is written.
-    const citation = `${authorStr ? `${authorStr} ` : ""}(${year || "n.d."}). ${title}. ${journal ? `${journal}, ` : ""}${volume ? `${volume}` : ""}${issue ? `(${issue})` : ""}${page ? `, ${page}` : ""}. https://doi.org/${cleanDoi}`
+    const citation = `${authorStr ? `${authorStr} ` : ""}${year ? `(${year}). ` : ""}${title}. ${journal ? `${journal}, ` : ""}${volume ? `${volume}` : ""}${issue ? `(${issue})` : ""}${page ? `, ${page}` : ""}. https://doi.org/${cleanDoi}`
       .replace(/\s+/g, " ")
       .trim();
 
@@ -603,13 +610,12 @@ router.post("/zotero/sync", async (req: Request, res: Response) => {
         url: data.url || (doi ? `https://doi.org/${doi}` : undefined),
       };
 
-      const authorStr = authors.length > 0 ? (authors.length > 2 ? `${authors[0]} et al.` : authors.join(" & ")) : "Unknown Author";
-      const citation = `${authorStr} (${year || "n.d."}). ${title}. ${publication ? `${publication}. ` : ""}${doi ? `https://doi.org/${doi}` : ""}`;
+      const citation = plainImportedCitation({ authors, year, title, venue: publication, doi });
 
       importedItems.push({
         id: crypto.randomUUID(),
         title,
-        content: abstract || `Imported from Zotero Library (${data.itemType}). Published in ${publication} (${year}).`,
+        content: abstract || `Imported from Zotero Library (${data.itemType}). ${[publication && `Published in ${publication}`, year && `(${year})`].filter(Boolean).join(" ")}.`,
         sourceType: "zotero",
         authors,
         year,
@@ -690,13 +696,12 @@ router.post("/mendeley/sync", async (req: Request, res: Response) => {
           doi: doi || undefined,
         };
 
-        const authorStr = authors.length > 0 ? (authors.length > 2 ? `${authors[0]} et al.` : authors.join(" & ")) : "Unknown Author";
-        const citation = `${authorStr} (${year || "n.d."}). ${title}. ${journal ? `${journal}. ` : ""}${doi ? `https://doi.org/${doi}` : ""}`;
+        const citation = plainImportedCitation({ authors, year, title, venue: journal, doi });
 
         importedItems.push({
           id: crypto.randomUUID(),
           title,
-          content: abstract || `Imported from Reference Manager BibTeX (${itemType}). Published in ${journal} (${year}).`,
+          content: abstract || `Imported from Reference Manager BibTeX (${itemType}). ${[journal && `Published in ${journal}`, year && `(${year})`].filter(Boolean).join(" ")}.`,
           sourceType: "mendeley",
           authors,
           year,

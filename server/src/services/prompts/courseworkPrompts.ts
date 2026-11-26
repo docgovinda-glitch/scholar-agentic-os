@@ -125,6 +125,22 @@ export function streamSectionFrameworkGuidelines({ isShortQA, mappedSources, cit
  * The phase copilot's persona and scoped context (Advisor / Librarian / Scribe / Examiner).
  * Inputs are the project's saved answers as the route reads them (free-form JSON).
  */
+/** The copilot prompt lists at most this many sources, decks and evidence items (the counts in the headings stay true). */
+const COPILOT_MAX_SOURCES = 12;
+const COPILOT_MAX_DECKS = 5;
+const COPILOT_MAX_EVIDENCE = 10;
+
+function capList<T>(items: T[], max: number, line: (item: T, index: number) => string): string {
+  const shown = items.slice(0, max).map(line).join("\n");
+  return items.length > max ? `${shown}\n  (and ${items.length - max} more, not listed)` : shown;
+}
+
+/** "(Author, Year)" from what the source really has; missing parts are left out, never replaced by placeholders. */
+function sourceByline(s: { authors?: string[]; year?: number | string }): string {
+  const parts = [s.authors?.length ? s.authors.join(", ") : "", s.year ? String(s.year) : ""].filter(Boolean);
+  return parts.length ? ` (${parts.join(", ")})` : "";
+}
+
 export function copilotPersona({ normalizedPhase, question, academicLevel, targetWordCount, citationStyle, assignmentType, analysis, rubricCriteria, keptSources, lectureSlides, evidenceItems, currentTotalWords, outline, peelSections, rubricAudit, unresolvedCitations }: CopilotContext): { personaName: string; personaRole: string; scopedContextSummary: string; systemPrompt: string } {
   let personaName = "Advisor";
   let personaRole = "Assignment Brief & Rubric Guidance";
@@ -156,11 +172,11 @@ Provide rigorous, structured, academic advice in concise markdown.`;
     scopedContextSummary = `
 PHASE 2 SOURCES & EVIDENCE STATE:
 - Approved / Kept Literature Sources (${keptSources.length} sources):
-${keptSources.map((s, i) => `  [${i + 1}] "${s.title}" (${s.authors?.join(", ") || "Unknown"}, ${s.year || "n.d."}) - ${s.venue || "Scholarly Source"}. Relevance: ${s.relevanceRationale || s.abstract?.slice(0, 150) || "Approved"}`).join("\n") || "  (No approved sources yet)"}
+${capList(keptSources, COPILOT_MAX_SOURCES, (s, i) => `  [${i + 1}] "${s.title}"${sourceByline(s)}${s.venue ? ` - ${s.venue}` : ""}${s.relevanceRationale || s.abstract ? `. Relevance: ${s.relevanceRationale || s.abstract?.slice(0, 150)}` : ""}`) || "  (No approved sources yet)"}
 - Uploaded Lecture Slides & Concepts (${lectureSlides.length} decks):
-${lectureSlides.map((d) => `  - Deck: "${d.title || d.fileName}". Key Concepts: ${(d.extractedConcepts || []).join(", ") || "Lecture notes"}`).join("\n") || "  (No lecture slides uploaded)"}
+${capList(lectureSlides, COPILOT_MAX_DECKS, (d) => `  - Deck: "${d.title || d.fileName}"${(d.extractedConcepts || []).length ? `. Key Concepts: ${(d.extractedConcepts || []).slice(0, 12).join(", ")}` : ""}`) || "  (No lecture slides uploaded)"}
 - Verified Evidence Ledger (${evidenceItems.length} claims):
-${evidenceItems.map((e, i) => `  [E${i + 1}] Claim: "${e.claimText}". Source: "${e.sourceTitle || e.sourceId}". Quote: "${e.quoteText?.slice(0, 120)}..."`).join("\n") || "  (No evidence items added)"}
+${capList(evidenceItems, COPILOT_MAX_EVIDENCE, (e, i) => `  [E${i + 1}] Claim: "${e.claimText}". Source: "${e.sourceTitle || e.sourceId}"${e.quoteText ? `. Quote: "${e.quoteText.slice(0, 120)}..."` : ""}`) || "  (No evidence items added)"}
 `;
     systemPrompt = `You are the Librarian, the Scholarly Literature & Sourcing Copilot in Scholar OS.
 Your role is to help the student curate peer-reviewed academic literature, synthesize concepts from university lecture slides, and construct verified evidence cards with grounded citations.
@@ -271,7 +287,7 @@ export function sourcesUserPrompt(task: string, sections: Array<{ id: string; ti
       .slice(0, 20)
       .map(
         (s) =>
-          `[${s.id}] ${clip(s.title, 300)} — ${clip((s.authors ?? []).slice(0, 4).join(", "), 160)} (${s.year || "n.d."}). ${clip(s.venue, 160)}${s.peerReviewed ? ", peer-reviewed" : ""}${typeof s.citationCount === "number" ? `, cited ${s.citationCount} times` : ""}\nAbstract: ${clip(s.abstract, 1500) || "(none)"}`
+          `[${s.id}] ${clip(s.title, 300)} — ${clip((s.authors ?? []).slice(0, 4).join(", "), 160)} ${s.year ? `(${s.year})` : "(year not recorded)"}. ${clip(s.venue, 160)}${s.peerReviewed ? ", peer-reviewed" : ""}${typeof s.citationCount === "number" ? `, cited ${s.citationCount} times` : ""}\nAbstract: ${clip(s.abstract, 1500) || "(none)"}`
       )
       .join("\n\n")}`,
   ].filter(Boolean).join("\n\n");
