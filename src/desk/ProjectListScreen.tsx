@@ -2279,7 +2279,8 @@ export default function ProjectListScreen({
 
         {/* Middle Section: Core Workspace Links & Recents Scrollable List */}
         <div className="flex-1 overflow-hidden px-3 flex flex-col w-[260px] min-h-0 antialiased">
-          {/* Phase 2: Core Workspace Links (The Library) */}
+          {/* Phase 2: Core Workspace Links (The Library). On a phone the bottom bar already has these. */}
+          {!isPhone && (
           <div className="space-y-1">
             <button
               type="button"
@@ -2349,6 +2350,7 @@ export default function ProjectListScreen({
               <span>Ask Scholar</span>
             </button>
           </div>
+          )}
 
           {userEmail && projectsLoadError && (
             <div role="alert" className="mt-6 mx-1 rounded-xl border border-amber-300 dark:border-amber-500/40 bg-amber-50 dark:bg-amber-500/10 px-3 py-2.5 text-xs text-[color:var(--text-primary)] flex flex-col gap-2">
@@ -2386,6 +2388,7 @@ export default function ProjectListScreen({
                   onClick={(e) => e.stopPropagation()}
                   className="w-full h-full bg-neutral-900/5 dark:bg-white/5 border border-neutral-200 dark:border-white/10 rounded-full pl-10 pr-11 text-xs focus:outline-none focus:ring-1 focus:ring-neutral-400 dark:focus:ring-white/20 transition-all cursor-text text-neutral-900 dark:text-neutral-200 placeholder-neutral-500 dark:placeholder-neutral-400"
                 />
+                {!isPhone && (
                 <button
                   type="button"
                   onClick={() => setIsCommandPaletteOpen(true)}
@@ -2394,6 +2397,7 @@ export default function ProjectListScreen({
                 >
                   ⌘K
                 </button>
+                )}
               </div>
 
               {/* Projects List (Scrollable Area) */}
@@ -2533,7 +2537,8 @@ export default function ProjectListScreen({
               </button>
             )}
 
-            {/* Minimal Icon-Only Theme Toggle */}
+            {/* Minimal Icon-Only Theme Toggle (a phone has its own in the header) */}
+            {!isPhone && (
             <button
               type="button"
               onClick={toggleTheme}
@@ -2549,6 +2554,7 @@ export default function ProjectListScreen({
                 )}
               </div>
             </button>
+            )}
           </div>
 
           {/* Multi-Account User Dropdown */}
@@ -2860,7 +2866,7 @@ export default function ProjectListScreen({
                         </p>
                       )}
 
-                      {resumeChatRow(hasReturningContent && visibleRecents.length > 0 ? "mb-3" : "mb-4")}
+                      {visibleRecents.length === 0 && resumeChatRow("mb-4")}
 
                       {!hasReturningContent && (
                       <div className="mt-4">
@@ -2894,6 +2900,7 @@ export default function ProjectListScreen({
                             Continue where you left off
                           </h2>
                           <ul className="space-y-2">
+                            {resumeTarget && <li>{resumeChatRow()}</li>}
                             {visibleRecents.map((item) => {
                               const tileTheme = getFormatTileTheme(item.outputTypeId);
                               return (
