@@ -30,7 +30,6 @@ For local work leave `VITE_CAPTCHA_SITE_KEY` empty: the placeholder value in `.e
 | `npm run clean` | Remove `dist/` and `server.js` |
 | `npm run verify:contrast`, `verify:csp-hash`, `verify:chunks` | Individual checks |
 | `npm run verify:slide-parity` | Renders the web and `.pptx` slides and compares them (`scripts/slide-parity/`, also a CI workflow) |
-| `npm run seed:ai-registry` | Seed `ai_providers` / `ai_models` from the code catalogs |
 | `npm run migrate:users-to-supabase` | One-off user migration script |
 
 `.husky/pre-commit` runs `npm run lint`. `package.json` has no `prepare` script, so enable the hook once per clone with `npx husky`.
