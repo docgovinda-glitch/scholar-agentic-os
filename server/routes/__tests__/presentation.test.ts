@@ -13,6 +13,7 @@ import { app } from "../../../server.ts";
 import { __resetProjectStoreForTests } from "../../../src/app/conductor/projectStore.ts";
 import { __resetRateLimitStore } from "../../src/middleware/rateLimit.ts";
 import { __setEnabledOutputTypesForTests } from "../outputTypeAccess.ts";
+import { scholarBrain } from "../../src/services/scholarBrain.ts";
 
 describe("Presentation Studio Endpoints (/api/projects/:id/presentation)", () => {
   beforeEach(() => {
@@ -94,6 +95,32 @@ describe("Presentation Studio Endpoints (/api/projects/:id/presentation)", () =>
     expect(res.status).toBe(400);
     expect(res.body.code).toBe("ai_provider_required");
     expect(res.body.qaScenarios).toBeUndefined();
+  });
+
+  it("POST /qa-simulate gives the model the real deck and the presenter's choices", async () => {
+    const projectId = await createPresentationProject();
+    const complete = vi.spyOn(scholarBrain, "complete").mockResolvedValue({
+      text: "",
+      parsedJson: { qaScenarios: [{ questionId: "qa-1", audienceType: "Charge nurse", difficultyLevel: "adversarial", targetedSlideNumber: 2, targetedTopic: "Sample", questionText: "Why only night shifts?", probingIntent: "x", suggestedAnswer: "y", modelRebuttalStructure: [] }] },
+    } as never);
+    const res = await request(app)
+      .post(`/api/projects/${projectId}/presentation/qa-simulate`)
+      .send({
+        title: "Night-shift fatigue",
+        deck: { slides: [{ actionHeadline: "Sleep loss slows reaction time", blocks: [] }, { actionHeadline: "Training reduces errors", blocks: [] }] },
+        difficulty: "adversarial",
+        targetSlideNumber: 2,
+        questionCount: 1,
+      });
+    expect(res.status).toBe(200);
+    const call = complete.mock.calls[0][0] as { systemPrompt: string; userPrompt: string };
+    expect(call.userPrompt).toContain("1. Sleep loss slows reaction time");
+    expect(call.userPrompt).toContain("2. Training reduces errors");
+    expect(call.userPrompt).toContain('every question must be "adversarial"');
+    expect(call.userPrompt).toContain("targets slide 2");
+    expect(call.systemPrompt).toContain("Write 1 questions");
+    expect(call.systemPrompt).not.toMatch(/non-Markovian|ablation|latency/);
+    complete.mockRestore();
   });
 
   it("POST /qa-simulate 404s on nonexistent project", async () => {

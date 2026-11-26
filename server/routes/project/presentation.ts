@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { stripCourseCodes } from "../../../src/utils/briefExtractor.ts";
+import { deckDigest, qaOptions } from "../../../src/shared/presentationQa.ts";
 import {
   VISUAL_TYPES,
   buildOutlineFromBrief,
@@ -491,13 +492,19 @@ router.post(
     const rawVaultSources = Array.isArray(record.evidenceLedger?.sources) ? record.evidenceLedger.sources : [];
     const vaultSources = rawVaultSources.map((s) => ({
       ...s,
-      year: s.year ?? "n.d.",
+      year: s.year ?? "",
     }));
-    const evidence = await scholarBrain.retrieveEvidence({
-      query: `${projectTitle} ${researchQuestions.join(" ")}`,
-      maxResults: 6,
-      vaultSources,
-    }).catch(() => []);
+    // A live search only when the presenter gave no material of their own and the project has no Vault
+    // sources: otherwise the title alone can pull in off-topic papers that the model is told are "verified".
+    const needsLiveEvidence = !userText && outlineCards.length === 0 && vaultSources.length === 0 && researchQuestions.length > 0;
+    const evidence =
+      vaultSources.length > 0 || needsLiveEvidence
+        ? await scholarBrain.retrieveEvidence({
+            query: `${projectTitle} ${researchQuestions.join(" ")}`,
+            maxResults: 6,
+            vaultSources,
+          }).catch(() => [])
+        : [];
 
     // Any connection counts, including a local model only the browser can reach (426 hand-off).
     if ((await requestKeyring(req as never)).length > 0) {
@@ -509,7 +516,7 @@ router.post(
           copyLimits: copyLimitsPromptGuide(),
         });
 
-        const evidenceSummary = evidence.map((e) => `${e.citationToken}: ${e.title} (${e.year || "n.d."})`).join("; ");
+        const evidenceSummary = evidence.map((e) => `${e.citationToken}: ${e.title}${e.year ? ` (${e.year})` : ""}`).join("; ");
 
         const userPrompt = [
           `Topic: ${projectTitle}`,
@@ -547,7 +554,7 @@ router.post(
           generatedSlides = parsed.slides.map((s, idx) => ({
             slideNumber: (s.slideNumber as number) || idx + 1,
             type: (s.type as SlidePresentationItem["type"]) || "framework_methodology",
-            title: normalizeUnicodeNFC(sanitizeScholarlyText((s.title as string) || "Empirical Synthesis")),
+            title: normalizeUnicodeNFC(sanitizeScholarlyText((s.title as string) || "")),
             subtitle: normalizeUnicodeNFC(sanitizeScholarlyText((s.subtitle as string) || "")),
             visualFocus: normalizeUnicodeNFC(sanitizeScholarlyText((s.visualFocus as string) || "")),
             keyPoints: Array.isArray(s.keyPoints)
@@ -667,21 +674,33 @@ router.post(
         const rawQaSources = Array.isArray(record.evidenceLedger?.sources) ? record.evidenceLedger.sources : [];
         const qaVaultSources = rawQaSources.map((s) => ({
           ...s,
-          year: s.year ?? "n.d.",
+          year: s.year ?? "",
         }));
-        const evidence = await scholarBrain.retrieveEvidence({
-          query: `${projectTitle} ${researchQuestions.join(" ")}`,
-          maxResults: 4,
-          vaultSources: qaVaultSources,
-        }).catch(() => []);
+        // What the questions are about: the real deck (compact), the presenter's choices, the project's own sources.
+        const digest = deckDigest(req.body?.deck);
+        const qa = qaOptions(req.body, digest.slideCount);
+        const evidence =
+          qaVaultSources.length > 0
+            ? await scholarBrain.retrieveEvidence({
+                query: `${projectTitle} ${researchQuestions.join(" ")}`,
+                maxResults: 4,
+                vaultSources: qaVaultSources,
+              }).catch(() => [])
+            : [];
 
-        const systemPrompt = scholarBrain.presentationPrompts.qaSimulatorSystemPrompt();
+        const systemPrompt = scholarBrain.presentationPrompts.qaSimulatorSystemPrompt({ count: qa.count, slideCount: digest.slideCount });
 
-        const userPrompt = `Project Title: ${projectTitle}
-Research Questions: ${JSON.stringify(researchQuestions)}
-Audience Focus: ${req.body?.audienceFocus || "Academic Conference Reviewers"}
-Slides: ${JSON.stringify(req.body?.slides || [])}
-Grounded Evidence: ${JSON.stringify(evidence.map((e) => ({ title: e.title, token: e.citationToken })))}`;
+        const userPrompt = [
+          `Project Title: ${projectTitle}`,
+          researchQuestions.length ? `Research Questions: ${JSON.stringify(researchQuestions)}` : "",
+          `Audience Focus: ${typeof req.body?.audienceFocus === "string" && req.body.audienceFocus.trim() ? req.body.audienceFocus.trim().slice(0, 120) : "the audience this deck is for"}`,
+          qa.difficulty ? `Difficulty: every question must be "${qa.difficulty}".` : "",
+          qa.targetSlide ? `Focus: every question targets slide ${qa.targetSlide}.` : "",
+          digest.text ? `Deck (${digest.slideCount} slides):\n${digest.text}` : "No slides were sent; ask only about the project's own research questions.",
+          evidence.length ? `Grounded Evidence: ${JSON.stringify(evidence.map((e) => ({ title: e.title, token: e.citationToken })))}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n");
 
         const brainRes = await scholarBrain.complete({
           req,
@@ -698,10 +717,10 @@ Grounded Evidence: ${JSON.stringify(evidence.map((e) => ({ title: e.title, token
         if (parsed && Array.isArray(parsed.qaScenarios) && parsed.qaScenarios.length > 0) {
           qaScenarios = parsed.qaScenarios.map((q, idx) => ({
             questionId: (q.questionId as string) || `qa-${idx + 1}`,
-            audienceType: normalizeUnicodeNFC(sanitizeScholarlyText((q.audienceType as string) || "Conference Referee")),
+            audienceType: normalizeUnicodeNFC(sanitizeScholarlyText((q.audienceType as string) || "")),
             difficultyLevel: (q.difficultyLevel as AudienceQuestion["difficultyLevel"]) || "rigorous",
             targetedSlideNumber: (q.targetedSlideNumber as number) || idx + 1,
-            targetedTopic: normalizeUnicodeNFC(sanitizeScholarlyText((q.targetedTopic as string) || "Methodological Rigor")),
+            targetedTopic: normalizeUnicodeNFC(sanitizeScholarlyText((q.targetedTopic as string) || "")),
             questionText: normalizeUnicodeNFC(sanitizeScholarlyText((q.questionText as string) || "")),
             probingIntent: normalizeUnicodeNFC(sanitizeScholarlyText((q.probingIntent as string) || "")),
             suggestedAnswer: normalizeUnicodeNFC(sanitizeScholarlyText((q.suggestedAnswer as string) || "")),
