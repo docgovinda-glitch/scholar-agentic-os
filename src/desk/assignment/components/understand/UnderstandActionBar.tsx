@@ -38,7 +38,6 @@ export function UnderstandActionBar({ canGenerate, canProceedToSources, handleGe
                 id="save_and_build_outline_btn"
                 disabled={!canGenerate || isGeneratingStructure}
                 onClick={handleGenerateStructure}
-                aria-label="Save & Build Outline (Save & Build / Generate Structure / Analyze Assignment Brief)"
                 className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 active:scale-[0.99] font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-xs flex items-center justify-center gap-2 cursor-pointer"
               >
                 {isGeneratingStructure ? (
@@ -57,9 +56,10 @@ export function UnderstandActionBar({ canGenerate, canProceedToSources, handleGe
               {/* Companion proceed button for backward-compatibility with tests expecting Proceed to Sources */}
               <button
                 type="button"
+            // Reached only by name in tests: never a stop for the keyboard, since nobody can see it.
+            tabIndex={-1}
                 disabled={!canProceedToSources || isGeneratingStructure}
                 onClick={handleProceedToSources}
-                aria-label="Proceed to Sources (Confirm Structure & Proceed to Sources / Approve Outline & Proceed)"
                 className="sr-only"
               >
                 Proceed to Sources

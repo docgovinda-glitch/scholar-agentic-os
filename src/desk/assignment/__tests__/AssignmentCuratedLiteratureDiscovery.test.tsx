@@ -223,7 +223,7 @@ describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
       expect(typePills.length).toBeGreaterThan(0);
 
       // Approve action buttons rendered
-      const approveBtns = within(grid).getAllByText(/\+ Add Source/i);
+      const approveBtns = within(grid).getAllByText(/^Add Source$/i);
       expect(approveBtns.length).toBeGreaterThan(0);
 
       // A catalog work's title is visible on its card

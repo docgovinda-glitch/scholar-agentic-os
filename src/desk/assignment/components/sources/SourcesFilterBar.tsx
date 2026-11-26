@@ -15,7 +15,7 @@ export interface SourcesFilterBarProps {
   activeFilterCount: number;
   activeTab: "all" | "curated" | "ask_scholar" | "ai_research" | "uploaded" | "approved" | "bookmarked" | "excluded";
   aiResearchCount: number;
-  approvedSourceIds: string[];
+  approvedCount: number;
   askScholarCount: number;
   bookmarkedIds: string[];
   excludedIds: string[];
@@ -32,13 +32,13 @@ export interface SourcesFilterBarProps {
   totalCuratedCount: number;
 }
 
-export function SourcesFilterBar({ activeFilterCount, activeTab, aiResearchCount, approvedSourceIds, askScholarCount, bookmarkedIds, excludedIds, handleReCurateForPrompt, isFindingMore, mappedUserSources, searchQuery, setActiveTab, setIsAddingCustom, setSearchQuery, setShowAdvancedFilters, showAdvancedFilters, totalActiveSources, totalCuratedCount }: SourcesFilterBarProps) {
+export function SourcesFilterBar({ activeFilterCount, activeTab, aiResearchCount, approvedCount, askScholarCount, bookmarkedIds, excludedIds, handleReCurateForPrompt, isFindingMore, mappedUserSources, searchQuery, setActiveTab, setIsAddingCustom, setSearchQuery, setShowAdvancedFilters, showAdvancedFilters, totalActiveSources, totalCuratedCount }: SourcesFilterBarProps) {
   return (
     <>
             {/* Filter Navigation Bar & Status Tabs */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+            <div className="flex flex-col gap-3 pt-2">
               {/* Status Tabs */}
-              <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+              <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Source lists">
                 <button
                   type="button"
                   onClick={() => setActiveTab("all")}
@@ -123,7 +123,7 @@ export function SourcesFilterBar({ activeFilterCount, activeTab, aiResearchCount
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   <span>Approved</span>
                   <span className="px-1.5 py-0.2 rounded-full text-xs bg-black/15 text-current">
-                    {approvedSourceIds.length}
+                    {approvedCount}
                   </span>
                 </button>
 
@@ -159,22 +159,24 @@ export function SourcesFilterBar({ activeFilterCount, activeTab, aiResearchCount
               </div>
 
               {/* Search Input, Filters, and Add Custom Reference Action */}
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setIsAddingCustom(true)}
                   className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer shadow-xs whitespace-nowrap"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>+ Add Reference</span>
+                  <span>Add Reference</span>
                 </button>
 
-                <div className="relative flex-1 sm:w-60">
+                <div className="relative flex-1 min-w-[12rem]">
                   <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--text-muted)]" />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
+                    id="source-search"
+                    name="sourceSearch"
                     placeholder="Search authors, title, keyword..."
                     aria-label="Search curated literature"
                     className="w-full pl-8 pr-3 py-1.5 rounded-xl text-xs bg-[color:var(--surface-inset)] border border-transparent focus:border-neutral-300 dark:focus:border-white/20 text-[color:var(--text-primary)] placeholder-neutral-400 outline-none transition-colors"
@@ -183,6 +185,7 @@ export function SourcesFilterBar({ activeFilterCount, activeTab, aiResearchCount
                     <button
                       type="button"
                       onClick={() => setSearchQuery("")}
+                      aria-label="Clear source search"
                       className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[color:var(--text-muted)] hover:text-neutral-600 dark:hover:text-neutral-200"
                     >
                       <X className="w-3 h-3" />

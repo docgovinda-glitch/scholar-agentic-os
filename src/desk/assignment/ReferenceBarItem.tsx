@@ -227,7 +227,7 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
             </>
           )}
           {typeof source.relevanceScore === "number" && source.relevanceScore > 0 && (
-            <span className="shrink-0 px-1.5 py-0.5 rounded text-xs font-mono font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+            <span className="shrink-0 px-1.5 py-0.5 rounded text-xs font-mono font-semibold bg-emerald-500/10 text-emerald-800 dark:text-emerald-300">
               {Math.round(source.relevanceScore <= 1 ? source.relevanceScore * 100 : source.relevanceScore)}% match
             </span>
           )}
@@ -296,7 +296,7 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
             e.stopPropagation();
             onToggleApproval(source.id);
           }}
-          aria-label={isApproved ? `Remove ${source.title} from approved` : `Approve ${source.title}`}
+          aria-label={isApproved ? `✓ Added: remove ${source.title} from approved` : `Add Source: approve ${source.title}`}
           className={`px-3 py-1 rounded-full text-xs font-medium transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
             isApproved
               ? "bg-emerald-700 text-white dark:bg-emerald-500 dark:text-neutral-950 hover:bg-emerald-700"
@@ -311,7 +311,7 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
           ) : (
             <>
               <Plus className="w-3 h-3" />
-              <span>+ Add Source</span>
+              <span>Add Source</span>
             </>
           )}
         </button>

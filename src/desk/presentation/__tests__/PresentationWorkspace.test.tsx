@@ -417,8 +417,8 @@ Multi-agent verification delivers 100% citation accuracy across 5,000 tested ref
 
     const header = screen.getByTestId("presentation-header");
     expect(within(header).getByText(/All changes saved|Saved/i)).toBeInTheDocument();
-    expect(within(header).getByRole("button", { name: /Simulate Audience Q&A/i })).toHaveTextContent("Q&A");
-    expect(within(header).getByRole("button", { name: /Toggle Ask Scholar/i })).toHaveTextContent("Ask Scholar");
+    expect(within(header).getByRole("button", { name: /Rehearse Q&A/i })).toHaveTextContent("Q&A");
+    expect(within(header).getByRole("button", { name: /Ask Scholar panel/i })).toHaveTextContent("Ask Scholar");
     expect(screen.queryByTestId("presentation-style-badge")).not.toBeInTheDocument();
     expect(screen.queryByText(/Conversational Academic/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/6x6 Density/i)).not.toBeInTheDocument();

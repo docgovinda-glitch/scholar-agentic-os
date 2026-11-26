@@ -350,14 +350,8 @@ export default function ThemeLibraryGrid({
             return (
               <div
                 key={theme.id}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    onSelectTheme(theme.id as SlideThemeId, theme.bestDesign);
-                  }
-                }}
+                // The whole card is a mouse target; keyboard and screen readers use the name button inside it.
+                // (A button role here would nest the preview and apply buttons inside a button.)
                 onClick={() => onSelectTheme(theme.id as SlideThemeId, theme.bestDesign)}
                 className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative group flex flex-col justify-between space-y-3 ${
                   isSelected
@@ -370,9 +364,18 @@ export default function ThemeLibraryGrid({
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-sm font-bold text-neutral-900 dark:text-white truncate">
+                      <button
+                        type="button"
+                        aria-pressed={isSelected}
+                        data-compact="true"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSelectTheme(theme.id as SlideThemeId, theme.bestDesign);
+                        }}
+                        className="min-h-6 text-left text-sm font-bold text-neutral-900 dark:text-white truncate cursor-pointer"
+                      >
                         {theme.name}
-                      </span>
+                      </button>
                       <span
                         className={`text-[9px] font-mono px-1.5 py-0.5 rounded-full uppercase font-bold shrink-0 ${
                           theme.mode === 'dark'

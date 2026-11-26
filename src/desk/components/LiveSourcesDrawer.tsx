@@ -110,7 +110,7 @@ export default function LiveSourcesDrawer({
                     <span
                       className={`text-[9px] uppercase font-mono px-1.5 py-0.5 rounded border ${
                         isPrimary
-                          ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-300/40"
+                          ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border-emerald-300/40"
                           : "bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-300 border-neutral-200 dark:border-white/10"
                       }`}
                     >
@@ -123,7 +123,7 @@ export default function LiveSourcesDrawer({
                         disabled={isSaved}
                         className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border transition-colors cursor-pointer ${
                           isSaved
-                            ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/40"
+                            ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/40"
                             : "bg-neutral-50 dark:bg-white/[0.04] hover:bg-sky-50 dark:hover:bg-sky-950/40 text-neutral-600 dark:text-neutral-300 hover:text-sky-700 dark:hover:text-sky-300 border-neutral-200/80 dark:border-white/10"
                         }`}
                         title={isSaved ? "Saved in Knowledge Vault" : "Save source to Knowledge Vault"}

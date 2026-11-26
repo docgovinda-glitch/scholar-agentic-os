@@ -19,8 +19,8 @@ import * as presentationPrompts from "./prompts/presentationPrompts.ts";
 import { draftSection, priorSectionsContext, researchContextFromAnswers, runSectionDraft } from "./sectionDrafter.ts";
 import { openSse } from "../utils/sse.ts";
 import { ASK_SEARCH_PLAN_SYSTEM, askSearchPlanPrompt, buildAskGeneralPrompt, buildAskSearchPrompt, parseAskSearchPlan, type AskSearchPlan } from "../../../src/shared/askPrompts.ts";
-import { aiAvailability as rawAiAvailability, NoAiConnectedError, routedCompletion as rawRoutedCompletion, routedText, RouterHandoffError, toRouterTask } from "../ai/routerBridge.ts";
-import { BrowserAiRequiredError, LocalModelUnreachableError, NoClientAiProviderError } from "../ai/aiRouteErrors.ts";
+import { aiAvailability as rawAiAvailability, NoAiConnectedError, routedCompletion as rawRoutedCompletion, routedText, RouterHandoffError, serverCannotUseLocal, toRouterTask } from "../ai/routerBridge.ts";
+import { BrowserAiRequiredError, NoClientAiProviderError } from "../ai/aiRouteErrors.ts";
 import { browserHandOffSupport } from "../ai/browserHandoff.ts";
 import {
   createChallengeTokenForRequest,
@@ -263,6 +263,8 @@ async function runGatewayCall<T>(kind: string, taskType: string | undefined, fn:
 export function aiAvailability(...args: Parameters<typeof rawAiAvailability>): ReturnType<typeof rawAiAvailability> {
   return rawAiAvailability(...args);
 }
+
+export { cloudFailureReason, serverCannotUseLocal } from "../ai/routerBridge.ts";
 
 /** The router call routes use (Coursework agent steps, the Journal studio): timed and logged like the other gateway calls, NFC-normalised, errors rethrown unchanged. */
 export function routedCompletion(...args: Parameters<typeof rawRoutedCompletion>): ReturnType<typeof rawRoutedCompletion> {
@@ -540,7 +542,7 @@ export const scholarBrain = {
         if (err instanceof NoAiConnectedError) throw new NoClientAiProviderError();
         if (err instanceof RouterHandoffError) {
           if (options.browserFallback) throw new BrowserAiRequiredError(browserPayload());
-          throw new LocalModelUnreachableError();
+          throw serverCannotUseLocal(err.cloudFailure);
         }
         throw new Error(`scholarBrain AI Execution Error: ${(err as Error).message}`);
       }

@@ -26,6 +26,7 @@ import {
   exportGraphToBibtex,
   exportGraphToGraphML,
 } from "../../services/discovery/snowballSamplingService";
+import { graphNodeLabel } from "../../services/discovery/graphLabels";
 
 export interface LiteratureDiscoveryWorkspaceProps {
   projectId?: string;
@@ -277,6 +278,8 @@ export default function LiteratureDiscoveryWorkspace({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              aria-label="Filter graph papers"
+              name="graphFilter"
               placeholder="Filter graph papers..."
               className="w-full pl-8 pr-2.5 py-1 rounded-lg border border-neutral-200 dark:border-white/10 bg-white dark:bg-neutral-800/80 text-xs focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
             />
@@ -284,6 +287,7 @@ export default function LiteratureDiscoveryWorkspace({
 
           {/* Cluster filter */}
           <select
+            aria-label="Filter by thematic cluster"
             value={activeClusterFilter}
             onChange={(e) => setActiveClusterFilter(e.target.value)}
             className="px-2.5 py-1 rounded-lg border border-neutral-200 dark:border-white/10 bg-white dark:bg-neutral-800/80 text-xs cursor-pointer focus:outline-hidden"
@@ -298,6 +302,7 @@ export default function LiteratureDiscoveryWorkspace({
 
           {/* Min citations filter */}
           <select
+            aria-label="Minimum citation count"
             value={minCitations}
             onChange={(e) => setMinCitations(Number(e.target.value))}
             className="px-2.5 py-1 rounded-lg border border-neutral-200 dark:border-white/10 bg-white dark:bg-neutral-800/80 text-xs cursor-pointer focus:outline-hidden"
@@ -353,6 +358,7 @@ export default function LiteratureDiscoveryWorkspace({
 
           {/* Breadth */}
           <select
+            aria-label="Papers to add per node"
             value={snowballBreadth}
             onChange={(e) => setSnowballBreadth(Number(e.target.value))}
             className="px-2 py-1 rounded-lg border border-neutral-200 dark:border-white/10 bg-white dark:bg-neutral-800 text-[11px] cursor-pointer"
@@ -560,7 +566,7 @@ export default function LiteratureDiscoveryWorkspace({
                       textAnchor="middle"
                       className="text-[10px] font-semibold fill-neutral-800 dark:fill-neutral-200 pointer-events-none select-none"
                     >
-                      {node.authors[0] ? node.authors[0].split(" ").pop() : "Paper"} ({node.year || "n.d."})
+                      {graphNodeLabel(node.authors, node.year)}
                     </text>
 
                     {/* Citation Count Centered */}
@@ -569,7 +575,8 @@ export default function LiteratureDiscoveryWorkspace({
                       textAnchor="middle"
                       className="text-[9.5px] font-bold font-mono fill-white pointer-events-none select-none"
                     >
-                      {node.citationCount === undefined ? "–" : node.citationCount > 999 ? `${(node.citationCount / 1000).toFixed(0)}k` : node.citationCount}
+                      {/* The citation count when an index reports one, otherwise the source's number in this graph. */}
+                      {node.citationCount === undefined ? `#${graphState.nodes.findIndex((n) => n.id === node.id) + 1}` : node.citationCount > 999 ? `${(node.citationCount / 1000).toFixed(0)}k` : node.citationCount}
                     </text>
                   </g>
                 );

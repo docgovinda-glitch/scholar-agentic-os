@@ -56,6 +56,7 @@ export default function AdminApp() {
   }
 
   useEffect(() => {
+    document.title = "Admin | Scholar Core";
     void checkAdmin();
   }, []);
 
@@ -71,9 +72,13 @@ export default function AdminApp() {
 
   if (status === "not-found") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)]">
-        <p className="text-sm text-[color:var(--text-secondary)]">404 — page not found.</p>
-      </div>
+      <main className="flex min-h-screen items-center justify-center bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)]">
+        <div className="text-center space-y-3">
+          <h1 className="sr-only">Page not found</h1>
+          <p className="text-sm text-[color:var(--text-secondary)]">404 — page not found.</p>
+          <BackToWorkspace />
+        </div>
+      </main>
     );
   }
 
@@ -92,6 +97,15 @@ export default function AdminApp() {
       <Route path="/login" element={<AdminLoginScreen onSignedIn={checkAdmin} />} />
       <Route path="*" element={<Navigate to="/admin/login" replace />} />
     </Routes>
+  );
+}
+
+/** A plain link: the admin screens are their own app, so this loads the workspace afresh. */
+function BackToWorkspace() {
+  return (
+    <a href="/projects" className="inline-block text-sm underline text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]">
+      Back to Workspace
+    </a>
   );
 }
 
@@ -147,7 +161,7 @@ function AdminLoginScreen({ onSignedIn }: { onSignedIn: () => Promise<void> }) {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[color:var(--surface-canvas)] px-4">
+    <main className="flex min-h-screen items-center justify-center bg-[color:var(--surface-canvas)] px-4">
       <form onSubmit={handleLogin} className="w-full max-w-sm space-y-3 rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-6">
         <h1 className="text-base font-semibold text-[color:var(--text-primary)]">Sign in</h1>
         {error && (
@@ -155,14 +169,20 @@ function AdminLoginScreen({ onSignedIn }: { onSignedIn: () => Promise<void> }) {
             {error}
           </p>
         )}
+        <label htmlFor="admin-username" className="sr-only">Username</label>
         <input
+          id="admin-username"
+          name="username"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           placeholder="Username"
           autoComplete="username"
           className="w-full rounded-[var(--radius-sm)] border border-[color:var(--border-control)] px-2.5 py-1.5 text-sm"
         />
+        <label htmlFor="admin-password" className="sr-only">Password</label>
         <input
+          id="admin-password"
+          name="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Password"
@@ -183,7 +203,10 @@ function AdminLoginScreen({ onSignedIn }: { onSignedIn: () => Promise<void> }) {
         <div className="pt-2">
           <GoogleSignInButton onClick={handleGoogleSignIn} busy={googleBusy} />
         </div>
+        <div className="text-center pt-1">
+          <BackToWorkspace />
+        </div>
       </form>
-    </div>
+    </main>
   );
 }

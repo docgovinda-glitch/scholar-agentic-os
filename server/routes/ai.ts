@@ -28,7 +28,7 @@ import { countExactWords } from "../src/utils/wordBudgetAllocator.ts";
 import { evaluateBurstiness } from "../src/utils/scholarlyVoiceGuard.ts";
 import { chunkAndRerankEvidence } from "../src/services/semanticRagEngine.ts";
 import { z } from "zod";
-import { askNeedsSearchPlan, decideAskMode } from "../../src/shared/askRouting.ts";
+import { askNeedsSearchPlan, decideAskMode, isGreeting } from "../../src/shared/askRouting.ts";
 import { buildConversationContext, normalizeAskHistory } from "../../src/shared/askConversation.ts";
 import { ASK_BASE_IDENTITY, askStyleDescription, platformFactsFor } from "../../src/shared/askPrompts.ts";
 import { ASK_QUICK_MAX_SOURCES, budgetSourcesForPrompt } from "../../src/shared/askBudget.ts";
@@ -481,7 +481,8 @@ export function registerAIRoutes(
         ? req.body.approvedSubQuestions
         : undefined;
       const normalizedPreRetrieved = await enrichTopSourcesWithFullText(
-        normalizePreRetrievedSources(req.body?.preRetrievedSources),
+        // A greeting is answered without sources, even if an older client searched for it.
+        isGreeting(String(req.body?.prompt || "")) ? [] : normalizePreRetrievedSources(req.body?.preRetrievedSources),
         effectivePrompt
       );
       const answerLength = String(req.body?.answerLength || "standard").toLowerCase();
@@ -777,6 +778,8 @@ export function registerAIRoutes(
               userPrompt: assembledUserPrompt,
               taskClass: "drafting",
               responseFormat: "text",
+              // The browser may be able to run its local model when no cloud connection answers.
+              browserFallback: true,
             });
             result = { text: brainRes.text, provider: brainRes.provider, model: brainRes.model };
           } else {

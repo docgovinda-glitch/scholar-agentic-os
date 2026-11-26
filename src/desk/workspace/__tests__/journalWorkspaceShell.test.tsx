@@ -60,7 +60,7 @@ describe("Journal workspace frame", () => {
     expect(screen.queryByText(/^Stage:/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Gates: \d+\/\d+ passed/)).not.toBeInTheDocument();
     // The shared model switcher lives in the header; it shows no unmeasured context-window figure.
-    fireEvent.click(within(header).getByRole("button", { name: "AI model" }));
+    fireEvent.click(within(header).getByRole("button", { name: /^AI model/ }));
     expect(screen.queryByText(/Context Window|32k \/ 1M/)).not.toBeInTheDocument();
   });
 

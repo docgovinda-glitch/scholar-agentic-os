@@ -191,7 +191,7 @@ export function DeepResearchWorkflowCard({
                 isCurrent
                   ? "bg-purple-600 text-white border-purple-600"
                   : isDone
-                    ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/50"
+                    ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/50"
                     : "bg-neutral-100 dark:bg-white/5 text-neutral-500 dark:text-neutral-400 border-neutral-200/60 dark:border-white/10"
               }`}
             >

@@ -11,6 +11,7 @@ import {
   type OllamaModelInfo,
 } from "../../services/ollamaService";
 import { checkLocalRuntimeConnectivity } from "../../services/localRuntimeConnectivity";
+import { setRunnerReach } from "../../services/localRunnerReachability";
 import { Chip } from "./ProviderDetail";
 import type { ProviderView } from "./useAiAccess";
 
@@ -89,6 +90,7 @@ export default function LocalRunnerDetail({
       if (runner.id === "ollama") {
         const diag = await diagnoseOllamaConnection(resolved);
         setDiagnosis(diag);
+        setRunnerReach(runner.id, diag.ok ? "reachable" : "unreachable");
 
         if (diag.ok) {
           setReachable(true);
@@ -114,6 +116,7 @@ export default function LocalRunnerDetail({
         }
       } else {
         const result = await checkLocalRuntimeConnectivity(runner, resolved);
+        setRunnerReach(runner.id, result.diagnosis === "reachable" ? "reachable" : "unreachable");
         if (result.diagnosis === "reachable") {
           setReachable(true);
           setModels(result.models);

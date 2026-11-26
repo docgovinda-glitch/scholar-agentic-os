@@ -60,9 +60,10 @@ export function AiModelSwitcher({ workspace, className = "", compact = false }: 
         type="button"
         onClick={() => { setOpen((o) => !o); if (!providers) void load(false); }}
         aria-expanded={open}
-        aria-label="AI model"
+        aria-label={`AI model: ${label}`}
+        data-compact="true"
         title={`${active ? `Active model: ${modelName(active)} (${active.via ?? active.provider})` : "Connect an AI in AI Access"}${answer ? ` · ${answer.switched ? "Backup answered" : "Answered by"} ${answer.label}` : ""}`}
-        className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium border border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] cursor-pointer"
+        className="inline-flex items-center justify-center gap-1.5 h-8 min-w-8 px-2 py-1 rounded-lg text-xs font-medium border border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] cursor-pointer"
       >
         <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${active ? "bg-emerald-500" : "bg-amber-500"}`} aria-hidden="true" />
         {compact ? <span className="hidden 2xl:inline max-w-[90px] truncate" data-testid="ai-model-short-name">{label}</span> : <span className="hidden xl:inline max-w-[110px] truncate">{label}</span>}
@@ -103,7 +104,7 @@ export function AiModelSwitcher({ workspace, className = "", compact = false }: 
                         >
                           <span>{m.displayName ?? m.id}</span>
                           {recommended?.id === m.id && (
-                            <span className="ml-1.5 rounded bg-emerald-500/15 px-1 py-0.5 text-[10px] text-emerald-700 dark:text-emerald-300" title={`Suits ${why}`}>Recommended here</span>
+                            <span className="ml-1.5 rounded bg-emerald-500/15 px-1 py-0.5 text-[10px] text-emerald-800 dark:text-emerald-300" title={`Suits ${why}`}>Recommended here</span>
                           )}
                           {m.badges.map((b) => <span key={b.id} title={b.evidence} className="ml-1 text-[10px] text-[color:var(--text-muted)]">{b.label}</span>)}
                         </button>

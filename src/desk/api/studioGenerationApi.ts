@@ -1,3 +1,4 @@
+import { getCloudProvider } from "../../config/providerCatalog";
 import { postWithBrowserHandOff } from "./browserHandOff";
 import { authedFetch, authedJsonFetch, json, UnauthenticatedError } from "./client";
 import { providersWithStoredKey } from "../../services/userAiSettings";
@@ -126,6 +127,9 @@ export function sendCopilotMessage(
   );
 }
 
+/** "openrouter" reads as "OpenRouter", the way the provider spells itself. */
+const providerName = (id: string): string => getCloudProvider(id)?.name ?? id;
+
 export async function getAiOperationalStatus(): Promise<AiOperationalStatus> {
   let byokProviders: string[] = [];
   try {
@@ -140,7 +144,7 @@ export async function getAiOperationalStatus(): Promise<AiOperationalStatus> {
     if (res.ok) {
       const serverStatus = await res.json();
       const connected = Boolean(serverStatus.connected || hasClientByok);
-      const activeProvider = serverStatus.providers?.[0]?.name || (hasClientByok ? byokProviders[0] : undefined);
+      const activeProvider = serverStatus.providers?.[0]?.name || (hasClientByok ? providerName(byokProviders[0]) : undefined);
       const activeModel = serverStatus.providers?.[0]?.model;
 
       return {
@@ -163,7 +167,7 @@ export async function getAiOperationalStatus(): Promise<AiOperationalStatus> {
   return {
     connected: hasClientByok,
     statusText: hasClientByok ? "Ready" : "AI Disconnected",
-    provider: hasClientByok ? byokProviders[0] : undefined,
+    provider: hasClientByok ? providerName(byokProviders[0]) : undefined,
     capabilities: {
       text: hasClientByok,
       vision: hasClientByok,
@@ -171,6 +175,6 @@ export async function getAiOperationalStatus(): Promise<AiOperationalStatus> {
       webSearch: false,
       deepResearch: false,
     },
-    providers: byokProviders.map((p: string) => ({ id: p, name: p, model: "byok", tier: "client" })),
+    providers: byokProviders.map((p: string) => ({ id: p, name: providerName(p), model: "byok", tier: "client" })),
   };
 }

@@ -1,6 +1,6 @@
-import { useCallback, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Navigate, useNavigate, useLocation, type Location } from "react-router-dom";
-import {
+import { getProfile,
   sendPasswordResetEmail,
   signIn,
   signUp,
@@ -730,6 +730,30 @@ function OnboardingScreen({ onDone }: { onDone: () => void }) {
   
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Someone who already finished this goes to their projects; a partly filled profile is shown as saved.
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+  useEffect(() => {
+    let active = true;
+    void Promise.resolve(getProfile())
+      .then((res) => {
+        if (!active || !res?.success) return;
+        const saved = res.profile;
+        if (saved.userType && saved.educationLevel) {
+          onDoneRef.current();
+          return;
+        }
+        setUserType((v) => v || saved.userType || "");
+        setEducationLevel((v) => v || saved.educationLevel || "");
+        setAffiliation((v) => v || saved.affiliation || "");
+        setPhoneState((v) => (v.number ? v : { number: saved.phone || "", code: saved.phoneCountryCode || v.code }));
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const parsedPhone = normalizeE164(phoneState.code, phoneState.number);
 

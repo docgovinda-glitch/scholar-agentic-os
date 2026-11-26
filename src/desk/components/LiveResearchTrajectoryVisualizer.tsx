@@ -314,7 +314,7 @@ export const LiveResearchTrajectoryVisualizer: React.FC<LiveResearchTrajectoryVi
                         </span>
                       )}
                       {isPast && (
-                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-emerald-500/10 text-emerald-800 dark:text-emerald-300">
                           Complete
                         </span>
                       )}

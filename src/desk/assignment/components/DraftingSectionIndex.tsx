@@ -136,7 +136,7 @@ export function DraftingSectionIndex({
                     <span>Writing</span>
                   </span>
                 ) : isCompleted ? (
-                  <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-800 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">
                     <CheckCircle2 className="w-2.5 h-2.5" />
                     <span>Ready</span>
                   </span>
@@ -203,29 +203,33 @@ export function DraftingSectionIndex({
                         : "text-[color:var(--text-secondary)] group-hover:text-[color:var(--text-primary)]"
                     }`}
                   >
-                    {section.title}
+                    {/* The keyboard way into a section; the whole card is the mouse target. */}
+                    <button
+                      type="button"
+                      aria-current={isActive ? "true" : undefined}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectSection(section.id);
+                      }}
+                      className="text-left cursor-pointer"
+                    >
+                      {section.title}
+                    </button>
                   </h3>
                   {onUpdateSectionTitle && (
-                    <span
-                      role="button"
-                      tabIndex={0}
+                    <button
+                      type="button"
+                      aria-label={`Edit title of ${section.title}`}
                       onClick={(e) => {
                         e.stopPropagation();
                         setEditingSectionId(section.id);
                         setEditTitleValue(section.title);
                       }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.stopPropagation();
-                          setEditingSectionId(section.id);
-                          setEditTitleValue(section.title);
-                        }
-                      }}
-                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] transition-opacity shrink-0 cursor-pointer"
+                      className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 w-6 h-6 flex items-center justify-center rounded text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] transition-opacity shrink-0 cursor-pointer"
                       title="Edit section title"
                     >
-                      <Edit2 className="w-3 h-3" />
-                    </span>
+                      <Edit2 className="w-3 h-3" aria-hidden="true" />
+                    </button>
                   )}
                 </div>
               )}
@@ -290,9 +294,9 @@ export function DraftingSectionIndex({
           }
 
           return (
-            <button
+            <div
               key={section.id}
-              type="button"
+              data-testid={`section-card-${section.id}`}
               onClick={() => onSelectSection(section.id)}
               className={`w-full text-left p-3 rounded-xl transition-all border cursor-pointer relative group ${
                 isActive
@@ -301,7 +305,7 @@ export function DraftingSectionIndex({
               }`}
             >
               {innerCardContent}
-            </button>
+            </div>
           );
         })}
       </nav>

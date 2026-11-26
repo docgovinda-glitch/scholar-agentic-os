@@ -27,7 +27,7 @@ export function UnderstandBriefSummaryBar({ briefSummary, localCitation, localLe
                 <span className="text-xs font-semibold text-[color:var(--text-primary)] uppercase tracking-wider">
                   Assignment Brief Summary
                 </span>
-                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border border-emerald-500/20">
                   From your brief
                 </span>
               </div>
@@ -40,7 +40,6 @@ export function UnderstandBriefSummaryBar({ briefSummary, localCitation, localLe
                   if (onBack) onBack();
                   else if (setPhase) setPhase("extract");
                 }}
-                aria-label="Edit Brief"
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer w-fit border border-[color:var(--border-subtle)]"
               >
                 <Edit2 className="w-3.5 h-3.5" />

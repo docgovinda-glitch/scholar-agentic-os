@@ -58,7 +58,7 @@ function mount(onProceed = vi.fn()) {
 
 /** The Save & Build button, once the loaded brief has enabled it. */
 async function buildButton() {
-  const button = await screen.findByRole("button", { name: /Save & Build Outline/i });
+  const button = await screen.findByRole("button", { name: /Save & Build/i });
   await waitFor(() => expect(button).not.toBeDisabled());
   return button;
 }

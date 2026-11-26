@@ -25,12 +25,15 @@ const DEEP_PHRASES = [
 
 const EXPLICIT_SEARCH = /\b(search the web|search online|look ?up online|web search|external sources|verify online|fact[- ]check)\b/i;
 
-const GREETING = /^(?:hi|hello|hey|thanks|thank you|ok|okay|good (?:morning|afternoon|evening)|bye|goodbye)\b[\s!.,?]*$/i;
+const GREETING = /^(?:(?:hi|hello|hey)(?:\s+(?:there|scholar|all|everyone))?|thanks(?:\s+a lot)?|thank you(?:\s+so much)?|ok|okay|good (?:morning|afternoon|evening|day)|how are you|bye|goodbye)\b[\s!.,?]*$/i;
 const OWN_TEXT_TASK = /^(?:please\s+)?(?:rewrite|rephrase|paraphrase|proofread|edit|translate|reword|shorten|expand|fix (?:the )?grammar)\b/i;
 const CODE_TASK = /\b(?:write|fix|debug|refactor|explain|review)\b.{0,40}\b(?:code|function|script|regex|python|javascript|typescript|sql|bug|class)\b/i;
 const ARITHMETIC = /^[\d\s+\-*/().^%=,]+$/;
 
 const TIME_SENSITIVE = /\b(?:latest|current(?:ly)?|recent(?:ly)?|today|yesterday|tonight|this (?:week|month|year)|right now|breaking|news|election|midterm|who won|stock price|market cap|inflation rate|exchange rate)\b/i;
+
+/** A greeting or acknowledgement: there is nothing to search for or cite. */
+export const isGreeting = (query: string): boolean => GREETING.test(query.trim());
 
 export function isTimeSensitiveQuery(query: string, now: Date = new Date()): boolean {
   const year = now.getFullYear();

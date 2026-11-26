@@ -58,7 +58,7 @@ export const ApprovedReferencesShelf: React.FC<ApprovedReferencesShelfProps> = (
         <div className="w-[92vw] max-w-3xl mb-3 bg-[color:var(--surface-raised)] backdrop-blur-xl border border-[color:var(--border-subtle)] rounded-2xl p-4 shadow-2xl space-y-3 pointer-events-auto animate-in fade-in slide-in-from-bottom-3 duration-200">
           <div className="flex items-center justify-between pb-2.5 border-b border-[color:var(--border-subtle)]">
             <div className="flex items-center gap-2">
-              <span className="p-1 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <span className="p-1 rounded-md bg-emerald-500/10 text-emerald-800 dark:text-emerald-400">
                 <BookOpen className="w-3.5 h-3.5" />
               </span>
               <h3 className="text-xs font-semibold text-[color:var(--text-primary)]">

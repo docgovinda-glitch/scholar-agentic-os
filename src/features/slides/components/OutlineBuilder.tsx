@@ -14,7 +14,7 @@ export interface OutlineBuilderProps {
 const badge: Record<string, string> = {
   'Title Hero': 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900',
   '2-Column Comparison': 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300',
-  '3-Card Grid': 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+  '3-Card Grid': 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-300',
   'Process / Timeline': 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
   'Architecture Diagram': 'bg-sky-500/10 text-sky-700 dark:text-sky-300',
   'Evidence & Metrics': 'bg-rose-500/10 text-rose-700 dark:text-rose-300',

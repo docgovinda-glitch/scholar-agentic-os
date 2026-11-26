@@ -1,3 +1,4 @@
+import { useProjectDocumentTitle } from "../documentTitle";
 import React,{ useState,useEffect,useRef } from "react";
 import type { AssignmentPhaseId } from "./types";
 import { AssignmentProvider,useAssignmentWorkspace } from "./AssignmentContext";
@@ -121,11 +122,7 @@ function AssignmentWorkspaceInner({
     }
   }, [project]);
 
-  useEffect(() => {
-    if (editableTitle) {
-      document.title = `${editableTitle} | Scholar Core`;
-    }
-  }, [editableTitle]);
+  useProjectDocumentTitle(editableTitle);
 
   const commitTitle = (next: string) => {
     const trimmed = next.trim() || "Academic Assignment";

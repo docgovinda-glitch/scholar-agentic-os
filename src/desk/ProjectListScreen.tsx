@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   createProject,
   listOutputTypes,
@@ -43,6 +43,8 @@ import { addVaultItem, setSessionUnlocked, listVaultItems, searchVaultItems, typ
 import { syncActiveSessionToRegistry } from "../services/auth/multiAccountService";
 import type { OutputTypeSummary, ProjectView } from "./types";
 import ScholarCoreLogo from "../components/ScholarCoreLogo";
+import ScholarSidebar, { type ScholarSidebarAction, type ScholarSidebarProject } from "../components/navigation/ScholarSidebar";
+import { applyTheme, useTheme } from "../hooks/useTheme";
 import { showAppToast } from "../components/ui/FeedbackSystem";
 import UserAccountMenu from "./components/UserAccountMenu";
 import EmbeddedAuthModal from "./auth/EmbeddedAuthModal";
@@ -51,6 +53,7 @@ const KnowledgeVault = lazy(() => import("./vault/KnowledgeVault"));
 const AiAccessPage = lazy(() => import("./aiAccess/AiAccessPage"));
 import type { SectionId } from "./aiAccess/AiAccessPage";
 import { CommandPalette } from "./components/CommandPalette";
+import PhoneProjectsList from "./components/PhoneProjectsList";
 import {
   Plus,
   FolderOpen,
@@ -59,14 +62,9 @@ import {
   ChevronLeft,
   X,
   Lightbulb,
-  Search,
   Database,
   Sliders,
-  MoreVertical,
-  Share2,
-  Pin,
   Pencil,
-  FolderPlus,
   Trash2,
   FileText,
   Sun,
@@ -77,6 +75,7 @@ import {
   Copy,
   ChevronDown,
   Clock,
+  PanelLeftOpen,
 } from "lucide-react";
 import LiteratureDiscoveryWorkspace from "./discovery/LiteratureDiscoveryWorkspace";
 import LiveResearchTrajectoryVisualizer from "./components/LiveResearchTrajectoryVisualizer";
@@ -90,6 +89,7 @@ import { DEFAULT_SCHOLAR_FILTERS, type ScholarFilters } from "../domain/ask/scho
 import { selectionFrom, setChoice as setSourceChoice, type PreviewSource } from "../domain/ask/sourceSelection";
 import { assessDeepResearchModel } from "../domain/ask/modelFitness";
 import { cleanVenue, normalizeAuthorList } from "../shared/authorNames";
+import { truncateAtWord } from "../shared/truncateAtWord";
 import { getCloudProvider } from "../config/providerCatalog";
 import { useVisualViewport } from "../hooks/useVisualViewport";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
@@ -97,13 +97,14 @@ import { useBackToClose } from "../hooks/useBackToClose";
 import { useDeviceClass } from "../hooks/useDeviceClass";
 import {
   askFailureMessage,
+  countCitedSources,
   liveSourcesAsCitations,
 } from "./dashboard/askScholarAnswer";
 import { loadUserAiSettings } from "../services/userAiSettings";
 import { type PromptMode } from "./PromptBarActionMenu";
 import { AskPromptBox } from "./ask/AskPromptBox";
 import { ASK_BASE_IDENTITY, buildAskGeneralPrompt, platformFactsFor } from "../shared/askPrompts";
-import { askNeedsSearchPlan, decideAskMode, isTimeSensitiveQuery } from "../shared/askRouting";
+import { askNeedsSearchPlan, decideAskMode, isGreeting, isTimeSensitiveQuery } from "../shared/askRouting";
 import { MAX_TURNS, withConversation } from "../shared/askConversation";
 import {
   ASK_SCHOLAR_CITATION_STYLES,
@@ -184,7 +185,7 @@ export {
 /** Shown while a lazily loaded full-page screen (Vault, AI Access) downloads. */
 function LazyScreenFallback() {
   return (
-    <div role="status" aria-live="polite" className="flex-1 flex items-center justify-center py-16 text-sm text-neutral-500 dark:text-neutral-400">
+    <div role="status" aria-live="polite" className="flex-1 flex items-center justify-center py-16 text-sm text-neutral-600 dark:text-neutral-400">
       <span className="w-4 h-4 mr-2 border-2 border-current border-t-transparent rounded-full animate-spin" aria-hidden="true" />
       Loading…
     </div>
@@ -200,6 +201,7 @@ export default function ProjectListScreen({
   onOpenAiAccess,
   showWelcome,
   onWelcomeSeen,
+  sessionPending = false,
   initialView = "projects",
   aiAccessSection,
   onAiAccessSectionChange,
@@ -212,6 +214,8 @@ export default function ProjectListScreen({
   onOpenAiAccess?: () => void;
   showWelcome?: boolean;
   onWelcomeSeen?: () => void;
+  /** Who is signed in is still being resolved: say "loading", never "sign in". */
+  sessionPending?: boolean;
   initialView?: DashboardView;
   aiAccessSection?: SectionId;
   onAiAccessSectionChange?: (next: SectionId) => void;
@@ -237,6 +241,10 @@ export default function ProjectListScreen({
   // In-Page Auth Modal State & Handlers
   const location = useLocation();
   const navigate = useNavigate();
+  // Phones: /projects is the project list; /projects?tab=ask is the Ask Scholar home. The address carries the tab,
+  // so it survives a visit to Vault or AI Access and the Back button.
+  const phoneProjectsOpen =
+    location.pathname === "/projects" && new URLSearchParams(location.search).get("tab") !== "ask" && !showWelcome;
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<"signin" | "signup">("signin");
   const [authModalMessage, setAuthModalMessage] = useState<string | undefined>(undefined);
@@ -425,87 +433,8 @@ export default function ProjectListScreen({
     }
   }, [location.pathname, location.search, openAuth]);
 
-  // Dynamic Day/Night mode theme state with instant switching and localStorage persistence
-  const [theme, setTheme] = useState<"light" | "dark">(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("scholar-theme") || localStorage.getItem("theme");
-      if (stored === "light" || stored === "dark") return stored;
-      if (document.documentElement.getAttribute("data-theme") === "light") {
-        return "light";
-      }
-      if (document.documentElement.classList.contains("dark") || document.documentElement.getAttribute("data-theme") === "dark") {
-        return "dark";
-      }
-      // First visit with no saved choice: follow the device setting.
-      if (window.matchMedia?.("(prefers-color-scheme: light)").matches) return "light";
-    }
-    return "dark";
-  });
-
-  const transitionTimeoutRef = useRef<number | null>(null);
-
-  const toggleTheme = useCallback(() => {
-    const nextTheme = theme === "dark" ? "light" : "dark";
-
-    const applyThemeToDOM = (t: "light" | "dark") => {
-      if (typeof document !== "undefined") {
-        document.documentElement.setAttribute("data-theme", t);
-        if (t === "dark") {
-          document.documentElement.classList.add("dark");
-        } else {
-          document.documentElement.classList.remove("dark");
-        }
-      }
-      try {
-        localStorage.setItem("scholar-theme", t);
-        localStorage.setItem("theme", t);
-      } catch { }
-    };
-
-    if (typeof document !== "undefined") {
-      document.documentElement.classList.add("theme-transition");
-      if (transitionTimeoutRef.current !== null) {
-        window.clearTimeout(transitionTimeoutRef.current);
-      }
-      transitionTimeoutRef.current = window.setTimeout(() => {
-        document.documentElement.classList.remove("theme-transition");
-        transitionTimeoutRef.current = null;
-      }, 200);
-    }
-
-    if (
-      typeof document !== "undefined" &&
-      "startViewTransition" in document &&
-      typeof (document as any).startViewTransition === "function" &&
-      !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
-    ) {
-      (document as any).startViewTransition(() => {
-        applyThemeToDOM(nextTheme);
-        setTheme(nextTheme);
-      });
-    } else {
-      applyThemeToDOM(nextTheme);
-      setTheme(nextTheme);
-    }
-  }, [theme]);
-
-  useEffect(() => {
-    return () => {
-      if (transitionTimeoutRef.current !== null) {
-        window.clearTimeout(transitionTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    document.documentElement.setAttribute("data-theme", theme);
-    if (theme === "dark") {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-  }, [theme]);
+  const { theme, toggleTheme } = useTheme();
+  useEffect(() => applyTheme(theme), [theme]);
 
   useEffect(() => {
     if (showWelcome) onWelcomeSeen?.();
@@ -571,7 +500,7 @@ export default function ProjectListScreen({
       deletedIds: deletedProjectIdsRef.current,
       pinnedIds: pinnedRecentIds,
       contextProjects: projects,
-    }).map(({ id, projectId, title }) => ({ id, projectId, title }));
+    }).map(({ id, projectId, title, project }) => ({ id, projectId, title, outputTypeId: project.outputTypeId }));
   }, [userEmail, projects, searchQuery, pinnedRecentIds]);
 
   const [activeProviderLabel, setActiveProviderLabel] = useState<string>("Ready");
@@ -741,6 +670,15 @@ export default function ProjectListScreen({
     }
   });
 
+  // Grounding needs something to ground in: with an empty Vault the switch reads as off.
+  const vaultGroundingOn = Boolean(userEmail && isVaultGroundingActive && userVaultItems.length > 0);
+
+  // The signed-in email usually arrives after the first render. That account's saved conversations are read then
+  // (replacing any guest list), so a reload never hides them or lets the next save overwrite them.
+  useEffect(() => {
+    if (userEmail) setAskThreads(loadLocalAskScholarThreads(userEmail));
+  }, [userEmail]);
+
   // Fetch remote Ask Scholar threads from server on sign-in
   useEffect(() => {
     let active = true;
@@ -873,6 +811,11 @@ export default function ProjectListScreen({
     const updatedAt = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     const updatedAtIso = new Date().toISOString();
     setAskThreads((prev) => {
+      // Opening a saved conversation changes nothing: no new timestamp, no reorder, no upload.
+      const existing = prev.find((t) => t.id === activeAskThreadId);
+      if (existing && JSON.stringify([existing.messages, existing.files ?? []]) === JSON.stringify([guideMessages, askThreadFiles])) {
+        return prev;
+      }
       const filtered = prev.filter((t) => t.id !== activeAskThreadId);
       const next: AskScholarConversationThread[] = [
         { id: activeAskThreadId, title, updatedAt, updatedAtIso, messages: guideMessages, files: askThreadFiles },
@@ -1072,6 +1015,26 @@ export default function ProjectListScreen({
     setIsGuideThinking(false);
     setAskPhase(null);
   }, [sidebarAiMode]);
+
+  // Opening Ask Scholar on a narrow screen folds the sidebar away; closing it puts the sidebar back.
+  const sidebarWasOpenRef = useRef(false);
+  const openAskScholar = useCallback(() => {
+    if (typeof window !== "undefined" && window.innerWidth < 1280 && isSidebarOpen) {
+      sidebarWasOpenRef.current = true;
+      setIsSidebarOpen(false);
+    }
+    setIsAiSidebarOpen(true);
+    window.setTimeout(() => guideInputRef.current?.focus(), 150);
+  }, [isSidebarOpen]);
+  useEffect(() => {
+    if (isAiSidebarOpen || !sidebarWasOpenRef.current) return;
+    sidebarWasOpenRef.current = false;
+    setIsSidebarOpen(true);
+  }, [isAiSidebarOpen]);
+  const toggleAskScholar = useCallback(() => {
+    if (isAiSidebarOpen) setIsAiSidebarOpen(false);
+    else openAskScholar();
+  }, [isAiSidebarOpen, openAskScholar]);
 
   const handleStartNewAskThread = useCallback(() => {
     askAbortRef.current = true;
@@ -1494,13 +1457,16 @@ export default function ProjectListScreen({
           askNeedsSearchPlan({ query, hasFiles: currentAttachments.length > 0, hasVaultSources: Boolean(isVaultGroundingActive && userEmail && userVaultItems.length > 0) })
             ? await fetchAskSearchPlan(query, previousQuestions)
             : null;
+        // A greeting is conversation: nothing is searched or cited, whichever composer sent it.
+        const isSmallTalk = targetMode !== "deep-research" && currentAttachments.length === 0 && isGreeting(query);
         const isExplicitChatOnly =
-          modeToSend === undefined &&
-          (searchPlan
-            ? !searchPlan.search
-            : sidebarAiMode === "chat"
-            ? !isTimeSensitiveQuery(query)
-            : sidebarAiMode === "auto" && autoMode === "chat");
+          isSmallTalk ||
+          (modeToSend === undefined &&
+            (searchPlan
+              ? !searchPlan.search
+              : sidebarAiMode === "chat"
+              ? !isTimeSensitiveQuery(query)
+              : sidebarAiMode === "auto" && autoMode === "chat"));
 
         const shouldRunClientPreSearch = !isExplicitChatOnly && targetMode === "normal";
 
@@ -1612,7 +1578,7 @@ export default function ProjectListScreen({
                 }
               });
               const reason = serverErr instanceof Error ? serverErr.message : "it did not respond";
-              showAppToast(`Scholar Core's server couldn't answer (${reason.slice(0, 160)}). This answer came directly from your browser using your own AI key, without the server's citation checks.`, "warning", 9000);
+              showAppToast(`Scholar Core's server couldn't answer (${truncateAtWord(reason, 300)}). This answer came directly from your browser using your own AI key, without the server's citation checks.`, "warning", 9000);
               agentResponse = {
                 ok: true,
                 text: clientTxt,
@@ -1648,8 +1614,9 @@ export default function ProjectListScreen({
             query,
             targetMode === "deep-research" || agentResponse.mode === "deep-research"
           );
-          const candidateCitations: WebsiteCitationItem[] =
-            agentResponse.citations && agentResponse.citations.length > 0
+          const candidateCitations: WebsiteCitationItem[] = isSmallTalk
+            ? []
+            : agentResponse.citations && agentResponse.citations.length > 0
               ? agentResponse.citations
               : liveSourcesAsCitations(resolvedLiveSources) || [];
 
@@ -1679,8 +1646,9 @@ export default function ProjectListScreen({
             }
           });
 
-          const citedCount = verifiedCslItems.length;
-          const readCount = Math.max(candidateCitations.length, citedCount);
+          // "Cited" means the answer's own text refers to it, not merely that it was retrieved.
+          const citedCount = countCitedSources(agentResponse.text, candidateCitations);
+          const readCount = candidateCitations.length;
           // Only what actually happened: sources read plus those excluded. No budget-sized figure.
           const searchedCount = readCount + excludedRecords.length;
           const isDeepMode =
@@ -1697,11 +1665,11 @@ export default function ProjectListScreen({
             plan: agentResponse.plan,
             stages: agentResponse.stages,
             citationStyle: agentResponse.citationStyle || askCitationStyle,
-            citations: agentResponse.citations,
+            citations: isSmallTalk ? undefined : agentResponse.citations,
             liveSources: resolvedLiveSources,
             searchedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
             wordCount: agentResponse.wordCount,
-            verifiedSourcesCount: agentResponse.verifiedSourcesCount ?? (citedCount > 0 ? citedCount : undefined),
+            verifiedSourcesCount: isSmallTalk ? undefined : agentResponse.verifiedSourcesCount ?? (verifiedCslItems.length > 0 ? verifiedCslItems.length : undefined),
             searchedCount,
             readCount,
             citedCount,
@@ -1892,36 +1860,8 @@ export default function ProjectListScreen({
 
   const [projectToDelete, setProjectToDelete] = useState<ProjectView | null>(null);
 
-  const [activeRecentMenuId, setActiveRecentMenuId] = useState<string | null>(null);
-  const recentMenuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (recentMenuRef.current && !recentMenuRef.current.contains(e.target as Node)) {
-        setActiveRecentMenuId(null);
-      }
-    }
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        setActiveRecentMenuId(null);
-      }
-    }
-    if (activeRecentMenuId) {
-      document.addEventListener("mousedown", handleClickOutside);
-      document.addEventListener("keydown", handleKeyDown);
-      return () => {
-        document.removeEventListener("mousedown", handleClickOutside);
-        document.removeEventListener("keydown", handleKeyDown);
-      };
-    }
-  }, [activeRecentMenuId]);
-
-  function handleRecentAction(
-    action: "share" | "pin" | "rename" | "add-to-project" | "delete",
-    item: { id: string; projectId?: string; title: string }
-  ) {
-    setActiveRecentMenuId(null);
-
+  function handleRecentAction(action: ScholarSidebarAction, item: ScholarSidebarProject) {
     if (action === "share") {
       const shareUrl = `${window.location.origin}${item.projectId ? `/projects/${encodeURIComponent(item.projectId)}` : "/"}`;
       if (navigator.clipboard?.writeText) {
@@ -2201,376 +2141,97 @@ export default function ProjectListScreen({
         />
       )}
 
-      {/* Left Sidebar (Navigation Pane) */}
-      <aside
-        ref={drawerRef}
-        // Off-screen is not the same as unreachable: without this, Tab and screen readers
-        // walk through a closed drawer's links. Inert also keeps the page behind an open
-        // drawer from taking focus.
-        inert={isPhone ? !mobileMenuOpen : !isSidebarOpen}
-        aria-label="Workspace navigation"
-        className={`fixed inset-y-0 left-0 z-50 ${isPhone ? "" : "md:relative md:z-30"} h-full flex flex-col justify-between border-r border-neutral-200 dark:border-white/10 bg-white dark:bg-ink-750 text-neutral-700 dark:text-neutral-300 flex-shrink-0 select-none transition-all duration-300 ease-in-out ${mobileMenuOpen
-          ? "translate-x-0 w-[260px] shadow-2xl"
-          : "-translate-x-full " + (isPhone ? "" : "md:translate-x-0 ") + (isSidebarOpen ? "w-[260px]" : "w-0 border-r-0 overflow-hidden")
-          }`}
-      >
-        {/* Top Section */}
-        <div className="flex flex-col flex-shrink-0 w-[260px]">
-          {/* Logo & Close/Collapse Header */}
-          <div className="p-4 pb-3 flex items-center justify-between border-b border-neutral-200 dark:border-white/10">
-            <Link
-              to="/"
-              onClick={() => {
+      {/* Left sidebar: the one shared with Presentation Studio */}
+      <ScholarSidebar
+        asideRef={drawerRef}
+        isPhone={isPhone}
+        mobileOpen={mobileMenuOpen}
+        onCloseMobile={() => setMobileMenuOpen(false)}
+        isCollapsed={!isSidebarOpen}
+        onToggle={() => setIsSidebarOpen(false)}
+        activeItem={activeView}
+        hideNavLinks={isPhone}
+        onHome={() => {
+          setMobileMenuOpen(false);
+          setChoosing(false);
+          setActiveView("projects");
+          navigate("/");
+          scrollToProjects();
+        }}
+        onNewProject={() => {
+          setMobileMenuOpen(false);
+          setActiveView("projects");
+          if (!userEmail) {
+            openAuth("signin", "Sign in or create an account to start a new research project.");
+            return;
+          }
+          setChoosing(true);
+        }}
+        onOpenVault={() => {
+          setMobileMenuOpen(false);
+          if (!userEmail) {
+            openAuth("signin", "Sign in to access your Knowledge Vault references.");
+            return;
+          }
+          setActiveView("vault");
+          onOpenVault?.();
+        }}
+        onOpenAiAccess={() => {
+          setMobileMenuOpen(false);
+          if (!userEmail) {
+            openAuth("signin", "Sign in to configure AI provider keys and models.");
+            return;
+          }
+          setActiveView("ai-access");
+          onOpenAiAccess?.();
+        }}
+        onOpenAskScholar={() => {
+          setMobileMenuOpen(false);
+          toggleAskScholar();
+        }}
+        askScholarExpanded={isAiSidebarOpen}
+        onOpenSettings={
+          onOpenAccountSettings
+            ? () => {
                 setMobileMenuOpen(false);
-                setChoosing(false);
-                setActiveView("projects");
-                scrollToProjects();
-              }}
-              className="flex items-center gap-2.5 min-w-0 cursor-pointer transition-opacity duration-200 hover:opacity-75 text-left"
-              title="Scholar Core Workspace"
-            >
-              <div className="w-9 h-9 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 flex items-center justify-center flex-shrink-0 shadow-xs">
-                <ScholarCoreLogo size="md" className="text-white dark:text-neutral-900" />
-              </div>
-              <div className="flex flex-col min-w-0 justify-center">
-                <span className="font-extrabold text-sm tracking-tight text-neutral-900 dark:text-neutral-100 leading-tight truncate font-sans">
-                  Scholar Core
-                </span>
-                <span className="text-[10px] font-medium text-neutral-500 dark:text-neutral-400 mt-0.5 tracking-normal font-sans">
-                  Workspace
-                </span>
-              </div>
-            </Link>
-
-            {/* Desktop Collapse Icon */}
-            <button
-              type="button"
-              onClick={() => setIsSidebarOpen(false)}
-              className={`${isPhone ? "hidden" : "hidden md:flex"} p-1.5 rounded-lg text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-900/5 dark:hover:bg-white/5 transition-colors cursor-pointer`}
-              title="Collapse sidebar"
-              aria-label="Collapse sidebar"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-              </svg>
-            </button>
-
-            {/* Mobile Close Button */}
-            <button
-              type="button"
-              onClick={() => setMobileMenuOpen(false)}
-              className={`${isPhone ? "" : "md:hidden"} p-2 rounded-lg text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-900/5 dark:hover:bg-white/5 transition-colors cursor-pointer`}
-              title="Close navigation"
-              aria-label="Close navigation"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-
-          {/* Primary + New Project Button & Search Field (Phase 1) */}
-          <div className="px-3 pt-3">
-            <button
-              type="button"
-              onClick={() => {
-                setMobileMenuOpen(false);
-                setActiveView("projects");
-                if (!userEmail) {
-                  openAuth("signin", "Sign in or create an account to start a new research project.");
-                  return;
-                }
-                setChoosing(true);
-              }}
-              className="w-full h-10 px-4 rounded-full text-xs font-semibold bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm group font-sans mb-2.5"
-            >
-              <span className="text-base font-bold leading-none">+</span>
-              <span>New Project</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Middle Section: Core Workspace Links & Recents Scrollable List */}
-        <div className="flex-1 overflow-hidden px-3 flex flex-col w-[260px] min-h-0 antialiased">
-          {/* Phase 2: Core Workspace Links (The Library). On a phone the bottom bar already has these. */}
-          {!isPhone && (
-          <div className="space-y-1">
-            <button
-              type="button"
-              onClick={() => {
-                setMobileMenuOpen(false);
-                if (!userEmail) {
-                  openAuth("signin", "Sign in to access your Knowledge Vault references.");
-                  return;
-                }
-                setActiveView("vault");
-                onOpenVault?.();
-              }}
-              aria-label="Knowledge Vault"
-              className={`flex items-center gap-3 px-3 py-2.5 md:py-2 rounded-lg text-[13px] font-medium transition-colors cursor-pointer text-left w-full group font-sans ${activeView === "vault"
-                ? "bg-neutral-900/10 dark:bg-white/10 text-neutral-900 dark:text-neutral-100 font-semibold"
-                : "hover:bg-neutral-900/5 dark:hover:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
-                }`}
-            >
-              <Database className="h-4 w-4 text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-200 flex-shrink-0" />
-              <span>Knowledge Vault</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setMobileMenuOpen(false);
-                if (!userEmail) {
-                  openAuth("signin", "Sign in to configure AI provider keys and models.");
-                  return;
-                }
-                setActiveView("ai-access");
-                onOpenAiAccess?.();
-              }}
-              aria-label="Manage AI Access"
-              className={`flex items-center gap-3 px-3 py-2.5 md:py-2 rounded-lg text-[13px] font-medium transition-colors cursor-pointer text-left w-full group font-sans ${activeView === "ai-access"
-                ? "bg-neutral-900/10 dark:bg-white/10 text-neutral-900 dark:text-neutral-100 font-semibold"
-                : "hover:bg-neutral-900/5 dark:hover:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
-                }`}
-            >
-              <Sliders className="h-4 w-4 text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-200 flex-shrink-0" />
-              <span>AI Access</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setMobileMenuOpen(false);
-                setIsAiSidebarOpen((prev) => {
-                  const next = !prev;
-                  if (next && typeof window !== "undefined" && window.innerWidth < 1280) {
-                    setIsSidebarOpen(false);
-                  }
-                  if (next) {
-                    setTimeout(() => guideInputRef.current?.focus(), 150);
-                  }
-                  return next;
-                });
-              }}
-              aria-label="Ask Scholar"
-              aria-expanded={isAiSidebarOpen}
-              className={`flex items-center gap-3 px-3 py-2.5 md:py-2 rounded-lg text-[13px] font-medium transition-colors cursor-pointer text-left w-full group font-sans ${isAiSidebarOpen
-                ? "bg-neutral-900/10 dark:bg-white/10 text-neutral-900 dark:text-neutral-100 font-semibold"
-                : "hover:bg-neutral-900/5 dark:hover:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
-                }`}
-            >
-              <Lightbulb className="h-4 w-4 text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-200 flex-shrink-0" />
-              <span>Ask Scholar</span>
-            </button>
-          </div>
-          )}
-
-          {userEmail && projectsLoadError && (
-            <div role="alert" className="mt-6 mx-1 rounded-xl border border-amber-300 dark:border-amber-500/40 bg-amber-50 dark:bg-amber-500/10 px-3 py-2.5 text-xs text-[color:var(--text-primary)] flex flex-col gap-2">
-              <span>{projectsLoadError}</span>
-              <button
-                type="button"
-                onClick={projectsLoadNeedsSignIn ? () => openAuth("signin", "Sign in again to see your projects.") : load}
-                className="self-start px-3 py-1 rounded-lg border border-[color:var(--border-control)] font-semibold hover:bg-[color:var(--surface-hover)] cursor-pointer"
-              >
-                {/* "Sign in again", not "Sign in": this banner can sit beside the real sign-in form,
-                    and two buttons with the same name are ambiguous (and broke the E2E sign-in step). */}
-                {projectsLoadNeedsSignIn ? "Sign in again" : "Try again"}
-              </button>
-            </div>
-          )}
-          {userEmail && projects === null && !projectsLoadError && (
-            <p role="status" className="mt-6 px-3 text-xs text-[color:var(--text-secondary)]">Loading your projects…</p>
-          )}
-
-          {/* Projects Section: Render only when logged in and active projects exist */}
-          {userEmail && projects && projects.length > 0 && (
-            <div className="flex-1 overflow-hidden flex flex-col min-h-0">
-              <h2 className="text-xs font-semibold tracking-wider text-neutral-500 uppercase mt-8 mb-2 px-3 flex-shrink-0">
-                Projects
-              </h2>
-
-              {/* Search Projects Box directly below PROJECTS heading */}
-              <div className="relative group cursor-text mb-2.5 w-full h-10 flex-shrink-0">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-200 transition-colors pointer-events-none" />
-                <input
-                  type="text"
-                  placeholder="Search projects..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="w-full h-full bg-neutral-900/5 dark:bg-white/5 border border-neutral-200 dark:border-white/10 rounded-full pl-10 pr-11 text-xs focus:outline-none focus:ring-1 focus:ring-neutral-400 dark:focus:ring-white/20 transition-all cursor-text text-neutral-900 dark:text-neutral-200 placeholder-neutral-500 dark:placeholder-neutral-400"
-                />
-                {!isPhone && (
+                onOpenAccountSettings();
+              }
+            : undefined
+        }
+        projectsNotice={
+          <>
+            {userEmail && projectsLoadError && (
+              <div role="alert" className="mt-6 mx-1 rounded-xl border border-amber-300 dark:border-amber-500/40 bg-amber-50 dark:bg-amber-500/10 px-3 py-2.5 text-xs text-[color:var(--text-primary)] flex flex-col gap-2">
+                <span>{projectsLoadError}</span>
                 <button
                   type="button"
-                  onClick={() => setIsCommandPaletteOpen(true)}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded bg-neutral-200/60 dark:bg-white/10 hover:bg-neutral-300 dark:hover:bg-white/20 text-[10px] font-mono font-medium text-neutral-500 dark:text-neutral-400 transition-colors cursor-pointer"
-                  title="Open Command Palette (⌘K)"
+                  onClick={projectsLoadNeedsSignIn ? () => openAuth("signin", "Sign in again to see your projects.") : load}
+                  className="self-start px-3 py-1 rounded-lg border border-[color:var(--border-control)] font-semibold hover:bg-[color:var(--surface-hover)] cursor-pointer"
                 >
-                  ⌘K
+                  {/* "Sign in again", not "Sign in": this banner can sit beside the real sign-in form,
+                      and two buttons with the same name are ambiguous (and broke the E2E sign-in step). */}
+                  {projectsLoadNeedsSignIn ? "Sign in again" : "Try again"}
                 </button>
-                )}
               </div>
-
-              {/* Projects List (Scrollable Area) */}
-              <div className="flex-1 overflow-y-auto space-y-1 pr-2 custom-scrollbar pb-3 min-h-0">
-                {isMounted && recentProjectsList.map((item, index) => {
-                  const isMenuOpen = activeRecentMenuId === item.id;
-                  const isNearBottom = index >= Math.max(recentProjectsList.length - 2, 2);
-                  const isPinned = pinnedRecentIds.includes(item.id);
-
-                  return (
-                    <div key={item.id} className="relative">
-                      <div
-                        onClick={() => {
-                          setMobileMenuOpen(false);
-                          setActiveView("projects");
-                          if (item.projectId) {
-                            onOpen(item.projectId);
-                          } else {
-                            scrollToProjects();
-                          }
-                        }}
-                        className="group flex items-center justify-between px-3 py-2 rounded-lg hover:bg-neutral-900/5 dark:hover:bg-white/5 transition-colors duration-200 cursor-pointer text-[13px] font-medium text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white antialiased"
-                        title={item.title}
-                      >
-                        <span className="truncate pr-2 flex items-center gap-2 min-w-0">
-                          <FileText className="w-3.5 h-3.5 text-neutral-500 group-hover:text-neutral-300 dark:group-hover:text-neutral-300 transition-colors duration-200 flex-shrink-0" />
-                          {isPinned && <Pin className="w-3 h-3 text-amber-500/80 group-hover:text-amber-500 rotate-45 flex-shrink-0 transition-colors duration-200" />}
-                          <span className="truncate">{item.title}</span>
-                        </span>
-                        <div className="flex items-center gap-0.5 flex-shrink-0">
-                          <button
-                            type="button"
-                            aria-label="Trash project"
-                            title="Delete project"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleRecentAction("delete", item);
-                            }}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-red-500/10 text-neutral-400 hover:text-red-500 flex-shrink-0 cursor-pointer"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            aria-label="More options"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setActiveRecentMenuId((prev) => (prev === item.id ? null : item.id));
-                            }}
-                            className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-neutral-900/10 dark:hover:bg-white/10 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 flex-shrink-0 ${isMenuOpen ? "!opacity-100" : ""
-                              }`}
-                          >
-                            <MoreVertical className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Popover Options Menu */}
-                      {isMenuOpen && (
-                        <div
-                          ref={recentMenuRef}
-                          className={`absolute ${isNearBottom ? "bottom-full mb-1" : "top-full mt-1"
-                            } right-0 z-50 shadow-xl rounded-xl bg-white dark:bg-ink-750 border border-neutral-200 dark:border-white/10 p-1 min-w-[180px] animate-in fade-in duration-150 text-neutral-700 dark:text-neutral-300`}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => handleRecentAction("share", item)}
-                            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-neutral-700 dark:text-neutral-300 hover:bg-neutral-900/5 dark:hover:bg-white/5 hover:text-neutral-900 dark:hover:text-neutral-100 cursor-pointer text-left"
-                          >
-                            <Share2 className="w-4 h-4 flex-shrink-0" />
-                            <span>Share</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleRecentAction("pin", item)}
-                            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-neutral-700 dark:text-neutral-300 hover:bg-neutral-900/5 dark:hover:bg-white/5 hover:text-neutral-900 dark:hover:text-neutral-100 cursor-pointer text-left"
-                          >
-                            <Pin className="w-4 h-4 flex-shrink-0" />
-                            <span>{isPinned ? "Unpin" : "Pin"}</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleRecentAction("rename", item)}
-                            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-neutral-700 dark:text-neutral-300 hover:bg-neutral-900/5 dark:hover:bg-white/5 hover:text-neutral-900 dark:hover:text-neutral-100 cursor-pointer text-left"
-                          >
-                            <Pencil className="w-4 h-4 flex-shrink-0" />
-                            <span>Rename</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleRecentAction("add-to-project", item)}
-                            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-neutral-700 dark:text-neutral-300 hover:bg-neutral-900/5 dark:hover:bg-white/5 hover:text-neutral-900 dark:hover:text-neutral-100 cursor-pointer text-left"
-                          >
-                            <FolderPlus className="w-4 h-4 flex-shrink-0" />
-                            <span>Add to Project</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleRecentAction("delete", item)}
-                            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-red-500 hover:bg-red-500/10 cursor-pointer text-left"
-                          >
-                            <Trash2 className="w-4 h-4 flex-shrink-0" />
-                            <span>Delete</span>
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Bottom Section */}
-        <div className="flex-shrink-0 p-3 border-t border-neutral-200 dark:border-white/10 flex flex-col justify-between gap-2 w-[260px] bg-white dark:bg-ink-750 h-[114px]">
-          {/* Action Row: Settings Navigation Item + Minimal Icon-Only Theme Toggle */}
-          <div className="flex items-center justify-between gap-1.5">
-            {onOpenAccountSettings && (
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  onOpenAccountSettings();
-                }}
-                aria-label="Settings"
-                className="flex-1 flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold tracking-tight text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-900/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-left group font-sans"
-              >
-                <svg className="w-4 h-4 flex-shrink-0 text-neutral-500 dark:text-neutral-400 group-hover:text-neutral-900 dark:group-hover:text-neutral-200 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                <span>Settings</span>
-              </button>
             )}
-
-            {/* Minimal Icon-Only Theme Toggle (a phone has its own in the header) */}
-            {!isPhone && (
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className="p-2 rounded-lg hover:bg-neutral-900/5 dark:hover:bg-white/5 cursor-pointer text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors border border-neutral-200 dark:border-white/10 flex-shrink-0"
-              aria-label="Toggle theme"
-              title={`Switch to ${theme === "dark" ? "Day" : "Night"} mode`}
-            >
-              <div className="relative w-4 h-4 transition-transform duration-200 rotate-0 dark:-rotate-90">
-                {theme === "dark" ? (
-                  <Sun className="w-4 h-4 text-amber-400" />
-                ) : (
-                  <Moon className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
-                )}
-              </div>
-            </button>
+            {userEmail && projects === null && !projectsLoadError && (
+              <p role="status" className="mt-6 px-3 text-xs text-[color:var(--text-secondary)]">Loading your projects…</p>
             )}
-          </div>
-
-          {/* Multi-Account User Dropdown */}
+          </>
+        }
+        showProjects={Boolean(userEmail && projects && projects.length > 0)}
+        projects={isMounted ? recentProjectsList.map((p) => ({ ...p, type: p.outputTypeId === "OT-22" ? "presentation" as const : "document" as const, isPinned: pinnedRecentIds.includes(p.id) })) : []}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+        onSelectProject={(item) => {
+          setMobileMenuOpen(false);
+          setActiveView("projects");
+          if (item.projectId) onOpen(item.projectId);
+          else scrollToProjects();
+        }}
+        onProjectAction={handleRecentAction}
+        footer={
           <UserAccountMenu
             userEmail={userEmail}
             onOpenAccountSettings={onOpenAccountSettings}
@@ -2580,8 +2241,8 @@ export default function ProjectListScreen({
             dropUp={true}
             variant="sidebar"
           />
-        </div>
-      </aside>
+        }
+      />
 
       {/* Main Content Area (Center Pane) */}
       <main inert={isPhone && mobileMenuOpen} className={`${isLandingPage && isAiSidebarOpen
@@ -2603,25 +2264,19 @@ export default function ProjectListScreen({
               </svg>
             </button>
 
-            {/* Desktop Sidebar Toggle Icon Button (ChatGPT-style) */}
-            <button
-              type="button"
-              onClick={() => setIsSidebarOpen((prev) => !prev)}
-              className={`${isPhone ? "hidden" : "hidden md:flex"} items-center gap-2 px-2.5 py-1.5 rounded-xl border border-neutral-200 dark:border-white/10 bg-neutral-900/5 dark:bg-white/5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-900/10 dark:hover:bg-white/10 text-xs font-medium cursor-pointer transition-all animate-in fade-in`}
-              title={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
-              aria-label={isSidebarOpen ? "Toggle sidebar" : "Expand sidebar"}
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                <rect x="3" y="3" width="18" height="18" rx="2" strokeWidth="1.5" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 3v18" />
-                {isSidebarOpen ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M14 9l-3 3 3 3" />
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 15l3-3-3-3" />
-                )}
-              </svg>
-              {!isSidebarOpen && <span>Open Sidebar</span>}
-            </button>
+            {/* Reopens a collapsed sidebar. While it is open, its own « button is the one control. */}
+            {!isPhone && !isSidebarOpen && (
+              <button
+                type="button"
+                onClick={() => setIsSidebarOpen(true)}
+                className="hidden md:flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-neutral-200 dark:border-white/10 bg-neutral-900/5 dark:bg-white/5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-900/10 dark:hover:bg-white/10 text-xs font-medium cursor-pointer transition-all animate-in fade-in"
+                title="Expand sidebar"
+                aria-label="Expand sidebar"
+              >
+                <PanelLeftOpen className="w-4 h-4" aria-hidden="true" />
+                <span aria-hidden="true">Expand sidebar</span>
+              </button>
+            )}
           </div>
 
           {/* Top Bar Right: AI Assistant Toggle & Active Provider Status */}
@@ -2636,11 +2291,11 @@ export default function ProjectListScreen({
                 }}
                 className={`${isAiSidebarOpen ? "hidden 2xl:inline-flex" : "hidden sm:inline-flex"
                   } items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-colors border cursor-pointer shadow-2xs ${aiStatus?.connected
-                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20"
+                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-500/20"
                     : "border-neutral-200 dark:border-white/10 bg-neutral-100/80 dark:bg-white/5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200/70 dark:hover:bg-white/10"
                   }`}
                 title="AI Access • Click to configure"
-                aria-label={`AI status: ${aiPillLabel}`}
+                aria-label={`${aiPillLabel}, AI status`}
                 data-testid="active-ai-pill"
               >
                 {/* Only an AI that is actually connected is shown as active; a saved
@@ -2677,13 +2332,10 @@ export default function ProjectListScreen({
             {!isAiSidebarOpen && !isPhone && (
               <button
                 type="button"
-                onClick={() => {
-                  setIsAiSidebarOpen(true);
-                  setTimeout(() => guideInputRef.current?.focus(), 150);
-                }}
+                onClick={openAskScholar}
                 title="Ask Scholar"
                 className="h-10 w-10 md:w-auto md:px-3.5 md:gap-2 rounded-full transition-all duration-200 flex items-center justify-center cursor-pointer shadow-xs border bg-white dark:bg-white/5 hover:bg-neutral-100 dark:hover:bg-white/10 border-neutral-200/90 dark:border-white/10 text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white animate-in fade-in zoom-in-95 duration-150"
-                aria-label="Toggle Scholar Core AI Assistant"
+                aria-label="Ask Scholar panel"
               >
                 <Lightbulb className="w-5 h-5 stroke-[1.9]" />
                 <span aria-hidden="true" className="hidden md:inline text-xs font-semibold">Ask Scholar</span>
@@ -2726,6 +2378,25 @@ export default function ProjectListScreen({
               />
             </div>
           </div>
+        ) : isPhone && phoneProjectsOpen && !isAiSidebarOpen ? (
+          <PhoneProjectsList
+            projects={isMounted ? recentProjectsList : []}
+            loading={sessionPending || (Boolean(userEmail) && projects === null && !projectsLoadError)}
+            error={userEmail ? projectsLoadError : null}
+            onRetry={load}
+            signedIn={sessionPending || Boolean(userEmail)}
+            onSignIn={() => openAuth("signin", "Sign in to see your projects.")}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            onOpen={onOpen}
+            onNewProject={() => {
+              if (!userEmail) {
+                openAuth("signin", "Sign in or create an account to start a new research project.");
+                return;
+              }
+              setChoosing(true);
+            }}
+          />
         ) : (
           <>
             {/* Scrollable / Flexible Center Area */}
@@ -2743,7 +2414,7 @@ export default function ProjectListScreen({
                       </div>
                       <div>
                         <p className="text-sm font-bold text-neutral-900 dark:text-gray-100 font-sans">Welcome to your Scholar Workspace</p>
-                        <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 font-normal leading-relaxed font-sans">
+                        <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1 font-normal leading-relaxed font-sans">
                           Select an academic workspace to begin, or upload reference PDFs to your Vault.
                         </p>
                       </div>
@@ -2837,7 +2508,7 @@ export default function ProjectListScreen({
                                           {tile.label}
                                         </span>
                                         {length && (
-                                          <span className="block text-[11px] text-neutral-500 dark:text-neutral-400">
+                                          <span className="block text-[11px] text-neutral-600 dark:text-neutral-400">
                                             {length}
                                           </span>
                                         )}
@@ -2853,12 +2524,13 @@ export default function ProjectListScreen({
                             <button
                               type="button"
                               data-testid="mobile-ai-status"
+                              aria-label={`${aiPillLabel}, AI status`}
                               onClick={() => {
                                 if (onOpenAiAccess) onOpenAiAccess();
                                 else setActiveView("ai-access");
                               }}
                               className={`inline-flex items-center gap-1.5 min-h-9 min-w-[8.5rem] max-w-full px-3 rounded-full text-xs font-medium border cursor-pointer active:scale-95 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 ${aiStatus?.connected
-                                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-400"
                                 : "border-neutral-200 dark:border-white/10 bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-300"
                                 }`}
                             >
@@ -2909,7 +2581,7 @@ export default function ProjectListScreen({
 
                       {visibleRecents.length > 0 && (
                         <div className={hasReturningContent ? "mt-1" : "mt-6"} data-testid="mobile-continue">
-                          <h2 className="px-0.5 mb-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+                          <h2 className="px-0.5 mb-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">
                             Continue where you left off
                           </h2>
                           <ul className="space-y-2">
@@ -2929,7 +2601,7 @@ export default function ProjectListScreen({
                                     <span className="min-w-0 flex-1">
                                       <span className="block text-[13px] font-semibold text-neutral-900 dark:text-white truncate">{item.title}</span>
                                       {item.typeLabel && (
-                                        <span className="block text-[11px] text-neutral-500 dark:text-neutral-400">{item.typeLabel}</span>
+                                        <span className="block text-[11px] text-neutral-600 dark:text-neutral-400">{item.typeLabel}</span>
                                       )}
                                     </span>
                                     <ArrowRight className="w-4 h-4 shrink-0 text-neutral-400" aria-hidden="true" />
@@ -3006,7 +2678,7 @@ export default function ProjectListScreen({
 
                               {/* Bottom Row: Divider & Actionable Deliverables Spec */}
                               {/* One spec per line: wrapped "a · b · c" stranded dots at line ends and put the dividers at different heights. */}
-                              <ul className="pt-3.5 mt-2 border-t border-neutral-100 dark:border-white/5 flex flex-col gap-0.5 text-[11px] sm:text-[11.5px] text-neutral-500 dark:text-neutral-400 font-sans leading-tight">
+                              <ul className="pt-3.5 mt-2 border-t border-neutral-100 dark:border-white/5 flex flex-col gap-0.5 text-[11px] sm:text-[11.5px] text-neutral-600 dark:text-neutral-400 font-sans leading-tight">
                                 {((tile.specs || tile.footer).split(" · ")).map((part, idx) => (
                                   <li key={idx} className="font-medium">{part}</li>
                                 ))}
@@ -3024,7 +2696,7 @@ export default function ProjectListScreen({
                     </div>
                     <div>
                       <h2 className="text-base font-semibold text-neutral-900 dark:text-white">Ask Scholar Copilot Active</h2>
-                      <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+                      <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-0.5">
                         Your research inquiry is active in full screen.
                       </p>
                     </div>
@@ -3073,15 +2745,27 @@ export default function ProjectListScreen({
                 label: "Ask",
                 fullName: "Ask Scholar",
                 icon: Lightbulb,
-                active: activeView === "projects" && !choosing,
+                active: activeView === "projects" && !choosing && !phoneProjectsOpen,
                 onClick: () => {
-                  if (activeView !== "projects") handleCloseCentralView();
+                  setActiveView("projects");
+                  navigate("/projects?tab=ask");
                   setChoosing(false);
                   if (hasStartedChatting) setIsAiSidebarOpen(true);
                   else setTimeout(() => guideTextareaRef.current?.focus(), 300);
                 },
               },
-              { label: "Projects", fullName: "Projects", icon: FolderOpen, active: false, onClick: () => setMobileMenuOpen(true) },
+              {
+                label: "Projects",
+                fullName: "Projects",
+                icon: FolderOpen,
+                active: activeView === "projects" && !choosing && phoneProjectsOpen,
+                onClick: () => {
+                  setActiveView("projects");
+                  navigate("/projects");
+                  setChoosing(false);
+                  setIsAiSidebarOpen(false);
+                },
+              },
               {
                 label: "Vault",
                 fullName: "Knowledge Vault",
@@ -3117,7 +2801,7 @@ export default function ProjectListScreen({
                 onClick={item.onClick}
                 aria-label={item.fullName}
                 aria-current={item.active ? "page" : undefined}
-                className={`flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-medium cursor-pointer ${item.active ? "text-neutral-900 dark:text-white" : "text-neutral-500 dark:text-neutral-400"
+                className={`flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-medium cursor-pointer ${item.active ? "text-neutral-900 dark:text-white" : "text-neutral-600 dark:text-neutral-400"
                   }`}
               >
                 <item.icon className="w-5 h-5" aria-hidden="true" />
@@ -3129,7 +2813,10 @@ export default function ProjectListScreen({
       </main>
 
       {/* Secondary View (Right Panel / Full-Screen Landing Chat): Module 3.2 AI Assistant */}
-      <aside
+      <div
+        // Full screen it is the page's main content (the column beside it is hidden); docked, a side panel.
+        role={isAiSidebarOpen && isLandingPage ? "main" : "complementary"}
+        aria-label="Ask Scholar assistant"
         style={
           isAiSidebarOpen && !isLandingPage
             ? { width: `min(${aiSidebarWidth}px, 100vw)` }
@@ -3160,7 +2847,7 @@ export default function ProjectListScreen({
 
         {isAiSidebarOpen && (
           <>
-            <div className="h-full flex flex-col w-full">
+            <section aria-label="Ask Scholar conversation" className="h-full flex flex-col w-full">
               {/* Sidebar Header with glassmorphism & elevated badge */}
               <header className="px-4 sm:px-5 py-3.5 border-b border-neutral-200/80 dark:border-white/10 flex items-center justify-between shrink-0 bg-white/95 dark:bg-ink-800/95 backdrop-blur-md sticky top-0 z-20">
                 <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
@@ -3260,12 +2947,13 @@ export default function ProjectListScreen({
 
                       {isAskHistoryOpen && (
                         <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 rounded-2xl bg-white dark:bg-ink-800 border border-neutral-200 dark:border-white/10 shadow-xl z-40 p-2 space-y-1 text-left">
-                          <div className="flex items-center justify-between px-2 py-1 text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 border-b border-neutral-100 dark:border-white/10">
+                          <div className="flex items-center justify-between px-2 py-1 text-[11px] font-semibold text-neutral-600 dark:text-neutral-400 border-b border-neutral-100 dark:border-white/10">
                             <span>Recent Conversations</span>
                             <button
                               type="button"
                               onClick={() => setIsAskHistoryOpen(false)}
-                              className="p-0.5 rounded hover:bg-neutral-100 dark:hover:bg-white/10 cursor-pointer"
+                              aria-label="Close recent conversations"
+                              className="w-7 h-7 flex items-center justify-center rounded hover:bg-neutral-100 dark:hover:bg-white/10 cursor-pointer"
                             >
                               <X className="w-3.5 h-3.5" />
                             </button>
@@ -3293,7 +2981,8 @@ export default function ProjectListScreen({
                                   <div className="truncate">{t.title}</div>
                                   <div className="text-[10px] text-neutral-400 font-normal">
                                     {t.messages.filter((m) => m.sender === "user").length} prompt
-                                    {t.messages.filter((m) => m.sender === "user").length === 1 ? "" : "s"} · {t.updatedAt}
+                                    {t.messages.filter((m) => m.sender === "user").length === 1 ? "" : "s"}
+                                    {t.updatedAt ? ` · ${t.updatedAt}` : ""}
                                   </div>
                                 </button>
                                 <button
@@ -3416,7 +3105,7 @@ export default function ProjectListScreen({
 
                               {/* Bottom Row: Divider & Actionable Deliverables Spec */}
                               {/* One spec per line: wrapped "a · b · c" stranded dots at line ends and put the dividers at different heights. */}
-                              <ul className="pt-3.5 mt-2 border-t border-neutral-100 dark:border-white/5 flex flex-col gap-0.5 text-[11px] sm:text-[11.5px] text-neutral-500 dark:text-neutral-400 font-sans leading-tight">
+                              <ul className="pt-3.5 mt-2 border-t border-neutral-100 dark:border-white/5 flex flex-col gap-0.5 text-[11px] sm:text-[11.5px] text-neutral-600 dark:text-neutral-400 font-sans leading-tight">
                                 {((tile.specs || tile.footer).split(" · ")).map((part, idx) => (
                                   <li key={idx} className="font-medium">{part}</li>
                                 ))}
@@ -3429,7 +3118,7 @@ export default function ProjectListScreen({
 
                     {/* Clean Mobile Landing View: Clean Workspace selector pill */}
                     <div className="w-full sm:hidden flex flex-col items-center gap-3 py-2 px-2 text-center">
-                      <p className="text-xs text-neutral-500 dark:text-neutral-400 max-w-xs leading-relaxed">
+                      <p className="text-xs text-neutral-600 dark:text-neutral-400 max-w-xs leading-relaxed">
                         Ask any academic question or paste a topic. Every response is grounded in authentic scholarly sources.
                       </p>
                       <button
@@ -3788,7 +3477,7 @@ export default function ProjectListScreen({
                           {/* Related questions: plain tappable lines, no boxes */}
                           {msg.sender === "assistant" && !msg.error && msg.followUps && msg.followUps.length > 0 && (
                             <div className="mt-4">
-                              <p className="mb-1 px-1 text-xs font-medium text-neutral-500 dark:text-neutral-400">Follow-ups</p>
+                              <p className="mb-1 px-1 text-xs font-medium text-neutral-600 dark:text-neutral-400">Follow-ups</p>
                               <ul className="divide-y divide-neutral-200/70 dark:divide-white/10">
                                 {msg.followUps.slice(0, 3).map((fu, fuIdx) => (
                                   <li key={fuIdx}>
@@ -3938,6 +3627,10 @@ export default function ProjectListScreen({
                               openAuth("signin", "Sign in to ground Ask Scholar in your personal Knowledge Vault.");
                               return;
                             }
+                            if (userVaultItems.length === 0) {
+                              showAppToast("Your Knowledge Vault has no items yet. Add a source to ground answers in it.", "info", 3000);
+                              return;
+                            }
                             setIsVaultGroundingActive((prev) => {
                               const next = !prev;
                               try {
@@ -3955,15 +3648,15 @@ export default function ProjectListScreen({
                               return next;
                             });
                           }}
-                          aria-pressed={Boolean(isVaultGroundingActive && userEmail)}
+                          aria-pressed={vaultGroundingOn}
                           aria-label="Vault Grounding"
-                          className={`${"inline-flex min-h-10 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-500 sm:min-h-8"} ${isVaultGroundingActive && userEmail
+                          className={`${"inline-flex min-h-10 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-500 sm:min-h-8"} ${vaultGroundingOn
                             ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
                             : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white"
                             }`}
                           title={
                             userEmail
-                              ? isVaultGroundingActive
+                              ? vaultGroundingOn
                                 ? `Knowledge Vault Grounding Active (${userVaultItems.length} items available)`
                                 : "Click to ground answers in your personal Knowledge Vault"
                               : "Sign in to ground answers in your personal Knowledge Vault"
@@ -3994,10 +3687,10 @@ export default function ProjectListScreen({
                   </AskPromptBox>
                 </div>
               </div>
-            </div>
+            </section>
           </>
         )}
-      </aside>
+      </div>
 
       {/* Delete Confirmation Modal Pop-up */}
       {projectToDelete && (

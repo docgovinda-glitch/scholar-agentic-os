@@ -327,6 +327,12 @@ export function classifySourceTypeAndCredibility(source: RawSourceInput): {
   const titleLower = (source.title || "").toLowerCase();
   const rawType = (source.sourceType || "").toLowerCase();
 
+  // News feeds and ordinary web pages are never scholarship, whatever publisher name they carry.
+  const isNews = /news\.google\.|\/rss\b|\/feed\b/.test(`${source.url || ""}`.toLowerCase()) || rawType === "media" || rawType.startsWith("news");
+  if (isNews) {
+    return { cslType: "webpage", sourceTypeLabel: "news article", credibilityLevel: "moderate" };
+  }
+
   if (
     urlOrDoi.includes("arxiv.org") ||
     urlOrDoi.includes("biorxiv.org") ||
@@ -364,6 +370,10 @@ export function classifySourceTypeAndCredibility(source: RawSourceInput): {
       sourceTypeLabel: "government / institutional report",
       credibilityLevel: "high",
     };
+  }
+
+  if ((rawType === "web" || rawType === "web page" || rawType === "web source") && !normalizeDoi(source.doi || source.url)) {
+    return { cslType: "webpage", sourceTypeLabel: "web source", credibilityLevel: "moderate" };
   }
 
   if (rawType.includes("conference") || /proceedings|conference|symposium|neurips|icml|cvpr|acl\b/.test(urlOrDoi)) {

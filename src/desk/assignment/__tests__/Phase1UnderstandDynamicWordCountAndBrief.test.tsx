@@ -316,7 +316,7 @@ describe("Phase 1: Dynamic Target Word Count & Brief-Specific Outline Generation
 
       // Verify the bottom button is renamed to "Proceed"
       const proceedButton = screen.getByRole("button", {
-        name: /^Proceed/i,
+        name: /Approve outline & continue to Sources/i,
       });
       expect(proceedButton).toBeInTheDocument();
       // The visible label says what proceeding does: it approves the outline.

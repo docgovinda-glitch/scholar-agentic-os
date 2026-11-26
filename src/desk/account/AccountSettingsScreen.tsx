@@ -126,14 +126,21 @@ export default function AccountSettingsScreen({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  const phoneProblem = e164Problem(phoneCountryCode, phone);
+  // The mobile number is optional, as at onboarding: only a number that was typed can be wrong, and it is
+  // reported once the person has left the field or tried to save.
+  const phoneProblem = phone.replace(/\D/g, "") ? e164Problem(phoneCountryCode, phone) : null;
+  const [phoneChecked, setPhoneChecked] = useState(false);
+  const shownPhoneProblem = phoneChecked ? phoneProblem : null;
 
   const handlePhoneChange = (val: string) => {
     setPhone(stripDialCode(phoneCountryCode, val));
   };
 
   async function handleSaveProfile() {
-    if (phoneProblem) return;
+    if (phoneProblem) {
+      setPhoneChecked(true);
+      return;
+    }
     setSaving(true);
     setSaveError(null);
     setSaved(false);
@@ -327,43 +334,25 @@ export default function AccountSettingsScreen({
                   >
                     {/* Account Identity Card (Username & Email - declared once in a clean unified card) */}
                     <div className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)]/50 p-3.5">
-                      <div className="flex items-center justify-between mb-2.5">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-[color:var(--text-secondary)] uppercase tracking-wider">
-                            Account Identity
-                          </span>
-                          <span className="text-[10px] font-medium text-[color:var(--text-muted)] bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)] px-2 py-0.5 rounded">
-                            Read-only
-                          </span>
-                        </div>
-                        <span className="text-[11px] text-[color:var(--text-muted)] hidden sm:inline">Credentials cannot be edited</span>
-                      </div>
+                      <span className="block mb-2.5 text-xs font-semibold text-[color:var(--text-secondary)] uppercase tracking-wider">
+                        Account Identity
+                      </span>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {/* Username - Strictly Read-only / Disabled */}
                         <div className="flex flex-col gap-1">
-                          <div className="flex items-center justify-between">
-                            <label className="text-xs font-medium text-[color:var(--text-secondary)]" htmlFor="account-username">
-                              Username
-                            </label>
-                            <span className="text-[10px] font-medium text-[color:var(--text-muted)] bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)] px-1.5 py-0.2 rounded">
-                              Read-only
-                            </span>
-                          </div>
+                          <label className="text-xs font-medium text-[color:var(--text-secondary)]" htmlFor="account-username">
+                            Username
+                          </label>
                           <input
                             id="account-username"
                             value={profile.username}
+                            name="username"
                             disabled
                             readOnly
                             aria-readonly="true"
                             className="w-full rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)] px-3 py-2 text-xs font-mono text-[color:var(--text-muted)] cursor-not-allowed opacity-80"
                           />
-                          <p className="text-[11px] text-[color:var(--text-muted)] flex items-center gap-1 mt-0.5">
-                            <svg className="w-3.5 h-3.5 flex-shrink-0 text-[color:var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-                            </svg>
-                            <span>Username cannot be changed.</span>
-                          </p>
                         </div>
 
                         {/* Email - System Controlled */}
@@ -374,6 +363,7 @@ export default function AccountSettingsScreen({
                           <input
                             id="account-email"
                             value={profile.email}
+                            name="email"
                             disabled
                             readOnly
                             aria-readonly="true"
@@ -385,7 +375,7 @@ export default function AccountSettingsScreen({
                         data-testid="profile-update-disabled-notice"
                         className="mt-2.5 text-[11px] text-[color:var(--text-muted)] border-t border-[color:var(--border-subtle)] pt-2"
                       >
-                        Note: Email and username change requests requiring administrator verification are temporarily paused during a security upgrade (TICKET-SEC-01). You can update your Full Name, Phone Number, Institution, and Academic Profile directly below.
+                        <span>Username cannot be changed.</span> <span>Email changes are paused for now.</span>
                       </p>
                     </div>
 
@@ -404,7 +394,11 @@ export default function AccountSettingsScreen({
                         }}
                         number={phone}
                         onNumberChange={handlePhoneChange}
-                        error={phoneProblem}
+                        error={shownPhoneProblem}
+                        onBlur={() => setPhoneChecked(true)}
+                        label="Phone"
+                        required={false}
+                        hint="Optional. Used for SMS recovery."
                       />
 
                       {/* Institution */}
@@ -425,13 +419,6 @@ export default function AccountSettingsScreen({
                       </div>
                     </div>
 
-                    <div className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-3.5 mt-4">
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-xs font-semibold text-[color:var(--text-primary)]">Premium</h3>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]">Coming soon</span>
-                      </div>
-                      <p className="mt-1 text-[11px] text-[color:var(--text-muted)]">Everything works today with your own AI: connect a local model or your own API key in AI Access.</p>
-                    </div>
                   </form>
                 )}
 
@@ -590,7 +577,7 @@ export default function AccountSettingsScreen({
                   <button
                     type="submit"
                     form="account-profile-form"
-                    disabled={saving || phoneProblem !== null}
+                    disabled={saving || shownPhoneProblem !== null}
                     aria-busy={saving}
                     className="rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-4 py-1.5 text-xs font-semibold text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] disabled:opacity-60 cursor-pointer inline-flex items-center justify-center gap-2 shadow-xs transition-colors"
                   >

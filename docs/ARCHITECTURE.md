@@ -109,12 +109,12 @@ The server imports from `src/` (citation formatters, `document_intelligence`, me
 | `/`, `/signin`, `/signup` | Public (landing or projects list) |
 | `/signup/check-email`, `/signup/resend`, `/reset-password` | Public only |
 | `/reset-password/confirm`, `/verify-email` | Public |
-| `/presentation` | Public (works signed out) |
+| `/presentation` | Public: a new deck. Signed in it is a local draft that becomes a project on first save; signed out nothing is sent to the server |
 | `/onboarding` | Signed in |
 | `/projects`, `/projects/:projectId`, `/projects/:projectId/:view` | Signed in and onboarded |
 | `/vault`, `/ai-access`, `/ai-access/:section`, `/settings` | Signed in and onboarded |
-| `/presentation` (inside the gate) | Signed in and onboarded |
-| `/agents`, anything else | Redirect to `/projects` |
+| `/agents` | Redirect to `/projects` |
+| anything else | "Page not found" |
 
 `ProjectRoute` loads the project and chooses the workspace from `outputTypeId` ([`PRODUCT.md`](PRODUCT.md) §2). The signed-in routes sit behind `RequireAuth`, `RequireOnboarding` and `OnboardingGate`.
 

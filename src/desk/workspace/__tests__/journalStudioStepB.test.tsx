@@ -413,7 +413,7 @@ describe("Journal Rebuild Step B — 5-Mode Navigation, Mode 1 Word Budgeter & M
       await waitFor(() => {
         expect(screen.getByTitle("Actual Words / Target Words")).toBeInTheDocument();
         expect(screen.getByTitle("Verified Sources & User Datasets")).toBeInTheDocument();
-        expect(screen.getByRole("button", { name: "AI model" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /^AI model/ })).toBeInTheDocument();
         expect(screen.getByTitle(/Autosave Status v3/i)).toBeInTheDocument();
       });
 
