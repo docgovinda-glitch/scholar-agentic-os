@@ -86,16 +86,6 @@ export function useToast(): ToastContextValue {
   return context;
 }
 
-export function useConfirm(): ConfirmContextValue {
-  const context = useContext(ConfirmContext);
-  if (!context) {
-    return {
-      confirm: requestAppConfirm,
-    };
-  }
-  return context;
-}
-
 interface ConfirmDialogState extends ConfirmDialogOptions {
   isOpen: boolean;
   resolve: (value: boolean) => void;

@@ -127,15 +127,6 @@ export interface ProviderDataPolicy {
 }
 
 /**
- * Whether this provider's prompts may stay private without the person doing
- * anything: only a documented "no-training" default qualifies. Everything else
- * (free-tier-trains, opt-in-training, unknown) needs the person to say their key
- * is on a paid / zero-retention plan (see `confidentialModeAllows`).
- */
-export const isNonTrainingByDefault = (spec: Pick<CloudProviderSpec, "dataPolicy"> | undefined): boolean =>
-  spec?.dataPolicy?.trainsOnFreeTier === "no-training";
-
-/**
  * The plain-language facts the AI Access UI shows for a provider, derived in
  * one place so every surface makes the SAME claim about cost and limits.
  *
@@ -881,9 +872,4 @@ export function apiKeyField(providerId: string): string {
 /** The AISettings field holding this provider's selected model, e.g. "groqModel". */
 export function modelField(providerId: string): string {
   return `${providerId}Model`;
-}
-
-/** The AISettings field holding a user-supplied base URL override. */
-export function baseUrlField(providerId: string): string {
-  return `${providerId}BaseUrl`;
 }

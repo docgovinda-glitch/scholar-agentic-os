@@ -160,32 +160,9 @@ async function idbDelete(userId: string, id: string): Promise<void> {
   }
 }
 
-export async function clearVaultItems(userId: string): Promise<void> {
-  if (typeof indexedDB !== "undefined") {
-    try {
-      const db = await openDb(userId);
-      await new Promise<void>((resolve, reject) => {
-        const tx = db.transaction(IDB_STORE, "readwrite");
-        tx.objectStore(IDB_STORE).clear();
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-      });
-      db.close();
-    } catch {}
-  }
-
-  if (isSupabaseConfigured()) {
-    try {
-      const supabase = getSupabaseClient();
-      await supabase.from("user_vault_items").delete().eq("user_id", userId);
-    } catch {}
-  }
-}
-
 /* -------------------------------------------------------------------------
  * Vault Items CRUD (Universal Cloud + Local Encryption Fallback)
  * ---------------------------------------------------------------------- */
-
 
 export async function addVaultItem(
   userId: string,
@@ -390,42 +367,6 @@ export async function listVaultItems(userId: string): Promise<VaultItem[]> {
   }
 }
 
-/** Adds several items in sequence, returning what was saved. */
-export async function addVaultItems(
-  userId: string,
-  items: Array<{
-    title: string;
-    content: string;
-    citation?: string;
-    citationStatus?: CitationStatus;
-    canonicalReference?: CanonicalReference;
-    sourceType?: VaultSourceType;
-    filename?: string;
-    mimeType?: string;
-    externalReference?: string;
-    storageReference?: string;
-    authors?: string[];
-    year?: string;
-    journal?: string;
-    collection?: string;
-    projects?: string[];
-    tags?: string[];
-    retractionStatus?: RetractionStatus;
-    retractionDetails?: {
-      noticeUrl?: string;
-      reason?: string;
-      date?: string;
-    };
-    metadata?: Record<string, any>;
-  }>
-): Promise<VaultItem[]> {
-  const saved: VaultItem[] = [];
-  for (const fields of items) {
-    saved.push(await addVaultItem(userId, fields));
-  }
-  return saved;
-}
-
 /** Updates arbitrary details (collection, projects, tags, retraction, citation, authors, year, journal) for a vault item. */
 export async function updateVaultItemDetails(
   userId: string,
@@ -521,21 +462,6 @@ export async function unlinkVaultItemFromProject(
   return updateVaultItemDetails(userId, itemId, {
     projects: updatedProjects,
     metadata: { ...existing.metadata, projects: updatedProjects },
-  });
-}
-
-/** Updates citation metadata and status for a vault item. */
-export async function updateVaultItemCitation(
-  userId: string,
-  id: string,
-  canonicalReference: CanonicalReference,
-  citationStatus: CitationStatus = "confirmed",
-  formattedCitation?: string
-): Promise<VaultItem | null> {
-  return updateVaultItemDetails(userId, id, {
-    canonicalReference,
-    citationStatus,
-    citation: formattedCitation,
   });
 }
 

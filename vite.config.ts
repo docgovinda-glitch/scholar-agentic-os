@@ -76,10 +76,7 @@ export default defineConfig(() => {
                 return 'mammoth';
               }
             }
-            if (
-              id.includes('src/desk/assignment/services/outlineService') ||
-              id.includes('src/desk/assignment/services/scholarlyDiscoveryService')
-            ) {
+            if (id.includes('src/desk/assignment/services/scholarlyDiscoveryService')) {
               return 'assignment-services';
             }
             return undefined;

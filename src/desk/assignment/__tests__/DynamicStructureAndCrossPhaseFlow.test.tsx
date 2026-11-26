@@ -3,16 +3,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import React from "react";
-import {
-  generateDynamicAssignmentStructure,
-  autoBalanceStructure,
-  distributeRemainingWords,
-  adjustSubheadingWordCount,
-  addMainHeading,
-  addSubheading,
-  removeSubheading,
-  removeMainHeading,
-} from "../services/outlineService";
+import { generateDynamicAssignmentStructure } from "../services/dynamicStructure";
+import { autoBalanceStructure, distributeRemainingWords, adjustSubheadingWordCount, addMainHeading, addSubheading, removeSubheading, removeMainHeading } from "../services/outlineEditing";
 import {
   structureToInternalSections,
   structureToSectionBudgets,

@@ -23,10 +23,7 @@ import {
   extractSubstantiveBriefQuestions,
   allocateWordsByMarks as clientAllocateWords,
 } from "../../../src/utils/briefExtractor.ts";
-import {
-  generateDynamicAssignmentStructure,
-  conductAskScholarResearchForOutline,
-} from "../../../src/desk/assignment/services/outlineService.ts";
+import { generateDynamicAssignmentStructure } from "../../../src/desk/assignment/services/dynamicStructure.ts";
 
 const originalFetch = global.fetch;
 

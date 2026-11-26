@@ -74,14 +74,3 @@ export function generateNaturalSlideTitle(
 
   return cleaned;
 }
-
-/**
- * Generates 5 clean natural-language titles for a topic.
- */
-export function generateBeatTitlesForTopic(topic: string, count = 5): string[] {
-  const result: string[] = [];
-  for (let i = 0; i < count; i++) {
-    result.push(generateNaturalSlideTitle('', topic, i));
-  }
-  return result;
-}

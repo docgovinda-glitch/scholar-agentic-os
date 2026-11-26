@@ -226,8 +226,3 @@ export function runnerChatUrl(spec: LocalRunnerSpec, override?: string): string 
   const base = resolveRunnerEndpoint(spec, override);
   return spec.apiStyle === "ollama-native" ? `${base}/api/chat` : `${base}/chat/completions`;
 }
-
-/** Runners worth probing during auto-detection, cheapest/most-likely first. */
-export function getDetectableRunners(): LocalRunnerSpec[] {
-  return LOCAL_RUNNERS;
-}

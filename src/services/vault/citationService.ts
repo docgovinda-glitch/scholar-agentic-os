@@ -90,54 +90,6 @@ export function formatVaultCitation(
 }
 
 /**
- * Formats in-text citation (e.g. "(Smith & Doe, 2024)" or "[1]").
- */
-export function formatVaultInText(
-  item: VaultItem | CanonicalReference,
-  style: CitationStyleType = "apa7",
-  position: number = 1
-): string {
-  let ref: CanonicalReference;
-  if ("canonicalReference" in item && item.canonicalReference) {
-    ref = {
-      ...item.canonicalReference,
-      kind: normalizeReferenceKind(item.canonicalReference.kind),
-    };
-  } else if ("kind" in item && "title" in item) {
-    ref = {
-      ...(item as CanonicalReference),
-      kind: normalizeReferenceKind((item as CanonicalReference).kind),
-    };
-  } else {
-    const vaultItem = item as VaultItem;
-    ref = {
-      kind: normalizeReferenceKind(vaultItem.sourceType),
-      title: vaultItem.title || "Untitled",
-      source: vaultItem.journal || vaultItem.title || "Source Library",
-      authors: (vaultItem.authors || []).map((name, idx) => {
-        const parts = name.trim().split(" ");
-        const lastName = parts.length > 1 ? parts[parts.length - 1] : name;
-        const firstName = parts.length > 1 ? parts.slice(0, -1).join(" ") : "";
-        return {
-          firstName,
-          lastName,
-          order: idx + 1,
-        };
-      }),
-      year: vaultItem.year ? String(vaultItem.year) : undefined,
-    };
-  }
-
-  const formatter = formatters[style] || formatters.apa7;
-  try {
-    return formatter.formatInText(ref, { position });
-  } catch {
-    const firstAuthor = ref.authors[0]?.lastName || "Author";
-    return `(${firstAuthor}, ${ref.year || "n.d."})`;
-  }
-}
-
-/**
  * Converts a vault item into BibTeX text format.
  */
 export function toBibTeX(item: VaultItem): string {

@@ -65,9 +65,6 @@ export function pipelineStepsFor(query?: string): ResearchStageStep[] {
   );
 }
 
-export const DEEP_RESEARCH_STEPS = RESEARCH_PIPELINE_STEPS;
-export const STANDARD_RESEARCH_STEPS = RESEARCH_PIPELINE_STEPS.slice(0, 4);
-
 export interface LiveResearchTrajectoryVisualizerProps {
   isLive?: boolean;
   currentStep?: "searching" | "writing" | string;

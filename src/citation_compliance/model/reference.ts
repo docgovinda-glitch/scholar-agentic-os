@@ -45,28 +45,6 @@ export interface ReferenceAuthor {
   order: number;
 }
 
-export interface ReferenceIdentifiers {
-  doi?: string;
-  url?: string;
-
-  isbn?: string;
-  issn?: string;
-
-  /** ORCID can appear at both author and reference levels */
-  orcid?: string;
-
-  /** Optional permanent link variants */
-  permanentUrl?: string;
-  shortUrl?: string;
-
-  /** Optional identifiers by some ingestion systems */
-  pmid?: string;
-  pmcid?: string;
-  arxivId?: string;
-  ssrnId?: string;
-  handleIdentifier?: string;
-}
-
 export interface ReferenceDetails {
   /** “Source” is the journal/conference name or container */
   source?: string;
@@ -101,14 +79,6 @@ export interface ReferenceDetails {
 
   /** Free-form: may help adapters without affecting determinism */
   language?: string;
-}
-
-export interface ReferenceDates {
-  publicationDate?: string; // ISO-ish or journal-provided; engine handles parsing deterministically
-  onlinePublicationDate?: string;
-  lastUpdated?: string;
-
-  accessDate?: string; // for online sources
 }
 
 export interface CanonicalReference {

@@ -32,7 +32,6 @@ const defaultSource: AccountAiSource = {
   },
 };
 let source: AccountAiSource = defaultSource;
-export function setAccountAiSource(s: AccountAiSource | undefined): void { source = s ?? defaultSource; cache.clear(); }
 export function clearAccountKeyring(userId?: string): void { if (userId) cache.delete(userId); else cache.clear(); }
 
 /** The person's connections from their account; empty when none, or when the account vault is off. Never throws. */

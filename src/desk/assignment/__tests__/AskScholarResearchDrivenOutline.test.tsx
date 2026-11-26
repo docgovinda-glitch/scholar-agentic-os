@@ -3,9 +3,7 @@ import React from "react";
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { planBriefInquiries } from "../../../domain/assignment/briefInquiryPlan";
-import {
-  generateDynamicAssignmentStructure,
-} from "../services/outlineService";
+import { generateDynamicAssignmentStructure } from "../services/dynamicStructure";
 import { DynamicStructurePlanner } from "../components/DynamicStructurePlanner";
 
 describe("Ask Scholar Research-Driven Outline Architecture", () => {

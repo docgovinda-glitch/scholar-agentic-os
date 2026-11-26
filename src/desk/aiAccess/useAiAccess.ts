@@ -72,17 +72,6 @@ export interface ProviderView {
   isDefault: boolean;
 }
 
-export interface AiAccessState {
-  loading: boolean;
-  error: string | null;
-  status: AiAccessStatus | null;
-  settings: UserAiSettings;
-  cloud: ProviderView[];
-  local: ProviderView[];
-  /** Everything currently connected, across tiers. */
-  connected: ProviderView[];
-}
-
 /** What connecting a provider found out, for the screen to show. */
 export interface ConnectCloudResult {
   ok: boolean;
@@ -369,8 +358,4 @@ export function useAiAccess() {
  */
 export function freeProviders(): CloudProviderSpec[] {
   return CLOUD_PROVIDERS.filter((p) => p.freeTier !== "paid");
-}
-
-export function byokProviders(): CloudProviderSpec[] {
-  return CLOUD_PROVIDERS;
 }

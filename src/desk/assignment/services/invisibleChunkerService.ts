@@ -15,14 +15,6 @@ export interface InternalSectionPlan extends AssignmentDraftingSection {
   boundSourceIds: string[];
 }
 
-export interface ClaimEvidenceBinding {
-  sectionId: string;
-  sectionTitle: string;
-  academicFunction: string;
-  boundSourceIds: string[];
-  suggestedClaims: string[];
-}
-
 /**
  * Step 3: Sequential Section Streaming Client Contract (Section 7.4)
  * Connects to POST /api/projects/:id/assignment/stream-section with SSE or resilient streaming fallback.

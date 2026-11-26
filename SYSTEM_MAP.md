@@ -31,7 +31,7 @@ A navigational map of the repository: where things live and where to start when 
 | `server/src/ai/` | `routerBridge` (request chain), `browserHandoff`, `accountAi`, `liveModels`, `serverLocalAccess`, `aiEndpointGuard`, `aiRouteErrors` |
 | `server/src/services/` | `scholarBrain.ts` (the only AI brain), `sectionDrafter.ts`, `semanticRagEngine.ts`, `prompts/` (all workspace prompt text) |
 | `server/src/research/`, `server/src/discovery/` | Web search, deep research, citation validation, scholarly retrieval, live search, blueprint scout |
-| `server/src/middleware/` | `auth`, `requireAdmin`, `rateLimit`, `captchaVerify`, `rejectClientCredentials`, `uploadGuard`, `errorHandler`, `asyncHandler` |
+| `server/src/middleware/` | `auth`, `requireAdmin`, `rateLimit`, `rejectClientCredentials`, `uploadGuard`, `errorHandler`, `asyncHandler` |
 | `server/src/utils/` | `citationLock`, `citationLockScrubber`, `scholarlyVoiceGuard`, `sectionBudget`, `sectionContract`, `sectionScaffold`, `sectionStream`, `wordBudgetAllocator` |
 | `server/src/supabaseRest.ts`, `syncRelational.ts`, `concurrency/projectLock.ts` | Data API client, relational mirroring, per-project lock |
 

@@ -110,8 +110,3 @@ export function useDeviceClass(): DeviceInfo {
 
   return info;
 }
-
-/** Non-hook form for use outside React (services, one-off checks). */
-export function getDeviceClass(): DeviceInfo {
-  return classify();
-}

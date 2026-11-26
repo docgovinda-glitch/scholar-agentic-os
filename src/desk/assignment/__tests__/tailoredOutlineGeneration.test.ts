@@ -1,9 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import {
-  generateDynamicAssignmentStructure,
-  deconstructQuestionSemantics,
-  formatAcademicTopicTitle,
-} from "../services/outlineService";
+import { generateDynamicAssignmentStructure } from "../services/dynamicStructure";
+import { deconstructQuestionSemantics, formatAcademicTopicTitle } from "../services/briefSemantics";
 
 describe("Tailored Academic Outline Generation", () => {
   it("deconstructs universal questions into relational entities and formats academic titles", () => {
@@ -41,7 +38,7 @@ describe("Tailored Academic Outline Generation", () => {
 
 });
 
-import { balanceAroundHeading } from "../services/outlineService";
+import { balanceAroundHeading } from "../services/outlineEditing";
 describe("balanceAroundHeading (word-budget stepper)", () => {
   const sub = (id: string, w: number) => ({ id, title: id, targetWordCount: w, currentWordCount: 0, notes: "", guidance: "", keyPoints: [] });
   const structure = {
@@ -57,7 +54,7 @@ describe("balanceAroundHeading (word-budget stepper)", () => {
   });
 });
 
-import { removeSubheading } from "../services/outlineService";
+import { removeSubheading } from "../services/outlineEditing";
 it("never removes a section's last part (its budget would fall to 0)", () => {
   const s = { version: 1, headings: [{ id: "h", subheadings: [{ id: "only", targetWordCount: 500 }] }] } as never;
   expect(removeSubheading(s, "only")).toBe(s);

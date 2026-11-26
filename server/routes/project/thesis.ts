@@ -22,22 +22,6 @@ import { emptyGraph } from "../../../src/domain/claim/graph.ts";
 
 const router = Router({ mergeParams: true });
 
-export interface VivaQuestion {
-  id: string;
-  category: string;
-  examinerQuestion: string;
-  assessmentFocus: string;
-  suggestedRebuttalStructure: string[];
-}
-
-export interface VivaSimulationResponse {
-  success: boolean;
-  title: string;
-  examinerPersona: string;
-  examinerRigorScore: string;
-  questions: VivaQuestion[];
-}
-
 export interface ChapterInput {
   chapterNumber: number;
   title: string;
@@ -60,9 +44,6 @@ export interface ChapterAuditResult {
   chapterSummaries?: ChapterGateSummary[];
   allChaptersReadyForG6?: boolean;
 }
-
-
-
 
 /**
  * POST /api/projects/:projectId/thesis/viva-simulate

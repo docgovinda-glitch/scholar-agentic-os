@@ -77,7 +77,6 @@ Project sub-routers (`server/routes/project/`): `agentic/` (journal pipeline, sp
 | `auth.ts` | `requireAuth`: verifies the Supabase access token with a direct GoTrue call (no supabase-js client), bounded in-memory token cache; 401 for bad tokens, 503 when verification cannot be performed |
 | `requireAdmin.ts` | Admin roster check, `MAIN_ADMIN_EMAIL` super-admin, scope enforcement (`requireScope`, `requireScopeInline`) |
 | `rateLimit.ts` | Fixed-window in-memory limiter, keyed by client IP (Cloudflare-aware; only trusts `CF-Connecting-IP` when the peer is a Cloudflare address) |
-| `captchaVerify.ts` | Turnstile token verification for sign-up |
 | `rejectClientCredentials.ts` | Rejects provider credentials in request bodies on AI routes |
 | `uploadGuard.ts` | Multer memory storage, `MAX_UPLOAD_MB` (default and hard ceiling 10), heavy-parser detection |
 | `errorHandler.ts`, `asyncHandler.ts` | Uniform error responses |

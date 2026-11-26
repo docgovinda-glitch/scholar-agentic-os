@@ -22,12 +22,6 @@ export interface ExtractedPalette {
   previewDataUrl?: string;
 }
 
-export interface PixelRgb {
-  r: number;
-  g: number;
-  b: number;
-}
-
 /**
  * Converts RGB components to a standard 6-character hex string.
  */
@@ -205,21 +199,6 @@ export function getFallbackPalette(
     edgeLuminance: isLight ? 0.8 : 0.1,
     previewDataUrl,
   };
-}
-
-/**
- * Extracts palette from an HTML5 canvas element.
- */
-export function extractPaletteFromCanvas(canvas: HTMLCanvasElement): ExtractedPalette {
-  try {
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return getFallbackPalette();
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL?.('image/jpeg', 0.8) ?? undefined;
-    return extractPaletteFromRgbaBuffer(imageData.data, canvas.width, canvas.height, dataUrl);
-  } catch {
-    return getFallbackPalette();
-  }
 }
 
 /**

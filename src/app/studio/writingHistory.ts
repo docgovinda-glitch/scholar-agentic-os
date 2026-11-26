@@ -70,16 +70,6 @@ export function recordRefinement(
   });
 }
 
-export function recordSubmission(sessionId: string): void {
-  const history = getWritingHistory(sessionId);
-  if (!history.enabled) return;
-
-  history.entries.push({
-    timestamp: new Date(),
-    action: "submit",
-  });
-}
-
 export function clearWritingHistory(sessionId: string): void {
   const history = getWritingHistory(sessionId);
   history.entries = [];

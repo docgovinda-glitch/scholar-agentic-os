@@ -116,17 +116,6 @@ export function parseProseBlocks(text: string): ProseBlock[] {
   return out;
 }
 
-/** Plain words of a block list (tables, quotes and lists included; no markup). */
-export function proseBlocksPlainText(blocks: ProseBlock[]): string {
-  return blocks
-    .map((b) =>
-      b.kind === "table" ? b.rows.map((r) => r.join(" ")).join("\n") : b.kind === "bullets" || b.kind === "numbered" ? b.items.join("\n") : b.text
-    )
-    .join("\n\n")
-    .replace(/<\/?u>/g, "")
-    .replace(/\*+/g, "");
-}
-
 /** Words in a section's stored text, not counting markup (pipes, table rules, tags, list and quote markers). */
 export function countProseWords(text: string): number {
   const plain = (text ?? "")

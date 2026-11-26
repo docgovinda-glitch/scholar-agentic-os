@@ -208,10 +208,6 @@ const LIVE_DISCOVERY_MAX_ENTRIES = 200;
 type LiveDraft = Awaited<ReturnType<typeof discoverScholarlySources>>[number];
 const liveDiscoveryCache = new Map<string, { at: number; results: Promise<LiveDraft[]> }>();
 
-export function __clearLiveDiscoveryCacheForTests(): void {
-  liveDiscoveryCache.clear();
-}
-
 function cachedLiveDiscovery(query: string, maxResults: number): Promise<LiveDraft[]> {
   const key = `${maxResults}|${query.trim().toLowerCase()}`;
   const now = Date.now();

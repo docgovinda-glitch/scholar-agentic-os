@@ -19,11 +19,6 @@ export interface PresentationControllerProps {
 }
 
 /**
- * Backward compatibility type alias
- */
-export type KeynoteControllerProps = PresentationControllerProps;
-
-/**
  * PresentationController:
  * Floating presenter dock and notes drawer with:
  * - Real-time rehearsal timer (MM:SS)

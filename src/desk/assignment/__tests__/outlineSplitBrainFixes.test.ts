@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { extractWordCountFromText } from "../../../utils/briefExtractor";
-import { extractBriefInquiriesAndConcepts, generateDynamicAssignmentStructure } from "../services/outlineService";
+import { extractBriefInquiriesAndConcepts } from "../services/briefSemantics";
+import { generateDynamicAssignmentStructure } from "../services/dynamicStructure";
 
 describe("outlineService split-brain fixes (OT-01)", () => {
   it("never reads a hyphenated module code as the word count", () => {

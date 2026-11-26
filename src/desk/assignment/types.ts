@@ -212,15 +212,6 @@ export type AssignmentType =
   | "short_answer"
   | "other";
 
-
-export type StageStatus =
-  | "completed"
-  | "active"
-  | "available"
-  | "locked"
-  | "needs_review"
-  | "ai_processing";
-
 export interface CommandVerbDetail {
   verb: string;
   meaning: string;
@@ -278,12 +269,6 @@ export interface ResearchPlan {
   userFeedback?: string;
 }
 
-export interface TutorWorkspacePatch {
-  plan?: Partial<ResearchPlan>;
-  analysis?: Partial<AssignmentAnalysis>;
-  question?: string;
-}
-
 export type SourceAcademicType =
   | "journal"
   | "book"
@@ -317,8 +302,6 @@ export type CitationImpactLevel =
   | "Recent Landmark"
   | "Emerging Scholarship"
   | "Standard Academic";
-
-export type LiteratureViewMode = "card" | "list" | "table" | "compact";
 
 export type SourceVerificationStatus = "verified" | "unverified" | "metadata_incomplete" | "doi_invalid";
 
@@ -484,79 +467,12 @@ export interface SubmissionCheckReport {
   priorityFixes: string[];
 }
 
-export type TutorMode = "socratic" | "rubric" | "counterargument" | "writing_polish";
-
 export type GradingBand =
   | "1st_class"
   | "2_1_upper_second"
   | "2_2_lower_second"
   | "3rd_class"
   | "fail";
-
-export interface RubricCriterionEstimate {
-  id: string;
-  criterion: string;
-  weightPercent?: number;
-  currentBand: GradingBand;
-  score: number; // e.g. 74
-  maxScore: number; // e.g. 100
-  critique: string;
-  howToReachNextBand: string;
-}
-
-export interface RubricGradeEstimation {
-  overallScore: number; // 0 - 100
-  overallBand: GradingBand;
-  bandLabel: string; // e.g. "First Class (1st) — 74%"
-  summary: string;
-  criteria: RubricCriterionEstimate[];
-  keyStrengths: string[];
-  keyRecommendations: string[];
-  targetBandRoadmap: {
-    targetBand: string;
-    actionableSteps: string[];
-  };
-}
-
-export interface SocraticQuestion {
-  id: string;
-  question: string;
-  targetConcept: string;
-  challengeType:
-    | "probe_assumptions"
-    | "request_evidence"
-    | "explore_implications"
-    | "counter_perspective"
-    | "clarify_concepts";
-  rationale: string;
-}
-
-export interface CounterArgument {
-  id: string;
-  opposingViewpoint: string;
-  theoreticalGrounding: string;
-  keyScholarsOrSchools: string[];
-  suggestedRebuttalStrategy: string;
-}
-
-export interface TutorChatMessage {
-  id: string;
-  sender: "user" | "tutor";
-  text: string;
-  timestamp: string;
-  mode?: TutorMode;
-  socraticQuestions?: SocraticQuestion[];
-  rubricEstimation?: RubricGradeEstimation;
-  counterArguments?: CounterArgument[];
-  actionableSuggestion?: {
-    type: "replace_text" | "reduce_words" | "add_evidence" | "rephrase";
-    targetSectionId?: string;
-    suggestedText?: string;
-  };
-  patch?: TutorWorkspacePatch;
-}
-
-
 
 export const ASSIGNMENT_TYPE_LABELS: Record<AssignmentType, string> = {
   coursework: "Coursework / Applied Assignment",
@@ -627,7 +543,6 @@ export const WRITING_TONE_OPTIONS: { id: string; label: string }[] = [
 
 export const AGENTIC_THINKING_STAGES = ["Your AI is reading the brief and writing the outline…"];
 
-
 export const COMMON_COMMAND_VERBS: Record<string, { definition: string; keyAction: string }> = {
   "critically discuss": {
     definition: "Give a balanced and reasoned argument investigating different viewpoints, with substantiated evaluation of strengths and flaws.",
@@ -682,7 +597,6 @@ export interface SectionBreakdown {
   body: SectionDetail;
   conclusion: SectionDetail;
 }
-
 
 /** A writing tone saved as a string or as { preset } / { id } (older saves), as a string. */
 export function tonePresetOf(tone: unknown): string {
@@ -742,7 +656,6 @@ export function normalizeProjectAnswers<T extends Record<string, unknown> & { se
     },
   });
 }
-
 
 /**
  * ============================================================================

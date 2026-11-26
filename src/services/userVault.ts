@@ -129,16 +129,6 @@ export async function hasVaultPassphraseOnThisDevice(): Promise<boolean> {
   }
 }
 
-export async function clearVaultPassphraseVerifier(): Promise<void> {
-  const userId = await currentUserId();
-  if (!userId) return;
-  try {
-    localStorage.removeItem(`${PASSPHRASE_VERIFIER_PREFIX}${userId}`);
-  } catch {
-    // Ignore localStorage errors
-  }
-}
-
 /* -------------------------------------------------------------------------
  * Vault existence (server-side, no secrets)
  * ---------------------------------------------------------------------- */
@@ -180,56 +170,6 @@ export async function loadVault(): Promise<VaultRecord | null> {
     result.storageMode = row.storage_mode === "local" ? "local" : "synced";
   }
   return result;
-}
-
-export async function resetVault(userId?: string): Promise<boolean> {
-  const currentId = userId || (await currentUserId());
-  if (!currentId) return false;
-
-  // 1. Clear Supabase tables if configured
-  if (isSupabaseConfigured()) {
-    try {
-      const supabase = getSupabaseClient();
-      await supabase.from("user_vault_items").delete().eq("user_id", currentId);
-      await supabase.from("user_vaults").delete().eq("user_id", currentId);
-      await supabase.from("user_cloud_integrations").delete().eq("user_id", currentId);
-    } catch (e) {
-      console.warn("Could not delete server vault records:", e);
-    }
-  }
-
-  // 2. Call backend reset endpoint if available
-  try {
-    let token = "";
-    if (isSupabaseConfigured()) {
-      const { data } = await getSupabaseClient().auth.getSession();
-      token = data.session?.access_token || "";
-    }
-    await fetch("/api/vault/reset", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-    });
-  } catch {}
-
-  // 3. Clear local storage verifiers, skips, and cache
-  try {
-    localStorage.removeItem(`${PASSPHRASE_VERIFIER_PREFIX}${currentId}`);
-    localStorage.removeItem(`scholar-vault-setup-skipped:${currentId}`);
-    localStorage.removeItem(`scholar-vault-v2-setup:${currentId}`);
-    localStorage.removeItem(`scholar_cloud_drive_${currentId}`);
-  } catch {}
-
-  // 4. Clear IndexedDB if available
-  try {
-    if (typeof indexedDB !== "undefined") {
-      indexedDB.deleteDatabase(`scholar-vault-items:${currentId}`);
-    }
-  } catch {}
-
-  return true;
 }
 
 export async function getVaultStorageMode(): Promise<"local" | "synced"> {

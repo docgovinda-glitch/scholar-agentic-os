@@ -50,12 +50,6 @@ export interface CanonicalDocument {
   metadata?: Record<string, string>;
 }
 
-/** A position within a document, addressed by block + character offset. */
-export interface DocPosition {
-  blockId: string;
-  offset: number;
-}
-
 /** A contiguous range within a single block. Cross-block ranges are out of
  * scope for V1 — callers needing to address multiple blocks operate on each
  * block's range separately, which is sufficient for the Studio's per-passage

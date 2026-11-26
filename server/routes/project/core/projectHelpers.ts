@@ -52,18 +52,13 @@ import { OptimisticLockError } from "../../../../src/services/store/types.ts";
 import { buildReport, compileRubricFromOutputType, applyWaivers } from "../../../../src/app/rubric/rubric.ts";
 
 import { emptyDocument } from "../../../../src/domain/document/model.ts";
-import type { Block, CanonicalDocument } from "../../../../src/domain/document/model.ts";
-import type { ClaimEvidenceGraph, EvidenceSpan } from "../../../../src/domain/claim/types.ts";
-import type { SubmissionRecord, SubmissionStatus } from "../../../../src/domain/submission/types.ts";
+import type { CanonicalDocument } from "../../../../src/domain/document/model.ts";
+import type { ClaimEvidenceGraph } from "../../../../src/domain/claim/types.ts";
 import type { JournalRequirements } from "../../../../src/domain/journal/types.ts";
 import type { SectionPlan } from "../../../../src/domain/manuscript/types.ts";
 import { priorSectionsContext, researchContextFromAnswers, type DraftSectionInput } from "../../../src/services/sectionDrafter.ts";
 
-import { BlockSchema, CanonicalDocumentSchema, GateIdSchema, EvidenceSpanSchema, SubmissionStatusSchema, NewSubmissionSchema, SubmissionPatchSchema, JournalRequirementsInputSchema } from "../../../../src/domain/schemas/projectSchemas.ts";
-
-export function isValidBlock(value: unknown): value is Block {
-  return BlockSchema.safeParse(value).success;
-}
+import { CanonicalDocumentSchema, GateIdSchema, JournalRequirementsInputSchema } from "../../../../src/domain/schemas/projectSchemas.ts";
 
 export function isValidDocument(value: unknown): value is CanonicalDocument {
   return CanonicalDocumentSchema.safeParse(value).success;
@@ -71,24 +66,6 @@ export function isValidDocument(value: unknown): value is CanonicalDocument {
 
 export function isGateId(value: unknown): value is GateId {
   return GateIdSchema.safeParse(value).success;
-}
-
-export function isValidEvidenceSpan(value: unknown): value is EvidenceSpan {
-  return EvidenceSpanSchema.safeParse(value).success;
-}
-
-export function isSubmissionStatus(value: unknown): value is SubmissionStatus {
-  return SubmissionStatusSchema.safeParse(value).success;
-}
-
-/** Body of POST .../submissions: everything but the id and statusUpdatedAt, which the server assigns. */
-export function isValidNewSubmission(value: unknown): value is Omit<SubmissionRecord, "id" | "statusUpdatedAt"> {
-  return NewSubmissionSchema.safeParse(value).success;
-}
-
-/** Body of PATCH .../submissions/:id: any subset of the mutable fields. */
-export function isValidSubmissionPatch(value: unknown): value is Partial<Omit<SubmissionRecord, "id" | "statusUpdatedAt">> {
-  return SubmissionPatchSchema.safeParse(value).success;
 }
 
 /** Body of PUT .../journal-requirements: everything but the fields the server stamps (source/capturedAt/capturedBy). */

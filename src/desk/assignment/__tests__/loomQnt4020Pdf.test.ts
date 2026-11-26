@@ -17,7 +17,7 @@ import {
 } from "../../../utils/briefQuestions";
 import { deriveDocumentTitle } from "../../../shared/presentationBrief";
 import { deriveHeuristicTitle } from "../../projectNaming";
-import { generateDynamicAssignmentStructure } from "../services/outlineService";
+import { generateDynamicAssignmentStructure } from "../services/dynamicStructure";
 import { structureToInternalSections } from "../types";
 import { structureFromAi } from "../../../domain/assignment/aiAssignmentOutline";
 import { briefGroundedStances, briefGroundedThesis } from "../../../domain/assignment/briefThesis";

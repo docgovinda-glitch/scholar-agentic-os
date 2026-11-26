@@ -1,7 +1,6 @@
 import {
   createContext,
   useCallback,
-  useContext,
   useEffect,
   useState,
   type ReactNode,
@@ -128,22 +127,4 @@ export function LoadingProvider({ children }: { children: ReactNode }) {
       {children}
     </LoadingContext.Provider>
   );
-}
-
-export function useLoading(): LoadingContextValue {
-  const context = useContext(LoadingContext);
-  if (!context) {
-    // Graceful fallback if invoked outside of LoadingProvider
-    return {
-      isLoading: globalLoading.isLoading,
-      startLoading: (id?: string) => globalLoading.startLoading(id),
-      stopLoading: (id?: string) => globalLoading.stopLoading(id),
-      setLoading: (loading: boolean) => globalLoading.setLoading(loading),
-      withLoading: <T,>(
-        operation: Promise<T> | (() => Promise<T>),
-        id?: string
-      ) => globalLoading.withLoading(operation, id),
-    };
-  }
-  return context;
 }

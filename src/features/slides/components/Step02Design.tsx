@@ -21,36 +21,11 @@ export interface Step02DesignProps {
 
 export type DesignStudioTab = 'curated' | 'library' | 'custom' | 'cloner';
 
-export interface CuratedThemePreset {
-  id: SlideThemeId;
-  testId: string;
-  name: string;
-  description: string;
-  canvasHex: string;
-  cardHex: string;
-  accentHex: string;
-  textColor: string;
-  mode: 'light' | 'dark';
-}
-
 /** Stable test ids for the long-standing presets; new themes use their own id. */
 const LEGACY_TEST_IDS: Record<string, string> = {
   'minimal-slate': 'theme-card-minimal-clean',
   'obsidian-aurora': 'theme-card-deep-midnight',
 };
-
-/** The curated themes, in the legacy preset shape other modules import. */
-export const CURATED_FOUR_THEMES: CuratedThemePreset[] = DECK_THEMES.map((t) => ({
-  id: t.id as SlideThemeId,
-  testId: LEGACY_TEST_IDS[t.id] ?? `theme-card-${t.id}`,
-  name: t.name,
-  description: t.description,
-  canvasHex: t.bg,
-  cardHex: t.surface,
-  accentHex: t.accent,
-  textColor: t.text,
-  mode: t.mode,
-}));
 
 export const CURATED_ACCENT_DOTS = [
   { hex: '#171717', name: 'Ink' },

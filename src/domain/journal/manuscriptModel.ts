@@ -47,8 +47,6 @@ export interface ManuscriptTexts {
   backMatter?: string;
 }
 
-export const EMPTY_TEXTS: ManuscriptTexts = { texts: {}, unsorted: "" };
-
 export const BACK_MATTER = /^(declarations?|references|bibliography|acknowledg(e)?ments?|appendi(x|ces)|funding|conflicts? of interest|competing interests|data availability|author contributions?)\b/i;
 
 /** Words as the rest of the journal workspace counts them (markup and citation tokens excluded). */
@@ -321,7 +319,6 @@ export function isDefaultOutline(units: ManuscriptUnit[]): boolean {
 export function unitLabel(u: ManuscriptUnit, sep = " › "): string {
   return u.isWholeSection ? u.title : `${u.sectionTitle}${sep}${u.title}`;
 }
-
 
 /**
  * The texts to edit. The assembled markdown is what other parts of the

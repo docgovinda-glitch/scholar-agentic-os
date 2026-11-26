@@ -75,10 +75,6 @@ export function tryAcquireHeavyParseSlot(): (() => void) | null {
   };
 }
 
-export function __getActiveHeavyParsesForTests(): number {
-  return activeHeavyParses;
-}
-
 export function __resetHeavyParseGuardForTests(): void {
   activeHeavyParses = 0;
 }

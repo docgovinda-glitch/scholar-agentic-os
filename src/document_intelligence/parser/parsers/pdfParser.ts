@@ -218,9 +218,3 @@ export class PDFParser implements Parser {
     };
   }
 }
-
-// ============================================================================
-// Export
-// ============================================================================
-
-export const createPDFParser = (): Parser => new PDFParser();

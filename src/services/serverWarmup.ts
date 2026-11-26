@@ -56,15 +56,6 @@ export const COLD_START_BUDGET_MS = 90_000;
  */
 export const QUICK_PROBE_MS = 6_000;
 
-/**
- * Ceiling for a single non-streaming proxy call. Sized to outlast a cold start
- * plus a real generation rather than to be tight — the previous behaviour was
- * no timeout at all, so a sleeping or wedged server hung the request
- * indefinitely. Streaming calls are deliberately not capped this way; see
- * `callServerProxyStream`.
- */
-export const PROXY_TIMEOUT_MS = 150_000;
-
 let state: ServerState = "unknown";
 let inFlight: Promise<ServerState> | null = null;
 const listeners = new Set<(state: ServerState) => void>();
