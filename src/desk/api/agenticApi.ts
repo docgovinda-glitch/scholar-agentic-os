@@ -648,3 +648,20 @@ export async function fetchDeepResearchPlan(question: string): Promise<{ fromMod
     return { fromModel: false, subQuestions: [] };
   }
 }
+
+/** The model's decision on whether a question needs a search, with a standalone query. null: use the routing rules. */
+export async function fetchAskSearchPlan(question: string, previousQuestions: string[]): Promise<{ search: boolean; query: string } | null> {
+  try {
+    const res = await authedFetch("/api/ai/ask/plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question, previousQuestions: previousQuestions.slice(-3) }),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { plan?: { search?: boolean; query?: string } | null };
+    return body.plan && typeof body.plan.search === "boolean" ? { search: body.plan.search, query: body.plan.query ?? "" } : null;
+  } catch {
+    return null;
+  }
+}

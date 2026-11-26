@@ -24,6 +24,7 @@ vi.mock("../api", () => ({
   executeAgenticLLM: (...a: unknown[]) => executeAgenticLLM(...a),
   fetchDeepResearchPlan: vi.fn().mockResolvedValue({ fromModel: false, subQuestions: [] }),
   executeAgenticQuery: (...a: unknown[]) => executeAgenticQuery(...a),
+  fetchAskSearchPlan: () => Promise.resolve(null),
   getAiOperationalStatus: (...a: unknown[]) => getAiOperationalStatus(...a),
   parseFileForAgent: (...a: unknown[]) => parseFileForAgent(...a),
 }));

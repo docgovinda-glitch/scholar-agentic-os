@@ -18,7 +18,7 @@ import * as thesisPrompts from "./prompts/thesisPrompts.ts";
 import * as presentationPrompts from "./prompts/presentationPrompts.ts";
 import { draftSection, priorSectionsContext, researchContextFromAnswers, runSectionDraft } from "./sectionDrafter.ts";
 import { openSse } from "../utils/sse.ts";
-import { buildAskGeneralPrompt, buildAskSearchPrompt } from "../../../src/shared/askPrompts.ts";
+import { ASK_SEARCH_PLAN_SYSTEM, askSearchPlanPrompt, buildAskGeneralPrompt, buildAskSearchPrompt, parseAskSearchPlan, type AskSearchPlan } from "../../../src/shared/askPrompts.ts";
 import { aiAvailability as rawAiAvailability, NoAiConnectedError, routedCompletion as rawRoutedCompletion, routedText, RouterHandoffError, toRouterTask } from "../ai/routerBridge.ts";
 import { BrowserAiRequiredError, LocalModelUnreachableError, NoClientAiProviderError } from "../ai/aiRouteErrors.ts";
 import { browserHandOffSupport } from "../ai/browserHandoff.ts";
@@ -465,6 +465,27 @@ export const scholarBrain = {
     return opts.kind === "search"
       ? buildAskSearchPrompt({ style: opts.style, length: opts.length })
       : buildAskGeneralPrompt({ base: opts.base, style: opts.style, length: opts.length });
+  },
+
+  /**
+   * Ask: does this question need a live search, and with what query? One short model call; null when the
+   * model cannot answer (no AI, hand-off, bad reply), so the caller falls back to the routing rules.
+   */
+  async askSearchPlan(options: { req: Parameters<typeof callOpenRouterJSON>[0]; question: string; previousQuestions?: string[] }): Promise<AskSearchPlan | null> {
+    try {
+      const res = await scholarBrain.complete({
+        req: options.req as never,
+        taskClass: "verification",
+        systemPrompt: ASK_SEARCH_PLAN_SYSTEM,
+        userPrompt: askSearchPlanPrompt(options.question, options.previousQuestions),
+        responseFormat: "json",
+        temperature: 0,
+        maxTokens: 120,
+      });
+      return parseAskSearchPlan(res.parsedJson ?? res.text);
+    } catch {
+      return null;
+    }
   },
 
   callJSON: (...args: Parameters<typeof callOpenRouterJSON>) => callOpenRouterJSON(...args),

@@ -8,6 +8,7 @@ import {
   saveIntakeAnswers,
   executeAgenticLLM,
   executeAgenticQuery,
+  fetchAskSearchPlan,
   fetchDeepResearchPlan,
   getAiOperationalStatus,
   parseFileForAgent,
@@ -102,7 +103,7 @@ import { loadUserAiSettings } from "../services/userAiSettings";
 import { type PromptMode } from "./PromptBarActionMenu";
 import { AskPromptBox } from "./ask/AskPromptBox";
 import { ASK_BASE_IDENTITY, buildAskGeneralPrompt, platformFactsFor } from "../shared/askPrompts";
-import { decideAskMode, isTimeSensitiveQuery } from "../shared/askRouting";
+import { askNeedsSearchPlan, decideAskMode, isTimeSensitiveQuery } from "../shared/askRouting";
 import { MAX_TURNS, withConversation } from "../shared/askConversation";
 import {
   ASK_SCHOLAR_CITATION_STYLES,
@@ -1484,9 +1485,22 @@ export default function ProjectListScreen({
         });
 
         let liveRetrievedSources: LiveSearchResult[] = [];
+        // When the rules cannot tell, the model decides whether to search and writes a standalone query.
+        // No answer from it (no AI, hand-off, slow) leaves the rules in charge.
+        const previousQuestions = priorThreadMessages.filter((m) => m.sender === "user").map((m) => m.text);
+        const searchPlan =
+          modeToSend === undefined &&
+          sidebarAiMode === "auto" &&
+          askNeedsSearchPlan({ query, hasFiles: currentAttachments.length > 0, hasVaultSources: Boolean(isVaultGroundingActive && userEmail && userVaultItems.length > 0) })
+            ? await fetchAskSearchPlan(query, previousQuestions)
+            : null;
         const isExplicitChatOnly =
           modeToSend === undefined &&
-          (sidebarAiMode === "chat" ? !isTimeSensitiveQuery(query) : sidebarAiMode === "auto" && autoMode === "chat");
+          (searchPlan
+            ? !searchPlan.search
+            : sidebarAiMode === "chat"
+            ? !isTimeSensitiveQuery(query)
+            : sidebarAiMode === "auto" && autoMode === "chat");
 
         const shouldRunClientPreSearch = !isExplicitChatOnly && targetMode === "normal";
 
@@ -1502,8 +1516,7 @@ export default function ProjectListScreen({
             }
           });
           try {
-            const previousQuestions = priorThreadMessages.filter((m) => m.sender === "user").map((m) => m.text);
-            liveRetrievedSources = await executeLiveSearch(buildRetrievalQuery(query, previousQuestions), { discipline: askUserSettings.preferredDiscipline, filters: askFilters });
+            liveRetrievedSources = await executeLiveSearch(searchPlan?.search ? searchPlan.query : buildRetrievalQuery(query, previousQuestions), { discipline: askUserSettings.preferredDiscipline, filters: askFilters });
             sourcesFound = liveRetrievedSources;
           } catch {
             // The answer still comes, marked as not based on a search.

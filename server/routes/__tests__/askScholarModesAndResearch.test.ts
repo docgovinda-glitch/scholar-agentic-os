@@ -54,6 +54,35 @@ describe("Ask Scholar 3-Mode Architecture, Source Authority & 7-Stage Deep Resea
     registerAIRoutes(app);
   });
 
+  describe("POST /ask/plan — the model decides whether to search", () => {
+    it("returns the model's decision and standalone query", async () => {
+      vi.spyOn(scholarBrain, "askSearchPlan").mockResolvedValue({ search: true, query: "metformin side effects in children" });
+      const res = await request(app).post("/api/ai/ask/plan").set(keyringHeader()).send({ question: "What about children?", previousQuestions: ["Metformin side effects?"] });
+      expect(res.status).toBe(200);
+      expect(res.body.plan).toEqual({ search: true, query: "metformin side effects in children" });
+    });
+
+    it("answers plan: null when the rules already decide, without a model call", async () => {
+      const spy = vi.spyOn(scholarBrain, "askSearchPlan");
+      const res = await request(app).post("/api/ai/ask/plan").set(keyringHeader()).send({ question: "hello" });
+      expect(res.body.plan).toBeNull();
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    it("answers plan: null when the answer would run in the browser (hand-off)", async () => {
+      vi.spyOn(routerBridge, "aiAvailability").mockResolvedValue("browser" as never);
+      const spy = vi.spyOn(scholarBrain, "askSearchPlan");
+      const res = await request(app).post("/api/ai/ask/plan").set(keyringHeader()).send({ question: "How does metformin affect kidney function?" });
+      expect(res.body.plan).toBeNull();
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    it("rejects an empty question", async () => {
+      const res = await request(app).post("/api/ai/ask/plan").set(keyringHeader()).send({ question: "  " });
+      expect(res.status).toBe(400);
+    });
+  });
+
   describe("Test 1 — Normal Chat Mode: Realism vs. Neorealism in International Relations", () => {
     it("delivers structured conversational & analytical prose without unsolicited external retrieval or unverified-claim tags", async () => {
       const retrieveSpy = vi.spyOn(scholarBrain, "retrieveEvidence");

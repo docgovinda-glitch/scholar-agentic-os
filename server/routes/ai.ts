@@ -28,7 +28,7 @@ import { countExactWords } from "../src/utils/wordBudgetAllocator.ts";
 import { evaluateBurstiness } from "../src/utils/scholarlyVoiceGuard.ts";
 import { chunkAndRerankEvidence } from "../src/services/semanticRagEngine.ts";
 import { z } from "zod";
-import { decideAskMode } from "../../src/shared/askRouting.ts";
+import { askNeedsSearchPlan, decideAskMode } from "../../src/shared/askRouting.ts";
 import { buildConversationContext, normalizeAskHistory } from "../../src/shared/askConversation.ts";
 import { ASK_BASE_IDENTITY, askStyleDescription, platformFactsFor } from "../../src/shared/askPrompts.ts";
 import { ASK_QUICK_MAX_SOURCES, budgetSourcesForPrompt } from "../../src/shared/askBudget.ts";
@@ -328,6 +328,23 @@ export function registerAIRoutes(
     } catch {
       return res.json({ fromModel: false, subQuestions: [] });
     }
+  });
+
+  /**
+   * POST /api/ai/ask/plan
+   * The model decides whether an unclear question needs a live search and writes a standalone query.
+   * `plan: null` means it could not (no AI, hand-off, bad reply): the browser uses the routing rules.
+   */
+  router.post("/ask/plan", requireAuth, async (req: Request, res: Response) => {
+    const parsed = z
+      .object({ question: z.string().trim().min(1).max(4000), previousQuestions: z.array(z.string().max(1000)).max(6).optional() })
+      .safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "A question is required." });
+    const { question, previousQuestions } = parsed.data;
+    if (!askNeedsSearchPlan({ query: question })) return res.json({ plan: null });
+    if ((await aiAvailability(req, "drafting").catch(() => "none" as const)) !== "server") return res.json({ plan: null });
+    const plan = await scholarBrain.askSearchPlan({ req, question, previousQuestions });
+    return res.json({ plan });
   });
 
   /**

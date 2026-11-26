@@ -80,3 +80,41 @@ OPERATING MODE: AskScholar. You are a general-purpose assistant: answer, write, 
 ${CITATION_STANDARD(style)}
 - When sources were provided and are relevant, cite them and end with a "## References" section in ${style}.`;
 }
+
+/** Decides whether a question needs a live search, and writes the query. Short on purpose: it runs before every unclear question. */
+export const ASK_SEARCH_PLAN_SYSTEM = `You decide whether a question needs a live web or scholarly search before it is answered.
+Search when the answer depends on facts, studies, figures, laws, products, people or events that a source would confirm, or that may have changed.
+Do not search for greetings, opinions, writing or editing the person's own text, translation, code, maths, brainstorming, or explaining a well-established concept the person did not ask to verify.
+When you search, write one standalone query of at most 12 words that makes sense without the earlier conversation (resolve "it", "that", "what about X?" from the earlier questions).
+Reply with JSON only: {"search": true|false, "query": "..."}. Leave "query" empty when search is false.`;
+
+export interface AskSearchPlan {
+  search: boolean;
+  query: string;
+}
+
+/** Reads the planner's reply. Anything that is not clearly a decision returns null, so the caller falls back to the rules. */
+export function parseAskSearchPlan(raw: unknown): AskSearchPlan | null {
+  let value: unknown = raw;
+  if (typeof raw === "string") {
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    try {
+      value = JSON.parse(match[0]);
+    } catch {
+      return null;
+    }
+  }
+  if (!value || typeof value !== "object") return null;
+  const { search, query } = value as { search?: unknown; query?: unknown };
+  if (typeof search !== "boolean") return null;
+  const text = typeof query === "string" ? query.replace(/\s+/g, " ").trim().slice(0, 200) : "";
+  if (search && !text) return null;
+  return { search, query: search ? text : "" };
+}
+
+/** The earlier questions the planner sees (at most 3, shortened), so a follow-up can be made standalone. */
+export function askSearchPlanPrompt(question: string, previousQuestions: string[] = []): string {
+  const earlier = previousQuestions.slice(-3).map((q) => `- ${q.replace(/\s+/g, " ").trim().slice(0, 240)}`);
+  return `${earlier.length ? `Earlier questions:\n${earlier.join("\n")}\n\n` : ""}Question: ${question.replace(/\s+/g, " ").trim().slice(0, 600)}`;
+}
