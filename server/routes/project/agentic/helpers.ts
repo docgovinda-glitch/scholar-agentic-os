@@ -31,6 +31,18 @@ export async function getProjectSafe<P extends Record<string, string | undefined
   return project;
 }
 
+/**
+ * Writes only the answer keys given, merged into the stored record. Routes that
+ * wait on the AI or a slow lookup must use this, not `save(project)`: saving the
+ * whole record loaded at the start would overwrite what the author saved meanwhile
+ * (the studio autosaves the manuscript every few hundred milliseconds).
+ * `project.answers` then reflects the stored, merged answers.
+ */
+export async function patchProjectAnswers(project: ProjectRecord, patch: Record<string, unknown>): Promise<void> {
+  const stored = await getProjectStore().patchAnswers(project.projectId, patch);
+  if (stored) project.answers = { ...stored.answers };
+}
+
 function toHeadingKind(level: number): "heading1" | "heading2" | "heading3" {
   if (level <= 1) return "heading1";
   if (level === 2) return "heading2";

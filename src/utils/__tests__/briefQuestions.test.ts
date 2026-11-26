@@ -206,3 +206,23 @@ describe("clipHeadingWords", () => {
     expect(clipHeadingWords("Short heading", 8)).toBe("Short heading");
   });
 });
+
+describe("question heading and marks layouts", () => {
+  it("reads 'Question N (K marks)' on its own line with the prompt below it", () => {
+    const rows = parseBriefQuestions(
+      "Question 1 (20 marks)\nDiscuss the role of monetary policy.\n(a) Define it (5 marks)\n(b) Evaluate it (15 marks)\n\nQuestion 2 (30 marks)\nCritically evaluate fiscal policy."
+    );
+    expect(rows.map((r) => [r.label, r.marks])).toEqual([
+      ["Q1", 20],
+      ["Q1a", 5],
+      ["Q1b", 15],
+      ["Q2", 30],
+    ]);
+  });
+
+  it("reads a bare trailing [25] as marks, but not a mid-sentence citation", () => {
+    const rows = parseBriefQuestions("1. Explain the causes of WWI. [25]\n2. Assess the impact of the treaty, as argued in [3] and later work.");
+    expect(rows[0]).toMatchObject({ label: "Q1", marks: 25, text: "Explain the causes of WWI" });
+    expect(rows[1].marks).toBeUndefined();
+  });
+});

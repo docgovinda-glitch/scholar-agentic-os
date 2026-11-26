@@ -27,31 +27,120 @@ export interface ExtractedThemeResult {
 
 const STORAGE_KEY = 'scholar_os_custom_slide_themes';
 
+const HEX_COLOUR = /^#[0-9a-f]{3,8}$/i;
+
+/** A stored entry that can be shown and applied: an id, a name and the three colours as hex. */
+function isUsableTheme(v: unknown): v is SlideTheme {
+  if (!v || typeof v !== 'object') return false;
+  const t = v as Record<string, unknown>;
+  return (
+    typeof t.id === 'string' && t.id !== '' &&
+    typeof t.name === 'string' &&
+    [t.canvasBg, t.cardBg, t.accent].every((c) => typeof c === 'string' && HEX_COLOUR.test(c))
+  );
+}
+
 /**
- * Retrieves all user-created themes saved to localStorage.
+ * Retrieves all user-created themes saved to localStorage. Anything in storage that is not a usable
+ * theme (a damaged save, an older format, a hand edit) is left out instead of breaking the library.
  */
 export function getStoredCustomThemes(): SlideTheme[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
-    return JSON.parse(raw);
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter(isUsableTheme) : [];
   } catch {
     return [];
   }
 }
 
 /**
- * Persists a user-created theme to localStorage.
+ * Persists a user-created theme to localStorage. Returns whether it was saved: storage can be full,
+ * blocked or switched off (private windows), and the caller must not say "Saved" then.
  */
-export function saveCustomThemeToStorage(theme: SlideTheme): void {
+export function saveCustomThemeToStorage(theme: SlideTheme): boolean {
   try {
-    const existing = getStoredCustomThemes();
-    const filtered = existing.filter((t) => t.id !== theme.id);
-    const updated = [theme, ...filtered];
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    const filtered = getStoredCustomThemes().filter((t) => t.id !== theme.id);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([theme, ...filtered]));
+    return true;
   } catch (err) {
     console.error('Failed to save custom theme to storage:', err);
+    return false;
   }
+}
+
+/** Removes a saved theme. Returns whether storage accepted the change. */
+export function removeCustomThemeFromStorage(id: string): boolean {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(getStoredCustomThemes().filter((t) => t.id !== id)));
+    return true;
+  } catch (err) {
+    console.error('Failed to remove custom theme from storage:', err);
+    return false;
+  }
+}
+
+const THEME_MODES = ['light', 'dark'] as const;
+const THEME_FONTS = ['sans', 'serif', 'mono'] as const;
+const THEME_MOTIFS = ['topographic', 'golden-waves', 'blueprint-grid', 'polar-compass', 'cyber-hud', 'radar-rings', 'mesh-aura', 'swiss-cut', 'editorial-split', 'minimal-frame', 'retro-poster-cut'] as const;
+const THEME_CATEGORIES = ['academic', 'minimal', 'dark', 'vibrant', 'editorial', 'executive', 'apple-keynote', 'scientific', 'conference'] as const;
+const COLOUR_FIELDS = ['canvasBg', 'cardBg', 'accent', 'textPrimary', 'textSecondary'] as const;
+const SIX_OR_THREE_HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+
+export interface ImportedTheme {
+  name: string;
+  accent: string;
+  mode?: (typeof THEME_MODES)[number];
+  fontFamily?: (typeof THEME_FONTS)[number];
+  visualMotif?: (typeof THEME_MOTIFS)[number];
+  category?: (typeof THEME_CATEGORIES)[number];
+  canvasBg?: string;
+  cardBg?: string;
+  textPrimary?: string;
+  textSecondary?: string;
+}
+
+/**
+ * Theme JSON pasted into the studio (shared by a teammate or a client). Nothing from it is applied
+ * unless every field it names is valid: colours as hex, and mode, font, motif and category from the
+ * lists this app knows. Otherwise the error says which field is wrong.
+ */
+export function parseThemeJson(text: string): { ok: true; theme: ImportedTheme } | { ok: false; error: string } {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return { ok: false, error: 'That is not valid JSON.' };
+  }
+  const root = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : null;
+  const data = root && root.theme && typeof root.theme === 'object' && !Array.isArray(root.theme) ? (root.theme as Record<string, unknown>) : root;
+  if (!data) return { ok: false, error: 'The JSON must describe one theme.' };
+
+  const name = typeof data.name === 'string' ? data.name.trim() : '';
+  if (!name || name.length > 80) return { ok: false, error: 'The theme needs a name of 1 to 80 characters.' };
+  const out: ImportedTheme = { name, accent: '' };
+
+  for (const field of COLOUR_FIELDS) {
+    const v = data[field];
+    if (v === undefined || v === null || v === '') {
+      if (field === 'accent') return { ok: false, error: 'The theme needs an accent colour (accent), such as #2563EB.' };
+      continue;
+    }
+    if (typeof v !== 'string' || !SIX_OR_THREE_HEX.test(v.trim())) return { ok: false, error: `"${field}" must be a hex colour such as #2563EB.` };
+    out[field] = v.trim();
+  }
+
+  const choose = <K extends 'mode' | 'fontFamily' | 'visualMotif' | 'category'>(field: K, allowed: readonly NonNullable<ImportedTheme[K]>[]): string | null => {
+    const v = data[field];
+    if (v === undefined || v === null || v === '') return null;
+    if (typeof v !== 'string' || !(allowed as readonly string[]).includes(v)) return `"${field}" must be one of: ${allowed.join(', ')}.`;
+    out[field] = v as ImportedTheme[K];
+    return null;
+  };
+  const problem = choose('mode', THEME_MODES) ?? choose('fontFamily', THEME_FONTS) ?? choose('visualMotif', THEME_MOTIFS) ?? choose('category', THEME_CATEGORIES);
+  if (problem) return { ok: false, error: problem };
+  return { ok: true, theme: out };
 }
 
 /**
@@ -282,10 +371,12 @@ export async function extractThemeFromImage(fileOrDataUrl: File | string): Promi
     } else {
       const reader = new FileReader();
       reader.onload = (e) => {
-        if (e.target?.result) {
-          img.src = e.target.result as string;
-        }
+        if (typeof e.target?.result === 'string' && e.target.result) img.src = e.target.result;
+        else reject(new Error('The image could not be read.'));
       };
+      // Without these the promise never settled and the screen sat on its "extracting" spinner.
+      reader.onerror = () => reject(new Error('The image could not be read.'));
+      reader.onabort = () => reject(new Error('Reading the image was cancelled.'));
       reader.readAsDataURL(fileOrDataUrl);
     }
   });

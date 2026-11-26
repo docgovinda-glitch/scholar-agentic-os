@@ -4,6 +4,7 @@
  * marked reported on their behalf. Pure; no I/O.
  */
 import { z } from "zod";
+import { csvCell } from "../../shared/csv";
 import { REPORTING_CHECKLISTS, type ReportingChecklist } from "./reportingChecklistData";
 
 export const checklistEntrySchema = z.object({
@@ -40,7 +41,7 @@ export const checklistById = (id: string): ReportingChecklist | undefined => REP
 export function suggestChecklist(...descriptions: Array<string | undefined>): ReportingChecklist["id"] | null {
   const s = descriptions.filter(Boolean).join(" ").toLowerCase();
   if (/systematic review|meta-analys|scoping review/.test(s)) return "prisma";
-  if (/randomi[sz]ed|randomi[sz]ation|\brct\b|clinical trial/.test(s)) return "consort";
+  if (/randomi[sz]ed|randomi[sz]ation|\brcts?\b|clinical trials?/.test(s)) return "consort";
   if (/\b(mice|mouse|rats?|zebrafish|rodents?|animal model|in vivo)\b/.test(s)) return "arrive";
   if (/cohort|case[- ]control|cross[- ]sectional|observational/.test(s)) return "strobe";
   return null;
@@ -74,10 +75,8 @@ export function checklistRows(list: ReportingChecklist, state: ChecklistState | 
   });
 }
 
-const csvCell = (s: string) => `"${s.replace(/"/g, '""')}"`;
-
 export function checklistCsv(list: ReportingChecklist, state: ChecklistState | null, title: string): string {
   const head = [`${list.fullName}${title ? ` for: ${title}` : ""}`, `Source: ${list.citation} (${list.licence}).`];
-  const rows = checklistRows(list, state).map((r) => [r.section, r.id, r.text, r.where, r.note].map(csvCell).join(","));
-  return [...head.map(csvCell), ["Section/topic", "Item", "Checklist item", "Location where reported", "Note"].map(csvCell).join(","), ...rows].join("\r\n") + "\r\n";
+  const rows = checklistRows(list, state).map((r) => [r.section, r.id, r.text, r.where, r.note].map((c) => csvCell(c)).join(","));
+  return [...head.map((c) => csvCell(c)), ["Section/topic", "Item", "Checklist item", "Location where reported", "Note"].map((c) => csvCell(c)).join(","), ...rows].join("\r\n") + "\r\n";
 }

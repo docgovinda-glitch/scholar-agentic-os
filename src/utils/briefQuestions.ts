@@ -64,9 +64,17 @@ function firstSentence(text: string, max = 150): string {
   return s.replace(/[.\s]+$/, "");
 }
 
+/** A bare "[25]" at the end of a line: the UK shorthand for marks (not a citation, which sits mid-sentence). */
+const TRAILING_BRACKET_MARKS = /\s*\[\s*(\d{1,3})\s*\]\s*$/;
+
 function pullMarks(text: string): { text: string; marks?: number } {
   const m = text.match(MARKS_RE);
-  if (!m) return { text };
+  if (!m) {
+    const b = text.match(TRAILING_BRACKET_MARKS);
+    if (!b) return { text };
+    const marks = parseInt(b[1], 10);
+    return { text: text.replace(TRAILING_BRACKET_MARKS, "").trim(), marks: marks > 0 ? marks : undefined };
+  }
   const marks = parseInt(m[1], 10);
   return { text: text.replace(MARKS_RE_G, " ").replace(/\s{2,}/g, " ").trim(), marks: marks > 0 ? marks : undefined };
 }
@@ -95,6 +103,11 @@ export function normalizeBriefLayout(text: string): string {
     const rest = whole.slice(offset + m.length).replace(/^\(?[a-h][.)]\s+/, "");
     return COMMAND_START.test(rest) ? `${end}\n` : m;
   });
+  // "Question 1 (20 marks)" alone on a line, its prompt on the next: one line, "Question 1: prompt (20 marks)".
+  t = t.replace(
+    new RegExp(`^([ \\t]*(?:Question|Q)[ \\t]*\\d{1,2})[ \\t]*[:.\\-–]?[ \\t]*([\\[(][ \\t]*\\d{1,3}[ \\t]*${MARKS_WORD}[ \\t]*[\\])])?[ \\t]*\\n+[ \\t]*(?!(?:Question|Q)[ \\t]*\\d|\\(?[a-h][.)][ \\t]|PART\\b|\\s)(\\S[^\\n]*)$`, "gim"),
+    (_m, head: string, marks: string | undefined, prompt: string) => `${head.trim()}: ${prompt.trim()}${marks ? ` ${marks}` : ""}`
+  );
   // "Question 1: Title [15 Marks] Current NISQ devices..." -> heading, then prompt.
   t = t
     .split("\n")

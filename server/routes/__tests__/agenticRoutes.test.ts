@@ -145,4 +145,31 @@ describe("Agentic Routes & Relational Table Persistence", () => {
       severity: "Critical",
     });
   });
+  it("POST /allocate-budget caps the target and leaves the other saved answers untouched", async () => {
+    const projectId = await createProject();
+    const store = getProjectStore();
+    await store.patchAnswers(projectId, { manuscript_markdown: "Saved by the studio." });
+
+    const res = await request(app).post(`/api/projects/${projectId}/agentic/allocate-budget`).send({ targetTotalWords: 9_999_999 });
+    expect(res.status).toBe(200);
+
+    const saved = await store.get(projectId);
+    expect(saved?.answers["target_word_count"]).toBe("100000");
+    expect(saved?.answers["manuscript_markdown"]).toBe("Saved by the studio.");
+  });
+
+  it("POST /allocate-budget uses the default for a missing or non-numeric target", async () => {
+    const projectId = await createProject();
+    const res = await request(app).post(`/api/projects/${projectId}/agentic/allocate-budget`).send({ targetTotalWords: "lots" });
+    expect(res.status).toBe(200);
+    expect((await getProjectStore().get(projectId))?.answers["target_word_count"]).toBe("6000");
+  });
+
+  it("POST /copilot-chat rejects a message that is not text", async () => {
+    const projectId = await createProject();
+    for (const message of [undefined, "   ", { text: "hi" }, 42]) {
+      const res = await request(app).post(`/api/projects/${projectId}/agentic/copilot-chat`).send({ stage: "drafting", message });
+      expect(res.status).toBe(400);
+    }
+  });
 });

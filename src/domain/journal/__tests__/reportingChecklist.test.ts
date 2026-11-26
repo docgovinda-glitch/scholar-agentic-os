@@ -45,6 +45,11 @@ describe("suggestChecklist", () => {
     expect(suggestChecklist("", "A prospective cohort of 2,000 adults")).toBe("strobe");
     expect(suggestChecklist("Essay on epistemology")).toBeNull();
   });
+
+  it("recognises plural trial wording (RCTs, clinical trials)", () => {
+    expect(suggestChecklist("Pooled RCTs of sleep hygiene")).toBe("consort");
+    expect(suggestChecklist("Phase II clinical trials in adults")).toBe("consort");
+  });
 });
 
 describe("progress and the completed file", () => {
@@ -80,5 +85,17 @@ describe("progress and the completed file", () => {
     expect(csv).toContain("doi:10.1136/bmj-2024-081123");
     expect(csv).toContain('"Title and structured abstract","1a","Identification as a randomised trial","Title",""');
     expect(parseChecklistState("nope")).toBeNull();
+  });
+});
+
+describe("checklistCsv: spreadsheet formulas", () => {
+  it("does not let author text or the title run as a formula", () => {
+    const list = checklistById("prisma")!;
+    const first = list.items[0].id;
+    const csv = checklistCsv(list, { checklistId: "prisma", entries: { [first]: { status: "reported", location: "=HYPERLINK(\"http://evil\",\"x\")", note: "@SUM(A1)" } } }, "+cmd|' /C calc'!A0");
+    expect(csv).toContain(`"'=HYPERLINK(""http://evil"",""x"")"`);
+    expect(csv).toContain(`"'@SUM(A1)"`);
+    expect(csv).toContain("for: +cmd");
+    expect(csv).not.toMatch(/(^|,)"[=+@]/m);
   });
 });

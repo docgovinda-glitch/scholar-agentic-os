@@ -89,3 +89,21 @@ export function countManuscriptWords(text: string | undefined): number {
     .replace(/^#{2,3}\s.*$/gm, "");
   return countProseWords(plain);
 }
+
+/**
+ * How deep each Markdown heading sits in this manuscript, for structured
+ * exports: the shallowest headings are sections (0), the next level are
+ * sub-sections (1), and so on. Relative, so a manuscript written with `##`
+ * sections and `###` sub-sections nests the same way as one that starts at
+ * `###`. A title-level `#` is a section like the shallowest of the rest.
+ */
+export function headingDepthOf(markdown: string): (hashes: number) => number {
+  const levels = new Set<number>();
+  for (const block of markdown.replace(/\r\n/g, "\n").split(/\n{2,}/)) {
+    const b = block.trim();
+    const m = !b.includes("\n") ? b.match(/^(#{1,6})\s+/) : null;
+    if (m && m[1].length >= 2) levels.add(m[1].length);
+  }
+  const ordered = [...levels].sort((a, b) => a - b);
+  return (hashes) => (hashes <= 1 ? 0 : Math.max(0, ordered.indexOf(hashes)));
+}

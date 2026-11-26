@@ -146,11 +146,14 @@ describe("References in Audit & Export", () => {
     expect(refApi.lookupDoi).toHaveBeenCalledWith("proj-refs", "10.1000/old");
     const saved = JSON.parse(current.answers.reference_records as string);
     expect(saved.src_old).toMatchObject({ id: "src_old", title: "A withdrawn result", registry: "crossref" });
+    // Only the keys this action changed are sent, so answers saved elsewhere meanwhile are not overwritten with a stale copy.
+    expect(Object.keys(vi.mocked(api.saveIntakeAnswers).mock.calls.at(-1)![1] as object).sort()).toEqual(["reference_records", "references_checked_at"]);
     expect(within(panel).getByText("1 to fix before export")).toBeInTheDocument();
 
     fireEvent.click(within(panel).getByRole("checkbox", { name: /I cite this paper to discuss its retraction/ }));
     expect(await within(panel).findByText("1 cited · 1 to review")).toBeInTheDocument();
     expect(JSON.parse(current.answers.acknowledged_retractions as string)).toEqual(["src_old"]);
+    expect(Object.keys(vi.mocked(api.saveIntakeAnswers).mock.calls.at(-1)![1] as object)).toEqual(["acknowledged_retractions"]);
   });
 });
 
@@ -291,6 +294,7 @@ describe("Do sources support their sentences", () => {
     fireEvent.click(within(panel).getByRole("button", { name: "Check with my AI" }));
     await waitFor(() => expect(current.answers.citation_support).toBeTruthy());
     expect(vi.mocked(api.authedJsonFetch).mock.calls[0][0]).toBe("/api/projects/proj-refs/agentic/citations/support");
+    expect(Object.keys(vi.mocked(api.saveIntakeAnswers).mock.calls.at(-1)![1] as object)).toEqual(["citation_support"]);
     expect(await within(panel).findByText("Partly")).toBeInTheDocument();
     expect(within(panel).getByText("“NumPy underpins scientific Python”")).toBeInTheDocument();
     expect(within(panel).getByText(/Source: Array programming with NumPy\. Narrower claim\./)).toBeInTheDocument();

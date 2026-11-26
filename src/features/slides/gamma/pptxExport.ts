@@ -8,6 +8,7 @@
  * pptxgenjs is loaded on demand, so it only reaches users who export.
  */
 import type PptxGenJS from 'pptxgenjs';
+import { xmlText } from '../../../shared/xmlText';
 import type { SlideDeck } from '../types/slides';
 import { getCardContent, resolveLayout } from './content';
 import { CANVAS_W, computeCardGeometry, type CardElement } from './geometry';
@@ -79,7 +80,7 @@ async function drawElement(pptx: PptxGenJS, slide: PptxSlide, el: CardElement, t
       const data = await toDataUrl(el.url);
       if (data) {
         slide.addImage({
-          data, x: inch(el.x), y: inch(el.y), w: inch(el.w), h: inch(el.h), altText: el.alt,
+          data, x: inch(el.x), y: inch(el.y), w: inch(el.w), h: inch(el.h), altText: el.alt ? xmlText(el.alt) : el.alt,
           sizing: { type: 'cover', w: inch(el.w), h: inch(el.h) },
         });
       } else {
@@ -92,7 +93,7 @@ async function drawElement(pptx: PptxGenJS, slide: PptxSlide, el: CardElement, t
       return;
     }
     case 'text': {
-      const body = el.uppercase ? el.text.toUpperCase() : el.text;
+      const body = xmlText(el.uppercase ? el.text.toUpperCase() : el.text);
       if (!body) return;
       // A little extra height so PowerPoint never wraps into a clipped line.
       const extra = Math.max(4, el.size * 0.25);
@@ -129,8 +130,8 @@ export async function buildDeckPptx(deck: SlideDeck): Promise<PptxGenJS> {
   const theme = resolveDeckTheme(deck.themeId, deck.customTheme);
 
   pptx.layout = 'LAYOUT_WIDE';
-  pptx.title = deck.title || 'Presentation';
-  pptx.subject = deck.topic || deck.title || '';
+  pptx.title = xmlText(deck.title || 'Presentation');
+  pptx.subject = xmlText(deck.topic || deck.title || '');
   pptx.author = 'Scholar Core';
   pptx.company = 'Scholar Core';
   pptx.theme = { headFontFace: PPTX_FONTS[theme.headingFont], bodyFontFace: PPTX_FONTS[theme.bodyFont] };
@@ -143,7 +144,7 @@ export async function buildDeckPptx(deck: SlideDeck): Promise<PptxGenJS> {
     for (const el of geometry.elements) {
       await drawElement(pptx, slide, el, theme);
     }
-    if (card.speakerNotes) slide.addNotes(card.speakerNotes);
+    if (card.speakerNotes) slide.addNotes(xmlText(card.speakerNotes));
   }
   return pptx;
 }

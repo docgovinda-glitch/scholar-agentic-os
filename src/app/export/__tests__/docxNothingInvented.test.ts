@@ -74,3 +74,39 @@ describe("Word export adds nothing the author didn't write", () => {
     expect(out).toContain("The authors");
   });
 });
+
+describe("Word export: the abstract appears once, and only when there is one", () => {
+  const count = (haystack: string, needle: string) => haystack.split(needle).length - 1;
+  const withAbstract: CanonicalDocument = {
+    id: "doc-2",
+    title: "Sleep and memory",
+    blocks: [
+      { id: "b1", kind: "heading2", text: "Abstract" },
+      { id: "b2", kind: "paragraph", text: "We tested overnight recall." },
+      { id: "b3", kind: "paragraph", text: "Sleep helped." },
+      { id: "b4", kind: "heading2", text: "Introduction" },
+      { id: "b5", kind: "paragraph", text: "Sleep supports memory." },
+    ],
+  };
+
+  it("uses an Abstract heading in the manuscript as the abstract page, not a second time in the body", async () => {
+    const out = await text(await renderDocx(withAbstract, { title: withAbstract.title, author: "" }, { template: "apa7" }));
+    expect(count(out, "Abstract")).toBe(2); // the page heading and the "Abstract: N words" count line
+    expect(count(out, "We tested overnight recall.")).toBe(1);
+    expect(out).toContain("We tested overnight recall. Sleep helped.");
+    expect(out).toContain("Abstract: 6 words");
+    expect(out).toContain("Introduction");
+  });
+
+  it("does not repeat an abstract that was also supplied in the options", async () => {
+    const out = await text(await renderDocx(withAbstract, { title: withAbstract.title, author: "" }, { template: "apa7", abstractText: "Supplied abstract text." }));
+    expect(count(out, "Supplied abstract text.")).toBe(1);
+    expect(out).not.toContain("We tested overnight recall.");
+  });
+
+  it("prints no Abstract heading when the manuscript has none", async () => {
+    const out = await text(await renderDocx(doc, { title: doc.title, author: "" }, { template: "apa7" }));
+    expect(count(out, "Abstract")).toBe(1); // only the "Abstract: 0 words" count line
+    expect(out).toContain("Abstract: 0 words");
+  });
+});

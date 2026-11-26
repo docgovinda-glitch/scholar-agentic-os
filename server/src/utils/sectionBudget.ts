@@ -4,6 +4,8 @@ import { countProseWords } from "../../../src/shared/proseBlocks.ts";
 export const SENTENCE_END = /[.!?]["'"')\]]?\s*$/;
 
 /** Regex to find sentence boundaries (period, exclamation, or question mark followed by optional closing punctuation). */
+const ENDS_IN_ABBREVIATION = /(?:\bet al|\be\.g|\bi\.e|\bcf|\bvs|\bFig|\bpp?)\.["'")\]]?$/;
+
 const SENTENCE_BOUNDARY = /[.!?]["'"')\]]?(?=\s)/;
 
 export function sectionWordRange(allocatedWords: number): { min: number; max: number } {
@@ -36,7 +38,8 @@ export function trimToSentenceWithinWords(text: string, maxWords: number): strin
     }
   }
   const head = tokens.slice(0, cutAt).join("").trimEnd();
-  if (SENTENCE_END.test(head)) return head;
+  // "…as shown by Smith et al." ends in a full stop but not a sentence: the cut then goes back to the sentence before.
+  if (SENTENCE_END.test(head) && !ENDS_IN_ABBREVIATION.test(head)) return head;
   // Last sentence end inside the kept words (followed by whitespace).
   const re = new RegExp(SENTENCE_BOUNDARY.source, "g");
   let lastEnd = -1;

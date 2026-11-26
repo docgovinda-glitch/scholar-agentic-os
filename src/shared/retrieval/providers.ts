@@ -9,6 +9,7 @@
  */
 
 import type { RawSourceInput } from "../../citation_compliance/cslEngine";
+import { stripTags } from "../markupText";
 
 export interface ProviderOptions {
   signal?: AbortSignal;
@@ -43,9 +44,9 @@ export type ProviderId =
 
 export const CROSSREF_USER_AGENT = "ScholarCore/2.0 (https://scholar.gkshah.com.np; mailto:support@scholar-core.org)";
 
+/** Plain text of an abstract or title: tags removed (inline ones without a gap, see stripTags), entities decoded. */
 export function stripMarkup(html: string): string {
-  return html
-    .replace(/<[^>]*>/g, " ")
+  return stripTags(html)
     .replace(/&quot;/g, '"')
     .replace(/&amp;/g, "&")
     .replace(/&#0?39;/g, "'")

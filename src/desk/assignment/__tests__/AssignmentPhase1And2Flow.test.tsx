@@ -324,7 +324,6 @@ describe("Assignment Phase 1 Wiring & Phase 2 Sources Workspace", () => {
           word_count: 0,
           citation_style: "",
           approved_source_ids: [],
-          assignment_sources: [],
           assignment_user_uploaded_sources: [],
         },
         gates: [],

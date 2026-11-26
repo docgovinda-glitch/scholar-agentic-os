@@ -81,15 +81,23 @@ export default function GammaPlayer({ deck, initialSlideIndex = 0, initialPresen
       timer = setTimeout(() => setChrome(false), 2600);
     };
     wake();
-    window.addEventListener('mousemove', wake);
+    // Touch and pen wake the bar too: on a tablet there is no mouse to move.
+    window.addEventListener('pointermove', wake);
+    window.addEventListener('pointerdown', wake);
     return () => {
-      window.removeEventListener('mousemove', wake);
+      window.removeEventListener('pointermove', wake);
+      window.removeEventListener('pointerdown', wake);
       if (timer) clearTimeout(timer);
     };
   }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Browser shortcuts (Ctrl+F find, Ctrl+R reload, Alt+Left back, Cmd+N…) are not the presenter's.
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      // Space and Enter press the control that has focus (Exit, Next…) instead of also moving on.
+      const onControl = e.target instanceof Element && e.target.closest('button, a, input, textarea, select, [contenteditable="true"]');
+      if (onControl && (e.key === ' ' || e.key === 'Enter')) return;
       switch (e.key) {
         case 'ArrowRight':
         case 'ArrowDown':

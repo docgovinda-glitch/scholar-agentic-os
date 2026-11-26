@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Loader2, Sparkles } from "lucide-react";
 import { authedJsonFetch } from "../api";
 import { textFingerprint, type SupportResult, type SupportVerdict } from "../../domain/journal/citationSupport";
+import { checkedAtLabel } from "./checkedAt";
 
 export interface SavedSupport {
   fingerprint: string;
@@ -18,13 +19,32 @@ const VERDICT: Record<SupportVerdict, { label: string; tone: string }> = {
 };
 const ORDER: SupportVerdict[] = ["does_not_support", "partly", "cannot_tell", "supports"];
 
+/**
+ * The saved check, read defensively: it comes back from the project's stored
+ * answers, so a result that is missing its verdict or sentence (an older or
+ * damaged save) is left out instead of breaking the screen.
+ */
 export function parseSavedSupport(raw: unknown): SavedSupport | null {
+  let v: unknown;
   try {
-    const v = typeof raw === "string" ? JSON.parse(raw) : raw;
-    return v && typeof v === "object" && Array.isArray((v as SavedSupport).results) ? (v as SavedSupport) : null;
+    v = typeof raw === "string" ? JSON.parse(raw) : raw;
   } catch {
     return null;
   }
+  if (!v || typeof v !== "object" || !Array.isArray((v as SavedSupport).results)) return null;
+  const o = v as Partial<SavedSupport>;
+  const results = (o.results as unknown[]).flatMap((r): SupportResult[] => {
+    if (!r || typeof r !== "object") return [];
+    const x = r as Partial<SupportResult>;
+    if (typeof x.key !== "string" || typeof x.citeId !== "string" || typeof x.sentence !== "string" || !x.verdict || !(x.verdict in VERDICT)) return [];
+    return [{ ...x, key: x.key, citeId: x.citeId, sentence: x.sentence, verdict: x.verdict, reason: typeof x.reason === "string" ? x.reason : "", quote: typeof x.quote === "string" ? x.quote : undefined }];
+  });
+  return {
+    fingerprint: typeof o.fingerprint === "string" ? o.fingerprint : "",
+    checkedAt: typeof o.checkedAt === "string" ? o.checkedAt : "",
+    truncated: typeof o.truncated === "number" && o.truncated > 0 ? o.truncated : 0,
+    results,
+  };
 }
 
 /**
@@ -98,7 +118,7 @@ export default function CitationSupportPanel({
         </button>
         {saved && (
           <span className={`text-[11px] ${stale ? "text-[color:var(--state-warning)]" : "text-[color:var(--text-muted)]"}`}>
-            {stale ? "The text has changed since this check; run it again." : `Checked ${new Date(saved.checkedAt).toLocaleString()}.`}
+            {stale ? "The text has changed since this check; run it again." : checkedAtLabel(saved.checkedAt) ? `Checked ${checkedAtLabel(saved.checkedAt)}.` : ""}
           </span>
         )}
       </div>

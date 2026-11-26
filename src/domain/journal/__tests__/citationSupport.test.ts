@@ -88,3 +88,15 @@ describe("groundSupport", () => {
     expect(textFingerprint("a")).not.toBe(textFingerprint("b"));
   });
 });
+
+describe("citingSentences: text directly under a heading", () => {
+  it("keeps the cited sentences of a paragraph that starts with a heading line", () => {
+    const out = citingSentences("### § Methods\nSleep improves recall [CITE:a]. Caffeine does not [CITE:b].");
+    expect(out.map((o) => o.citeId)).toEqual(["a", "b"]);
+    expect(out[0].sentence).toBe("Sleep improves recall.");
+  });
+
+  it("still skips a heading on its own and pipe tables", () => {
+    expect(citingSentences("## Results\n\n| A | B |\n| - | - |\n| x [CITE:a] | y |")).toEqual([]);
+  });
+});

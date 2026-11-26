@@ -14,6 +14,8 @@ import { __resetProjectStoreForTests } from "../../../src/app/conductor/projectS
 import { __resetRateLimitStore } from "../../src/middleware/rateLimit.ts";
 import { __setEnabledOutputTypesForTests } from "../outputTypeAccess.ts";
 import { scholarBrain } from "../../src/services/scholarBrain.ts";
+import { memoryDecks } from "../presentations.ts";
+import { getProjectStore } from "../../../src/services/store/projectStore.ts";
 
 describe("Presentation Studio Endpoints (/api/projects/:id/presentation)", () => {
   beforeEach(() => {
@@ -161,4 +163,62 @@ describe("Presentation Studio Endpoints (/api/projects/:id/presentation)", () =>
     expect(verifyRes.status).toBe(200);
     expect(verifyRes.body.deck.title).toBe("Updated Empirical Slide Deck");
   });
+
+  it("PUT /deck never writes to a deck row named in the request body (no taking over another user's deck)", async () => {
+    const projectId = await createPresentationProject();
+    const OTHER = "22222222-2222-4222-8222-222222222222";
+    memoryDecks.clear();
+    memoryDecks.set("victim-deck", { id: "victim-deck", user_id: OTHER, project_id: "victim-project", title: "Victim's deck", slides: [{ id: "s1" }] });
+
+    const res = await request(app)
+      .put(`/api/projects/${projectId}/presentation/deck`)
+      .send({ deck: { id: "victim-deck", title: "Attacker's deck", slides: [] } });
+
+    expect(res.status).toBe(200);
+    expect(memoryDecks.get("victim-deck")).toMatchObject({ user_id: OTHER, title: "Victim's deck", slides: [{ id: "s1" }] });
+    // The caller's own deck is stored under an id made from their project.
+    expect(memoryDecks.get(`deck-${projectId}`)).toMatchObject({ user_id: TEST_USER_ID, title: "Attacker's deck" });
+  });
+
+  it("PUT /deck rejects a deck whose slides are not a list, or are too many", async () => {
+    const projectId = await createPresentationProject();
+    for (const deck of [{ title: "x", slides: "nope" }, { title: "x", slides: { a: 1 } }, { title: "x", slides: new Array(201).fill({}) }, [], "text"]) {
+      const res = await request(app).put(`/api/projects/${projectId}/presentation/deck`).send({ deck });
+      expect(res.status, JSON.stringify(deck).slice(0, 30)).toBe(400);
+    }
+  });
+
+  it("PUT /deck changes only the deck and its title, leaving answers saved elsewhere untouched", async () => {
+    const projectId = await createPresentationProject();
+    await getProjectStore().patchAnswers(projectId, { speaker_notes_style: "short" });
+    const res = await request(app).put(`/api/projects/${projectId}/presentation/deck`).send({ deck: { title: "Quarterly Review of Sleep Studies", slides: [] } });
+    expect(res.status).toBe(200);
+    const saved = await getProjectStore().get(projectId);
+    expect(saved?.answers["speaker_notes_style"]).toBe("short");
+    expect(saved?.answers["title"]).toBe("Quarterly Review of Sleep Studies");
+    expect((saved?.answers["presentation_deck"] as { title: string }).title).toBe("Quarterly Review of Sleep Studies");
+  });
+
+  it("POST /generate-deck writes only the deck key, keeping other saved answers", async () => {
+    const projectId = await createPresentationProject();
+    await getProjectStore().patchAnswers(projectId, { speaker_notes_style: "short" });
+    const res = await request(app).post(`/api/projects/${projectId}/presentation/generate-deck`).send({ title: "Sleep and memory", durationMinutes: 10 });
+    expect(res.status).toBe(200);
+    const saved = await getProjectStore().get(projectId);
+    expect(saved?.answers["speaker_notes_style"]).toBe("short");
+    expect(saved?.answers["presentation_deck"]).toBeTruthy();
+  });
+
+  it("passes an abort signal to the model on the routes that call it, so closing the request stops it", async () => {
+    const projectId = await createPresentationProject();
+    const complete = vi.spyOn(scholarBrain, "complete").mockResolvedValue({ text: "", parsedJson: { title: "t", body: "b", qaScenarios: [] } } as never);
+    await request(app).post(`/api/projects/${projectId}/presentation/write-block`).send({ kind: "Key Insight Card", slideTitle: "Sleep", context: "Sleep matters." });
+    await request(app).post(`/api/projects/${projectId}/presentation/qa-simulate`).send({ title: "Sleep", deck: { slides: [{ actionHeadline: "Sleep", blocks: [] }] } });
+    expect(complete.mock.calls.length).toBeGreaterThanOrEqual(2);
+    for (const [options] of complete.mock.calls) {
+      expect((options as { signal?: unknown }).signal, "a model call without an abort signal").toBeInstanceOf(AbortSignal);
+    }
+    complete.mockRestore();
+  });
 });
+

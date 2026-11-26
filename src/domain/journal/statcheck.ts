@@ -151,6 +151,8 @@ export function checkStatistics(text: string): StatResult[] {
       const reportedP = Number(pStr);
       if (!Number.isFinite(value) || !Number.isFinite(reportedP)) continue;
       if (test === "r" && Math.abs(value) > 1) continue;
+      // Degrees of freedom are positive: "t(0) = …" is a typo, not a result to recompute.
+      if ((df1 !== undefined && !(df1 > 0)) || (df2 !== undefined && !(df2 > 0))) continue;
       const op: StatResult["op"] = opRaw === "<" || opRaw === "≤" ? "<" : opRaw === ">" || opRaw === "≥" ? ">" : "=";
 
       // The statistic was rounded when reported: p could come from anywhere in that interval.
@@ -160,6 +162,7 @@ export function checkStatistics(text: string): StatResult[] {
       const pAt = (v: number) => pValue(test, v, df1, df2);
       const pMax = pAt(lo), pMin = pAt(hi);
       const computedP = pAt(Math.abs(value));
+      if (!Number.isFinite(computedP) || !Number.isFinite(pMin) || !Number.isFinite(pMax)) continue;
       const pd = decimals(pStr);
       const round = (p: number) => Number(p.toFixed(pd));
 

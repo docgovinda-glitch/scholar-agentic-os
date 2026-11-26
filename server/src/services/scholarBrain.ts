@@ -97,6 +97,8 @@ export interface ScholarBrainCompleteOptions {
    * of failing. The route must build the same prompt on the retried request.
    */
   browserFallback?: boolean;
+  /** Stops the model when the caller no longer wants the answer (the client closed the request). */
+  signal?: AbortSignal;
 }
 
 export interface StreamPromptConfig {
@@ -536,6 +538,7 @@ export const scholarBrain = {
           userPrompt: options.userPrompt,
           temperature: options.temperature,
           maxOutputTokens: options.maxTokens,
+          signal: options.signal,
         });
         answeredBy = (req as { aiRoute?: { answeredBy?: { label: string } } }).aiRoute?.answeredBy?.label ?? "router";
       } catch (err) {
@@ -1017,6 +1020,7 @@ export const scholarBrain = {
     visualTypes: readonly string[];
     instruction?: string;
     current?: Array<{ title: string; bullets: string[] }>;
+    signal?: AbortSignal;
   }): Promise<unknown> {
     const systemPrompt = `You plan presentation outlines in the style of Gamma: one idea per card, each card a visual.
 Write EXACTLY ${options.slideCount} cards for the material, in presentation order: a title card first, a key-takeaways card last.
@@ -1035,7 +1039,7 @@ Output strict JSON only: {"title":"...","slides":[{"title":"...","visualType":".
     ]
       .filter(Boolean)
       .join("\n\n");
-    const res = await scholarBrain.complete({ req: options.req, browserFallback: true, taskClass: "verification", systemPrompt, userPrompt, responseFormat: "json" });
+    const res = await scholarBrain.complete({ req: options.req, browserFallback: true, taskClass: "verification", systemPrompt, userPrompt, responseFormat: "json", signal: options.signal });
     return res.parsedJson ?? (res.text ? parseAndRepairLLMJson(res.text) : null);
   },
 
@@ -1066,13 +1070,14 @@ Output strict JSON only: {"title":"...","slides":[{"title":"...","visualType":".
     slideTitle: string;
     context: string;
     existing?: string;
+    signal?: AbortSignal;
   }): Promise<unknown> {
     const systemPrompt = `You write one block of a presentation slide using assertion-evidence design.
 Block kind: ${options.kind}. Write a "title" (max 8 words, an assertion not a topic) and a "body" (15-30 words, concrete, scannable, no filler or clichés).
 Use only what the slide context supports; never invent figures, quotations or citations. If the context has no figure, do not write one.
 Output strict JSON only: {"title":"...","body":"..."}`;
     const userPrompt = `Slide: ${options.slideTitle}\nContext:\n${options.context.slice(0, 4000)}${options.existing ? `\nCurrent text: ${options.existing}` : ""}`;
-    const res = await scholarBrain.complete({ req: options.req, browserFallback: true, taskClass: "verification", systemPrompt, userPrompt, responseFormat: "json" });
+    const res = await scholarBrain.complete({ req: options.req, browserFallback: true, taskClass: "verification", systemPrompt, userPrompt, responseFormat: "json", signal: options.signal });
     return res.parsedJson ?? (res.text ? parseAndRepairLLMJson(res.text) : null);
   },
 

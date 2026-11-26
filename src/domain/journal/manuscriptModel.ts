@@ -49,7 +49,7 @@ export interface ManuscriptTexts {
 
 export const EMPTY_TEXTS: ManuscriptTexts = { texts: {}, unsorted: "" };
 
-const BACK_MATTER = /^(declarations?|references|bibliography|acknowledg(e)?ments?|appendi(x|ces)|funding|conflicts? of interest|competing interests|data availability|author contributions?)\b/i;
+export const BACK_MATTER = /^(declarations?|references|bibliography|acknowledg(e)?ments?|appendi(x|ces)|funding|conflicts? of interest|competing interests|data availability|author contributions?)\b/i;
 
 /** Words as the rest of the journal workspace counts them (markup and citation tokens excluded). */
 export const countWords = countManuscriptWords;
@@ -63,7 +63,8 @@ export function isUnitWritten(words: number, targetWords: number): boolean {
 
 export function sectionKind(title: string): SectionKind {
   const t = title.toLowerCase();
-  if (/abstract|summary/.test(t)) return "abstract";
+  // "Summary" alone is the abstract; "Summary of Findings" or "Summary and Conclusions" is not.
+  if (/\babstract\b|^(?:an? )?(?:executive |plain[- ]language |lay )?summary$/.test(t.trim())) return "abstract";
   if (/method|material|design|procedure|protocol|data collection|approach/.test(t)) return "methods";
   if (/result|finding/.test(t)) return "results";
   if (/discussion|implication|interpretation/.test(t)) return "discussion";

@@ -7,6 +7,7 @@
  */
 import type { ReferenceRecord } from "./references";
 import { citedIds, isNumeric, withoutReferenceSection, type StyleKey } from "./citationStyles";
+import { headingDepthOf } from "./manuscriptText";
 import { figureFile, imageBytes, numberFigures, type ManuscriptFigure } from "./figures";
 
 export type LatexTemplate = "elsarticle" | "ieeetran" | "sn-jnl" | "article";
@@ -65,20 +66,21 @@ const isRule = (l: string) => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$
 const cells = (l: string) => l.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
 
 /**
- * Block Markdown to LaTeX. Headings: "### § Title" or "## Title" → \section,
- * "####" → \subsection. Lists, pipe tables and paragraphs are converted;
+ * Block Markdown to LaTeX. Headings nest by depth (see headingDepthOf): the
+ * shallowest level → \section, the next → \subsection, then \subsubsection. Lists, pipe tables and paragraphs are converted;
  * everything else is escaped text.
  */
 export function bodyLatex(markdown: string, cite: (keys: string[]) => string): string {
   const blocks = markdown.replace(/\r\n/g, "\n").split(/\n{2,}/).map((b) => b.trim()).filter(Boolean);
   const out: string[] = [];
+  const depthOf = headingDepthOf(markdown);
   for (const b of blocks) {
     const lines = b.split("\n");
     const h = lines.length === 1 ? lines[0].match(/^(#{1,6})\s+(?:§\s*)?(.+)$/) : null;
     if (h) {
-      const level = h[1].length;
+      const depth = depthOf(h[1].length);
       const title = inlineLatex(h[2].replace(/^\d+(\.\d+)*\.?\s+/, ""), cite);
-      out.push(level >= 4 ? `\\subsection{${title}}` : `\\section{${title}}`);
+      out.push(`\\${depth === 0 ? "section" : depth === 1 ? "subsection" : "subsubsection"}{${title}}`);
     } else if (lines.every((l) => /^[-*] /.test(l))) {
       out.push(["\\begin{itemize}", ...lines.map((l) => `  \\item ${inlineLatex(l.slice(2), cite)}`), "\\end{itemize}"].join("\n"));
     } else if (lines.every((l) => /^\d+\. /.test(l))) {

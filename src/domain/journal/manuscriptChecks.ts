@@ -128,27 +128,72 @@ function sequence(kind: NumberingFinding["kind"], order: number[], chapter?: num
   return { kind, ...(chapter !== undefined ? { chapter } : {}), order, missing, outOfOrder };
 }
 
+/** One mention of a figure or table: its number (and chapter, in chapter numbering). */
+interface Mention {
+  index: number;
+  chapter?: number;
+  n: number;
+}
+
+const NUM_REF = String.raw`\d+(?:\.\d+)?`;
+
+/** "1", "2.3", "1-3", "1 and 2" in "Figures 1, 2 and 4" / "Tables 1–3": every number named, ranges spelled out. */
+function expandList(list: string): Array<{ chapter?: number; n: number }> {
+  const out: Array<{ chapter?: number; n: number }> = [];
+  const one = (t: string) => {
+    const [a, b] = t.split(".");
+    return b !== undefined ? { chapter: Number(a), n: Number(b) } : { n: Number(a) };
+  };
+  for (const part of list.split(/\s*(?:,|;|\band\b|&)\s*/i).filter(Boolean)) {
+    const range = part.match(new RegExp(`^(${NUM_REF})\\s*(?:-|–|—|to)\\s*(${NUM_REF})$`));
+    if (!range) {
+      const m = part.match(new RegExp(`^${NUM_REF}`));
+      if (m) out.push(one(m[0]));
+      continue;
+    }
+    const from = one(range[1]);
+    const to = one(range[2]);
+    // A range within one chapter (or plain numbering), kept short so a stray "1-2000" is not expanded.
+    if (from.chapter === to.chapter && to.n >= from.n && to.n - from.n <= 30) {
+      for (let k = from.n; k <= to.n; k++) out.push({ chapter: from.chapter, n: k });
+    } else {
+      out.push(from, to);
+    }
+  }
+  return out;
+}
+
+function mentionsOf(markdown: string, word: "Figure" | "Table"): Mention[] {
+  const singular = word === "Figure" ? String.raw`\b(?:Figure|Fig\.)\s*(\d+)(?:\.(\d+))?` : String.raw`\bTable\s+(\d+)(?:\.(\d+))?`;
+  const plural = word === "Figure" ? "(?:Figures|Figs\\.)" : "Tables";
+  const list = String.raw`${NUM_REF}(?:\s*(?:,|;|and|&|–|—|-|to)\s*${NUM_REF})*`;
+  const found: Mention[] = [];
+  for (const m of markdown.matchAll(new RegExp(singular, "gi"))) {
+    found.push({ index: m.index ?? 0, ...(m[2] !== undefined ? { chapter: Number(m[1]), n: Number(m[2]) } : { n: Number(m[1]) }) });
+  }
+  for (const m of markdown.matchAll(new RegExp(String.raw`\b${plural}\s*(${list})`, "gi"))) {
+    for (const x of expandList(m[1])) found.push({ index: m.index ?? 0, ...x });
+  }
+  return found.sort((a, b) => a.index - b.index);
+}
+
 /**
  * Gaps and order of figure and table numbers. Plain numbering (Figure 2) runs
  * through the document; chapter numbering (Figure 3.2, as in theses) is
- * checked within each chapter.
+ * checked within each chapter. Lists and ranges ("Figures 1 and 2",
+ * "Tables 1-3") count every number they name.
  */
 export function checkNumbering(markdown: string): NumberingFinding[] {
-  const kinds: Array<[NumberingFinding["kind"], RegExp]> = [
-    ["Figure", /\b(?:Figure|Fig\.)\s*(\d+)(?:\.(\d+))?/gi],
-    ["Table", /\bTable\s+(\d+)(?:\.(\d+))?/gi],
-  ];
   const out: NumberingFinding[] = [];
-  for (const [kind, re] of kinds) {
+  for (const kind of ["Figure", "Table"] as const) {
     const plain: number[] = [];
     const byChapter = new Map<number, number[]>();
-    for (const m of markdown.matchAll(re)) {
-      const first = Number(m[1]);
-      if (m[2] !== undefined) {
-        const list = byChapter.get(first) ?? [];
-        if (!list.includes(Number(m[2]))) list.push(Number(m[2]));
-        byChapter.set(first, list);
-      } else if (!plain.includes(first)) plain.push(first);
+    for (const m of mentionsOf(markdown, kind)) {
+      if (m.chapter !== undefined) {
+        const list = byChapter.get(m.chapter) ?? [];
+        if (!list.includes(m.n)) list.push(m.n);
+        byChapter.set(m.chapter, list);
+      } else if (!plain.includes(m.n)) plain.push(m.n);
     }
     if (plain.length) out.push(sequence(kind, plain));
     for (const [chapter, order] of Array.from(byChapter).sort((a, b) => a[0] - b[0])) out.push(sequence(kind, order, chapter));

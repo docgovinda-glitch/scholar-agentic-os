@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createBlankSheetDeck } from '../blankSheetService';
 import { extractFromClientHtml, recreateDeckFromFile } from '../deckRecreatorService';
 import type { SlideDeck } from '../../types/slides';
@@ -143,5 +143,40 @@ Phase 1 port integrations followed by regional depot automation.
     expect(result.summary).toContain('created 4 slides');
     expect(result.detectedTitle).toBe('Autonomous Supply Chain Architecture');
     expect(result.customTheme).toBeDefined();
+  });
+});
+
+describe('recreateDeckFromFile writes nothing the file did not give', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const existing = { id: 'deck-1', title: 'My talk', topic: '', framework: 'Standard-Narrative', slides: [{ id: 's1', order: 1, title: 'Mine', blocks: [] }], activeSlideIndex: 0, createdAt: '', updatedAt: '' } as unknown as SlideDeck;
+
+  it('takes only the palette from an image and leaves the slides as they are', async () => {
+    const result = await recreateDeckFromFile(new File([new Uint8Array([137, 80, 78, 71])], 'Screenshot 1.png', { type: 'image/png' }), existing);
+    expect(result.deck.slides).toEqual(existing.slides);
+    expect(result.deck.title).toBe('My talk');
+    expect(result.wordCount).toBe(0);
+    expect(result.summary).toContain('your slides are unchanged');
+    expect(JSON.stringify(result)).not.toMatch(/Executive Synthesis|Strategic Outcomes|roadmap/i);
+  });
+
+  it('makes no slides from an image when there is no deck yet', async () => {
+    const result = await recreateDeckFromFile(new File([new Uint8Array([1, 2, 3])], 'brand.png', { type: 'image/png' }), null);
+    expect(result.deck.slides).toHaveLength(0);
+    expect(result.summary).toContain('no slides were made');
+  });
+
+  it('reports a server that cannot be reached instead of inventing a deck', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+    await expect(recreateDeckFromFile(new File(['x'], 'talk.pptx'))).rejects.toThrow(/could not be reached/);
+  });
+
+  it("shows the server's own reason when it cannot read the file", async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 422, json: async () => ({ error: 'We could not read text from this file.' }) }));
+    await expect(recreateDeckFromFile(new File(['x'], 'scan.pdf'))).rejects.toThrow('We could not read text from this file.');
+  });
+
+  it('refuses a file that gave no text, rather than making slides from a placeholder', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ text: '   ', detectedTitle: 'x' }) }));
+    await expect(recreateDeckFromFile(new File(['x'], 'empty.pptx'))).rejects.toThrow('Could not extract readable text');
   });
 });

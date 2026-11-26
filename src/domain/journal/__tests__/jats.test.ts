@@ -54,3 +54,29 @@ describe("buildJats", () => {
     expect(bare).not.toMatch(/<contrib-group|<abstract|<kwd-group|<back>/);
   });
 });
+
+describe("buildJats: section nesting", () => {
+  const build = (body: string) => buildJats({ title: "T", authors: [], body, declarations: [], records: {} });
+  const balanced = (xml: string) => (xml.match(/<sec[ >]/g) ?? []).length === (xml.match(/<\/sec>/g) ?? []).length;
+
+  it("nests ### § sub-sections inside their ## section", () => {
+    const xml = build("## Methods\n\nA.\n\n### § Participants\n\nB.\n\n## Results\n\nC.");
+    expect(xml).toMatch(/<sec id="sec1"><title>Methods<\/title>\s*<p>A\.<\/p>\s*<sec id="sec2"><title>Participants<\/title>\s*<p>B\.<\/p>\s*<\/sec>\s*<\/sec>\s*<sec id="sec3"><title>Results/);
+    expect(balanced(xml)).toBe(true);
+  });
+
+  it("never closes more sections than it opened when a sub-heading has no parent", () => {
+    const xml = build("#### Orphan\n\nA.\n\n### Next\n\nB.");
+    expect(balanced(xml)).toBe(true);
+  });
+});
+
+describe("buildJats: control characters", () => {
+  it("never writes a character XML forbids (a pasted form feed or stray control code)", () => {
+    const dirty = `Sleep${String.fromCharCode(0x0c)}and ${String.fromCharCode(1)}memory ${String.fromCharCode(0x0b)}end`;
+    const xml = buildJats({ title: dirty, journal: dirty, authors: [{ name: dirty, affiliation: dirty }], abstract: dirty, keywords: [dirty], body: `## ${dirty}\n\n${dirty} [CITE:a]`, declarations: [{ label: dirty, text: dirty }], records: { a: rec } });
+    expect(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(xml)).toBe(false);
+    expect(xml).toContain("Sleep");
+  });
+});
+

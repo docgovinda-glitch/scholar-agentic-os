@@ -22,6 +22,7 @@ import {
   normalizeUnicodeNFC,
 } from "../../src/utils/scholarlyVoiceGuard.ts";
 import { scholarBrain } from "../../src/services/scholarBrain.ts";
+import { abortOnClose } from "../../src/utils/abortOnClose.ts";
 import {
   BrowserAiRequiredError,
   InvalidLlmChallengeError,
@@ -38,6 +39,9 @@ import { parseGammaCard, GAMMA_LAYOUT_IDS, type GammaCardPayload } from "./prese
 import { copyLimitsPromptGuide, layoutPromptGuide } from "../../../src/domain/presentation/slideSchema.ts";
 
 const router = Router({ mergeParams: true });
+
+/** Most slides one deck may hold (the standalone deck routes use the same cap). */
+const MAX_DECK_SLIDES = 200;
 
 export interface SlidePresentationItem {
   slideNumber: number;
@@ -357,6 +361,7 @@ router.post(
           visualTypes: VISUAL_TYPES,
           instruction: instruction || undefined,
           current,
+          signal: abortOnClose(req),
         });
         const parsed = outlineSchema.safeParse(raw);
         if (parsed.success) {
@@ -384,6 +389,8 @@ router.post(
         if (aiErr instanceof BrowserAiRequiredError || aiErr instanceof InvalidLlmChallengeError) {
           return sendAiFailure(res, aiErr, "Presentation outline");
         }
+        // The presenter stopped it or left: nothing more to do for a closed request.
+        if (abortOnClose(req).aborted) return;
         console.warn("[project/presentation.ts] AI outline fallback:", aiErr);
       }
     }
@@ -407,7 +414,7 @@ router.post(
     const slideTitle = str(body.slideTitle, 200).trim();
     const context = str(body.context, 4000);
     try {
-      const raw = (await scholarBrain.writeSlideBlock({ req, kind, slideTitle, context, existing: str(body.existing, 400) || undefined })) as { title?: unknown; body?: unknown } | null;
+      const raw = (await scholarBrain.writeSlideBlock({ req, kind, slideTitle, context, existing: str(body.existing, 400) || undefined, signal: abortOnClose(req) })) as { title?: unknown; body?: unknown } | null;
       const title = typeof raw?.title === "string" ? raw.title.trim() : "";
       const text = typeof raw?.body === "string" ? raw.body.trim() : "";
       if (!title && !text) throw new UnusableAiResponseError("slide block");
@@ -417,6 +424,7 @@ router.post(
         body: normalizeUnicodeNFC(sanitizeScholarlyText(stripCourseCodes(text))),
       });
     } catch (err) {
+      if (abortOnClose(req).aborted) return;
       return sendAiFailure(res, err, "Slide block");
     }
   })
@@ -546,6 +554,7 @@ router.post(
           systemPrompt,
           userPrompt,
           responseFormat: "json",
+          signal: abortOnClose(req),
         });
 
         const rawJson = brainRes.parsedJson || (brainRes.text ? JSON.parse(brainRes.text.replace(/```json/g, "").replace(/```/g, "").trim()) : null);
@@ -575,6 +584,8 @@ router.post(
         if (aiErr instanceof BrowserAiRequiredError || aiErr instanceof InvalidLlmChallengeError) {
           return sendAiFailure(res, aiErr, "Presentation deck");
         }
+        // The presenter stopped it or left: do not build and save a fallback deck nobody is waiting for.
+        if (abortOnClose(req).aborted) return;
         console.warn("[project/presentation.ts] AI deck generation fallback:", aiErr);
       }
     }
@@ -596,11 +607,9 @@ router.post(
 
     // Persist into project intake answers and memory store
     try {
-      const updatedAnswers = {
-        ...answers,
-        presentation_deck: formattedDeck,
-      };
-      await store.save({ ...record, answers: updatedAnswers });
+      // Only this key is written, merged into the stored record: the AI call above can take a long time,
+      // and saving the whole record loaded before it would overwrite whatever the presenter saved meanwhile.
+      await store.patchAnswers(record.projectId, { presentation_deck: formattedDeck });
 
       // Upsert into presentations memory table
       const now = new Date().toISOString();
@@ -710,6 +719,7 @@ router.post(
           systemPrompt,
           userPrompt,
           responseFormat: "json",
+          signal: abortOnClose(req),
         });
 
         const rawJson = brainRes.parsedJson || (brainRes.text ? JSON.parse(brainRes.text.replace(/```json/g, "").replace(/```/g, "").trim()) : null);
@@ -735,6 +745,7 @@ router.post(
         }
       } catch (aiErr) {
         // No stand-in questions: the user sees that nothing was generated.
+        if (abortOnClose(req).aborted) return;
         return sendAiFailure(res, aiErr, "Audience questions");
       }
     }
@@ -821,22 +832,26 @@ router.put(
     if (!record) return;
 
     const { deck } = req.body || {};
-    if (!deck || typeof deck !== "object") {
+    if (!deck || typeof deck !== "object" || Array.isArray(deck)) {
       return res.status(400).json({ error: "Missing or invalid slide deck payload." });
+    }
+    if (deck.slides !== undefined && (!Array.isArray(deck.slides) || deck.slides.length > MAX_DECK_SLIDES)) {
+      return res.status(400).json({ error: `A deck's slides must be a list of at most ${MAX_DECK_SLIDES}.` });
     }
 
     // Renaming the deck renames the project, so project lists never keep the old name.
+    // Only these keys are written, merged into the stored record, so answers saved elsewhere meanwhile are kept.
     const deckTitle = typeof deck.title === "string" ? deck.title.trim().slice(0, 300) : "";
-    const updatedAnswers = {
-      ...(record.answers || {}),
+    const updated = await store.patchAnswers(record.projectId, {
       presentation_deck: deck,
       ...(deckTitle && !isUntitledDeckTitle(deckTitle) ? { title: deckTitle } : {}),
-    };
-
-    const updated = await store.save({ ...record, answers: updatedAnswers });
+    });
+    if (!updated) return res.status(404).json({ error: "Project not found" });
 
     // Also synchronize into presentation_decks memory and Supabase table
-    const deckId = (deck.id as string) || `deck-${record.projectId}`;
+    // The row id comes from the project the caller owns, never from the request body: an id taken from the
+    // body would let one user upsert over (and take ownership of) another user's deck.
+    const deckId = `deck-${record.projectId}`;
     const now = new Date().toISOString();
     const presentationRow: PresentationDeckRow = {
       id: deckId,

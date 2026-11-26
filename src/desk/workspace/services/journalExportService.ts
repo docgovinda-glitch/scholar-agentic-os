@@ -8,7 +8,6 @@
  * 3. LaTeX (.tex) and BibTeX (.bib) source for STEM and computing submissions.
  */
 
-import { showAppToast } from "../../../components/ui/FeedbackSystem";
 import {
   Document,
   Packer,
@@ -26,6 +25,8 @@ import {
   BorderStyle,
 } from "docx";
 import type { Author } from "../../types";
+import { createHeadingNumberer, numberingFor, type HeadingNumbering } from "../../../domain/journal/headingNumbers";
+import { headingDepthOf } from "../../../domain/journal/manuscriptText";
 
 export type JournalExportAuthor =
   | Author
@@ -41,12 +42,12 @@ export type JournalExportAuthor =
       isCorresponding?: boolean;
     };
 
-export function getAuthorDisplayName(author: any): string {
-  if (!author) return "[Author name]";
-  if (author.name) return author.name;
-  const parts = [author.title, author.firstName, author.middleName, author.surname].filter(Boolean);
-  if (parts.length > 0) return parts.join(" ");
-  return "[Author name]";
+/** The author's name as entered; empty when none was (never a placeholder). */
+export function getAuthorDisplayName(author: JournalExportAuthor | null | undefined): string {
+  if (!author) return "";
+  const a = author as { name?: string; title?: string; firstName?: string; middleName?: string; surname?: string };
+  if (a.name?.trim()) return a.name.trim();
+  return [a.title, a.firstName, a.middleName, a.surname].filter(Boolean).join(" ");
 }
 
 export interface JournalExportParams {
@@ -54,6 +55,8 @@ export interface JournalExportParams {
   targetJournal: string;
   template?: "nature" | "ieee" | "acm" | "apa7" | "elsevier" | "typst_modern";
   citationStyle?: string;
+  /** Section numbers; defaults to what the template calls for (see numberingFor). */
+  headingNumbering?: HeadingNumbering;
   authors?: JournalExportAuthor[];
   abstract?: string;
   keywords?: string[];
@@ -112,7 +115,13 @@ export function downloadBlob(blob: Blob, filename: string): void {
 /**
  * Parses markdown lines within a section into docx Paragraphs or Tables.
  */
-function parseMarkdownToDocx(content: string, fontName: string): (Paragraph | Table)[] {
+function parseMarkdownToDocx(
+  content: string,
+  fontName: string,
+  numberer: (depth: number, title: string) => string = () => "",
+  baseDepth = 0
+): (Paragraph | Table)[] {
+  const depthOf = headingDepthOf(content);
   const elements: (Paragraph | Table)[] = [];
   const lines = content.split("\n");
 
@@ -153,38 +162,17 @@ function parseMarkdownToDocx(content: string, fontName: string): (Paragraph | Ta
       continue;
     }
 
-    // Heading 2 or 3
-    if (trimmed.startsWith("### ")) {
+    // Headings: levels follow the manuscript's own nesting, numbered the way the journal prints them.
+    const heading = trimmed.match(/^(#{1,6})\s+(?:§\s*)?(.+)$/);
+    if (heading) {
+      const depth = baseDepth + depthOf(heading[1].length);
+      const title = heading[2].trim();
       elements.push(
         new Paragraph({
-          text: trimmed.replace(/^###\s+/, ""),
-          heading: HeadingLevel.HEADING_3,
-          spacing: { before: 200, after: 100 },
-          run: { font: fontName, bold: true, size: 22 },
-        })
-      );
-      continue;
-    }
-
-    if (trimmed.startsWith("## ")) {
-      elements.push(
-        new Paragraph({
-          text: trimmed.replace(/^##\s+/, ""),
-          heading: HeadingLevel.HEADING_2,
-          spacing: { before: 280, after: 120 },
-          run: { font: fontName, bold: true, size: 24 },
-        })
-      );
-      continue;
-    }
-
-    if (trimmed.startsWith("# ")) {
-      elements.push(
-        new Paragraph({
-          text: trimmed.replace(/^#\s+/, ""),
-          heading: HeadingLevel.HEADING_1,
-          spacing: { before: 360, after: 140 },
-          run: { font: fontName, bold: true, size: 26 },
+          text: `${numberer(depth, title)}${title}`,
+          heading: depth === 0 ? HeadingLevel.HEADING_1 : depth === 1 ? HeadingLevel.HEADING_2 : HeadingLevel.HEADING_3,
+          spacing: depth === 0 ? { before: 360, after: 140 } : depth === 1 ? { before: 280, after: 120 } : { before: 200, after: 100 },
+          run: { font: fontName, bold: true, size: depth === 0 ? 26 : depth === 1 ? 24 : 22 },
         })
       );
       continue;
@@ -351,28 +339,29 @@ function parseFormattedRuns(text: string, fontName: string): TextRun[] {
  */
 export function buildJournalDocxDocument(params: JournalExportParams): Document {
   const fontName = params.template === "ieee" || params.template === "acm" ? "Arial" : "Times New Roman";
-  const authorList = params.authors && params.authors.length > 0
-    ? params.authors
-    : [{ name: "[Author name]", affiliation: "[Affiliation]", email: "" }];
+  // Only the authors the user entered: no placeholder name or affiliation is ever printed.
+  const authorList = (params.authors ?? []).filter((a) => getAuthorDisplayName(a).trim());
 
   const children: (Paragraph | Table)[] = [];
 
   // ── Header: Target Journal Tag ──
-  children.push(
-    new Paragraph({
-      alignment: AlignmentType.RIGHT,
-      spacing: { before: 0, after: 180 },
-      children: [
-        new TextRun({
-          text: `Prepared for Submission to: ${params.targetJournal}`,
-          font: fontName,
-          italics: true,
-          size: 19, // 9.5pt
-          color: "64748B",
-        }),
-      ],
-    })
-  );
+  if (params.targetJournal?.trim()) {
+    children.push(
+      new Paragraph({
+        alignment: AlignmentType.RIGHT,
+        spacing: { before: 0, after: 180 },
+        children: [
+          new TextRun({
+            text: `Prepared for Submission to: ${params.targetJournal.trim()}`,
+            font: fontName,
+            italics: true,
+            size: 19, // 9.5pt
+            color: "64748B",
+          }),
+        ],
+      })
+    );
+  }
 
   // ── Article Title ──
   children.push(
@@ -392,6 +381,8 @@ export function buildJournalDocxDocument(params: JournalExportParams): Document 
 
   // ── Authors ──
   const authorNamesRuns: TextRun[] = [];
+  // The corresponding author is the one flagged; with none flagged, the first (as before).
+  const correspondingAt = Math.max(0, authorList.findIndex((a) => (a as { isCorresponding?: boolean }).isCorresponding));
   authorList.forEach((author, idx) => {
     authorNamesRuns.push(
       new TextRun({
@@ -403,7 +394,7 @@ export function buildJournalDocxDocument(params: JournalExportParams): Document 
     );
     authorNamesRuns.push(
       new TextRun({
-        text: `${idx + 1}${idx === 0 ? "*" : ""}`,
+        text: `${idx + 1}${idx === correspondingAt ? "*" : ""}`,
         font: fontName,
         superScript: true,
         size: 18,
@@ -414,13 +405,15 @@ export function buildJournalDocxDocument(params: JournalExportParams): Document 
     }
   });
 
-  children.push(
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { before: 80, after: 80 },
-      children: authorNamesRuns,
-    })
-  );
+  if (authorNamesRuns.length > 0) {
+    children.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 80, after: 80 },
+        children: authorNamesRuns,
+      })
+    );
+  }
 
   // ── Affiliations ──
   authorList.forEach((author, idx) => {
@@ -451,7 +444,7 @@ export function buildJournalDocxDocument(params: JournalExportParams): Document 
   });
 
   // Corresponding author footnote
-  const firstAuthor = authorList[0];
+  const firstAuthor = authorList[correspondingAt];
   if (firstAuthor?.email) {
     children.push(
       new Paragraph({
@@ -495,7 +488,8 @@ export function buildJournalDocxDocument(params: JournalExportParams): Document 
   }
 
   // ── Keywords ──
-  if (params.keywords && params.keywords.length > 0) {
+  const keywordList = (params.keywords ?? []).map((k) => k.trim()).filter(Boolean);
+  if (keywordList.length > 0) {
     children.push(
       new Paragraph({
         alignment: AlignmentType.JUSTIFIED,
@@ -510,7 +504,7 @@ export function buildJournalDocxDocument(params: JournalExportParams): Document 
             size: 20,
           }),
           new TextRun({
-            text: params.keywords.join("; "),
+            text: keywordList.join("; "),
             font: fontName,
             size: 20,
           }),
@@ -531,27 +525,28 @@ export function buildJournalDocxDocument(params: JournalExportParams): Document 
   );
 
   // ── IMRaD Manuscript Sections ──
-  params.sections.forEach((sec, idx) => {
-    const isAbstract = sec.section.toLowerCase().includes("abstract");
-    if (isAbstract) return; // Abstract already handled in header block
+  // Numbered the way the journal prints them (decimal, IEEE or none); the abstract (printed above) takes no
+  // number, and a section with no title is body text only (the manuscript's own headings stay as written).
+  const numberer = createHeadingNumberer(params.headingNumbering ?? numberingFor(params.template));
+  params.sections.forEach((sec) => {
+    const title = sec.section.trim();
+    if (title.toLowerCase().includes("abstract")) return; // Abstract already handled in header block
 
-    // Section Title
-    const formattedHeading = sec.section.match(/^\d+[\.\s]/)
-      ? sec.section
-      : `${idx + 1}. ${sec.section}`;
+    if (title) {
+      // A title the author already numbered ("2. Methods") is kept as written.
+      const formattedHeading = /^\d+[\.\s]/.test(title) ? title : `${numberer(0, title)}${title}`;
+      children.push(
+        new Paragraph({
+          text: formattedHeading,
+          heading: HeadingLevel.HEADING_1,
+          spacing: { before: 360, after: 140 },
+          run: { font: fontName, bold: true, size: 26 },
+        })
+      );
+    }
 
-    children.push(
-      new Paragraph({
-        text: formattedHeading,
-        heading: HeadingLevel.HEADING_1,
-        spacing: { before: 360, after: 140 },
-        run: { font: fontName, bold: true, size: 26 },
-      })
-    );
-
-    // Section Content
-    const contentElements = parseMarkdownToDocx(sec.content, fontName);
-    children.push(...contentElements);
+    // Section Content: under a titled section its headings sit one level lower.
+    children.push(...parseMarkdownToDocx(sec.content, fontName, numberer, title ? 1 : 0));
   });
 
   // ── Declarations: only the statements the authors wrote ──
@@ -694,232 +689,6 @@ export async function exportJournalToDocx(params: JournalExportParams): Promise<
     .slice(0, 40);
   const filename = `${cleanTitle}_Camera_Ready.docx`;
   downloadBlob(blob, filename);
-}
-
-/**
- * Opens a camera-ready print window formatted like a high-tier journal preprint.
- */
-export function printJournalManuscript(params: JournalExportParams): void {
-  if (typeof window === "undefined") return;
-
-  const printWindow = window.open("", "_blank");
-  if (!printWindow) {
-    showAppToast("Popup blocked: please allow popups to open the camera-ready print preview.", "warning");
-    return;
-  }
-
-  const authorsHtml = (params.authors?.length ? params.authors : [{ name: "[Author name]", affiliation: "[Affiliation]", email: "" }])
-    .map((a, i) => `<span class="author-item"><strong>${getAuthorDisplayName(a)}</strong><sup>${i + 1}</sup></span>`)
-    .join(", ");
-
-  const affiliationsHtml = (params.authors?.length ? params.authors : [{ name: "[Author name]", affiliation: "[Affiliation]", email: "" }])
-    .map((a, i) => `<div><sup>${i + 1}</sup> ${a.affiliation || ""}</div>`)
-    .join("");
-
-  const declarationsHtml = [
-    ["Funding", params.declarations?.funding],
-    ["Conflict of Interest", params.declarations?.conflictOfInterest],
-    ["Data Availability", params.declarations?.dataAvailability],
-  ]
-    .filter(([, v]) => typeof v === "string" && v.trim())
-    .map(([k, v]) => `<p><strong>${k}:</strong> ${v}</p>`)
-    .join("");
-
-  const sectionsHtml = params.sections
-    .map((sec, i) => {
-      if (sec.section.toLowerCase().includes("abstract")) return "";
-      const formattedTitle = sec.section.match(/^\d+[\.\s]/) ? sec.section : `${i + 1}. ${sec.section}`;
-      return `
-        <section class="manuscript-section">
-          <h2>${formattedTitle}</h2>
-          <div class="section-body">${sec.content.replace(/\n\n/g, "</p><p>")}</div>
-        </section>
-      `;
-    })
-    .join("");
-
-  const referencesHtml = (params.references ?? [])
-    .map((r, i) => `<div class="ref-item">[${i + 1}] ${r}</div>`)
-    .join("");
-
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>${params.title} - Camera Ready</title>
-  <style>
-    @page {
-      size: A4;
-      margin: 20mm;
-      @bottom-center { content: counter(page); }
-    }
-    body {
-      font-family: "Times New Roman", Times, serif;
-      color: #111;
-      line-height: 1.6;
-      max-width: 820px;
-      margin: 0 auto;
-      padding: 24px;
-    }
-    .venue-header {
-      text-align: right;
-      font-size: 11px;
-      color: #666;
-      font-style: italic;
-      border-bottom: 1px solid #ddd;
-      padding-bottom: 6px;
-      margin-bottom: 24px;
-    }
-    h1 {
-      font-size: 24px;
-      font-weight: bold;
-      text-align: center;
-      margin-bottom: 14px;
-      line-height: 1.25;
-    }
-    .authors {
-      text-align: center;
-      font-size: 14px;
-      margin-bottom: 8px;
-    }
-    .affiliations {
-      text-align: center;
-      font-size: 12px;
-      color: #555;
-      font-style: italic;
-      margin-bottom: 24px;
-    }
-    .abstract-box {
-      margin: 20px 30px;
-      padding: 14px;
-      background: #fdfdfd;
-      border-top: 1px solid #ccc;
-      border-bottom: 1px solid #ccc;
-      font-size: 12px;
-      text-align: justify;
-      line-height: 1.5;
-    }
-    .abstract-box strong { font-weight: bold; }
-    .keywords {
-      margin-top: 8px;
-      font-size: 11px;
-      color: #444;
-    }
-    h2 {
-      font-size: 16px;
-      font-weight: bold;
-      border-bottom: 1px solid #eee;
-      padding-bottom: 4px;
-      margin-top: 24px;
-      margin-bottom: 10px;
-    }
-    p {
-      text-align: justify;
-      margin-bottom: 12px;
-      font-size: 13px;
-    }
-    .declarations, .references {
-      margin-top: 32px;
-      border-top: 1px solid #ccc;
-      padding-top: 16px;
-    }
-    .ref-item {
-      font-size: 11px;
-      padding-left: 24px;
-      text-indent: -24px;
-      margin-bottom: 6px;
-      line-height: 1.4;
-    }
-    @media print {
-      body { padding: 0; }
-      .no-print { display: none; }
-    }
-  </style>
-</head>
-<body>
-  <div class="no-print" style="margin-bottom: 16px; display: flex; justify-content: flex-end; gap: 8px;">
-    <button onclick="window.print()" style="padding: 8px 16px; background: #2563eb; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">
-      Print / Save as PDF
-    </button>
-  </div>
-  <div class="venue-header">Prepared for submission to: ${params.targetJournal}</div>
-  <h1>${params.title}</h1>
-  <div class="authors">${authorsHtml}</div>
-  <div class="affiliations">${affiliationsHtml}</div>
-  ${params.abstract ? `
-  <div class="abstract-box">
-    <strong>Abstract—</strong> ${params.abstract}
-    ${params.keywords ? `<div class="keywords"><strong>Keywords—</strong> ${params.keywords.join("; ")}</div>` : ""}
-  </div>` : ""}
-  <div class="manuscript-body">${sectionsHtml}</div>
-  ${declarationsHtml ? `<div class="declarations">
-    <h2>Declarations</h2>
-    ${declarationsHtml}
-  </div>` : ""}
-  ${referencesHtml ? `<div class="references">
-    <h2>References</h2>
-    ${referencesHtml}
-  </div>` : ""}
-</body>
-</html>`;
-
-  printWindow.document.write(html);
-  printWindow.document.close();
-}
-
-/**
- * Generates LaTeX (.tex) and BibTeX (.bib) source string.
- */
-export function generateJournalLatex(params: JournalExportParams): { tex: string; bib: string } {
-  const isIEEE = params.template === "ieee";
-  const docClass = isIEEE ? "\\documentclass[journal]{IEEEtran}" : "\\documentclass[11pt,a4paper]{article}";
-
-  const authorLatex = (params.authors ?? [])
-    .filter((a) => getAuthorDisplayName(a).trim())
-    .map((a) => `\\author{${getAuthorDisplayName(a)}\\thanks{${a.affiliation || ""}}}`)
-    .join("\n");
-
-  const sectionsLatex = params.sections
-    .map((sec) => {
-      const cleanTitle = sec.section.replace(/^\d+[\.\s]/, "");
-      return `\\section{${cleanTitle}}\n${sec.content}\n`;
-    })
-    .join("\n");
-
-  const declared = [
-    ["Funding", params.declarations?.funding],
-    ["Conflict of Interest", params.declarations?.conflictOfInterest],
-    ["Data Availability", params.declarations?.dataAvailability],
-  ].filter(([, v]) => typeof v === "string" && v.trim());
-  const latexDeclarations = declared.length
-    ? `\\section*{Declarations}\n${declared.map(([k, v]) => `\\textbf{${k}:} ${v}`).join(" \\\\\n")}\n`
-    : "";
-
-  const tex = `% Camera-Ready LaTeX Source for ${params.targetJournal}
-${docClass}
-\\usepackage{amsmath,amsfonts}
-\\usepackage{graphicx}
-\\usepackage{hyperref}
-\\usepackage{cite}
-
-\\title{${params.title}}
-${authorLatex}
-\\date{\\today}
-
-\\begin{document}
-\\maketitle
-
-${params.abstract?.trim() ? `\\begin{abstract}\n${params.abstract.trim()}\n\\end{abstract}\n` : ""}
-${sectionsLatex}
-
-${latexDeclarations}
-\\end{document}
-`;
-
-  // References are part of the manuscript text; no bibliography file is invented.
-  const bib = "";
-
-  return { tex, bib };
 }
 
 /**

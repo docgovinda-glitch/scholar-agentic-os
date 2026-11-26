@@ -20,6 +20,7 @@ import CitationSupportPanel, { parseSavedSupport, type SavedSupport } from "../j
 import VerificationChecks, { useVerification } from "../journal/VerificationChecks";
 import { LATEX_TEMPLATES, buildLatex, exportParts, packageReadme, suggestTemplate, type LatexTemplate } from "../../domain/journal/latex";
 import { buildJats } from "../../domain/journal/jats";
+import { numberHeadings, numberingForStyle } from "../../domain/journal/headingNumbers";
 import { suggestWordLayout } from "../../domain/journal/wordLayouts";
 import { parseFigures, placeFigures } from "../../domain/journal/figures";
 import AuthorsEditor from "../journal/AuthorsEditor";
@@ -301,8 +302,8 @@ export default function AuditExportMode() {
       }
     }
 
+    // Only the keys this action changes are sent (the server merges them), so answers saved elsewhere meanwhile are kept.
     const nextAnswers = {
-      ...answers,
       ...manuscriptAnswerPatch(updatedMarkdown, answers),
       data_availability_statement: dataAvailabilityStatement,
       competing_interests_statement: competingInterestsStatement,
@@ -374,7 +375,6 @@ export default function AuditExportMode() {
         for (const { id, doi } of toCheck) if (results[doi]) next[id] = { ...next[id], integrity: results[doi] };
       }
       const saved = await saveIntakeAnswers(effectiveProjectId, {
-        ...answers,
         reference_records: JSON.stringify(next),
         references_checked_at: new Date().toISOString(),
       });
@@ -391,7 +391,7 @@ export default function AuditExportMode() {
     async (id: string, on: boolean) => {
       if (!effectiveProjectId) return;
       const next = on ? Array.from(new Set([...acknowledgedRetractions, id])) : acknowledgedRetractions.filter((x) => x !== id);
-      const saved = await saveIntakeAnswers(effectiveProjectId, { ...answers, acknowledged_retractions: JSON.stringify(next) });
+      const saved = await saveIntakeAnswers(effectiveProjectId, { acknowledged_retractions: JSON.stringify(next) });
       setProject(saved);
     },
     [effectiveProjectId, acknowledgedRetractions, answers, setProject]
@@ -401,7 +401,10 @@ export default function AuditExportMode() {
   const exportBlocked = referenceAudit.blocking > 0;
   const exportBlockedNotice = `Fix the references first: ${referenceAudit.blocking} citation${referenceAudit.blocking === 1 ? "" : "s"} ${referenceAudit.blocking === 1 ? "points" : "point"} to no source or to a retracted paper. See "2. References".`;
   // Figures and tables go after the references, numbered by first mention, with their captions.
-  const exportText = useMemo(() => placeFigures(renderedManuscript.markdown, figures).markdown, [renderedManuscript, figures]);
+  const exportText = useMemo(() => numberHeadings(placeFigures(renderedManuscript.markdown, figures).markdown, "none"), [renderedManuscript, figures]);
+  // The same text with section numbers the way this journal family prints them, for Word, PDF and Markdown.
+  const headingNumbering = numberingForStyle(styleKey(citationStyle));
+  const numberedText = useMemo(() => numberHeadings(exportText, headingNumbering), [exportText, headingNumbering]);
   // The declarations the authors wrote and left switched on; nothing else.
   const writtenDeclarations = (
     [
@@ -451,7 +454,7 @@ export default function AuditExportMode() {
       // Try backend endpoint first
       const blob = await downloadProjectExportBlob(effectiveProjectId, "docx", {
         template: layoutMode === "2-column-camera" ? "ieee" : "apa7",
-        manuscriptMarkdown: exportText,
+        manuscriptMarkdown: numberedText,
         layout: layoutMode === "2-column-camera" ? "two_column" : "review",
         lineNumbers,
       });
@@ -465,15 +468,12 @@ export default function AuditExportMode() {
           targetJournal: targetJournalName,
           template: layoutMode === "2-column-camera" ? "ieee" : "apa7",
           citationStyle,
+          headingNumbering,
           authors: namedAuthors.map((a) => ({ name: fullName(a), affiliation: a.affiliation, email: a.email, isCorresponding: a.isCorresponding })),
-          abstract: answers["abstract"] || "",
-          keywords: keywords.split(",").map((s) => s.trim()),
-          sections: [
-            {
-              section: "Manuscript Content",
-              content: exportText,
-            },
-          ],
+          // The abstract goes in the front matter once; the rest keeps the manuscript's own headings.
+          abstract: exportParts(exportText).abstract || answers["abstract"] || "",
+          keywords: keywords.split(",").map((s) => s.trim()).filter(Boolean),
+          sections: [{ section: "", content: exportParts(exportText).body }],
           declarations: {
             dataAvailability: dataAvailabilityStatement,
             conflictOfInterest: competingInterestsStatement,
@@ -502,6 +502,8 @@ export default function AuditExportMode() {
     answers,
     keywords,
     exportText,
+    numberedText,
+    headingNumbering,
     exportBlocked,
     exportBlockedNotice,
     dataAvailabilityStatement,
@@ -521,7 +523,7 @@ export default function AuditExportMode() {
     try {
       const blob = await downloadProjectExportBlob(effectiveProjectId, "pdf", {
         template: layoutMode === "2-column-camera" ? "ieee" : "nature",
-        manuscriptMarkdown: exportText,
+        manuscriptMarkdown: numberedText,
       });
       downloadBlob(blob, `${title.replace(/[^a-zA-Z0-9_-]/g, "_")}_CameraReady.pdf`);
       setExportNotice("Downloaded Camera-Ready (.pdf) successfully.");
@@ -531,7 +533,7 @@ export default function AuditExportMode() {
       setIsExporting(null);
       setTimeout(() => setExportNotice(null), 5000);
     }
-  }, [project, effectiveProjectId, layoutMode, title, exportBlocked, exportBlockedNotice, exportText]);
+  }, [project, effectiveProjectId, layoutMode, title, exportBlocked, exportBlockedNotice, numberedText]);
 
   const handleDownloadRefereeLetter = useCallback(async () => {
     if (!effectiveProjectId) return;
@@ -571,7 +573,7 @@ export default function AuditExportMode() {
         return;
       }
       if (format === "markdown") {
-        const blob = new Blob([exportText], { type: "text/markdown;charset=utf-8" });
+        const blob = new Blob([numberedText], { type: "text/markdown;charset=utf-8" });
         downloadBlob(blob, `${title.replace(/[^a-zA-Z0-9_-]/g, "_")}.md`);
       } else if (format === "latex" || format === "jats") {
         const parts = exportParts(manuscriptMarkdown);
@@ -607,7 +609,7 @@ export default function AuditExportMode() {
         downloadBlob(blob, `${title.replace(/[^a-zA-Z0-9_-]/g, "_")}.typ`);
       }
     },
-    [exportText, exportBlocked, exportBlockedNotice, title, authorName, affiliation, namedAuthors, answers, manuscriptMarkdown, keywords, writtenDeclarations, sources, savedRecords, latexTemplate, citationStyle, figures]
+    [exportText, numberedText, exportBlocked, exportBlockedNotice, title, authorName, affiliation, namedAuthors, answers, manuscriptMarkdown, keywords, writtenDeclarations, sources, savedRecords, latexTemplate, citationStyle, figures]
   );
 
   return (
@@ -762,7 +764,7 @@ export default function AuditExportMode() {
               saved={parseSavedSupport(answers["citation_support"])}
               titleOf={(id) => sources.find((s) => s.id === id)?.title ?? id}
               onSave={async (support: SavedSupport) => {
-                const saved = await saveIntakeAnswers(effectiveProjectId, { ...answers, citation_support: JSON.stringify(support) });
+                const saved = await saveIntakeAnswers(effectiveProjectId, { citation_support: JSON.stringify(support) });
                 setProject(saved);
               }}
             />
@@ -787,7 +789,7 @@ export default function AuditExportMode() {
               sections={Object.keys(sectionsOf(manuscriptMarkdown))}
               title={title}
               onSave={async (state: ChecklistState | null) => {
-                const saved = await saveIntakeAnswers(effectiveProjectId, { ...(project?.answers || answers), reporting_checklist: state ? JSON.stringify(state) : "" });
+                const saved = await saveIntakeAnswers(effectiveProjectId, { reporting_checklist: state ? JSON.stringify(state) : "" });
                 setProject(saved);
               }}
             />

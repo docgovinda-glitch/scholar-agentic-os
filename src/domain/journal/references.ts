@@ -5,6 +5,7 @@
  * Pure; no I/O.
  */
 import { z } from "zod";
+import { stripTags } from "../../shared/markupText";
 
 export const refNameSchema = z.object({
   family: z.string(),
@@ -67,7 +68,7 @@ const str = (v: unknown): string | undefined => {
   if (Array.isArray(v)) return str(v[0]);
   if (typeof v === "number") return String(v);
   if (typeof v !== "string") return undefined;
-  const t = v.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  const t = stripTags(v);
   return t || undefined;
 };
 const yearOf = (v: unknown): number | undefined => {
