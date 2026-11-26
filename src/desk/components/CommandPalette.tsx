@@ -172,7 +172,7 @@ export function CommandPalette({
       },
       {
         id: "act-theme",
-        title: `Switch to ${theme === "light" ? "Dark" : "Light"} Mode`,
+        title: `Switch to ${theme === "light" ? "dark" : "light"} mode`,
         subtitle: `Currently using ${theme} theme`,
         icon: theme === "light" ? <Moon className="w-4 h-4 text-purple-500" /> : <Sun className="w-4 h-4 text-amber-400" />,
         action: () => {
@@ -237,7 +237,7 @@ export function CommandPalette({
         onKeyDown={handleKeyDown}
       >
         {/* Search Input Bar */}
-        <div className="flex items-center gap-3 px-4 py-3.5 border-b border-neutral-200 dark:border-white/10 bg-neutral-50/50 dark:bg-white/[0.02]">
+        <div className="flex items-center gap-3 px-4 py-3.5 border-b border-neutral-200 dark:border-white/10 focus-within:border-[color:var(--focus-ring)] bg-neutral-50/50 dark:bg-white/[0.02]">
           <Search className="w-5 h-5 text-neutral-400 shrink-0" />
           <input
             ref={inputRef}
@@ -247,14 +247,17 @@ export function CommandPalette({
               setQuery(e.target.value);
               setSelectedIndex(0);
             }}
-            placeholder="Type a command, search projects, or launch deep research..."
-            className="w-full bg-transparent text-sm text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 focus:outline-none"
+            aria-label="Search commands and projects"
+            name="commandSearch"
+            placeholder="Type a command or search projects..."
+            className="prompt-bare-input w-full bg-transparent text-sm text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500"
           />
           {query && (
             <button
               type="button"
               onClick={() => setQuery("")}
-              className="p-1 rounded-full hover:bg-neutral-200 dark:hover:bg-white/10 text-neutral-400 cursor-pointer"
+              aria-label="Clear search"
+              className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-neutral-200 dark:hover:bg-white/10 text-neutral-400 cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -265,7 +268,7 @@ export function CommandPalette({
         </div>
 
         {/* Results List */}
-        <div ref={listRef} className="flex-1 overflow-y-auto p-2 space-y-1 scholar-scrollbar">
+        <div ref={listRef} className="flex-1 overflow-y-auto p-2 pb-6 scroll-pb-6 space-y-1 scholar-scrollbar">
           {items.length === 0 ? (
             <div className="py-10 text-center text-sm text-neutral-500">
               No matching commands or projects found for "{query}".

@@ -369,7 +369,7 @@ export function DraftingActiveEditor({
             })()}
 
             {section.status === "completed" && (
-              <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-800 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
                 <CheckCircle2 className="w-3 h-3" />
                 <span>Drafted</span>
               </span>

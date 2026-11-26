@@ -619,7 +619,8 @@ export default function AssignmentSourcesStage({
     (s) => s.sourceOrigin === "ai_research" && !excludedIds.includes(s.id) && !s.isExcluded && s.status !== "removed"
   ).length;
 
-  const approvedCount = approvedSourceIds.length > 0 ? approvedSourceIds.length : totalActiveSources;
+  // The one approved count: the filter tab, the footer and the shelf all read it.
+  const approvedCount = approvedSourcesList.length;
 
   return (
     <div className="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8 pb-32 space-y-7 animate-in fade-in duration-200">
@@ -728,8 +729,8 @@ export default function AssignmentSourcesStage({
                 <button
                   type="button"
                   onClick={() => setViewMode("bar")}
-                  title="Compact Bar View"
-                  aria-label="Compact Bar View"
+                  title="Compact Bars view"
+                  aria-label="Compact Bars view"
                   className={`px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
                     viewMode === "bar"
                       ? "bg-[color:var(--surface-raised)] text-[color:var(--text-primary)] shadow-2xs font-semibold"
@@ -774,7 +775,7 @@ export default function AssignmentSourcesStage({
 
             <SourcesQueryBar aiSearchPrompt={aiSearchPrompt} handleAISearchLiterature={handleAISearchLiterature} isAISearching={isAISearching} setAiSearchPrompt={setAiSearchPrompt} />
 
-            <SourcesFilterBar activeFilterCount={activeFilterCount} activeTab={activeTab} aiResearchCount={aiResearchCount} approvedSourceIds={approvedSourceIds} askScholarCount={askScholarCount} bookmarkedIds={bookmarkedIds} excludedIds={excludedIds} handleReCurateForPrompt={handleReCurateForPrompt} isFindingMore={isFindingMore} mappedUserSources={mappedUserSources} searchQuery={searchQuery} setActiveTab={setActiveTab} setIsAddingCustom={setIsAddingCustom} setSearchQuery={setSearchQuery} setShowAdvancedFilters={setShowAdvancedFilters} showAdvancedFilters={showAdvancedFilters} totalActiveSources={totalActiveSources} totalCuratedCount={totalCuratedCount} />
+            <SourcesFilterBar activeFilterCount={activeFilterCount} activeTab={activeTab} aiResearchCount={aiResearchCount} approvedCount={approvedCount} askScholarCount={askScholarCount} bookmarkedIds={bookmarkedIds} excludedIds={excludedIds} handleReCurateForPrompt={handleReCurateForPrompt} isFindingMore={isFindingMore} mappedUserSources={mappedUserSources} searchQuery={searchQuery} setActiveTab={setActiveTab} setIsAddingCustom={setIsAddingCustom} setSearchQuery={setSearchQuery} setShowAdvancedFilters={setShowAdvancedFilters} showAdvancedFilters={showAdvancedFilters} totalActiveSources={totalActiveSources} totalCuratedCount={totalCuratedCount} />
 
             <SourcesCustomReferenceForm customForm={customForm} handleAddCustomSource={handleAddCustomSource} isAddingCustom={isAddingCustom} setCustomForm={setCustomForm} setIsAddingCustom={setIsAddingCustom} />
 
@@ -800,6 +801,7 @@ export default function AssignmentSourcesStage({
                   <button
                     type="button"
                     onClick={() => setDiscoverySuccessMsg(null)}
+                    aria-label="Dismiss notice"
                     className="text-[color:var(--text-muted)] hover:text-white cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5" />
@@ -851,7 +853,10 @@ export default function AssignmentSourcesStage({
         </>
       )}
 
-      <SourcesExitGate approvedCount={approvedCount} handleContinue={handleContinue} handleReturn={handleReturn} />
+      {/* The analysis view ends with its own action row. */}
+      {(activeMainView !== "analysis" || allMasterSources.length === 0) && (
+        <SourcesExitGate approvedCount={approvedCount} handleContinue={handleContinue} handleReturn={handleReturn} />
+      )}
       {/* Floating Bottom Reference Shelf Dock */}
       <ApprovedReferencesShelf
         approvedSources={approvedSourcesList}

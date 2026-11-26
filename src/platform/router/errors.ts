@@ -1,3 +1,4 @@
+import { truncateAtWord } from "../../shared/truncateAtWord";
 import type { Failure, FailureKind } from "./types";
 
 /** Errors adapters throw carry status/headers; anything else is classified by shape. */
@@ -58,7 +59,7 @@ export function classify(err: unknown, signal: AbortSignal): Failure {
   if (err instanceof EmptyOutputError) return f("empty_output", err.message, false, true);
   if (err instanceof ProviderHttpError) {
     const s = err.status;
-    const msg = err.message.slice(0, 300);
+    const msg = truncateAtWord(err.message, 400);
     const code = String(err.code ?? "").toLowerCase();
     if (code.includes("context") || /context.{0,20}(length|window)|too many tokens|maximum context/i.test(msg))
       return f("context_overflow", msg, false, true, { httpStatus: s });
@@ -83,7 +84,7 @@ export function classify(err: unknown, signal: AbortSignal): Failure {
     return f("invalid_request", msg, false, false, { httpStatus: s });
   }
   const msg = err instanceof Error ? err.message : String(err);
-  return f("network", msg.slice(0, 300), true, true);
+  return f("network", truncateAtWord(msg, 400), true, true);
 }
 
 /** Failures that should count against a provider's circuit. */

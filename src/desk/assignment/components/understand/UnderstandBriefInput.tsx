@@ -72,7 +72,7 @@ export function UnderstandBriefInput({ fileInputRef, handleLevelChange, handleQu
                   </span>
                 )}
                 {uploadedFileName && (
-                  <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1.5 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+                  <span className="text-xs text-emerald-800 dark:text-emerald-400 font-medium flex items-center gap-1.5 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
                     <FileText className="w-3.5 h-3.5" />
                     <span>{uploadedFileName}</span>
                   </span>

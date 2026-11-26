@@ -161,6 +161,8 @@ export function invalidateGate(projectId: string, gate: string, reason: string):
   ).then((r) => json(r));
 }
 
+const projectReads = new Map<string, Promise<ProjectView>>();
+
 export function getProject(projectId: string): Promise<ProjectView> {
   const migratedId = getMigratedDraftRealId(projectId);
   if (migratedId && migratedId !== projectId) {
@@ -178,7 +180,14 @@ export function getProject(projectId: string): Promise<ProjectView> {
       .then((r) => json<ProjectView>(r))
       .catch(() => Promise.reject(new Error(`Draft project ${projectId} not found in ephemeral memory`)));
   }
-  return authedFetch(`/api/projects/${encodeURIComponent(projectId)}`).then((r) => json(r));
+  // Concurrent readers (route and workspace mounting together) share one request.
+  const pending = projectReads.get(projectId);
+  if (pending) return pending;
+  const read = authedFetch(`/api/projects/${encodeURIComponent(projectId)}`)
+    .then((r) => json<ProjectView>(r))
+    .finally(() => projectReads.delete(projectId));
+  projectReads.set(projectId, read);
+  return read;
 }
 
 export async function getRubric(projectId: string): Promise<RubricReport | null> {

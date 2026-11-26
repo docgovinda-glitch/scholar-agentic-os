@@ -41,7 +41,7 @@ export function ScholarCoreLogo({
       data-testid="scholar-core-animated-logo"
     >
       <img
-        src="cognitive_authority_veena_logo_v7b_colored_details.png"
+        src="/cognitive_authority_veena_logo_v7b_colored_details.png"
         alt={alt}
         aria-hidden={!alt ? true : undefined}
         width={mark}
@@ -49,12 +49,6 @@ export function ScholarCoreLogo({
         className="ai-logo-spin object-contain select-none pointer-events-none rounded-full"
         style={{ width: `${mark}px`, height: `${mark}px` }}
         loading="eager"
-        onError={(e) => {
-          const target = e.currentTarget;
-          if (!target.src.startsWith(window.location.origin + '/cognitive_authority_veena_logo_v7b_colored_details.png')) {
-            target.src = '/cognitive_authority_veena_logo_v7b_colored_details.png';
-          }
-        }}
       />
     </div>
   );

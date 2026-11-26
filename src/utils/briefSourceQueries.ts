@@ -134,7 +134,10 @@ export function anchorQueries(queries: string[], domainTerms: string[]): string[
 
 /**
  * 0-100 relevance of a paper to the brief: needs at least one subject word in
- * its title/venue (else 0, i.e. off-topic), then rises with query-term overlap.
+ * its title, venue or abstract (else 0, i.e. off-topic), then rises with how much
+ * of the best search phrase it carries and how many subject words it names. A
+ * word in the title counts for more than one buried in a long abstract, so 100
+ * means every term is in the title.
  */
 export function scoreSourceRelevance(
   paper: { title: string; venue?: string; abstract?: string },
@@ -147,20 +150,23 @@ export function scoreSourceRelevance(
   // Must mention one of the brief's core subject words, not just a minor one.
   const core = domainTerms.slice(0, 3);
   if (core.length > 0 && !core.some((d) => words.has(d) || hay.includes(d))) return 0;
+  const title = paper.title.toLowerCase();
+  // "self-attention" also matches a title that says "attention".
+  const found = (term: string, text: string) => text.includes(term) || term.split("-").some((p) => p.length >= 4 && text.includes(p));
   let best = 0;
+  let anyTerm = false;
   for (const q of queries) {
     const terms = contentWords(q).map((w) => w.toLowerCase().replace(/s$/, ""));
     if (!terms.length) continue;
-    // "self-attention" also matches a title that says "attention".
-    const hit = (t: string) => words.has(t) || hay.includes(t) || t.split("-").some((p) => p.length >= 4 && (words.has(p) || hay.includes(p)));
-    const share = terms.filter(hit).length / terms.length;
-    best = Math.max(best, share);
+    const anywhere = terms.filter((t) => words.has(t) || found(t, hay)).length / terms.length;
+    const inTitle = terms.filter((t) => found(t, title)).length / terms.length;
+    if (anywhere > 0) anyTerm = true;
+    best = Math.max(best, 0.5 * anywhere + 0.5 * inTitle);
   }
   // A short brief yields no subject words; a paper must then share at least
   // one key word with a search phrase, or anything from any field would pass.
-  if (domainTerms.length === 0 && best === 0) return 0;
-  const domainShare = domainTerms.length ? Math.min(1, domainHits / Math.min(2, domainTerms.length)) : 1;
-  return Math.round(100 * (0.45 * domainShare + 0.55 * best));
+  if (domainTerms.length === 0) return anyTerm ? Math.round(100 * best) : 0;
+  return Math.round(100 * (0.35 * (domainHits / domainTerms.length) + 0.65 * best));
 }
 
 /**

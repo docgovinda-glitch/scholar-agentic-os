@@ -253,9 +253,9 @@ export const SectionAnalysisWorkspace: React.FC<SectionAnalysisWorkspaceProps> =
               </span>
             )}
           </div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[color:var(--text-primary)]">
+          <h2 className="text-lg sm:text-xl font-bold tracking-tight text-[color:var(--text-primary)]">
             AI Analysis & Argumentation
-          </h1>
+          </h2>
           <p className="text-xs sm:text-sm text-[color:var(--text-muted)] max-w-2xl leading-relaxed">
             Construct evidence-backed arguments for each section of your outline. Claims, evidence excerpts, interpretations, and verified in-text citations are automatically calibrated.
           </p>
@@ -303,7 +303,7 @@ export const SectionAnalysisWorkspace: React.FC<SectionAnalysisWorkspaceProps> =
               <Layers className="w-3.5 h-3.5 text-[color:var(--text-muted)]" />
               <span>Outline Sections ({outlineSections.length})</span>
             </h2>
-            <span className="text-xs text-[color:var(--text-muted)] font-mono">Phase 1 Outline</span>
+            <span className="text-xs text-[color:var(--text-muted)] font-mono">From 02 Understand</span>
           </div>
 
           <div className="space-y-1.5 max-h-[600px] overflow-y-auto pr-1">
@@ -323,7 +323,7 @@ export const SectionAnalysisWorkspace: React.FC<SectionAnalysisWorkspaceProps> =
                   }`}
                 >
                   <div className="min-w-0">
-                    <span className="text-xs font-mono opacity-60 block">
+                    <span className="text-xs font-mono block">
                       Section {sec.numberStr || ""}
                     </span>
                     <span className="text-xs font-semibold truncate block">
@@ -728,20 +728,22 @@ export const SectionAnalysisWorkspace: React.FC<SectionAnalysisWorkspaceProps> =
         </div>
       )}
 
-      {/* Phase 2 Bottom Action Bar */}
+      {/* Bottom action bar */}
       <div className="rounded-2xl p-6 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-5">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold text-[color:var(--text-primary)]">
-              Phase 2: Evidence & Analysis Complete
+              {syntheses.length > 0 ? "Evidence & analysis ready" : "Evidence & analysis not started"}
             </h3>
-            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 flex items-center gap-1 border border-emerald-500/20">
+            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-800 dark:text-emerald-400 flex items-center gap-1 border border-emerald-500/20">
               <CheckCircle2 className="w-3 h-3" />
               <span>{syntheses.length} Analytical Arguments Formulated</span>
             </span>
           </div>
           <p className="text-xs text-[color:var(--text-muted)]">
-            All analytical arguments are grounded in your unified source vault with valid in-text citations. Proceed to Phase 3 drafting when ready.
+            {syntheses.length > 0
+              ? "Check each argument against its source, then continue to 04 Drafting when ready."
+              : "No arguments have been written yet. Add one to a section, or continue to 04 Drafting."}
           </p>
         </div>
 
@@ -764,7 +766,7 @@ export const SectionAnalysisWorkspace: React.FC<SectionAnalysisWorkspaceProps> =
               data-testid="proceed-to-drafting-btn"
               className="px-7 py-2.5 rounded-full text-xs font-semibold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 active:scale-[0.99] transition-all cursor-pointer flex items-center gap-2 shadow-xs dark:shadow-none"
             >
-              <span>Proceed to Phase 3: Drafting</span>
+              <span>Proceed to Drafting</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           )}

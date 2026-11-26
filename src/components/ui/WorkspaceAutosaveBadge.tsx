@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { announcePolite } from "./AriaLiveAnnouncer";
+import { announcePolite, clearAnnouncements } from "./AriaLiveAnnouncer";
 
 export type AutosaveState = "saved" | "saving" | "offline" | "error" | "idle" | "signed-out";
 
@@ -46,6 +46,8 @@ export function WorkspaceAutosaveBadge({
       prevStatusRef.current = normalizedStatus;
     }
   }, [normalizedStatus, version]);
+
+  useEffect(() => () => clearAnnouncements(), []);
 
   const isSaving = normalizedStatus === "saving";
   const isOffline = normalizedStatus === "offline";

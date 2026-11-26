@@ -336,7 +336,7 @@ export default function ProviderDetail({
               type="button"
               onClick={() => void handleTestPing()}
               disabled={pingRunning || (!view.connected && !apiKey.trim())}
-              className="rounded-[var(--radius-md)] border border-emerald-600/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 px-3 py-2 text-sm font-medium disabled:opacity-50 cursor-pointer flex items-center gap-1.5 transition-colors"
+              className="rounded-[var(--radius-md)] border border-emerald-600/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-800 dark:text-emerald-400 px-3 py-2 text-sm font-medium disabled:opacity-50 cursor-pointer flex items-center gap-1.5 transition-colors"
             >
               <span>{pingRunning ? "Testing…" : "Test connection"}</span>
             </button>
@@ -344,7 +344,7 @@ export default function ProviderDetail({
           {pingResult && (
             <div className={`mt-3 rounded-[var(--radius-sm)] border p-2.5 text-xs font-mono flex items-center justify-between gap-2 ${
               pingResult.ok
-                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300"
                 : "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300"
             }`}>
               <div className="flex items-center gap-2">

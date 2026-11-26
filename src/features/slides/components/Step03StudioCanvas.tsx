@@ -116,13 +116,15 @@ function SortableThumb({ slide, index, total, active, theme, onSelect, onMove, o
         type="button"
         onClick={onSelect}
         aria-current={active ? 'true' : undefined}
-        aria-label={`Slide ${index + 1}: ${slide.actionHeadline}`}
         data-testid={`studio-thumb-${index}`}
-        className="w-full flex items-start gap-2 text-left cursor-pointer"
+        className="relative w-full flex items-start gap-2 text-left cursor-pointer"
         {...listeners}
       >
-        <span className={`w-4 pt-1 text-[11px] tabular-nums text-right shrink-0 ${active ? 'text-neutral-900 dark:text-white font-semibold' : 'text-neutral-400'}`}>{index + 1}</span>
+        {/* Named by words, not by the miniature slide, whose text would be read out in full. */}
+        <span className="sr-only">{`Slide ${index + 1}: ${slide.actionHeadline}`}</span>
+        <span aria-hidden="true" className={`w-4 pt-1 text-[11px] tabular-nums text-right shrink-0 ${active ? 'text-neutral-900 dark:text-white font-semibold' : 'text-neutral-400'}`}>{index + 1}</span>
         <span
+          aria-hidden="true"
           className={`block flex-1 rounded-[10px] transition-shadow pointer-events-none ${
             active ? 'ring-2 ring-neutral-900 dark:ring-neutral-100 ring-offset-2 ring-offset-[#F8F7F4] dark:ring-offset-[#171717]' : 'ring-1 ring-transparent group-hover:ring-neutral-900/20 dark:group-hover:ring-white/20'
           }`}

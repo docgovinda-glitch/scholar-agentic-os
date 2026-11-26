@@ -11,12 +11,14 @@ import {
   AudienceQaSimulator,
   type AudienceQaQuestion,
 } from '../../features/slides';
-import { authedFetch, getProject, saveIntakeAnswers } from '../api';
+import { authedFetch, getProject, isEphemeralProject, saveIntakeAnswers } from '../api';
 import { DEFAULT_DECK_THEME_ID } from '../../features/slides/gamma/theme';
 import { composeDeckFromText, composeDeckFromTopic } from '../../features/slides/gamma/composer';
 import { normalizeDeck } from '../../features/slides/gamma/content';
 import ScholarSidebar, { type ScholarSidebarProject } from '../../components/navigation/ScholarSidebar';
+import { useDeviceClass } from '../../hooks/useDeviceClass';
 import { useDeskSession } from '../useDeskSession';
+import { useProjectDocumentTitle } from '../documentTitle';
 import { listProjects } from '../api/projectsApi';
 import { normalizeProjectList } from '../sidebarProjects';
 import GammaPlayer from '../../features/slides/gamma/GammaPlayer';
@@ -27,7 +29,8 @@ import { showAppToast } from '../../components/ui/FeedbackSystem';
 export type { PresentationStudioStep } from '../../features/slides';
 
 export interface PresentationWorkspaceProps {
-  projectId: string;
+  /** Omitted for a new deck that has no project: nothing is read from or saved to the server. */
+  projectId?: string;
   onClose?: () => void;
   onOpenAccountSettings?: () => void;
   onOpenVault?: () => void;
@@ -50,10 +53,12 @@ export default function PresentationWorkspace({
   const computedInitialStep =
     initialStep ?? (initialDeck || (initialCourseworkText && initialCourseworkText.trim()) ? 'studio' : 'understand');
   const [currentStep, setCurrentStep] = useState<PresentationStudioStep>(computedInitialStep);
-  // Phones start with the navigation closed so the studio gets the full width.
+  const { isMobile: isPhone } = useDeviceClass();
+  // Below 1024px the studio needs the full width, so the navigation starts closed.
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
-    () => typeof window !== 'undefined' && window.innerWidth < 768
+    () => typeof window !== 'undefined' && window.innerWidth < 1024
   );
+  const [sidebarSearch, setSidebarSearch] = useState('');
   // The sidebar shows the signed-in user's own projects and email, nothing else.
   const session = useDeskSession();
   const sessionName = session.status === 'signed-in' ? session.name ?? null : null;
@@ -98,9 +103,12 @@ export default function PresentationWorkspace({
       cancelled = true;
     };
   }, [signedIn, session.status]);
+  const goTo = (route: string) => {
+    if (typeof window !== 'undefined') window.location.href = route;
+  };
   const [showLivePlayer, setShowLivePlayer] = useState(false);
   const [playerStartIndex, setPlayerStartIndex] = useState(0);
-  const [autosaveStatus, setAutosaveStatus] = useState<'saved' | 'saving' | 'idle' | 'error' | 'signed-out'>('saved');
+  const [autosaveStatus, setAutosaveStatus] = useState<'saved' | 'saving' | 'idle' | 'error' | 'signed-out'>(projectId ? 'saved' : 'signed-out');
   const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
   const [projectVersion, setProjectVersion] = useState<number>(1);
   useUnsavedChangesGuard(autosaveStatus === 'saving' || autosaveStatus === 'error');
@@ -138,6 +146,13 @@ export default function PresentationWorkspace({
     };
   });
 
+  // The open deck's row shows the name as it is being edited, not the one fetched when the page opened.
+  const namedProjects = sidebarProjects.map((row) =>
+    row.id === projectId && deck && !isUntitledDeckTitle(deck.title) ? { ...row, title: deck.title } : row
+  );
+  const visibleSidebarProjects = namedProjects.filter((p) => p.title.toLowerCase().includes(sidebarSearch.trim().toLowerCase()));
+  useProjectDocumentTitle(deck && !isUntitledDeckTitle(deck.title) ? deck.title : null);
+
   const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Hydrate from getProject(projectId) and scoped presentation endpoint on mount
@@ -145,6 +160,8 @@ export default function PresentationWorkspace({
     let mounted = true;
 
     async function hydrate() {
+      // A new local deck has nothing to load.
+      if (!projectId || isEphemeralProject(projectId)) return;
       try {
         const project = await getProject(projectId);
         if (!mounted || !project) return;
@@ -235,7 +252,7 @@ export default function PresentationWorkspace({
       }
 
       // A signed-out visitor's deck lives only in this tab: say so instead of calling the server.
-      if (!signedIn) {
+      if (!signedIn || !projectId) {
         setAutosaveStatus('signed-out');
         return;
       }
@@ -311,6 +328,7 @@ export default function PresentationWorkspace({
   const handleSaveQaQuestions = useCallback(
     (newQuestions: AudienceQaQuestion[]) => {
       setSavedQaQuestions(newQuestions);
+      if (!projectId) return;
       saveIntakeAnswers(projectId, { presentationQaHistory: newQuestions }).catch(() =>
         showAppToast("Your rehearsal questions could not be saved. They stay on this screen; try again before leaving.", "warning", 7000)
       );
@@ -406,26 +424,39 @@ export default function PresentationWorkspace({
       className="flex h-dvh w-full overflow-hidden bg-paper-warm dark:bg-ink-850 text-neutral-900 dark:text-neutral-100 font-sans transition-colors duration-200"
       data-testid="presentation-workspace"
     >
-      {/* Left Sidebar Shell */}
+      {/* Left sidebar: the one shared with the main screen */}
       <ScholarSidebar
+        isPhone={isPhone}
+        mobileOpen={isPhone && !sidebarCollapsed}
+        onCloseMobile={() => setSidebarCollapsed(true)}
         isCollapsed={sidebarCollapsed}
-        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        onToggle={() => setSidebarCollapsed(true)}
         activeItem="presentation"
-        onNavigate={(route) => {
-          if (onClose && route === '/projects') {
-            onClose();
-          } else if (typeof window !== 'undefined') {
-            window.location.href = route;
-          }
-        }}
-        onOpenSettings={onOpenAccountSettings}
-        onOpenVault={onOpenVault}
-        onOpenAiAccess={onOpenAiAccess}
+        onHome={handleNavigateBack}
+        onNewProject={() => goTo('/projects?new=1')}
+        onOpenVault={() => (onOpenVault ? onOpenVault() : goTo('/vault'))}
+        onOpenAiAccess={() => (onOpenAiAccess ? onOpenAiAccess() : goTo('/ai-access'))}
+        onOpenSettings={() => (onOpenAccountSettings ? onOpenAccountSettings() : goTo('/settings'))}
         onOpenAskScholar={() => setIsAskScholarOpen((prev) => !prev)}
-        projects={sidebarProjects}
+        askScholarExpanded={isAskScholarOpen}
+        projects={visibleSidebarProjects}
         projectsLoading={session.status === 'loading' || projectsLoading}
-        userName={displayName}
-        userEmail={sessionEmail ?? undefined}
+        searchQuery={sidebarSearch}
+        onSearchChange={setSidebarSearch}
+        onSelectProject={(p) => goTo(`/projects/${p.id}`)}
+        footer={
+          sessionEmail ? (
+            <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl bg-neutral-50 dark:bg-white/5 border border-neutral-200/60 dark:border-white/5" data-testid="user-profile-card">
+              <div className="w-7 h-7 rounded-full bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 flex items-center justify-center text-[11px] font-bold shrink-0">
+                {(displayName || sessionEmail).slice(0, 2).toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-semibold text-neutral-900 dark:text-white truncate">{displayName || sessionEmail}</p>
+                {displayName && <p className="text-[10px] text-neutral-600 dark:text-neutral-400 truncate">{sessionEmail}</p>}
+              </div>
+            </div>
+          ) : null
+        }
       />
 
       {/* Main Workspace Column */}
@@ -448,7 +479,10 @@ export default function PresentationWorkspace({
           onNavigateBack={handleNavigateBack}
           isSidebarCollapsed={sidebarCollapsed}
           onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
-          onOpenQaSimulator={() => setIsQaSimulatorOpen(true)}
+          onOpenQaSimulator={() => {
+            if (projectId) setIsQaSimulatorOpen(true);
+            else showAppToast('Sign in to rehearse audience questions.', 'info', 4000);
+          }}
         />
 
         {/* Scrollable Canvas Body */}
@@ -505,9 +539,9 @@ export default function PresentationWorkspace({
         </main>
       </div>
 
-      {/* Right Collapsible Ask Scholar Drawer */}
+      {/* Right Collapsible Ask Scholar Drawer. On a phone it covers the studio instead of squeezing it. */}
       {isAskScholarOpen && (
-        <aside className="w-80 lg:w-96 flex-shrink-0 border-l border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-750 flex flex-col h-full shadow-lg z-20 transition-all duration-300">
+        <aside aria-label="Ask Scholar" className="max-sm:fixed max-sm:inset-0 max-sm:z-50 sm:w-80 lg:w-96 flex-shrink-0 border-l border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-750 flex flex-col h-full shadow-lg z-20 transition-all duration-300">
           <AskScholarPresentationDrawer
             deck={deck}
             onUpdateDeck={handleUpdateDeck}
@@ -519,7 +553,7 @@ export default function PresentationWorkspace({
       )}
 
       {/* Audience Q&A Simulator Modal */}
-      {isQaSimulatorOpen && (
+      {isQaSimulatorOpen && projectId && (
         <AudienceQaSimulator
           projectId={projectId}
           deck={deck}

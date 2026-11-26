@@ -211,7 +211,7 @@ export default function SettingsView({
       {successMsg && (
         <div
           role="status"
-          className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded-[var(--radius-md)] text-xs leading-relaxed flex items-start gap-2 animate-in fade-in"
+          className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 rounded-[var(--radius-md)] text-xs leading-relaxed flex items-start gap-2 animate-in fade-in"
         >
           <span>✓</span>
           <span>{successMsg}</span>
@@ -268,7 +268,7 @@ export default function SettingsView({
                 <div className="flex items-center gap-2 flex-wrap">
                   <h4 className="text-xs font-bold text-[color:var(--text-primary)]">Google Drive</h4>
                   {isGoogleConnected ? (
-                    <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-500/20 shrink-0">
+                    <span className="text-[10px] font-semibold text-emerald-800 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-500/20 shrink-0">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                       Connected &amp; Synced
                     </span>
@@ -332,7 +332,7 @@ export default function SettingsView({
                 <div className="flex items-center gap-2 flex-wrap">
                   <h4 className="text-xs font-bold text-[color:var(--text-primary)]">Microsoft OneDrive</h4>
                   {isOneDriveConnected ? (
-                    <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-500/20 shrink-0">
+                    <span className="text-[10px] font-semibold text-emerald-800 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-500/20 shrink-0">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                       Connected &amp; Synced
                     </span>
@@ -412,7 +412,7 @@ export default function SettingsView({
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-xs font-bold text-[color:var(--text-primary)]">Universal Cloud Sync</span>
                 {storageMode === "synced" && (
-                  <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                  <span className="text-[10px] font-bold text-emerald-800 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
                     Active
                   </span>
                 )}
@@ -423,7 +423,7 @@ export default function SettingsView({
             </div>
             <div className="pt-2">
               {storageMode === "synced" ? (
-                <div className="w-full py-1.5 px-3 text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-[var(--radius-md)] inline-flex items-center justify-center gap-1.5">
+                <div className="w-full py-1.5 px-3 text-xs font-medium text-emerald-800 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-[var(--radius-md)] inline-flex items-center justify-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                   <span>Currently Active</span>
                 </div>

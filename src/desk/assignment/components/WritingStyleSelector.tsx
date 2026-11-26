@@ -310,7 +310,7 @@ export default function WritingStyleSelector({
               >
                 {customFileName ? (
                   <div className="space-y-2">
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-400 text-xs font-medium">
                       <FileText className="w-3.5 h-3.5" />
                       <span className="truncate max-w-[180px]">{customFileName}</span>
                       <button

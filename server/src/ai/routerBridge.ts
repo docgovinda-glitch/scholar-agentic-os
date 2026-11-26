@@ -44,7 +44,8 @@ export class RouterExhaustedError extends Error {
   constructor(message: string, public code: "exhausted" | "context_overflow" | "non_retryable") { super(message); this.name = "RouterExhaustedError"; }
 }
 export class RouterHandoffError extends Error {
-  constructor(public label: string) { super(`Continue on the user's device with ${label}`); this.name = "RouterHandoffError"; }
+  /** `cloudFailure` says why no cloud connection answered first; empty when the local model simply is the only one. */
+  constructor(public label: string, public cloudFailure: string = "") { super(`Continue on the user's device with ${label}`); this.name = "RouterHandoffError"; }
 }
 export class NoAiConnectedError extends Error {
   constructor() { super("No AI is connected. Add your own AI key or a local model in AI Access."); this.name = "NoAiConnectedError"; }
@@ -53,6 +54,24 @@ export class NoAiConnectedError extends Error {
 interface BridgeDeps { adapters: Partial<Record<ProviderId, ProviderAdapter>>; breaker: CircuitBreaker }
 let deps: BridgeDeps = { adapters: serverAdapters(), breaker: serverBreaker };
 export function configureRouterBridge(next: Partial<BridgeDeps>): void { deps = { ...deps, ...next }; }
+
+/**
+ * Why the cloud connections of this request did not answer: the last failure the router hit, plus every
+ * connection it skipped. Empty when there was no cloud connection to try.
+ */
+export function cloudFailureReason(req: { headers?: Request["headers"] }, handoffReason = ""): string {
+  const skipped = ((req as Scoped).aiRoute?.notices ?? []).filter((n) => n.kind === "skipped").map((n) => n.text);
+  const failed = / failed: /.test(handoffReason) ? [handoffReason] : [];
+  // Each reason is a sentence of its own, whether or not the notice ended with a full stop.
+  return [...new Set([...failed, ...skipped])].map((t) => t.replace(/\s+/g, " ").trim().replace(/([^.!?])$/, "$1.")).join(" ");
+}
+
+/** The error for a server step that cannot hand over to the browser: the cloud failure when there was one. */
+export function serverCannotUseLocal(cloudFailure: string): Error {
+  return cloudFailure
+    ? new RouterExhaustedError(`Your cloud AI could not answer. ${cloudFailure} The next model in your chain runs on your computer, which Scholar Core's server cannot reach. Check your cloud key in AI Access and try again.`, "exhausted")
+    : new LocalModelUnreachableError();
+}
 
 /** The AI connections this request sent: the `x-ai-keyring` header, in the user's order. */
 export function keyringFromRequest(req: { headers?: Request["headers"] }): KeyringEntry[] {
@@ -193,7 +212,7 @@ export async function routedResult(req: Request, call: RoutedCall): Promise<Rout
         if (!text.trim()) throw new RouterExhaustedError("The AI returned an empty answer.", "exhausted");
         return { text, finishReason: ev.finishReason };
       }
-      if (ev.type === "handoff") throw new RouterHandoffError(ev.label);
+      if (ev.type === "handoff") throw new RouterHandoffError(ev.label, cloudFailureReason(req, ev.reason));
       if (ev.type === "error") throw new RouterExhaustedError(ev.message, ev.code);
       if (ev.type === "cancelled") throw new RouterExhaustedError("Cancelled", "non_retryable");
     }
@@ -261,7 +280,7 @@ export async function routedCompletion(req: Request, call: RoutedCall, handOff?:
     if (err instanceof RouterHandoffError) {
       const res = req.res;
       const canHandOff = Boolean(handOff) && call.handOff !== false && Boolean(res) && !res!.headersSent && !call.images?.some((i) => i.data);
-      if (!canHandOff) throw new LocalModelUnreachableError();
+      if (!canHandOff) throw serverCannotUseLocal(err.cloudFailure);
       throw new BrowserAiRequiredError({
         challengeToken: handOff!.challengeFor(req, systemPrompt, call.userPrompt),
         systemPrompt,

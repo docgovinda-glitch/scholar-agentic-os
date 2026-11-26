@@ -663,7 +663,7 @@ export default function CustomThemeStudio({
                     : 'text-neutral-500 hover:text-white'
                 }`}
               >
-                🌙 Dark Mode
+                🌙 Dark mode
               </button>
             </div>
           </div>

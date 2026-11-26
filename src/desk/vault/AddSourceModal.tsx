@@ -873,7 +873,7 @@ export default function AddSourceModal({
                     <div className="flex items-center gap-1.5 font-bold text-[color:var(--text-primary)]">
                       <span>📁</span>
                       <span>Google Drive</span>
-                      <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded-full">
+                      <span className="text-[10px] font-semibold text-emerald-800 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded-full">
                         Connected ({googleAccount?.accountEmail})
                       </span>
                     </div>
@@ -948,7 +948,7 @@ export default function AddSourceModal({
                                 {file.name}
                               </span>
                               {isSelected && (
-                                <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded-full shrink-0">
+                                <span className="text-[10px] font-bold text-emerald-800 dark:text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded-full shrink-0">
                                   ✓ Selected
                                 </span>
                               )}
@@ -1056,7 +1056,7 @@ export default function AddSourceModal({
                     <div className="flex items-center gap-1.5 font-bold text-[color:var(--text-primary)]">
                       <span>☁️</span>
                       <span>Microsoft OneDrive</span>
-                      <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded-full">
+                      <span className="text-[10px] font-semibold text-emerald-800 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded-full">
                         Connected ({oneDriveAccount?.accountEmail})
                       </span>
                     </div>
@@ -1131,7 +1131,7 @@ export default function AddSourceModal({
                                 {file.name}
                               </span>
                               {isSelected && (
-                                <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded-full shrink-0">
+                                <span className="text-[10px] font-bold text-emerald-800 dark:text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded-full shrink-0">
                                   ✓ Selected
                                 </span>
                               )}

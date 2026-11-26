@@ -3,6 +3,7 @@
  * person is told when no answer could be written.
  */
 
+import { truncateAtWord } from "../../shared/truncateAtWord";
 import { cleanVenue, normalizeAuthorList, normalizeAuthorName } from "../../shared/authorNames";
 import type { LiveSearchResult } from "../../services/liveSearchService";
 import type { WebsiteAssistantMessage } from "./types";
@@ -42,6 +43,35 @@ export function liveSourcesAsCitations(sources?: LiveSearchResult[]): Citation[]
   }));
 }
 
+/**
+ * How many of these sources the answer text actually refers to: by its [n] number, its DOI or URL, or its first
+ * author's surname next to its year. A reference list appended to the answer does not count as citing.
+ */
+export function countCitedSources(
+  text: string,
+  sources: Array<{ authors?: string[]; author?: string; year?: number | string; doi?: string; url?: string }>
+): number {
+  const body = text.split(/\n#{1,4}\s*(?:references|bibliography|works cited|sources)\b/i)[0];
+  const numbers = new Set<number>();
+  for (const group of body.matchAll(/\[(\d{1,3}(?:\s*[,–-]\s*\d{1,3})*)\]/g)) {
+    for (const part of group[1].split(",")) {
+      const [from, to = from] = part.split(/[–-]/).map((n) => Number(n.trim()));
+      for (let n = from; n <= to && n - from < 100; n++) numbers.add(n);
+    }
+  }
+  const lower = body.toLowerCase();
+  return sources.filter((source, index) => {
+    if (numbers.has(index + 1)) return true;
+    if (source.doi && lower.includes(source.doi.toLowerCase())) return true;
+    if (source.url && source.url.startsWith("http") && lower.includes(source.url.toLowerCase())) return true;
+    const first = (source.authors?.[0] || source.author || "").trim();
+    const surname = (first.includes(",") ? first.split(",")[0] : first.split(/\s+/).pop() || "").toLowerCase();
+    if (surname.length < 3 || !source.year) return false;
+    const escaped = surname.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`\\b${escaped}\\b[^()\\n]{0,40}\\(?[^()\\n]{0,20}\\b${source.year}\\b`).test(lower);
+  }).length;
+}
+
 const NO_AI = /no ai providers|not configured|no provider|connect a provider|api key|unauthori[sz]ed|\b401\b|\b426\b/i;
 /** The server rejected the request for lack of a signed-in session (not a bad provider key). */
 const SIGNED_OUT = /authori[sz]ation header|missing or invalid (?:token|session|credentials)|not signed in|sign in required|jwt|session (?:has )?expired/i;
@@ -78,7 +108,7 @@ export function askFailureMessage(
       text: `${found ? `${found}no AI is` : "There is no AI"} connected on this device, so I can't write an answer yet. Connect one in AI Access (Google Gemini has a free key) and ask again.`,
     };
   }
-  const detail = raw ? ` (${raw.replace(/\s+/g, " ").slice(0, 160)})` : "";
+  const detail = raw ? ` (${truncateAtWord(raw, 600).replace(/\.$/, "")})` : "";
   return {
     kind: "failed",
     text: `${found ? `${found}the` : "The"} AI didn't return an answer${detail}. Try again in a moment; if it keeps failing, check your AI in AI Access.`,

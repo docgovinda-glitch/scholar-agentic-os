@@ -10,6 +10,7 @@
  */
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createDedupingFetch } from "./supabaseDedupeFetch";
 
 const env =
   (typeof import.meta !== "undefined" && import.meta && import.meta.env)
@@ -77,6 +78,7 @@ export function getSupabaseClient(): SupabaseClient {
       (typeof window !== "undefined" && window.localStorage?.getItem("scholar_disable_realtime") === "true");
 
     const clientOptions: any = {
+      global: { fetch: createDedupingFetch() },
       realtime: isRealtimeDisabled
         ? false
         : {

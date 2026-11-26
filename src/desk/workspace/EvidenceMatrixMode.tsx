@@ -612,7 +612,7 @@ export default function EvidenceMatrixMode() {
                           Format: {d.format.toUpperCase()} · {d.sourceType}
                         </span>
                       </div>
-                      <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 shrink-0">
+                      <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border border-emerald-500/30 shrink-0">
                         User Data
                       </span>
                     </div>
@@ -870,7 +870,7 @@ export default function EvidenceMatrixMode() {
                         <span
                           className={`mt-1.5 block text-[9px] font-bold text-center px-1.5 py-0.5 rounded uppercase tracking-wider ${
                             row.isUserData
-                              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
+                              ? "bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border border-emerald-500/30"
                               : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/30"
                           }`}
                         >

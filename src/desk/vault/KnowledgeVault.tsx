@@ -38,6 +38,7 @@ import {
   isDuplicateProjectTitle,
   getFormatLabel,
   deduplicateProjectList,
+  isBlankProject,
 } from "../projectNaming";
 import { markProjectDeleted, unmarkProjectDeleted, withoutDeletedProjects } from "../sidebarProjects";
 import SourceLibraryScreen from "./SourceLibraryScreen";
@@ -53,6 +54,11 @@ export interface KnowledgeVaultProps {
   onLock?: () => void;
   onResetVault?: () => void;
 }
+
+/** Output types that share one chip: a thesis can be stored under any of these ids. */
+const THESIS_TYPE_IDS = ["OT-06", "OT-07", "OT-20"];
+const matchesTypeFilter = (outputTypeId: string, filter: string) =>
+  filter === "OT-20" ? THESIS_TYPE_IDS.includes(outputTypeId) : outputTypeId === filter;
 
 export const VAULT_FORMAT_TILES = [
   { id: "OT-10", label: "Journal Article" },
@@ -158,17 +164,26 @@ export default function KnowledgeVault({
     return map;
   }, [types]);
 
+  // The one list the cards, the chip counts and the totals are all read from. Only empty copies of one
+  // draft are folded together; every project with content is listed, even when titles repeat.
+  const listedProjects = useMemo(() => {
+    if (!projects) return null;
+    const blanks = deduplicateProjectList(projects.filter(isBlankProject), projects);
+    const keptBlanks = new Set(blanks.map((p) => p.projectId));
+    return projects.filter((p) => !isBlankProject(p) || keptBlanks.has(p.projectId));
+  }, [projects]);
+
   const filteredProjects = useMemo(() => {
-    if (!projects) return [];
-    let list = projects;
+    if (!listedProjects) return [];
+    let list = listedProjects;
     if (selectedTypeFilter !== "all") {
-      list = list.filter((p) => p.outputTypeId === selectedTypeFilter);
+      list = list.filter((p) => matchesTypeFilter(p.outputTypeId, selectedTypeFilter));
     }
     if (searchQuery.trim()) {
-      list = list.filter((p) => matchesProjectSearch(p, searchQuery, projects));
+      list = list.filter((p) => matchesProjectSearch(p, searchQuery, projects || []));
     }
-    return deduplicateProjectList(list, projects);
-  }, [projects, selectedTypeFilter, searchQuery]);
+    return list;
+  }, [listedProjects, projects, selectedTypeFilter, searchQuery]);
 
   // Save renamed project heading inline
   const handleSaveRename = async (projectId: string) => {
@@ -222,23 +237,23 @@ export default function KnowledgeVault({
 
   // Progress metrics
   const metrics = useMemo(() => {
-    if (!projects || projects.length === 0) {
+    if (!listedProjects || listedProjects.length === 0) {
       return { total: 0, drafting: 0, intake: 0, avgProgress: 0, totalGates: 0, gatesVerified: 0 };
     }
-    const total = projects.length;
-    const drafting = projects.filter((p) => p.hasDocument).length;
+    const total = listedProjects.length;
+    const drafting = listedProjects.filter((p) => p.hasDocument).length;
     const intake = total - drafting;
     const avgProgress = Math.round(
-      projects.reduce((acc, p) => acc + (p.intakeCompleteness || 0) * 100, 0) / total
+      listedProjects.reduce((acc, p) => acc + (p.intakeCompleteness || 0) * 100, 0) / total
     );
     let gatesVerified = 0;
     let totalGates = 0;
-    for (const p of projects) {
+    for (const p of listedProjects) {
       gatesVerified += p.gates?.filter((g) => g.status === "signed_off").length || 0;
       totalGates += p.gates?.length || 5;
     }
     return { total, drafting, intake, avgProgress, totalGates, gatesVerified };
-  }, [projects]);
+  }, [listedProjects]);
 
   // Delete project (optimistic update)
   const handleConfirmDelete = async () => {
@@ -294,7 +309,7 @@ export default function KnowledgeVault({
 
           {/* Secondary Tab Switcher & Actions */}
           <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
-            <nav className="flex items-center gap-1 p-1 rounded-xl bg-gray-100 dark:bg-neutral-800/80 border border-gray-200/80 dark:border-neutral-700/60 shrink-0">
+            <nav aria-label="Vault sections" className="flex items-center gap-1 p-1 rounded-xl bg-gray-100 dark:bg-neutral-800/80 border border-gray-200/80 dark:border-neutral-700/60 shrink-0">
               <button
                 type="button"
                 onClick={() => setActiveTab("projects")}
@@ -353,7 +368,7 @@ export default function KnowledgeVault({
       </header>
 
       {/* Main Content Pane */}
-      <main className="flex-1 w-full overflow-y-auto">
+      <div className="flex-1 w-full overflow-y-auto">
         {activeTab === "projects" && (
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 flex flex-col gap-6">
             {/* Completion & Tracking Summary Bar */}
@@ -420,6 +435,9 @@ export default function KnowledgeVault({
                   <Search className="w-4 h-4 text-gray-400 dark:text-gray-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     type="text"
+                    id="vault-project-search"
+                    name="vaultProjectSearch"
+                    aria-label="Search projects"
                     placeholder="Search projects..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -479,7 +497,7 @@ export default function KnowledgeVault({
               </div>
 
               {/* Format Filter Tabs Track (Single horizontal row with clean smooth scroll) */}
-              <div className="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -mx-1 px-1">
+              <div className="flex flex-wrap items-center gap-2 py-1">
                 <button
                   type="button"
                   onClick={() => setSelectedTypeFilter("all")}
@@ -490,19 +508,19 @@ export default function KnowledgeVault({
                   }`}
                 >
                   <span className="whitespace-nowrap">All</span>
-                  {projects && (
+                  {listedProjects && (
                     <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full tabular-nums leading-none ${
                       selectedTypeFilter === "all"
                         ? "bg-white/20 dark:bg-black/20 text-white dark:text-gray-900"
                         : "bg-gray-100 dark:bg-neutral-800 text-gray-600 dark:text-gray-400"
                     }`}>
-                      {projects.length}
+                      {listedProjects.length}
                     </span>
                   )}
                 </button>
 
                 {VAULT_FORMAT_TILES.map((tile) => {
-                  const count = projects ? projects.filter((p) => p.outputTypeId === tile.id).length : 0;
+                  const count = listedProjects ? listedProjects.filter((p) => matchesTypeFilter(p.outputTypeId, tile.id)).length : 0;
                   const isActive = selectedTypeFilter === tile.id;
                   return (
                     <button
@@ -519,7 +537,7 @@ export default function KnowledgeVault({
                         <FormatIcon id={tile.id} className="w-3.5 h-3.5" />
                       </span>
                       <span className="whitespace-nowrap">{tile.label}</span>
-                      {count > 0 && (
+                      {listedProjects && (
                         <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full tabular-nums leading-none ${
                           isActive
                             ? "bg-white/20 dark:bg-black/20 text-white dark:text-gray-900"
@@ -959,7 +977,7 @@ export default function KnowledgeVault({
             onResetVault={onResetVault}
           />
         )}
-      </main>
+      </div>
 
       {/* Delete Confirmation Modal */}
       {projectToDelete && (

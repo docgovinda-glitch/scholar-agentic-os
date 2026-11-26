@@ -278,7 +278,7 @@ export function DynamicStructurePlanner({
               Structure v{structure.version || 1}
             </span>
             {isConfirmed && (
-              <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+              <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
                 <Check className="w-2.5 h-2.5" />
                 <span>Confirmed</span>
               </span>
@@ -345,7 +345,7 @@ export function DynamicStructurePlanner({
             <span
               className={`px-2.5 py-1 rounded-md font-mono font-semibold flex items-center gap-1.5 ${
                 isBalanced
-                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                  ? "bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border border-emerald-500/20"
                   : isOver
                   ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
                   : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"

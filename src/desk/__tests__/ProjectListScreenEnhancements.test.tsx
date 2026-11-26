@@ -78,7 +78,7 @@ describe("UI/UX Enhancements: Command Palette, Boot Project, Related Inquiries, 
     expect(dialog).toBeInTheDocument();
 
     // Type query to search existing project
-    const input = within(dialog).getByPlaceholderText(/Type a command, search projects/i);
+    const input = within(dialog).getByPlaceholderText(/Type a command or search projects/i);
     fireEvent.change(input, { target: { value: "CRISPR" } });
 
     expect(within(dialog).getByText("CRISPR Epigenetics Study")).toBeInTheDocument();

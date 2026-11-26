@@ -357,7 +357,7 @@ export default function SourceLibraryScreen({
               <span>Source Library</span>
               {/* Only when a drive is really connected (this badge was always shown). */}
               {connectedDrives.length > 0 && (
-                <span data-testid="cloud-connected-badge" className="text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                <span data-testid="cloud-connected-badge" className="text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border border-emerald-500/20">
                   {Array.from(new Set(connectedDrives.map((d) => (d.provider === "google_drive" ? "Google Drive" : "OneDrive")))).join(" + ")} connected
                 </span>
               )}
@@ -412,7 +412,7 @@ export default function SourceLibraryScreen({
       </header>
 
       {/* ================= SECONDARY NAVIGATION (SOURCES, PROJECTS, SETTINGS) ================= */}
-      <nav className="px-6 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)] flex items-center justify-between text-xs font-semibold">
+      <nav aria-label="Source library views" className="px-6 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)] flex items-center justify-between text-xs font-semibold">
         <div className="flex items-center gap-6">
           <button
             type="button"
@@ -449,7 +449,7 @@ export default function SourceLibraryScreen({
       </nav>
 
       {/* ================= TAB CONTENT AREA ================= */}
-      <main className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto">
         {/* TAB 1: SOURCES VIEW */}
         {activeTab === "sources" && (
           <div className="max-w-5xl mx-auto w-full p-6 flex flex-col gap-5">
@@ -599,7 +599,7 @@ export default function SourceLibraryScreen({
                       </button>
                     )}
                   </div>
-                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                  <div className="flex flex-wrap items-center gap-1.5 max-h-28 overflow-y-auto pb-1" role="group" aria-label="Filter by project">
                     <button
                       type="button"
                       onClick={() => setSelectedProjectFilter("all")}
@@ -629,7 +629,7 @@ export default function SourceLibraryScreen({
                         >
                           <span>📁</span>
                           <span className="truncate max-w-[160px]">{proj}</span>
-                          <span className="opacity-75 text-[10px]">({count})</span>
+                          <span className="text-[10px]">({count})</span>
                         </button>
                       );
                     })}
@@ -865,11 +865,11 @@ export default function SourceLibraryScreen({
               /* Empty State */
               <div className="p-12 text-center rounded-[var(--radius-xl)] border border-dashed border-[color:var(--border-default)] bg-[color:var(--surface-raised)] flex flex-col items-center justify-center gap-3 my-4">
                 <span className="text-4xl">📚</span>
-                <h3 className="text-base font-bold text-[color:var(--text-primary)]">
+                <h2 className="text-base font-bold text-[color:var(--text-primary)]">
                   {searchQuery || activeTag || selectedProjectFilter !== "all"
                     ? "No sources match your filter"
                     : "Your Source Library is empty"}
-                </h3>
+                </h2>
                 <p className="text-xs text-[color:var(--text-secondary)] max-w-sm leading-relaxed">
                   {searchQuery || activeTag || selectedProjectFilter !== "all"
                     ? "Try adjusting your search terms, project filter, or clearing tags."
@@ -1121,7 +1121,7 @@ export default function SourceLibraryScreen({
                         {/* Status Badges */}
                         <div className="flex items-center gap-2">
                           {semanticResultsMap.has(source.id) && (
-                            <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/20">
+                            <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 font-bold border border-emerald-500/20">
                               {semanticResultsMap.get(source.id)!.score}% Match
                             </span>
                           )}
@@ -1213,7 +1213,7 @@ export default function SourceLibraryScreen({
             onResetVault={onResetVault}
           />
         )}
-      </main>
+      </div>
 
       {/* ================= ADD SOURCE MODAL ================= */}
       {showAddModal && (

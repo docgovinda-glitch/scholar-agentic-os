@@ -279,7 +279,7 @@ export default function Step01Understand({ projectId, deck, onUpdateDeck, onNext
           Phase 1 · Understand
         </span>
         <h1 className="mt-1.5 text-xl sm:text-2xl font-semibold tracking-tight">Outline your presentation</h1>
-        <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-1">
+        <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400 mt-1">
           Upload your brief or type a topic. Your AI reads it and drafts a slide-by-slide outline you can edit.
         </p>
       </div>
@@ -292,7 +292,7 @@ export default function Step01Understand({ projectId, deck, onUpdateDeck, onNext
               type="button"
               onClick={() => setInputMode(mode)}
               className={`py-1.5 px-3 rounded-lg text-xs font-medium cursor-pointer ${
-                inputMode === mode ? 'bg-white dark:bg-[#2C2C2E] shadow-2xs font-semibold text-neutral-900 dark:text-white' : 'text-neutral-500 dark:text-neutral-400'
+                inputMode === mode ? 'bg-white dark:bg-[#2C2C2E] shadow-2xs font-semibold text-neutral-900 dark:text-white' : 'text-neutral-600 dark:text-neutral-400'
               }`}
             >
               {mode === 'topic' ? 'Enter Topic or Question' : 'Upload Document (.pdf, .docx)'}
@@ -318,7 +318,7 @@ export default function Step01Understand({ projectId, deck, onUpdateDeck, onNext
             <div className="flex items-center gap-2 min-w-0">
               <FileText className="w-4 h-4 text-emerald-600 shrink-0" />
               <span className="text-xs font-medium truncate">{fileName}</span>
-              {fileWords > 0 && <span className="text-[11px] text-neutral-500 shrink-0">{fileWords.toLocaleString()} words read</span>}
+              {fileWords > 0 && <span className="text-[11px] text-neutral-600 shrink-0">{fileWords.toLocaleString()} words read</span>}
             </div>
             <button type="button" onClick={removeFile} aria-label="Remove file" className="text-neutral-400 hover:text-red-500 cursor-pointer">
               <Trash2 className="w-4 h-4" />
@@ -486,7 +486,7 @@ export default function Step01Understand({ projectId, deck, onUpdateDeck, onNext
           </div>
         </div>
       ) : (
-        <div data-testid="zero-ghost-outline-empty-state" className="border-2 border-dashed border-neutral-200/80 dark:border-white/10 rounded-2xl p-10 text-center text-xs sm:text-sm text-neutral-500 dark:text-neutral-400">
+        <div data-testid="zero-ghost-outline-empty-state" className="border-2 border-dashed border-neutral-200/80 dark:border-white/10 rounded-2xl p-10 text-center text-xs sm:text-sm text-neutral-600 dark:text-neutral-400">
           Your outline appears here once you add a topic or upload your brief.
         </div>
       )}

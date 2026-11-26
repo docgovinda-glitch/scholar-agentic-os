@@ -30,6 +30,8 @@ export interface AskScholarConversationThread {
 
 const BASE_STORAGE_KEY = "scholar_ask_threads_v1";
 const MAX_THREADS = 30;
+// Long enough for a cold server and a large thread; a short limit aborted requests that would have succeeded.
+const THREAD_TIMEOUT_MS = 30_000;
 
 function getScopedKey(userEmail?: string | null): string {
   const clean = (userEmail || "").trim().toLowerCase();
@@ -124,7 +126,7 @@ export async function fetchAskScholarThreadsFromServer(
     const res = await fetch("/api/ai/threads", {
       method: "GET",
       headers,
-      signal: AbortSignal.timeout(4000),
+      signal: AbortSignal.timeout(THREAD_TIMEOUT_MS),
     });
     if (!res.ok) return [];
     const data = (await res.json()) as { threads?: AskScholarConversationThread[] };
@@ -155,7 +157,7 @@ export async function syncAskScholarThreadsToServer(
       method: "POST",
       headers,
       body: JSON.stringify({ threads: threads.slice(0, MAX_THREADS) }),
-      signal: AbortSignal.timeout(4500),
+      signal: AbortSignal.timeout(THREAD_TIMEOUT_MS),
     });
     return res.ok;
   } catch {
@@ -179,7 +181,7 @@ export async function deleteAskScholarThreadOnServer(
     const res = await fetch(`/api/ai/threads/${encodeURIComponent(threadId)}`, {
       method: "DELETE",
       headers,
-      signal: AbortSignal.timeout(4500),
+      signal: AbortSignal.timeout(THREAD_TIMEOUT_MS),
     });
     return res.ok;
   } catch {

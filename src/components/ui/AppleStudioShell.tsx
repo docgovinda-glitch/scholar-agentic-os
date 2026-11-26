@@ -138,6 +138,7 @@ export function AppleStudioHeader({
   };
 
   return (
+    <section aria-label="Studio header" className="shrink-0 z-30">
     <div
       role="toolbar"
       aria-label="Studio Workspace Chrome"
@@ -341,6 +342,7 @@ export function AppleStudioHeader({
         {rightActions}
       </div>
     </div>
+    </section>
   );
 }
 
