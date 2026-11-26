@@ -65,7 +65,7 @@ export function AskScholarSettingsPopover({
         phone
           ? `${PHONE_SHEET_CLASSES} p-3.5 rounded-2xl bg-white dark:bg-ink-800 border border-neutral-200 dark:border-white/15 space-y-3 text-xs scholar-scrollbar animate-in fade-in duration-150`
           : `absolute ${
-              direction === "up" ? "left-0 bottom-full mb-2" : "right-0 top-full mt-2"
+              direction === "up" ? "right-0 bottom-full mb-2" : "right-0 top-full mt-2"
             } z-50 w-80 max-w-[calc(100vw-2rem)] max-h-[75vh] overflow-y-auto p-3.5 rounded-2xl bg-white dark:bg-ink-800 border border-neutral-200 dark:border-white/15 shadow-2xl space-y-3 text-xs scholar-scrollbar animate-in fade-in ${
               direction === "up" ? "slide-in-from-bottom-2" : "slide-in-from-top-2"
             } duration-150`
@@ -135,11 +135,10 @@ export function AskScholarSettingsPopover({
         data-testid="ask-scholar-settings-btn"
         aria-label="AskScholar preferences"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex min-h-10 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-xs font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-500 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white sm:min-h-8 min-w-10 sm:min-w-8"
+        className="inline-flex min-h-10 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full text-xs font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-500 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white sm:min-h-8 min-w-10 sm:min-w-8"
         title="Research preferences: discipline and answer length"
       >
         <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
-        <span className="hidden sm:inline">Preferences</span>
       </button>
 
       {open && (phone ? createPortal(panel, document.body) : panel)}

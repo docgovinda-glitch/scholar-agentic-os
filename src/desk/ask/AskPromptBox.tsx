@@ -30,7 +30,7 @@ export interface AskPromptBoxProps {
   /** Extra controls after the attach/mode menu (citation style, preferences, vault toggle…). */
   children?: React.ReactNode;
   className?: string;
-  /** When both are given, a Quick Scholar | Deep Research toggle and scholarly filter chips are shown. */
+  /** When both are given, a Quick Scholar | Deep Research toggle and the Year and Sources filter menus are shown. */
   filters?: ScholarFilters;
   onFiltersChange?: (filters: ScholarFilters) => void;
 }
@@ -197,47 +197,44 @@ export function AskPromptBox({
         className="prompt-bare-input scholar-scrollbar w-full min-w-0 resize-none overflow-y-auto border-none bg-transparent px-1 text-base font-normal leading-relaxed text-neutral-900 shadow-none outline-none placeholder:text-neutral-500 focus:shadow-none focus:outline-none focus:ring-0 dark:text-neutral-100 dark:placeholder:text-neutral-400 sm:text-sm"
       />
 
-      {filters && onFiltersChange && (
-        <div className="mt-1.5 px-1">
+      <div className="mt-2 flex flex-wrap items-center gap-1">
+        <PromptBarActionMenu onAttachFiles={onAttachFiles} />
+        {filters && onFiltersChange && (
           <ScholarFilterBar mode={mode} onModeChange={onModeChange} filters={filters} onFiltersChange={onFiltersChange} />
-        </div>
-      )}
+        )}
 
-      <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 pt-1.5">
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-          <PromptBarActionMenu onAttachFiles={onAttachFiles} />
+        <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1">
           {children}
-        </div>
-
-        <div className="relative group shrink-0">
-          {stopping ? (
-            <button
-              type="button"
-              onClick={onStop}
-              title="Stop generating"
-              aria-label="Stop generating"
-              className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-neutral-900 text-white shadow-xs transition-all duration-200 hover:opacity-90 active:scale-95 dark:bg-white dark:text-neutral-900 sm:h-8 sm:w-8"
-            >
-              <Square className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
-            </button>
-          ) : (
-            <button
-              type="submit"
-              disabled={!canSend || isThinking}
-              title={`${sendLabel} (Enter)`}
-              aria-label={sendLabel}
-              className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-neutral-900 text-white shadow-xs transition-all duration-200 hover:bg-neutral-800 active:scale-95 disabled:cursor-not-allowed disabled:bg-neutral-200/80 disabled:text-neutral-400 disabled:shadow-none dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200 dark:disabled:bg-white/10 dark:disabled:text-neutral-500 sm:h-8 sm:w-8"
-            >
-              {isThinking ? (
-                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true" />
-              ) : (
-                <ArrowUp className="h-4 w-4 stroke-[2.25]" aria-hidden="true" />
-              )}
-            </button>
-          )}
-          <span className="pointer-events-none absolute bottom-full right-0 z-30 mb-2 hidden whitespace-nowrap rounded bg-neutral-900 px-2 py-1 text-[11px] text-white shadow-md group-hover:block dark:bg-neutral-800">
-            {stopping ? "Stop generating" : `${sendLabel} (Enter)`}
-          </span>
+          <div className="relative group shrink-0">
+            {stopping ? (
+              <button
+                type="button"
+                onClick={onStop}
+                title="Stop generating"
+                aria-label="Stop generating"
+                className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-neutral-900 text-white shadow-xs transition-all duration-200 hover:opacity-90 active:scale-95 dark:bg-white dark:text-neutral-900 sm:h-8 sm:w-8"
+              >
+                <Square className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={!canSend || isThinking}
+                title={`${sendLabel} (Enter)`}
+                aria-label={sendLabel}
+                className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-neutral-900 text-white shadow-xs transition-all duration-200 hover:bg-neutral-800 active:scale-95 disabled:cursor-not-allowed disabled:bg-neutral-200/80 disabled:text-neutral-400 disabled:shadow-none dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200 dark:disabled:bg-white/10 dark:disabled:text-neutral-500 sm:h-8 sm:w-8"
+              >
+                {isThinking ? (
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true" />
+                ) : (
+                  <ArrowUp className="h-4 w-4 stroke-[2.25]" aria-hidden="true" />
+                )}
+              </button>
+            )}
+            <span className="pointer-events-none absolute bottom-full right-0 z-30 mb-2 hidden whitespace-nowrap rounded bg-neutral-900 px-2 py-1 text-[11px] text-white shadow-md group-hover:block dark:bg-neutral-800">
+              {stopping ? "Stop generating" : `${sendLabel} (Enter)`}
+            </span>
+          </div>
         </div>
       </div>
     </form>

@@ -16,28 +16,41 @@ describe("ScholarFilterBar", () => {
   it("sets year range and source scope filters", () => {
     const onFilters = vi.fn();
     render(<ScholarFilterBar mode="auto" onModeChange={() => undefined} filters={DEFAULT_SCHOLAR_FILTERS} onFiltersChange={onFilters} />);
+    fireEvent.click(screen.getByTestId("scholar-year-filter"));
     fireEvent.click(screen.getByRole("button", { name: "2020–2026" }));
     expect(onFilters).toHaveBeenLastCalledWith({ yearPreset: "2020-2026", scopes: [] });
+    fireEvent.click(screen.getByTestId("scholar-source-filter"));
     fireEvent.click(screen.getByRole("button", { name: "Peer-reviewed only" }));
     expect(onFilters).toHaveBeenLastCalledWith({ yearPreset: "any", scopes: ["peer_reviewed"] });
   });
 });
 
-describe("ScholarFilterBar — phone layout", () => {
-  it("puts the year and scope chips behind a Filters toggle (hidden until opened below 640px)", () => {
-    render(<ScholarFilterBar mode="auto" onModeChange={() => undefined} filters={DEFAULT_SCHOLAR_FILTERS} onFiltersChange={() => undefined} />);
-    const toggle = screen.getByTestId("scholar-filters-toggle");
-    const options = screen.getByTestId("scholar-filter-options");
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-    expect(options.className).toMatch(/(^|\s)hidden(\s|$)/);
-    expect(options.className).toContain("sm:contents");
-    fireEvent.click(toggle);
-    expect(toggle).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByTestId("scholar-filter-options").className).not.toMatch(/(^|\s)hidden(\s|$)/);
+describe("ScholarFilterBar — filter menus", () => {
+  const bar = (filters = DEFAULT_SCHOLAR_FILTERS) =>
+    render(<ScholarFilterBar mode="auto" onModeChange={() => undefined} filters={filters} onFiltersChange={() => undefined} />);
+
+  it("keeps the options closed until asked, and closes them with Escape", () => {
+    bar();
+    const year = screen.getByTestId("scholar-year-filter");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    fireEvent.click(year);
+    expect(year).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("dialog", { name: "Publication years" })).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(year).toHaveFocus();
   });
 
-  it("shows how many filters are on", () => {
-    render(<ScholarFilterBar mode="auto" onModeChange={() => undefined} filters={{ ...DEFAULT_SCHOLAR_FILTERS, yearPreset: "2020-2026", scopes: ["peer_reviewed"] }} onFiltersChange={() => undefined} />);
-    expect(screen.getByTestId("scholar-filters-toggle")).toHaveTextContent("Filters (2)");
+  it("shows the chosen years and how many source filters are on", () => {
+    bar({ yearPreset: "2020-2026", scopes: ["peer_reviewed", "vault_only"] });
+    expect(screen.getByTestId("scholar-year-filter")).toHaveTextContent("2020–2026");
+    expect(screen.getByTestId("scholar-source-filter")).toHaveTextContent("Sources · 2");
+  });
+
+  it("offers year boxes for a custom range and flags an inverted one", () => {
+    bar({ yearPreset: "custom", yearFrom: 2024, yearTo: 2020, scopes: [] });
+    fireEvent.click(screen.getByTestId("scholar-year-filter"));
+    fireEvent.blur(screen.getByLabelText("From year"));
+    expect(screen.getByRole("alert")).toHaveTextContent("is after");
   });
 });
