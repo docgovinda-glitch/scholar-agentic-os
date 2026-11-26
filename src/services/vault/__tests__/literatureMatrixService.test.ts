@@ -112,6 +112,14 @@ describe("literatureMatrixService", () => {
     expect(csv).toContain("Systematic Review of Medical Agent Architectures");
   });
 
+  it("does not let a source's title or notes run as a spreadsheet formula", () => {
+    const matrix = generateLiteratureMatrix(sampleItems);
+    matrix.rows[0] = { ...matrix.rows[0], title: '=HYPERLINK("http://evil","click")', researchQuestion: "@SUM(1+1)" };
+    const csv = exportMatrixToCSV(matrix);
+    expect(csv).toContain(`"'=HYPERLINK(""http://evil"",""click"")"`);
+    expect(csv).toContain(`"'@SUM(1+1)"`);
+  });
+
   it("batch generates BibTeX and bibliographies", () => {
     const bibtex = generateBatchBibTeX(sampleItems);
     expect(bibtex).toContain("@article");

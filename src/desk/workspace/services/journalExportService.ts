@@ -25,6 +25,8 @@ import {
   BorderStyle,
 } from "docx";
 import type { Author } from "../../types";
+import { createHeadingNumberer, numberingFor, type HeadingNumbering } from "../../../domain/journal/headingNumbers";
+import { headingDepthOf } from "../../../domain/journal/manuscriptText";
 
 export type JournalExportAuthor =
   | Author
@@ -53,6 +55,8 @@ export interface JournalExportParams {
   targetJournal: string;
   template?: "nature" | "ieee" | "acm" | "apa7" | "elsevier" | "typst_modern";
   citationStyle?: string;
+  /** Section numbers; defaults to what the template calls for (see numberingFor). */
+  headingNumbering?: HeadingNumbering;
   authors?: JournalExportAuthor[];
   abstract?: string;
   keywords?: string[];
@@ -111,7 +115,13 @@ export function downloadBlob(blob: Blob, filename: string): void {
 /**
  * Parses markdown lines within a section into docx Paragraphs or Tables.
  */
-function parseMarkdownToDocx(content: string, fontName: string): (Paragraph | Table)[] {
+function parseMarkdownToDocx(
+  content: string,
+  fontName: string,
+  numberer: (depth: number, title: string) => string = () => "",
+  baseDepth = 0
+): (Paragraph | Table)[] {
+  const depthOf = headingDepthOf(content);
   const elements: (Paragraph | Table)[] = [];
   const lines = content.split("\n");
 
@@ -152,38 +162,17 @@ function parseMarkdownToDocx(content: string, fontName: string): (Paragraph | Ta
       continue;
     }
 
-    // Heading 2 or 3
-    if (trimmed.startsWith("### ")) {
+    // Headings: levels follow the manuscript's own nesting, numbered the way the journal prints them.
+    const heading = trimmed.match(/^(#{1,6})\s+(?:§\s*)?(.+)$/);
+    if (heading) {
+      const depth = baseDepth + depthOf(heading[1].length);
+      const title = heading[2].trim();
       elements.push(
         new Paragraph({
-          text: trimmed.replace(/^###\s+(?:§\s*)?/, ""),
-          heading: HeadingLevel.HEADING_3,
-          spacing: { before: 200, after: 100 },
-          run: { font: fontName, bold: true, size: 22 },
-        })
-      );
-      continue;
-    }
-
-    if (trimmed.startsWith("## ")) {
-      elements.push(
-        new Paragraph({
-          text: trimmed.replace(/^##\s+(?:§\s*)?/, ""),
-          heading: HeadingLevel.HEADING_2,
-          spacing: { before: 280, after: 120 },
-          run: { font: fontName, bold: true, size: 24 },
-        })
-      );
-      continue;
-    }
-
-    if (trimmed.startsWith("# ")) {
-      elements.push(
-        new Paragraph({
-          text: trimmed.replace(/^#\s+/, ""),
-          heading: HeadingLevel.HEADING_1,
-          spacing: { before: 360, after: 140 },
-          run: { font: fontName, bold: true, size: 26 },
+          text: `${numberer(depth, title)}${title}`,
+          heading: depth === 0 ? HeadingLevel.HEADING_1 : depth === 1 ? HeadingLevel.HEADING_2 : HeadingLevel.HEADING_3,
+          spacing: depth === 0 ? { before: 360, after: 140 } : depth === 1 ? { before: 280, after: 120 } : { before: 200, after: 100 },
+          run: { font: fontName, bold: true, size: depth === 0 ? 26 : depth === 1 ? 24 : 22 },
         })
       );
       continue;
@@ -536,16 +525,16 @@ export function buildJournalDocxDocument(params: JournalExportParams): Document 
   );
 
   // ── IMRaD Manuscript Sections ──
-  // Numbered in the order written; the abstract (printed above) takes no number, and
-  // a section with no title is body text only (the manuscript's own headings stay as written).
-  let sectionNumber = 0;
+  // Numbered the way the journal prints them (decimal, IEEE or none); the abstract (printed above) takes no
+  // number, and a section with no title is body text only (the manuscript's own headings stay as written).
+  const numberer = createHeadingNumberer(params.headingNumbering ?? numberingFor(params.template));
   params.sections.forEach((sec) => {
     const title = sec.section.trim();
     if (title.toLowerCase().includes("abstract")) return; // Abstract already handled in header block
 
     if (title) {
-      sectionNumber += 1;
-      const formattedHeading = title.match(/^\d+[\.\s]/) ? title : `${sectionNumber}. ${title}`;
+      // A title the author already numbered ("2. Methods") is kept as written.
+      const formattedHeading = /^\d+[\.\s]/.test(title) ? title : `${numberer(0, title)}${title}`;
       children.push(
         new Paragraph({
           text: formattedHeading,
@@ -556,9 +545,8 @@ export function buildJournalDocxDocument(params: JournalExportParams): Document 
       );
     }
 
-    // Section Content
-    const contentElements = parseMarkdownToDocx(sec.content, fontName);
-    children.push(...contentElements);
+    // Section Content: under a titled section its headings sit one level lower.
+    children.push(...parseMarkdownToDocx(sec.content, fontName, numberer, title ? 1 : 0));
   });
 
   // ── Declarations: only the statements the authors wrote ──

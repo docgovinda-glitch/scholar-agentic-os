@@ -1,5 +1,6 @@
 import { Loader2, ShieldCheck } from "lucide-react";
 import type { CitationAudit, CitationAuditRow, CitationState } from "../../domain/journal/referenceAudit";
+import { checkedAtLabel, isWebUrl } from "./checkedAt";
 
 const STATE: Record<CitationState, { label: string; tone: "ok" | "warn" | "bad" | "muted"; text: string }> = {
   verified: { label: "Registered", tone: "ok", text: "Record from the DOI registry; no retraction or concern on record." },
@@ -31,7 +32,7 @@ function Row({ row, acknowledged, onAcknowledge }: { row: CitationAuditRow; ackn
       </div>
       <p className="text-[11px] text-[color:var(--text-muted)] pl-1">
         {s.text}
-        {row.notice && (
+        {isWebUrl(row.notice) && (
           <>
             {" "}
             <a href={row.notice} target="_blank" rel="noopener noreferrer" className="underline">
@@ -113,7 +114,7 @@ export default function ReferencesCheck({
           </button>
           <span className="text-[11px] text-[color:var(--text-muted)]">
             {canCheck
-              ? `Looks up each DOI at Crossref.${lastChecked ? ` Last checked ${new Date(lastChecked).toLocaleString()}.` : ""}`
+              ? `Looks up each DOI at Crossref.${checkedAtLabel(lastChecked) ? ` Last checked ${checkedAtLabel(lastChecked)}.` : ""}`
               : "None of the cited sources has a DOI to check."}
           </span>
         </div>

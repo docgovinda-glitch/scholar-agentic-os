@@ -44,6 +44,7 @@ describe("Journal DOCX export prints only what the author entered", () => {
     const out = text(
       await documentXml({
         ...base,
+        template: "elsevier",
         sections: [
           { section: "Abstract", content: "Ignored here." },
           { section: "Introduction", content: "Intro." },
@@ -56,5 +57,57 @@ describe("Journal DOCX export prints only what the author entered", () => {
     expect(out).not.toContain("2. Introduction");
     expect(out).toContain("Participants");
     expect(out).not.toContain("§");
+  });
+});
+
+describe("Journal DOCX heading numbers follow the journal's style", () => {
+  const body = "## Introduction\n\nA.\n\n## Methods\n\nB.\n\n### § Participants\n\nC.\n\n### § Materials\n\n#### Sampling\n\nD.\n\n## Results\n\nE.\n\n## References\n\nSmith (2020).\n\n## Figures and tables\n\nFigure 1.";
+  const build = (template: JournalExportParams["template"]) => documentXml({ ...base, template, sections: [{ section: "", content: body }] }).then(text);
+
+  it("uses decimal numbering (1, 1.1, 1.1.1) for Elsevier, Springer and ACM layouts", async () => {
+    for (const template of ["elsevier", "acm", undefined] as const) {
+      const out = await build(template);
+      expect(out, String(template)).toContain("1. Introduction");
+      expect(out).toContain("2. Methods");
+      expect(out).toContain("2.1. Participants");
+      expect(out).toContain("2.2. Materials");
+      expect(out).toContain("2.2.1. Sampling");
+      expect(out).toContain("3. Results");
+    }
+  });
+
+  it("uses Roman numerals, letters and numbers for IEEE", async () => {
+    const out = await build("ieee");
+    expect(out).toContain("I. Introduction");
+    expect(out).toContain("II. Methods");
+    expect(out).toContain("A. Participants");
+    expect(out).toContain("B. Materials");
+    expect(out).toContain("1) Sampling");
+    expect(out).toContain("III. Results");
+  });
+
+  it("leaves headings unnumbered for APA 7 and Nature", async () => {
+    for (const template of ["apa7", "nature"] as const) {
+      const out = await build(template);
+      expect(out, template).toContain("|Introduction|");
+      expect(out).toContain("|Participants|");
+      expect(out).not.toMatch(/\|\d+\. |\|[IVX]+\. /);
+    }
+  });
+
+  it("never numbers References or the figures and tables list", async () => {
+    for (const template of ["elsevier", "ieee", "apa7"] as const) {
+      const out = await build(template);
+      expect(out, template).toContain("|References|");
+      expect(out).toContain("|Figures and tables|");
+    }
+  });
+
+  it("lets the caller choose the numbering, overriding the template", async () => {
+    const withNumbering = (headingNumbering: JournalExportParams["headingNumbering"]) =>
+      documentXml({ ...base, template: "apa7", headingNumbering, sections: [{ section: "", content: body }] }).then(text);
+    expect(await withNumbering("decimal")).toContain("2.1. Participants");
+    expect(await withNumbering("ieee")).toContain("A. Participants");
+    expect(await withNumbering(undefined)).toContain("|Participants|");
   });
 });

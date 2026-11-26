@@ -7,6 +7,7 @@
  */
 
 import type { VaultItem } from "../vaultContents";
+import { csvCell } from "../../shared/csv";
 import { formatVaultCitation } from "./citationService";
 import { parsePersonName } from "../../desk/assignment/services/personName";
 
@@ -321,10 +322,7 @@ export function exportMatrixToMarkdown(matrix: LiteratureMatrixData): string {
 export function exportMatrixToCSV(matrix: LiteratureMatrixData): string {
   if (matrix.rows.length === 0) return "";
 
-  function escapeCSV(val: string): string {
-    const str = (val || "").replace(/\r?\n/g, " ").replace(/"/g, '""');
-    return `"${str}"`;
-  }
+  const escapeCSV = (val: string): string => csvCell(val, { singleLine: true });
 
   const headers = [
     "Source Citation",

@@ -1,5 +1,6 @@
 import { Fragment, useMemo, useRef, useState } from "react";
 import { Download } from "lucide-react";
+import { requestAppConfirm } from "../../components/ui/FeedbackSystem";
 import { REPORTING_CHECKLISTS } from "../../domain/journal/reportingChecklistData";
 import {
   checklistById,
@@ -17,9 +18,16 @@ function download(blob: Blob, name: string) {
   const a = document.createElement("a");
   a.href = url;
   a.download = name;
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  // Revoked after the browser has started the download, not before.
+  setTimeout(() => {
+    a.remove();
+    URL.revokeObjectURL(url);
+  }, 100);
 }
+
+const hasEntries = (s: ChecklistState | null) => Object.values(s?.entries ?? {}).some((e) => e.status || e.location.trim() || e.note.trim());
 
 /**
  * The reporting guideline for the study design (CONSORT, PRISMA, STROBE,
@@ -80,7 +88,7 @@ export default function ReportingChecklistPanel({
     }
   };
 
-  const fileBase = (title || "manuscript").replace(/[^a-zA-Z0-9_-]+/g, "_");
+  const fileBase = (title || "").replace(/[^a-zA-Z0-9_-]+/g, "_").replace(/^_+|_+$/g, "") || "manuscript";
   const downloadDocx = async () => {
     if (!list) return;
     const { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, WidthType } = await import("docx");
@@ -125,7 +133,20 @@ export default function ReportingChecklistPanel({
         <select
           aria-label="Reporting guideline"
           value={state?.checklistId ?? ""}
-          onChange={(e) => void persist(e.target.value ? { checklistId: e.target.value as ChecklistState["checklistId"], entries: state?.checklistId === e.target.value ? state.entries : {} } : null)}
+          onChange={async (e) => {
+            const id = e.target.value as ChecklistState["checklistId"] | "";
+            if (id === (state?.checklistId ?? "")) return;
+            // Each guideline has its own items, so switching drops the entries made for this one: ask first.
+            if (hasEntries(state)) {
+              const ok = await requestAppConfirm({
+                title: "Switch guideline?",
+                message: `The entries you made for ${list?.name ?? "this checklist"} will be cleared, because each guideline has its own items.`,
+                confirmLabel: "Switch and clear",
+              });
+              if (!ok) return;
+            }
+            void persist(id ? { checklistId: id, entries: {} } : null);
+          }}
           className={`${field} text-xs`}
         >
           <option value="">None chosen</option>

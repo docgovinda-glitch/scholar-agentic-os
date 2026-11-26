@@ -49,7 +49,7 @@ export interface ManuscriptTexts {
 
 export const EMPTY_TEXTS: ManuscriptTexts = { texts: {}, unsorted: "" };
 
-const BACK_MATTER = /^(declarations?|references|bibliography|acknowledg(e)?ments?|appendi(x|ces)|funding|conflicts? of interest|competing interests|data availability|author contributions?)\b/i;
+export const BACK_MATTER = /^(declarations?|references|bibliography|acknowledg(e)?ments?|appendi(x|ces)|funding|conflicts? of interest|competing interests|data availability|author contributions?)\b/i;
 
 /** Words as the rest of the journal workspace counts them (markup and citation tokens excluded). */
 export const countWords = countManuscriptWords;

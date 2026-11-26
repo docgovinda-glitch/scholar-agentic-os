@@ -87,3 +87,15 @@ describe("progress and the completed file", () => {
     expect(parseChecklistState("nope")).toBeNull();
   });
 });
+
+describe("checklistCsv: spreadsheet formulas", () => {
+  it("does not let author text or the title run as a formula", () => {
+    const list = checklistById("prisma")!;
+    const first = list.items[0].id;
+    const csv = checklistCsv(list, { checklistId: "prisma", entries: { [first]: { status: "reported", location: "=HYPERLINK(\"http://evil\",\"x\")", note: "@SUM(A1)" } } }, "+cmd|' /C calc'!A0");
+    expect(csv).toContain(`"'=HYPERLINK(""http://evil"",""x"")"`);
+    expect(csv).toContain(`"'@SUM(A1)"`);
+    expect(csv).toContain("for: +cmd");
+    expect(csv).not.toMatch(/(^|,)"[=+@]/m);
+  });
+});
