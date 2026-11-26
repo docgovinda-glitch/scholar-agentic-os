@@ -148,7 +148,6 @@ describe("Phase I Dynamic Structure & Cross-Phase Workflow", () => {
         <DynamicStructurePlanner
           structure={initialStructure}
           targetWordCount={2000}
-          assignmentQuestion="Evaluate carbon taxation vs cap-and-trade systems."
           onChange={mockOnChange}
         />
       );

@@ -473,10 +473,6 @@ export default function AssignmentUnderstandStage({
     saveAnswers(updates).catch(console.warn);
   };
 
-  const handleWordCountChange = (newCount: number) => {
-    handleTargetWordCountChange(newCount);
-  };
-
   const handleStructureChange = (newStructure: AssignmentStructure, opts: { balance?: boolean } = {}) => {
     // A student's own per-question word counts are kept exactly as typed.
     const balanced = opts.balance === false ? newStructure : autoBalanceStructure(newStructure, localWordCount);
@@ -902,7 +898,7 @@ export default function AssignmentUnderstandStage({
 
           <UnderstandBriefInput fileInputRef={fileInputRef} handleLevelChange={handleLevelChange} handleQuestionBlur={handleQuestionBlur} handleTypeChange={handleTypeChange} intakeTab={intakeTab} isDraggingOver={isDraggingOver} localDiscipline={localDiscipline} localQuestion={localQuestion} localType={localType} parseNotice={parseNotice} processUploadedFile={processUploadedFile} project={project} promptWordCount={promptWordCount} saveAnswers={saveAnswers} setIntakeTab={setIntakeTab} setIsDraggingOver={setIsDraggingOver} setLocalDiscipline={setLocalDiscipline} setLocalQuestion={setLocalQuestion} setParseNotice={setParseNotice} uploadedFileName={uploadedFileName} uploadingBrief={uploadingBrief} />
 
-          <UnderstandSettingsGrid dispatchToneAssistantSuggestions={dispatchToneAssistantSuggestions} handleCitationChange={handleCitationChange} handleLevelChange={handleLevelChange} handleTargetWordCountChange={handleTargetWordCountChange} handleToneChange={handleToneChange} handleTypeChange={handleTypeChange} handleWordCountChange={handleWordCountChange} localCitation={localCitation} localLevel={localLevel} localTone={localTone} localType={localType} localWordCount={localWordCount} setLocalWordCount={setLocalWordCount} toneSectionRef={toneSectionRef} />
+          <UnderstandSettingsGrid dispatchToneAssistantSuggestions={dispatchToneAssistantSuggestions} handleCitationChange={handleCitationChange} handleLevelChange={handleLevelChange} handleTargetWordCountChange={handleTargetWordCountChange} handleToneChange={handleToneChange} handleTypeChange={handleTypeChange} localCitation={localCitation} localLevel={localLevel} localTone={localTone} localType={localType} localWordCount={localWordCount} setLocalWordCount={setLocalWordCount} toneSectionRef={toneSectionRef} />
 
           <UnderstandActionBar canGenerate={canGenerate} canProceedToSources={canProceedToSources} handleGenerateStructure={handleGenerateStructure} handleProceedToSources={handleProceedToSources} isGeneratingStructure={isGeneratingStructure} missingFields={missingFields} />
         </div>
@@ -996,11 +992,7 @@ export default function AssignmentUnderstandStage({
                   regeneratingHeadingId={regeneratingHeadingId}
                   buildingMessage={buildingMessage}
                   onUseStarterOutline={handleUseStarterOutline}
-                  question={localQuestion}
-                  assignmentType={localType}
-                  academicLevel={localLevel}
                   writingTone={localTone}
-                  citationStyle={localCitation}
                   isConfirmed={localStructure.isConfirmed}
                 />
               </div>

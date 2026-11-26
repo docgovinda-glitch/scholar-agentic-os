@@ -62,12 +62,7 @@ export interface DynamicStructurePlannerProps {
   onChange?: (structure: AssignmentStructure) => void;
   onTargetWordCountChange?: (target: number) => void;
   onRegenerateOutline?: () => void;
-  question?: string;
-  assignmentQuestion?: string;
-  assignmentType?: string;
-  academicLevel?: string;
   writingTone?: string;
-  citationStyle?: string;
   isConfirmed?: boolean;
   onConfirmStructure?: () => void;
   className?: string;
@@ -88,12 +83,7 @@ export function DynamicStructurePlanner({
   onChange,
   onTargetWordCountChange,
   onRegenerateOutline,
-  question = "",
-  assignmentQuestion = "",
-  assignmentType = "essay",
-  academicLevel = "undergraduate",
   writingTone,
-  citationStyle,
   isConfirmed = false,
   className = "",
   onRegenerateHeading,

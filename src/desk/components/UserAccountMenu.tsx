@@ -15,9 +15,6 @@ export interface UserAccountMenuProps {
   userEmail?: string | null;
   userFullName?: string | null;
   onOpenAccountSettings?: () => void;
-  onOpenVault?: () => void;
-  onOpenAiAccess?: () => void;
-  onOpenHelp?: () => void;
   onOpenAuth?: (mode: "signin" | "signup") => void;
   dropUp?: boolean;
   variant?: "bar" | "sidebar";
@@ -27,9 +24,6 @@ export default function UserAccountMenu({
   userEmail,
   userFullName,
   onOpenAccountSettings,
-  onOpenVault,
-  onOpenAiAccess,
-  onOpenHelp,
   onOpenAuth,
   dropUp = false,
   variant = "bar",

@@ -66,7 +66,6 @@ Names the code reads, grouped by purpose. "Server" variables are read by `server
 
 | Variable | Purpose |
 | :--- | :--- |
-| `ENABLE_SERVER_AI` | Set to `false` to disable server AI execution |
 | `ALLOW_SERVER_LOCAL_AI` | `true` lets the server call local runners at its own `localhost`; `false` forbids it; unset means allowed outside production |
 | `ALLOW_PRIVATE_AI_ENDPOINTS` | `true` lets users name private-address AI base URLs (otherwise https and public only) |
 | `TAVILY_API_KEY`, `SERPER_API_KEY`, `BRAVE_SEARCH_API_KEY` | Web-search backends for Ask Scholar (`/api/ai/agent`) and deep research (Tavily is also a secret of the `search-proxy` Edge Function) |

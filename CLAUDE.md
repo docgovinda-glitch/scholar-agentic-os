@@ -126,7 +126,7 @@ supabase/                 schema*.sql, migrations/ (timestamped), functions/ (De
 
 ## Environment
 
-Template: `.env.example` (all real `.env*` files are gitignored). Full inventory and what each variable does: `SETUP.md` §4. Keys the code reads: Supabase (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`), crypto and security (`MASTER_KEY`, `LLM_CHALLENGE_SECRET`, `MAIN_ADMIN_EMAIL`, `VITE_CAPTCHA_SITE_KEY`, `CAPTCHA_SECRET_KEY`), AI and search (`TAVILY_API_KEY`, `SERPER_API_KEY`, `BRAVE_SEARCH_API_KEY`, `OPENALEX_API_KEY`, `ALLOW_SERVER_LOCAL_AI`, `ENABLE_SERVER_AI`), runtime (`PORT`, `NODE_ENV`, `MAX_UPLOAD_MB`). Email keys (`RESEND_*`, `ADMIN_EMAIL`) are Supabase Edge Function secrets.
+Template: `.env.example` (all real `.env*` files are gitignored). Full inventory and what each variable does: `SETUP.md` §4. Keys the code reads: Supabase (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`), crypto and security (`MASTER_KEY`, `LLM_CHALLENGE_SECRET`, `MAIN_ADMIN_EMAIL`, `VITE_CAPTCHA_SITE_KEY`, `CAPTCHA_SECRET_KEY`), AI and search (`TAVILY_API_KEY`, `SERPER_API_KEY`, `BRAVE_SEARCH_API_KEY`, `OPENALEX_API_KEY`, `ALLOW_SERVER_LOCAL_AI`), runtime (`PORT`, `NODE_ENV`, `MAX_UPLOAD_MB`). Email keys (`RESEND_*`, `ADMIN_EMAIL`) are Supabase Edge Function secrets.
 
 ## Rules
 

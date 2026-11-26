@@ -26,8 +26,6 @@ vi.mock("../../api", () => ({
   setGlobalManualModelOverride: vi.fn(),
   downloadProjectExportBlob: vi.fn(),
   downloadRefereeResponseLetterBlob: vi.fn(),
-  runPreFlightComplianceAudit: vi.fn(),
-  exportProjectManuscript: vi.fn(),
 }));
 
 describe("Journal Rebuild Step D — Mode 5 Pre-Flight Compliance Studio & Camera-Ready Compiler", () => {
