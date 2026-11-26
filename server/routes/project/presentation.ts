@@ -39,6 +39,9 @@ import { copyLimitsPromptGuide, layoutPromptGuide } from "../../../src/domain/pr
 
 const router = Router({ mergeParams: true });
 
+/** Most slides one deck may hold (the standalone deck routes use the same cap). */
+const MAX_DECK_SLIDES = 200;
+
 export interface SlidePresentationItem {
   slideNumber: number;
   type:
@@ -596,11 +599,9 @@ router.post(
 
     // Persist into project intake answers and memory store
     try {
-      const updatedAnswers = {
-        ...answers,
-        presentation_deck: formattedDeck,
-      };
-      await store.save({ ...record, answers: updatedAnswers });
+      // Only this key is written, merged into the stored record: the AI call above can take a long time,
+      // and saving the whole record loaded before it would overwrite whatever the presenter saved meanwhile.
+      await store.patchAnswers(record.projectId, { presentation_deck: formattedDeck });
 
       // Upsert into presentations memory table
       const now = new Date().toISOString();
@@ -821,22 +822,26 @@ router.put(
     if (!record) return;
 
     const { deck } = req.body || {};
-    if (!deck || typeof deck !== "object") {
+    if (!deck || typeof deck !== "object" || Array.isArray(deck)) {
       return res.status(400).json({ error: "Missing or invalid slide deck payload." });
+    }
+    if (deck.slides !== undefined && (!Array.isArray(deck.slides) || deck.slides.length > MAX_DECK_SLIDES)) {
+      return res.status(400).json({ error: `A deck's slides must be a list of at most ${MAX_DECK_SLIDES}.` });
     }
 
     // Renaming the deck renames the project, so project lists never keep the old name.
+    // Only these keys are written, merged into the stored record, so answers saved elsewhere meanwhile are kept.
     const deckTitle = typeof deck.title === "string" ? deck.title.trim().slice(0, 300) : "";
-    const updatedAnswers = {
-      ...(record.answers || {}),
+    const updated = await store.patchAnswers(record.projectId, {
       presentation_deck: deck,
       ...(deckTitle && !isUntitledDeckTitle(deckTitle) ? { title: deckTitle } : {}),
-    };
-
-    const updated = await store.save({ ...record, answers: updatedAnswers });
+    });
+    if (!updated) return res.status(404).json({ error: "Project not found" });
 
     // Also synchronize into presentation_decks memory and Supabase table
-    const deckId = (deck.id as string) || `deck-${record.projectId}`;
+    // The row id comes from the project the caller owns, never from the request body: an id taken from the
+    // body would let one user upsert over (and take ownership of) another user's deck.
+    const deckId = `deck-${record.projectId}`;
     const now = new Date().toISOString();
     const presentationRow: PresentationDeckRow = {
       id: deckId,

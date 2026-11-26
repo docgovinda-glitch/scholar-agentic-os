@@ -70,3 +70,13 @@ describe("buildJats: section nesting", () => {
     expect(balanced(xml)).toBe(true);
   });
 });
+
+describe("buildJats: control characters", () => {
+  it("never writes a character XML forbids (a pasted form feed or stray control code)", () => {
+    const dirty = `Sleep${String.fromCharCode(0x0c)}and ${String.fromCharCode(1)}memory ${String.fromCharCode(0x0b)}end`;
+    const xml = buildJats({ title: dirty, journal: dirty, authors: [{ name: dirty, affiliation: dirty }], abstract: dirty, keywords: [dirty], body: `## ${dirty}\n\n${dirty} [CITE:a]`, declarations: [{ label: dirty, text: dirty }], records: { a: rec } });
+    expect(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(xml)).toBe(false);
+    expect(xml).toContain("Sleep");
+  });
+});
+

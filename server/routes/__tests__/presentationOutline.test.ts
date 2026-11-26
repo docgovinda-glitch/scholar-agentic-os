@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import JSZip from "jszip";
 
 const TEST_USER_ID = "55555555-5555-4555-8555-555555555555";
 vi.mock("../../src/middleware/auth.ts", () => ({
@@ -99,5 +100,48 @@ describe("PDF upload in OT-22", () => {
   it("returns a clear 422 for an unreadable PDF instead of decoding it as text", async () => {
     const res = await request(app).post("/api/presentations/parse-document").attach("file", Buffer.from("%PDF-1.4 \u0000 broken"), { filename: "scan.pdf", contentType: "application/pdf" });
     expect(res.status).toBe(422);
+  });
+});
+
+describe("parse-document: .pptx and images", () => {
+  const post = (file: Buffer, filename: string, contentType: string) => request(app).post("/api/presentations/parse-document").attach("file", file, { filename, contentType });
+  const PPTX = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+  const pptx = async (slides: string[]) => {
+    const zip = new JSZip();
+    slides.forEach((xml, i) => zip.file(`ppt/slides/slide${i + 1}.xml`, xml));
+    return zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
+  };
+  const slide = (text: string) => `<p:sld><a:p><a:r><a:t>${text}</a:t></a:r></a:p></p:sld>`;
+
+  it("reads the text of a real .pptx, slide by slide", async () => {
+    const res = await post(await pptx([slide("Sleep and memory"), slide("Forty adults took part")]), "talk.pptx", PPTX);
+    if (res.status === 401) return;
+    expect(res.status).toBe(200);
+    expect(res.body.text).toContain("Sleep and memory");
+    expect(res.body.text).toContain("Forty adults took part");
+  });
+
+  it("answers 422 for a .pptx that cannot be unzipped, instead of decoding its bytes as text", async () => {
+    const res = await post(Buffer.from("PK\u0003\u0004 this is not a real archive \u0000\u0001 readable-looking-junk"), "broken.pptx", PPTX);
+    if (res.status === 401) return;
+    expect(res.status).toBe(422);
+    expect(JSON.stringify(res.body)).not.toContain("readable-looking-junk");
+  });
+
+  it("refuses a .pptx whose slides unpack far larger than the file (decompression bomb)", async () => {
+    const bomb = await pptx([slide("x".repeat(6 * 1024 * 1024))]);
+    expect(bomb.length).toBeLessThan(100 * 1024); // tiny on the wire
+    const res = await post(bomb, "bomb.pptx", PPTX);
+    if (res.status === 401) return;
+    expect(res.status).toBe(422);
+  });
+
+  it("answers 422 for an image rather than writing stand-in slide text for it", async () => {
+    const png = Buffer.from("89504e470d0a1a0a0000000d49484452", "hex");
+    const res = await post(png, "Screenshot 20260101.png", "image/png");
+    if (res.status === 401) return;
+    expect(res.status).toBe(422);
+    expect(res.body.code).toBe("image_has_no_text");
+    expect(JSON.stringify(res.body)).not.toMatch(/Executive Summary|Core Thesis|quantitative drivers/i);
   });
 });

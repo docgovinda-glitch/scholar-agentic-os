@@ -7,6 +7,7 @@
  */
 import type { ReferenceRecord } from "./references";
 import { citedIds } from "./citationStyles";
+import { xmlText } from "../../shared/xmlText";
 import { headingDepthOf } from "./manuscriptText";
 import { figureFile, numberFigures, type ManuscriptFigure, type Numbering } from "./figures";
 
@@ -23,7 +24,7 @@ export interface JatsInput {
   figures?: ManuscriptFigure[];
 }
 
-export const escapeXml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+export const escapeXml = (s: string) => xmlText(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const refId = (id: string) => `ref-${id.replace(/[^A-Za-z0-9_.-]/g, "_")}`;
 
 // Numbering for the document being built (buildJats is synchronous and sets it first).

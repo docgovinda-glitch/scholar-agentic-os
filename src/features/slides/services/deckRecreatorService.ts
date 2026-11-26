@@ -102,17 +102,8 @@ export async function recreateDeckFromFile(
       imgThemeResult = generateThemeFromPrompt(detectedTitle);
     }
 
-    rawText =
-      `# ${detectedTitle}\n\n` +
-      `## Executive Synthesis & Visual Direction\n` +
-      `Extracted empirical narrative and visual hierarchy from imported slide artifact.\n\n` +
-      `## Core Architecture & Comparative Drivers\n` +
-      `Structured comparative frameworks and quantitative indicators.\n\n` +
-      `## Strategic Outcomes & Forward Action\n` +
-      `Validated takeaways and multi-phase roadmap.`;
-
-    const words = rawText.split(/\s+/).filter(Boolean);
-    wordCount = words.length;
+    // An image has no text this app can read: only its colours are taken. Nothing is written for the slides.
+    wordCount = 0;
 
     const compiledTheme = compileSlideTheme(imgThemeResult);
     const contrast = calculateContrastRatio(compiledTheme.accent, compiledTheme.cardBg);
@@ -134,24 +125,25 @@ export async function recreateDeckFromFile(
       source: 'custom',
     };
 
-    const baseDeck = extractSlidesFromAcademicText(rawText, 'Standard-Narrative');
-    baseDeck.title = detectedTitle;
+    // The user's slides stay as they are; only the theme is applied to them.
+    const baseDeck = existingDeck ? { ...existingDeck } : extractSlidesFromAcademicText('', 'Standard-Narrative');
+    if (!existingDeck) baseDeck.title = detectedTitle;
     baseDeck.id = existingDeck?.id || `deck-recreated-${Date.now()}`;
 
-    const progressionDeck = applyDeckTheme(
+    const themedDeck = applyDeckTheme(
       { ...baseDeck, themeId: compiledTheme.id as SlideThemeId, customTheme },
       compiledTheme.id as SlideThemeId,
       customTheme
     );
 
     return {
-      deck: progressionDeck,
+      deck: themedDeck,
       recreatedTheme: compiledTheme,
       customTheme,
       fileName: file.name,
       wordCount,
       detectedTitle,
-      summary: `Extracted visual color palette (${compiledTheme.mode} mode, accent ${compiledTheme.accent}) and created ${progressionDeck.slides.length} slides from the text in the image.`,
+      summary: `Took the colour palette (${compiledTheme.mode} mode, accent ${compiledTheme.accent}) from the image. An image has no slide text to read, so ${existingDeck?.slides.length ? 'your slides are unchanged' : 'no slides were made; add your text to build them'}.`,
     };
   }
 
@@ -178,45 +170,46 @@ export async function recreateDeckFromFile(
       file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
   } else {
     // 3. For PPTX, PPT, PDF, DOCX -> call backend /api/presentations/parse-document
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const headers: Record<string, string> = {};
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const headers: Record<string, string> = {};
-      try {
-        const { isSupabaseConfigured, getSupabaseClient } = await import('../../../services/supabaseClient');
-        if (isSupabaseConfigured()) {
-          const { data } = await getSupabaseClient().auth.getSession();
-          if (data?.session?.access_token) {
-            headers['Authorization'] = `Bearer ${data.session.access_token}`;
-          }
+      const { isSupabaseConfigured, getSupabaseClient } = await import('../../../services/supabaseClient');
+      if (isSupabaseConfigured()) {
+        const { data } = await getSupabaseClient().auth.getSession();
+        if (data?.session?.access_token) {
+          headers['Authorization'] = `Bearer ${data.session.access_token}`;
         }
-      } catch {}
+      }
+    } catch {
+      // signed out or offline: the server decides
+    }
 
-      const res = await fetch('/api/presentations/parse-document', {
+    let res: Response;
+    try {
+      res = await fetch('/api/presentations/parse-document', {
         method: 'POST',
         ...(Object.keys(headers).length > 0 ? { headers } : {}),
         body: formData,
       });
-
-      if (res.ok) {
-        const data = await res.json();
-        rawText = data.text || '';
-        detectedTitle = data.detectedTitle || file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
-        wordCount = data.wordCount || 0;
-        serverTheme = data.detectedTheme || null;
-      } else {
-        throw new Error(`Server returned HTTP ${res.status}`);
-      }
     } catch {
-      // Fallback for offline tests or direct reading
-      rawText = `# ${file.name.replace(/\.[^/.]+$/, '')}\n\n## Overview\nRecreated presentation content from ${file.name}.`;
-      detectedTitle = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+      throw new Error('The document could not be read: the server could not be reached. Check your connection and try again.');
     }
+    if (!res.ok) {
+      const err = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(err.error || `The document could not be read (HTTP ${res.status}).`);
+    }
+    const data = await res.json();
+    rawText = data.text || '';
+    detectedTitle = data.detectedTitle || file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+    wordCount = data.wordCount || 0;
+    serverTheme = data.detectedTheme || null;
   }
 
+  // Nothing is written in place of text the file did not give.
   if (!rawText.trim()) {
-    rawText = `# ${file.name.replace(/\.[^/.]+$/, '')}\n\n## Executive Synthesis\nRecreated presentation content.`;
+    throw new Error('Could not extract readable text from this file.');
   }
 
   const words = rawText.split(/\s+/).filter(Boolean);

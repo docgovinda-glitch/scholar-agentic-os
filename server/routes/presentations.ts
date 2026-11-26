@@ -17,12 +17,29 @@ import { createUploadInstance } from "../src/middleware/uploadGuard.ts";
 
 const upload = createUploadInstance({ enforceHeavyParseLimit: true });
 
+/** What an uploaded .pptx may unpack to: a small file can hold gigabytes once decompressed. */
+const PPTX_MAX_SLIDES = 500;
+const PPTX_MAX_ENTRY_BYTES = 5 * 1024 * 1024;
+const PPTX_MAX_TOTAL_BYTES = 40 * 1024 * 1024;
+
+const uncompressedSize = (entry: unknown): number => {
+  const size = (entry as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize;
+  return typeof size === "number" && Number.isFinite(size) ? size : 0;
+};
+
 async function extractTextFromPptx(buffer: Buffer): Promise<{ text: string; themeColors?: { accent?: string; canvasBg?: string; cardBg?: string; textPrimary?: string } }> {
   try {
     const zip = await JSZip.loadAsync(buffer);
     const slideFiles = Object.keys(zip.files).filter((name) =>
       /^ppt\/slides\/slide\d+\.xml$/.test(name)
     );
+    // Declared sizes are checked before anything is decompressed.
+    const read = [...slideFiles, "ppt/theme/theme1.xml"].filter((n) => zip.files[n]);
+    const total = read.reduce((sum, n) => sum + uncompressedSize(zip.files[n]), 0);
+    if (slideFiles.length > PPTX_MAX_SLIDES || read.some((n) => uncompressedSize(zip.files[n]) > PPTX_MAX_ENTRY_BYTES) || total > PPTX_MAX_TOTAL_BYTES) {
+      console.warn("[presentations.ts] PPTX rejected: too many slides or too large once unpacked.");
+      return { text: "" };
+    }
     slideFiles.sort((a, b) => {
       const numA = parseInt(a.match(/slide(\d+)\.xml/)?.[1] || "0", 10);
       const numB = parseInt(b.match(/slide(\d+)\.xml/)?.[1] || "0", 10);
@@ -65,8 +82,9 @@ async function extractTextFromPptx(buffer: Buffer): Promise<{ text: string; them
 
     return { text: slideTexts.join("\n\n"), themeColors };
   } catch (err) {
-    console.warn("[presentations.ts] PPTX parse fallback error:", err);
-    return { text: buffer.toString("utf-8").replace(/[^\x20-\x7E\n]/g, " ").trim() };
+    // A file that could not be unzipped is never decoded as text: that would hand binary junk on as the brief.
+    console.warn("[presentations.ts] PPTX could not be read:", err instanceof Error ? err.message : err);
+    return { text: "" };
   }
 }
 
@@ -263,22 +281,11 @@ router.post("/parse-document", upload.single("file"), async (req: Request, res: 
     let detectedTheme: any = null;
 
     if (isImage) {
-      const cleanBaseName = file.originalname
-        .replace(/\.[^/.]+$/, "")
-        .replace(/[-_]/g, " ")
-        .replace(/\b\w/g, (c: string) => c.toUpperCase())
-        .trim();
-
-      const isScreenshot = /screenshot|screen\s*shot|img|image|capture|\d{8,}/i.test(cleanBaseName);
-      detectedTitle = isScreenshot ? "Visual Presentation Blueprint" : cleanBaseName;
-
-      text = `# ${detectedTitle}\n\n` +
-        `## Executive Summary & Core Thesis\n` +
-        `Empirical observations and structured takeaways derived from visual slide blueprint.\n\n` +
-        `## Analytical Context & Empirical Drivers\n` +
-        `Key quantitative drivers, comparative dynamics, and methodological validation.\n\n` +
-        `## Strategic Takeaways & Conclusion\n` +
-        `Actionable conclusions and rigorous forward-looking roadmap.`;
+      // An image has no text this server can read; nothing is written in its place.
+      return res.status(422).json({
+        error: "Slide text can't be read from an image. Upload the document or paste the text instead.",
+        code: "image_has_no_text",
+      });
     } else if (
       file.mimetype === "text/html" ||
       lowerName.endsWith(".html") ||

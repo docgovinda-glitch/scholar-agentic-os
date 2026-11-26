@@ -1,5 +1,5 @@
 import { useDisplayName } from '../useDisplayIdentity';
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { SlideDeck, PresentationStudioStep } from '../../features/slides';
 import {
   Step01Understand,
@@ -12,7 +12,7 @@ import {
   type AudienceQaQuestion,
 } from '../../features/slides';
 import { authedFetch, getProject, isEphemeralProject, saveIntakeAnswers } from '../api';
-import { DEFAULT_DECK_THEME_ID } from '../../features/slides/gamma/theme';
+import { useDeckAutosave } from './useDeckAutosave';
 import { composeDeckFromText, composeDeckFromTopic } from '../../features/slides/gamma/composer';
 import { normalizeDeck } from '../../features/slides/gamma/content';
 import ScholarSidebar, { type ScholarSidebarProject } from '../../components/navigation/ScholarSidebar';
@@ -153,8 +153,6 @@ export default function PresentationWorkspace({
   const visibleSidebarProjects = namedProjects.filter((p) => p.title.toLowerCase().includes(sidebarSearch.trim().toLowerCase()));
   useProjectDocumentTitle(deck && !isUntitledDeckTitle(deck.title) ? deck.title : null);
 
-  const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null);
-
   // Hydrate from getProject(projectId) and scoped presentation endpoint on mount
   useEffect(() => {
     let mounted = true;
@@ -240,85 +238,19 @@ export default function PresentationWorkspace({
     hydrate();
     return () => {
       mounted = false;
-      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
     };
   }, [projectId, initialDeck, initialCourseworkText]);
 
-  // 500ms Debounced Autosave to REST API
-  const triggerDebouncedAutosave = useCallback(
-    (deckToSave: SlideDeck) => {
-      if (autosaveTimerRef.current) {
-        clearTimeout(autosaveTimerRef.current);
-      }
-
-      // A signed-out visitor's deck lives only in this tab: say so instead of calling the server.
-      if (!signedIn || !projectId) {
-        setAutosaveStatus('signed-out');
-        return;
-      }
-
-      setAutosaveStatus('saving');
-
-      autosaveTimerRef.current = setTimeout(async () => {
-        try {
-          const payload = {
-            deck: deckToSave,
-          };
-
-          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-
-          const legacyPayload = {
-            id: deckToSave.id,
-            title: deckToSave.title,
-            topic: deckToSave.topic,
-            framework: deckToSave.framework,
-            theme_id: deckToSave.themeId || DEFAULT_DECK_THEME_ID,
-            custom_theme: deckToSave.customTheme,
-            slides: deckToSave.slides,
-            source_module: deckToSave.sourceModule || 'presentation-studio',
-          };
-
-          // 1. Save directly to project-scoped presentation endpoint via authedFetch
-          authedFetch(
-            `/api/projects/${encodeURIComponent(projectId)}/presentation/deck`,
-            {
-              method: 'PUT',
-              headers,
-              body: JSON.stringify(payload),
-            }
-          )
-            .then(async (projectRes) => {
-              if (projectRes.ok) {
-                const data = await projectRes.json();
-                if (data.version) {
-                  setProjectVersion(data.version);
-                }
-              }
-            })
-            .catch(() => {});
-
-          // 2. Also update /api/presentations/:id for unified access
-          const res = await authedFetch(`/api/presentations/${encodeURIComponent(deckToSave.id)}`, {
-            method: 'PUT',
-            headers,
-            body: JSON.stringify(legacyPayload),
-          });
-
-          if (res.ok) {
-            setAutosaveStatus('saved');
-            setLastSavedTime(
-              new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-            );
-          } else {
-            setAutosaveStatus('error');
-          }
-        } catch {
-          setAutosaveStatus('error');
-        }
-      }, 500);
+  // Autosave: one save at a time, newest deck wins, a pending edit is sent when leaving (see useDeckAutosave).
+  const { schedule: triggerDebouncedAutosave } = useDeckAutosave({
+    projectId,
+    signedIn,
+    onStatus: setAutosaveStatus,
+    onSaved: ({ version, at }) => {
+      if (version) setProjectVersion(version);
+      setLastSavedTime(at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
     },
-    [projectId, signedIn]
-  );
+  });
 
   const handleUpdateDeck = (updatedDeck: SlideDeck) => {
     setDeck(updatedDeck);

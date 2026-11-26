@@ -263,7 +263,27 @@ function itemsFrom(content: CardContent): CardItem[] {
   return sentences(content.lede).map((s) => ({ title: s }));
 }
 
-export function reflowContent(content: CardContent, layout: GammaLayout): CardContent {
+/**
+ * Columns are always a pair or absent. Stored or hand-edited content can hold one column, none, or a
+ * hole (a path edit on a card that had no columns yet), which would crash every layout that reads
+ * them; anything that is not two readable columns is treated as absent and derived from the items.
+ */
+function pairOfColumns(columns: unknown): [CardColumn, CardColumn] | undefined {
+  if (!Array.isArray(columns) || columns.length < 2) return undefined;
+  const column = (raw: unknown): CardColumn | undefined => {
+    if (!raw || typeof raw !== 'object') return undefined;
+    const c = raw as { title?: unknown; points?: unknown };
+    return {
+      title: typeof c.title === 'string' ? c.title : '',
+      points: Array.isArray(c.points) ? c.points.filter((p): p is string => typeof p === 'string') : [],
+    };
+  };
+  const [l, r] = [column(columns[0]), column(columns[1])];
+  return l && r ? [l, r] : undefined;
+}
+
+export function reflowContent(raw: CardContent, layout: GammaLayout): CardContent {
+  const content: CardContent = { ...raw, columns: pairOfColumns(raw.columns) };
   const next: CardContent = { ...content, items: [...content.items], stats: [...content.stats] };
 
   switch (layout) {
