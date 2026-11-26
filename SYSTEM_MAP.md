@@ -41,7 +41,7 @@ A navigational map of the repository: where things live and where to start when 
 | :--- | :--- |
 | `main.tsx` | SPA entry: `/admin/*` (lazy) and `/*` (`DeskApp`) |
 | `desk/` | UI by feature; `DeskApp.tsx` routes, `DeskShell.tsx` generic shell, `ProjectListScreen.tsx`, workspaces `assignment/`, `thesis/`, `workspace/` (journal studio), `journal/`, `presentation/`, plus `vault/`, `aiAccess/`, `ai/`, `auth/`, `account/`, `admin/`, `dashboard/`, `setup/`, `regions/`, `api/` (typed client) |
-| `app/` | Engines: `atlas` (output-type catalog), `conductor` (project store and gates), `mesh`, `citation`, `manuscript`, `review`, `coherence`, `rubric`, `studio`, `journal`, `anonymization`, `coverLetter`, `export` |
+| `app/` | Engines: `atlas` (output-type catalog), `conductor` (project store and gates), `mesh`, `citation`, `manuscript`, `review`, `coherence`, `rubric`, `studio`, `journal`, `coverLetter`, `export` |
 | `domain/` | Pure models and zod schemas |
 | `features/` | `slides` (Gamma engine, Presentation Studio steps), `coursework` (style engine, legacy components), `drafting`, `sources`, `understand` |
 | `platform/` | `router/` (the one AI engine), `completion.ts`, `warden/` |

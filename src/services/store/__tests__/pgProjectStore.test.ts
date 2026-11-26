@@ -352,13 +352,8 @@ describe("services/store: pgProjectStore", () => {
     expect(fetched?.peerReviewHistory).toEqual(peerReviewHistory);
   });
 
-  it("cover_letter/anonymization_report/anonymized_document round-trip: serialize to JSON on save, default to undefined when a row predates the columns, and rehydrate when present", async () => {
+  it("cover_letter round-trip: serialize to JSON on save, default to undefined when a row predates the columns, and rehydrate when present", async () => {
     const coverLetter: ProjectRecord["coverLetter"] = { text: "Dear Editor,\n\n...", journalName: "Water Research", generatedAt: "2026-01-01T00:00:00.000Z" };
-    const anonymizationReport: ProjectRecord["anonymizationReport"] = {
-      proposals: [{ blockId: "acknowledgements", category: "acknowledgement", originalText: "Dr. Smith", replacementText: "[name removed]", reason: "Names a person." }],
-      checkedAt: "2026-01-01T00:00:00.000Z",
-    };
-    const anonymizedDocument: ProjectRecord["anonymizedDocument"] = { id: "d1", title: "Paper", blocks: [{ id: "acknowledgements", kind: "paragraph", text: "We thank [name removed]." }] };
     const record: ProjectRecord = {
       projectId: "proj-anon",
       ownerId: "11111111-1111-4111-8111-111111111111",
@@ -371,15 +366,11 @@ describe("services/store: pgProjectStore", () => {
       evidenceLedger: { sources: [], items: [] },
       peerReviewHistory: { rounds: [] },
       coverLetter,
-      anonymizationReport,
-      anonymizedDocument,
     };
     const saveDb = fakeDb();
     await createPgProjectStore(saveDb).save(record);
     const params = saveDb.calls[0].params;
     expect(JSON.parse(params?.[16] as string)).toEqual(coverLetter);
-    expect(JSON.parse(params?.[17] as string)).toEqual(anonymizationReport);
-    expect(JSON.parse(params?.[18] as string)).toEqual(anonymizedDocument);
 
     const staleRowDb = fakeDb([
       {
@@ -393,13 +384,11 @@ describe("services/store: pgProjectStore", () => {
         claim_graph: { claims: {}, evidence: {}, bindings: {} },
         waivers: {},
         submissions: [],
-        // No cover_letter/anonymization_report/anonymized_document keys at all — a row from before the migration.
+        // No cover_letter key at all — a row from before the migration.
       },
     ]);
     const staleFetched = await createPgProjectStore(staleRowDb).get("proj-old3");
     expect(staleFetched?.coverLetter).toBeUndefined();
-    expect(staleFetched?.anonymizationReport).toBeUndefined();
-    expect(staleFetched?.anonymizedDocument).toBeUndefined();
 
     const getDb = fakeDb([
       {
@@ -414,14 +403,10 @@ describe("services/store: pgProjectStore", () => {
         waivers: {},
         submissions: [],
         cover_letter: coverLetter,
-        anonymization_report: anonymizationReport,
-        anonymized_document: anonymizedDocument,
       },
     ]);
     const fetchedRecord = await createPgProjectStore(getDb).get("proj-anon");
     expect(fetchedRecord?.coverLetter).toEqual(coverLetter);
-    expect(fetchedRecord?.anonymizationReport).toEqual(anonymizationReport);
-    expect(fetchedRecord?.anonymizedDocument).toEqual(anonymizedDocument);
   });
 
   it("source_count_override round-trips: serializes to JSON on save, defaults to undefined when a row predates the column, and rehydrates when present", async () => {
@@ -441,7 +426,7 @@ describe("services/store: pgProjectStore", () => {
     };
     const saveDb = fakeDb();
     await createPgProjectStore(saveDb).save(record);
-    expect(JSON.parse(saveDb.calls[0].params?.[19] as string)).toEqual(record.sourceCountOverride);
+    expect(JSON.parse(saveDb.calls[0].params?.[17] as string)).toEqual(record.sourceCountOverride);
 
     const staleRowDb = fakeDb([
       {

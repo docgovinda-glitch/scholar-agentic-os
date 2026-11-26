@@ -65,5 +65,4 @@ jobs:
           server/routes/__tests__/coherenceCheck.test.ts
           server/routes/__tests__/peerReview.test.ts
           server/routes/__tests__/coverLetter.test.ts
-          server/routes/__tests__/anonymization.test.ts
           server/routes/__tests__/journalRequirementsExtract.test.ts

@@ -58,7 +58,6 @@ Every endpoint registered by `server.ts` (modules in `server/routes/`). All path
 | POST | `/api/projects/:id/manuscript/start`, `/next-section`, `/pause`, `/resume`, `/coherence-check`, `/resolve-citations` |
 | GET, POST | `/api/projects/:id/manuscript/peer-review` |
 | GET, POST | `/api/projects/:id/cover-letter` |
-| POST | `/api/projects/:id/anonymization/propose`, `/anonymization/apply`; GET `/anonymization` |
 | POST | `/api/projects/:id/export`, `/export/:format`; GET `/export/:format` |
 
 Export formats: `docx`, `odt`, `pdf`, `latex`, `typst`, `camera_ready_pdf`, `markdown` (`md`), `rebuttal_letter` (`rebuttal-letter`). 400 when the project has no document or the format is invalid.

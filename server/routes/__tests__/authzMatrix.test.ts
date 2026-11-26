@@ -210,7 +210,7 @@ describe("Automated Express Route Authz & Ownership Matrix", () => {
     );
 
     // The journal pipeline is mounted once (/agentic); the old /agent alias doubled its routes.
-    expect(resourceRoutes.length).toBeGreaterThan(115);
+    expect(resourceRoutes.length).toBeGreaterThan(105);
 
     const failures: string[] = [];
 

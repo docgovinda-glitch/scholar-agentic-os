@@ -125,7 +125,7 @@ export async function commitProjectToDatabase(projectId: string): Promise<Projec
  */
 export const AI_ROUTE_PATTERNS: RegExp[] = [
   /^\/api\/ai(\/|$)/,
-  /^\/api\/projects\/[^/]+\/(agentic|assignment|thesis|presentation|manuscript|journal-requirements|cover-letter|anonymization)(\/|$)/,
+  /^\/api\/projects\/[^/]+\/(agentic|assignment|thesis|presentation|manuscript|journal-requirements|cover-letter)(\/|$)/,
   /^\/api\/studio\/refine(\/|$)/,
 ];
 

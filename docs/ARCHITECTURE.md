@@ -123,7 +123,7 @@ The server imports from `src/` (citation formatters, `document_intelligence`, me
 | :--- | :--- |
 | `src/desk/` | UI by feature: assignment, thesis, journal, workspace (journal studio), proposal, presentation, vault, aiAccess, ai, auth, account, admin, dashboard, intake, setup, claims, evidence, gates, discovery, export, manuscript, editor |
 | `src/desk/api/` | Typed client: `client.ts` (authenticated fetch, transient `x-ai-*` headers on AI routes via `routeUsesClientAi`, offline queue), `projectsApi.ts`, `agenticApi.ts`, `claimEvidenceApi.ts`, `studioGenerationApi.ts` |
-| `src/app/` | Client engines: `atlas` (output-type catalog), `conductor` (gates), `mesh` (agent registry and executor), `citation`, `manuscript`, `review`, `coherence`, `rubric`, `studio`, `journal`, `anonymization`, `coverLetter`, `export` |
+| `src/app/` | Client engines: `atlas` (output-type catalog), `conductor` (gates), `mesh` (agent registry and executor), `citation`, `manuscript`, `review`, `coherence`, `rubric`, `studio`, `journal`, `coverLetter`, `export` |
 | `src/domain/` | Pure models and zod schemas; no React and no I/O |
 | `src/features/` | `slides` (Presentation Studio and Gamma card engine), `coursework` (style engine, legacy coursework components), `drafting`, `sources`, `understand` |
 | `src/platform/` | `router/` (the one AI engine: adapters, failover, key rotation, circuit breaker, model listing and curation, SSE bridge), `completion.ts` (the `Completer` app modules use), `warden/` (egress policy, used by the mesh agents) |
