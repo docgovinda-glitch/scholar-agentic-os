@@ -405,7 +405,9 @@ describe("Desk — account settings", () => {
     expect(await screen.findByText("Journal Article")).toBeInTheDocument();
     // Not just the project — the exact tab it was opened from (Definition, here:
     // G0 isn't signed off in this fixture, so that's the auto-decided tab).
-    expect(window.location.pathname).toBe("/projects/proj-42/definition");
+    // Waited for: Close goes back through history, which lands a tick later, and the project
+    // behind the settings screen already shows the text above.
+    await waitFor(() => expect(window.location.pathname).toBe("/projects/proj-42/definition"));
   });
 });
 
