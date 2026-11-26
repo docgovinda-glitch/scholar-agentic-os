@@ -235,8 +235,11 @@ function pillLabel(ctx: Ctx, o: { x: number; y: number; text: string; path?: str
   const h = 32;
   const x = o.align === 'center' ? o.x - w / 2 : o.x;
   rect(ctx, { x, y: o.y, w, h, fill: o.fill, radius: h / 2, pill: true });
+  // The label is centred in a box a little wider than its measured text: PowerPoint and Word set it in a
+  // wider font than the one measured here, and with no slack the last letter wraps onto a second line.
+  const slack = 12;
   text(ctx, {
-    x: x + 16, y: o.y, w: w - 32, h, text: o.text, path: o.path, size, weight: 700, color: o.ink, font: theme.bodyFont,
+    x: x + 16 - slack, y: o.y, w: w - 32 + slack * 2, h, text: o.text, path: o.path, size, weight: 700, color: o.ink, font: theme.bodyFont,
     align: 'center', valign: 'middle', lineHeight: 1.2, letterSpacing: spacing, uppercase: true,
   });
   return w;
