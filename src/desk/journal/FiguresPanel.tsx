@@ -124,7 +124,7 @@ export default function FiguresPanel({ figures: saved, onChange: save }: { figur
           return (
             <li key={f.id} className="p-3 rounded-xl border border-[color:var(--border-subtle)] space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-[color:var(--text-muted)]">
+                <span className="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)]">
                   {f.kind === "table" ? "Table" : "Figure"} · <code className="normal-case">{figureToken(f)}</code>
                 </span>
                 <button type="button" aria-label={`Remove ${name}`} onClick={() => void onChange(latest.current.filter((x) => x.id !== f.id))} className="p-1 rounded text-[color:var(--text-muted)] hover:text-[color:var(--state-danger)] cursor-pointer">
@@ -144,7 +144,7 @@ export default function FiguresPanel({ figures: saved, onChange: save }: { figur
                     className={`${box} font-mono`}
                   />
                   {(f.rows?.length ?? 0) > 0 && (
-                    <p className="text-[11px] text-[color:var(--text-muted)]">
+                    <p className="text-xs text-[color:var(--text-muted)]">
                       {f.rows!.length - 1} row{f.rows!.length === 2 ? "" : "s"} × {Math.max(...f.rows!.map((r) => r.length))} columns; the first row is the header.
                     </p>
                   )}

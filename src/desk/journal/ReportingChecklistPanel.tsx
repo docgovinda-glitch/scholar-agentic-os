@@ -11,7 +11,7 @@ import {
   type ChecklistState,
 } from "../../domain/journal/reportingChecklist";
 
-const field = "w-full text-[11px] p-1.5 rounded border border-[color:var(--border-control)] bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)] focus:outline-none focus:border-[color:var(--border-strong)]";
+const field = "w-full text-xs p-1.5 rounded border border-[color:var(--border-control)] bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)] focus:outline-none focus:border-[color:var(--border-strong)]";
 
 function download(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob);
@@ -125,10 +125,10 @@ export default function ReportingChecklistPanel({
           </span>
         )}
       </div>
-      <p className="text-[11px] text-[color:var(--text-secondary)]">
+      <p className="text-xs text-[color:var(--text-secondary)]">
         Many journals ask for the completed checklist of the guideline for your study design. Say where each item is reported in your manuscript, or why it doesn't apply.
       </p>
-      <label className="text-[11px] font-semibold text-[color:var(--text-primary)] flex flex-col gap-1">
+      <label className="text-xs font-semibold text-[color:var(--text-primary)] flex flex-col gap-1">
         Guideline
         <select
           aria-label="Reporting guideline"
@@ -158,11 +158,11 @@ export default function ReportingChecklistPanel({
           ))}
         </select>
       </label>
-      {!state && suggested && <p className="text-[11px] text-[color:var(--text-muted)]">Suggested from your article type and description: {checklistById(suggested)?.name}.</p>}
+      {!state && suggested && <p className="text-xs text-[color:var(--text-muted)]">Suggested from your article type and description: {checklistById(suggested)?.name}.</p>}
 
       {list && progress && (
         <>
-          <p className="text-[10px] text-[color:var(--text-muted)]">
+          <p className="text-xs text-[color:var(--text-muted)]">
             Item wording as published: {list.citation}. {list.licence}.{" "}
             <a href={list.url} target="_blank" rel="noopener noreferrer" className="underline">
               Official checklist
@@ -182,8 +182,8 @@ export default function ReportingChecklistPanel({
               return (
                 <Fragment key={item.id}>
                   <li className="p-2 space-y-1.5">
-                    {newSection && <p className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--text-muted)]">{item.section}</p>}
-                    {newLead && <p className="text-[11px] text-[color:var(--text-secondary)]">{item.lead}</p>}
+                    {newSection && <p className="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)]">{item.section}</p>}
+                    {newLead && <p className="text-xs text-[color:var(--text-secondary)]">{item.lead}</p>}
                     <p className="text-xs text-[color:var(--text-primary)] whitespace-pre-line">
                       <span className="font-semibold">{item.id}.</span> {item.text}
                     </p>
@@ -218,7 +218,7 @@ export default function ReportingChecklistPanel({
             })}
           </ol>
           {progress.problems.length > 0 && (
-            <ul aria-label="Checklist items to finish" className="text-[11px] text-[color:var(--state-warning)] list-disc pl-4">
+            <ul aria-label="Checklist items to finish" className="text-xs text-[color:var(--state-warning)] list-disc pl-4">
               {progress.problems.slice(0, 6).map((p) => (
                 <li key={p}>{p}</li>
               ))}
@@ -238,7 +238,7 @@ export default function ReportingChecklistPanel({
               <Download className="w-3.5 h-3.5" aria-hidden="true" />
               CSV
             </button>
-            {saveError && <span role="alert" className="text-[11px] text-[color:var(--state-danger)]">Not saved. Your entries are still on screen; change one to try again.</span>}
+            {saveError && <span role="alert" className="text-xs text-[color:var(--state-danger)]">Not saved. Your entries are still on screen; change one to try again.</span>}
           </div>
         </>
       )}

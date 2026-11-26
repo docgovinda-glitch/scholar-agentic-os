@@ -83,7 +83,7 @@ export default function ChapterEditor({
               </button>
               <span className="w-6 h-6 rounded-full bg-primary text-surface font-bold text-xs flex items-center justify-center shrink-0">{ch.chapterNumber}</span>
               <h3 id={`chapter-${i}-heading`} className="flex-1 min-w-0 text-sm font-bold text-primary truncate">{ch.title || `Chapter ${ch.chapterNumber}`}</h3>
-              <span className="text-[11px] tabular-nums text-tertiary shrink-0">
+              <span className="text-xs tabular-nums text-tertiary shrink-0">
                 {words.toLocaleString()} / {ch.targetWordCount.toLocaleString()} words
               </span>
             </div>
@@ -94,7 +94,7 @@ export default function ChapterEditor({
             {isOpen && (
               <div id={`chapter-${i}-body`} className="p-4 space-y-3 border-t border-border/60">
                 <div className="grid grid-cols-1 sm:grid-cols-[1fr_9rem_9rem] gap-2">
-                  <label className="text-[11px] font-semibold text-secondary">
+                  <label className="text-xs font-semibold text-secondary">
                     Title
                     <input
                       value={ch.title}
@@ -102,7 +102,7 @@ export default function ChapterEditor({
                       className="mt-1 w-full px-3 py-2 text-xs border border-border rounded-xl bg-background text-primary"
                     />
                   </label>
-                  <label className="text-[11px] font-semibold text-secondary">
+                  <label className="text-xs font-semibold text-secondary">
                     Target words
                     <input
                       type="number"
@@ -112,7 +112,7 @@ export default function ChapterEditor({
                       className="mt-1 w-full px-3 py-2 text-xs border border-border rounded-xl bg-background text-primary"
                     />
                   </label>
-                  <label className="text-[11px] font-semibold text-secondary">
+                  <label className="text-xs font-semibold text-secondary">
                     Status
                     <select
                       value={ch.status}
@@ -127,7 +127,7 @@ export default function ChapterEditor({
                   </label>
                 </div>
 
-                <label className="block text-[11px] font-semibold text-secondary">
+                <label className="block text-xs font-semibold text-secondary">
                   Chapter text
                   <textarea
                     value={ch.content ?? ""}
@@ -146,7 +146,7 @@ export default function ChapterEditor({
                 )}
 
                 <div className="rounded-xl bg-surface-hover/60 p-3 space-y-2">
-                  <label className="block text-[11px] font-semibold text-secondary">
+                  <label className="block text-xs font-semibold text-secondary">
                     What this chapter must cover (optional, sent with the AI draft)
                     <input
                       value={guidance[i] ?? ""}
@@ -165,7 +165,7 @@ export default function ChapterEditor({
                       {busy === i ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Sparkles className="w-3.5 h-3.5" aria-hidden="true" />}
                       {busy === i ? "Drafting…" : words > 0 ? "Redraft with AI" : "Draft with AI"}
                     </button>
-                    {!canDraft && draftBlocker && <span className="text-[11px] text-tertiary">{draftBlocker}</span>}
+                    {!canDraft && draftBlocker && <span className="text-xs text-tertiary">{draftBlocker}</span>}
                     <span className="flex-1" />
                     <button type="button" onClick={() => onMove(i, -1)} disabled={i === 0} aria-label={`Move chapter ${ch.chapterNumber} up`} className="p-1.5 rounded-lg hover:bg-surface disabled:opacity-30 cursor-pointer">
                       <ArrowUp className="w-3.5 h-3.5" aria-hidden="true" />

@@ -297,19 +297,16 @@ export default function KnowledgeVault({
                 <h1 className="text-base sm:text-lg font-bold tracking-tight text-gray-900 dark:text-gray-100">
                   Knowledge Vault
                 </h1>
-                <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 whitespace-nowrap">
-                  Workspace Repository
-                </span>
               </div>
               <p className="text-xs text-gray-500 dark:text-gray-400 font-normal truncate max-w-md">
-                Manage research projects, literature evidence, and citation provenance.
+                Your sources and the projects that use them.
               </p>
             </div>
           </div>
 
           {/* Secondary Tab Switcher & Actions */}
-          <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
-            <nav aria-label="Vault sections" className="flex items-center gap-1 p-1 rounded-xl bg-gray-100 dark:bg-neutral-800/80 border border-gray-200/80 dark:border-neutral-700/60 shrink-0">
+          <div className="flex items-center gap-2 min-w-0 max-w-full flex-wrap sm:flex-nowrap">
+            <nav aria-label="Vault sections" className="flex items-center gap-1 p-1 overflow-x-auto max-w-full rounded-xl bg-gray-100 dark:bg-neutral-800/80 border border-gray-200/80 dark:border-neutral-700/60 shrink-0">
               <button
                 type="button"
                 onClick={() => setActiveTab("projects")}
@@ -322,7 +319,7 @@ export default function KnowledgeVault({
                 <Layers className="w-3.5 h-3.5" />
                 <span>Projects</span>
                 {projects && projects.length > 0 && (
-                  <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-gray-200 dark:bg-neutral-700 text-gray-700 dark:text-gray-300">
+                  <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-xs bg-gray-200 dark:bg-neutral-700 text-gray-700 dark:text-gray-300">
                     {projects.length}
                   </span>
                 )}
@@ -359,7 +356,7 @@ export default function KnowledgeVault({
               type="button"
               onClick={onClose}
               className="flex items-center gap-1 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-neutral-800 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer h-9 shrink-0"
-              title="Return to main dashboard"
+              title="Back to projects"
             >
               <span>← Back</span>
             </button>
@@ -376,7 +373,7 @@ export default function KnowledgeVault({
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
                 <div className="p-4 rounded-xl border border-gray-200/90 dark:border-neutral-800 bg-white dark:bg-ink-750 shadow-2xs flex flex-col justify-between min-h-[104px]">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                    <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                       Active Projects
                     </span>
                     <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
@@ -384,14 +381,14 @@ export default function KnowledgeVault({
                   <div className="text-2xl font-bold text-gray-900 dark:text-gray-100 my-1">
                     {metrics.total}
                   </div>
-                  <span className="text-[11px] text-gray-500 dark:text-gray-400 leading-normal truncate">
+                  <span className="text-xs text-gray-500 dark:text-gray-400 leading-normal truncate">
                     {metrics.drafting} drafting • {metrics.intake} intake
                   </span>
                 </div>
 
                 <div className="p-4 rounded-xl border border-gray-200/90 dark:border-neutral-800 bg-white dark:bg-ink-750 shadow-2xs flex flex-col justify-between min-h-[104px]">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                    <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                       Quality Gates
                     </span>
                     <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
@@ -399,14 +396,14 @@ export default function KnowledgeVault({
                   <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 my-1">
                     {metrics.gatesVerified} <span className="text-xs text-gray-400 font-normal">/ {metrics.totalGates}</span>
                   </div>
-                  <span className="text-[11px] text-gray-500 dark:text-gray-400 leading-normal truncate">
+                  <span className="text-xs text-gray-500 dark:text-gray-400 leading-normal truncate">
                     Verified milestone gates
                   </span>
                 </div>
 
                 <div className="p-4 rounded-xl border border-gray-200/90 dark:border-neutral-800 bg-white dark:bg-ink-750 shadow-2xs flex flex-col justify-between min-h-[104px]">
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                    <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                       Overall Progress Average
                     </span>
                     <span className="text-sm font-bold text-gray-900 dark:text-gray-100 font-mono">
@@ -419,7 +416,7 @@ export default function KnowledgeVault({
                       style={{ width: `${metrics.avgProgress}%` }}
                     />
                   </div>
-                  <span className="text-[11px] text-gray-500 dark:text-gray-400 mt-1 block leading-normal truncate">
+                  <span className="text-xs text-gray-500 dark:text-gray-400 mt-1 block leading-normal truncate">
                     Synthesizing evidence across all research pipelines
                   </span>
                 </div>
@@ -509,7 +506,7 @@ export default function KnowledgeVault({
                 >
                   <span className="whitespace-nowrap">All</span>
                   {listedProjects && (
-                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full tabular-nums leading-none ${
+                    <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full tabular-nums leading-none ${
                       selectedTypeFilter === "all"
                         ? "bg-white/20 dark:bg-black/20 text-white dark:text-gray-900"
                         : "bg-gray-100 dark:bg-neutral-800 text-gray-600 dark:text-gray-400"
@@ -538,7 +535,7 @@ export default function KnowledgeVault({
                       </span>
                       <span className="whitespace-nowrap">{tile.label}</span>
                       {listedProjects && (
-                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full tabular-nums leading-none ${
+                        <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full tabular-nums leading-none ${
                           isActive
                             ? "bg-white/20 dark:bg-black/20 text-white dark:text-gray-900"
                             : "bg-gray-100 dark:bg-neutral-800 text-gray-600 dark:text-gray-400"
@@ -627,13 +624,13 @@ export default function KnowledgeVault({
                         <div className="flex-1 min-w-0">
                           {/* Badges line */}
                           <div className="flex items-center gap-2 mb-1 flex-wrap">
-                            <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-neutral-800 border border-gray-200/60 dark:border-neutral-700">
+                            <span className="px-2 py-0.5 rounded-full text-xs font-semibold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-neutral-800 border border-gray-200/60 dark:border-neutral-700">
                               {typeLabel}
                             </span>
-                            <span className="px-2 py-0.5 rounded-full text-[11px] font-medium text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-neutral-800/80 border border-gray-200/60 dark:border-neutral-700">
+                            <span className="px-2 py-0.5 rounded-full text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-neutral-800/80 border border-gray-200/60 dark:border-neutral-700">
                               {project.hasDocument ? "Drafting stage" : "Evidence intake"}
                             </span>
-                            <span className="text-[11px] text-gray-400 dark:text-neutral-500 font-mono hidden sm:inline">
+                            <span className="text-xs text-gray-400 dark:text-neutral-500 font-mono hidden sm:inline">
                               {signedOff} of {totalGates} gates verified
                             </span>
                           </div>
@@ -692,7 +689,7 @@ export default function KnowledgeVault({
                                 </button>
                               </div>
                               {renameError && (
-                                <span className="text-[11px] text-red-500 font-medium mt-1 block">
+                                <span className="text-xs text-red-500 font-medium mt-1 block">
                                   {renameError}
                                 </span>
                               )}
@@ -730,7 +727,7 @@ export default function KnowledgeVault({
                       <div className="flex flex-wrap sm:flex-nowrap items-center justify-between lg:justify-end gap-4 shrink-0 pt-3 lg:pt-0 border-t lg:border-t-0 border-gray-100 dark:border-neutral-800/80">
                         {/* Progress */}
                         <div className="w-32 sm:w-40 shrink-0">
-                          <div className="flex justify-between text-[11px] font-medium text-gray-500 dark:text-gray-400 mb-1">
+                          <div className="flex justify-between text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
                             <span>Completion</span>
                             <span className="font-semibold text-gray-900 dark:text-gray-100 font-mono">{percent}%</span>
                           </div>
@@ -799,15 +796,15 @@ export default function KnowledgeVault({
                               <FormatIcon id={project.outputTypeId} className="w-5 h-5" />
                             </div>
                             <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-                              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-neutral-800 border border-gray-200/60 dark:border-neutral-700 whitespace-nowrap">
+                              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-neutral-800 border border-gray-200/60 dark:border-neutral-700 whitespace-nowrap">
                                 {typeLabel}
                               </span>
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-medium text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-neutral-800/80 border border-gray-200/60 dark:border-neutral-700 whitespace-nowrap">
+                              <span className="px-2 py-0.5 rounded-full text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-neutral-800/80 border border-gray-200/60 dark:border-neutral-700 whitespace-nowrap">
                                 {project.hasDocument ? "Drafting stage" : "Evidence intake"}
                               </span>
                             </div>
                           </div>
-                          <div className="shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-50 dark:bg-neutral-800/60 border border-gray-200/60 dark:border-neutral-700/60 text-[11px] text-gray-500 dark:text-gray-400 font-mono whitespace-nowrap">
+                          <div className="shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-50 dark:bg-neutral-800/60 border border-gray-200/60 dark:border-neutral-700/60 text-xs text-gray-500 dark:text-gray-400 font-mono whitespace-nowrap">
                             <CheckCircle2 className="w-3 h-3 text-emerald-500" />
                             <span>{signedOff}/{totalGates} gates</span>
                           </div>
@@ -867,7 +864,7 @@ export default function KnowledgeVault({
                               </button>
                             </div>
                             {renameError && (
-                              <span className="text-[11px] text-red-500 font-medium mt-1 block">
+                              <span className="text-xs text-red-500 font-medium mt-1 block">
                                 {renameError}
                               </span>
                             )}

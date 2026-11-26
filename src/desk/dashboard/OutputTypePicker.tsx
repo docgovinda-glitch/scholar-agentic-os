@@ -61,7 +61,7 @@ export function ChooseOutputType({
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
           <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
         </svg>
-        <span>Return to Command Center</span>
+        <span>Back to projects</span>
       </button>
 
       <div className="mb-8">
@@ -165,7 +165,7 @@ export function ChooseOutputType({
                 </>
               ) : (
                 <>
-                  <span>{selected ? `Boot ${FORMAT_TILES.find((t) => t.id === selected)?.label || "Workspace"}` : "Select a Format to Boot"}</span>
+                  <span>{selected ? `Create ${FORMAT_TILES.find((t) => t.id === selected)?.label || "project"}` : "Choose a format"}</span>
                   <span aria-hidden="true" className="text-sm font-bold">→</span>
                 </>
               )}

@@ -54,7 +54,7 @@ describe("LiteratureMatrixModal", () => {
 
     expect(screen.getByText("Literature Review Synthesis Matrix")).toBeInTheDocument();
     expect(screen.getByText(/2\s+Sources/)).toBeInTheDocument();
-    expect(screen.getByText("📁 AI-Safety")).toBeInTheDocument();
+    expect(screen.getByText("AI-Safety")).toBeInTheDocument();
 
     // Table rows
     expect(screen.getByText("Connor & Reese (2024)")).toBeInTheDocument();
@@ -82,7 +82,7 @@ describe("LiteratureMatrixModal", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Ask Selected Sources/ }));
 
-    expect(screen.getByText("⚡ Quick Analytical Presets:")).toBeInTheDocument();
+    expect(screen.getByText("Quick Analytical Presets:")).toBeInTheDocument();
 
     // Click preset
     fireEvent.click(screen.getByRole("button", { name: /Compare Methodologies/ }));

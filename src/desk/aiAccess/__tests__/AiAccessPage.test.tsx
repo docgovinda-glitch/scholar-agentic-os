@@ -375,7 +375,8 @@ describe("AI Access upgrade: honest status, quick start, live routing", () => {
     renderPage();
     fireEvent.click(await screen.findByRole("button", { name: "Overview" }));
     const start = await screen.findByRole("region", { name: "Get started" });
-    expect(start).toHaveTextContent("Recommended: Google Gemini");
+    expect(start).toHaveTextContent("Google Gemini");
+    expect(start).toHaveTextContent("Recommended");
     expect(start).toHaveTextContent("Groq");
     expect(start).toHaveTextContent("Ollama");
     expect(screen.getAllByRole("link", { name: /Get a key/ })[0]).toHaveAttribute("href", "https://aistudio.google.com/app/apikey");

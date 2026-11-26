@@ -49,6 +49,28 @@
   --font-mono: var(--font-sans);
 }
 
+/* Semantic colour utilities. Components write text-primary, text-secondary,
+   text-muted, border-subtle, bg-surface… ; before this block those classes
+   generated no CSS at all (the tokens lived only in :root), so muted text
+   rendered as body text and bg-background was transparent. `inline` makes
+   each utility read the live token, so both themes switch with it.
+   (--text-* is Tailwind's font-size namespace, so text colours are mapped
+   through --color-* names.) */
+@theme inline {
+  --color-primary: var(--text-primary);
+  --color-secondary: var(--text-secondary);
+  --color-muted: var(--text-muted);
+  --color-tertiary: var(--text-muted);
+  --color-subtle: var(--border-subtle);
+  --color-border: var(--border-default);
+  --color-background: var(--surface-canvas);
+  --color-canvas: var(--surface-canvas);
+  --color-surface: var(--surface-raised);
+  --color-surface-hover: var(--surface-hover);
+  --color-card: var(--surface-raised);
+  --color-accent: var(--accent);
+}
+
 /* ----------------------------------------------------------------------------
    2. SEMANTIC COLOUR — LIGHT (default)
 
@@ -426,9 +448,6 @@
   --color-luminous-blue-dim: var(--accent-hover);
   --color-border-subtle:     var(--border-subtle);
 
-  /* Pre-sci-fi brand names, still referenced by a handful of files. */
-  --color-primary:      var(--text-primary);
-  --color-accent:       var(--accent);
 
 }
 
@@ -440,8 +459,10 @@
 html, body, #root {
   height: auto !important;
   min-height: 100% !important;
-  background-color: var(--surface-canvas);
-  color: var(--text-primary);
+  /* !important beats the dark inline style index.html puts on <body> to
+     avoid a white flash before this stylesheet loads. */
+  background-color: var(--surface-canvas) !important;
+  color: var(--text-primary) !important;
 }
 
 body {
@@ -613,6 +634,12 @@ button:disabled {
 :focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
+}
+/* Inside scrolling side panels the ring is drawn inset, or the panel's own
+   overflow clips it (it did on the sidebar's first item). */
+[data-testid="scholar-sidebar"] :focus-visible,
+aside :focus-visible {
+  outline-offset: -2px;
 }
 
 /* Scrollbars — tokenised so they follow the theme. */

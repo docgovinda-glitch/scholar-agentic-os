@@ -86,7 +86,7 @@ export function AskScholarSettingsPopover({
 
       {/* 2. Preferred Academic Discipline */}
       <div className="space-y-1">
-        <label htmlFor="pref-discipline" className="block text-[11px] font-semibold text-neutral-600 dark:text-neutral-300">
+        <label htmlFor="pref-discipline" className="block text-xs font-semibold text-neutral-600 dark:text-neutral-300">
           Preferred Discipline
         </label>
         <select
@@ -105,7 +105,7 @@ export function AskScholarSettingsPopover({
 
       {/* 3. Answer Length Preference */}
       <div className="space-y-1">
-        <span className="block text-[11px] font-semibold text-neutral-600 dark:text-neutral-300">Answer Length Preference</span>
+        <span className="block text-xs font-semibold text-neutral-600 dark:text-neutral-300">Answer Length Preference</span>
         <div className="grid grid-cols-3 gap-1">
           {(["concise", "standard", "detailed"] as AnswerLengthPreference[]).map((len) => (
             <button
@@ -113,7 +113,7 @@ export function AskScholarSettingsPopover({
               type="button"
               data-testid={`pref-length-${len}`}
               onClick={() => updateSetting("answerLengthPreference", len)}
-              className={`py-1.5 rounded-lg text-[11px] font-semibold capitalize border transition-colors cursor-pointer ${
+              className={`py-1.5 rounded-lg text-xs font-semibold capitalize border transition-colors cursor-pointer ${
                 settings.answerLengthPreference === len
                   ? "bg-neutral-900 text-white border-neutral-900 dark:bg-white dark:text-neutral-900 dark:border-white"
                   : "bg-neutral-50 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-white/10"

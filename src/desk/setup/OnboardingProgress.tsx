@@ -19,7 +19,7 @@ export type OnboardingStage = "ai-setup" | "knowledge" | "workshop";
 const STEPS: { id: OnboardingStage; label: string; optional?: boolean }[] = [
   { id: "ai-setup", label: "AI Access" },
   { id: "knowledge", label: "Knowledge", optional: true },
-  { id: "workshop", label: "Workshop" },
+  { id: "workshop", label: "Your projects" },
 ];
 
 export default function OnboardingProgress({ current }: { current: OnboardingStage }) {

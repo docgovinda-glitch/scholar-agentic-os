@@ -1,9 +1,11 @@
+import { AlertTriangle } from "lucide-react";
 import { useProjectDocumentTitle } from "../documentTitle";
-import React,{ useState,useEffect,useRef } from "react";
+import React,{ useState,useEffect } from "react";
 import type { AssignmentPhaseId } from "./types";
 import { AssignmentProvider,useAssignmentWorkspace } from "./AssignmentContext";
 import AssignmentStageNavigation from "./components/AssignmentStageNavigation";
 import { authedJsonFetch } from "../api";
+import { getProjectDisplayName } from "../projectNaming";
 import { useUnsavedChangesGuard } from "../../hooks/useUnsavedChangesGuard";
 import AppleStudioHeader,{ type AppleStudioPhaseId } from "../../components/ui/AppleStudioShell";
 
@@ -82,8 +84,6 @@ function AssignmentWorkspaceInner({
     project,
     currentPhase,
     setPhase,
-    targetWordCount,
-    currentWordCount,
     isLoading,
     error,
     saveAnswers,
@@ -107,25 +107,22 @@ function AssignmentWorkspaceInner({
   }, [isZenMode]);
 
   // Inline-editable title with auto-save on blur / Enter
-  const initialTitle =
-    project?.answers?.["title"] ||
-    "Academic Assignment";
+  // One name everywhere: the sidebar, project list, tab title and this header
+  // all use getProjectDisplayName.
+  const fallbackTitle = getProjectDisplayName(project);
+  const initialTitle = (project?.answers?.["title"] as string | undefined) || fallbackTitle;
   const [editableTitle, setEditableTitle] = useState(initialTitle);
-  const titleInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (project) {
-      setEditableTitle(
-        project.answers?.["title"] ||
-        "Academic Assignment"
-      );
+      setEditableTitle((project.answers?.["title"] as string | undefined) || fallbackTitle);
     }
   }, [project]);
 
   useProjectDocumentTitle(editableTitle);
 
   const commitTitle = (next: string) => {
-    const trimmed = next.trim() || "Academic Assignment";
+    const trimmed = next.trim() || fallbackTitle;
     setEditableTitle(trimmed);
     if (project && (trimmed !== (project.answers?.["title"]))) {
       saveAnswers({ assignment_title: trimmed, title: trimmed });
@@ -142,19 +139,11 @@ function AssignmentWorkspaceInner({
     }
   };
 
-  const handleTitleBlur = () => commitTitle(editableTitle);
-
-  const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      e.currentTarget.blur();
-    }
-  };
-
   if (error) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-paper-cool dark:bg-ink-850 p-6 text-center text-[color:var(--text-primary)]">
         <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-2">
-          <span className="text-2xl">⚠️</span>
+          <AlertTriangle className="w-6 h-6 shrink-0" aria-hidden="true" />
         </div>
         <p className="max-w-md text-sm text-red-600 dark:text-red-400 font-medium">{error}</p>
         {onClose && (
@@ -220,6 +209,7 @@ function AssignmentWorkspaceInner({
         return (
           <AssignmentExtractStage
             onProceed={() => setPhase("understand")}
+            onOpenAiAccess={onOpenAiAccess}
           />
         );
       case "understand":
@@ -249,6 +239,7 @@ function AssignmentWorkspaceInner({
         return (
           <AssignmentExtractStage
             onProceed={() => setPhase("understand")}
+            onOpenAiAccess={onOpenAiAccess}
           />
         );
     }
@@ -258,8 +249,6 @@ function AssignmentWorkspaceInner({
     <div className="h-screen flex flex-col bg-paper-cool dark:bg-ink-850 text-[color:var(--text-primary)] overflow-hidden">
       {/* Shared Apple-Grade Studio Chrome Bar */}
       <AppleStudioHeader
-        deliverableCode="OT-01"
-        deliverableLabel="Coursework Studio"
         projectTitle={editableTitle || "Untitled Assignment"}
         onProjectTitleChange={commitTitle}
         activePhase={
@@ -287,7 +276,6 @@ function AssignmentWorkspaceInner({
           if (onClose) onClose();
           else if (typeof window !== "undefined") window.location.href = "/";
         }}
-        metricLabel={`${(currentWordCount || 0).toLocaleString()} / ${(targetWordCount || 0).toLocaleString()} words`}
         onOpenAiAccess={onOpenAiAccess}
         aiWorkspace="coursework"
         autosaveStatus={saveStatus}
@@ -295,39 +283,7 @@ function AssignmentWorkspaceInner({
         projectVersion={project?.version}
       />
 
-      {/* Assignment bar: the title (editable on phones where the studio header hides it) */}
-      <header className={`${isZenMode ? "hidden" : "sm:hidden"} bg-[color:var(--surface-raised)] border-b border-[color:var(--border-subtle)] z-20 shrink-0`}>
-        <div className="flex items-center justify-between px-4 sm:px-6 pt-2.5 pb-1 gap-4">
-          <div className="flex items-center gap-2.5 min-w-0">
-            {/* Inline-Editable Project Title with Auto-Save onBlur */}
-            <div className="flex items-center gap-1 group max-w-xs sm:max-w-md md:max-w-lg min-w-0">
-              <input
-                ref={titleInputRef}
-                type="text"
-                value={editableTitle}
-                onChange={(e) => setEditableTitle(e.target.value)}
-                onBlur={handleTitleBlur}
-                onKeyDown={handleTitleKeyDown}
-                aria-label="Assignment Title"
-                title="Click to edit assignment title"
-                className="text-xs sm:text-sm font-medium text-[color:var(--text-primary)] bg-transparent hover:bg-[color:var(--surface-hover)] focus:bg-white dark:focus:bg-ink-750 border border-transparent hover:border-neutral-200/80 dark:hover:border-white/10 focus:border-neutral-300 dark:focus:border-white/20 rounded-lg px-2 py-1 focus:outline-none transition-all truncate cursor-text"
-              />
-              <button
-                type="button"
-                onClick={() => titleInputRef.current?.focus()}
-                title="Rename assignment"
-                aria-label="Rename assignment"
-                className="opacity-0 group-hover:opacity-100 focus:opacity-100 text-[color:var(--text-muted)] hover:text-neutral-700 dark:hover:text-neutral-200 p-1 rounded-md transition-opacity cursor-pointer shrink-0"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
-                </svg>
-              </button>
-            </div>
-          </div>
-
-        </div>
-      </header>
+      {/* The studio header carries the title (renamable) at every width; no second title row. */}
 
       {/* Horizontal 5-Phase Progress Navigation Bar */}
       {!isZenMode && <AssignmentStageNavigation />}

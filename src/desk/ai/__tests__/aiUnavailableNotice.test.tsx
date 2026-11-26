@@ -55,7 +55,7 @@ describe("AiUnavailableHost", () => {
       announceAiUnavailable({ code: "ai_provider_required", message: "No AI connected" });
     });
     expect(screen.getByRole("dialog")).toHaveTextContent("Connect an AI to continue");
-    fireEvent.click(screen.getByRole("button", { name: /Configure AI Access/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Open AI Access/i }));
     expect(await screen.findByText("AI Access page")).toBeInTheDocument();
   });
 });

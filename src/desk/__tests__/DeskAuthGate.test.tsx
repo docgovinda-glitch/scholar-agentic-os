@@ -290,9 +290,13 @@ describe("sign in", () => {
     expect(screen.getByLabelText("Password")).toBeInTheDocument();
   });
 
-  it("keeps submit disabled until both fields are filled", () => {
+  it("says what is missing when submitted empty, instead of a greyed-out button", async () => {
     navigateToSignIn();
-    expect(screen.getByRole("button", { name: "Sign in" })).toBeDisabled();
+    const submit = screen.getByRole("button", { name: "Sign in" });
+    expect(submit).not.toBeDisabled();
+    fireEvent.click(submit);
+    expect(await screen.findByText("Enter your username, email or mobile number.")).toBeInTheDocument();
+    expect(signIn).not.toHaveBeenCalled();
   });
 
   it("surfaces a credentials failure as an announced error", async () => {
@@ -350,17 +354,17 @@ describe("registration", () => {
       if (skip.includes(label)) continue;
       fireEvent.change(screen.getByLabelText(label), { target: { value } });
     }
-    if (!skip.includes("User Type")) {
-      fireEvent.change(screen.getByLabelText("User Type"), { target: { value: "student" } });
+    if (!skip.includes("I am a")) {
+      fireEvent.change(screen.getByLabelText("I am a"), { target: { value: "student" } });
     }
-    if (!skip.includes("Level of Education")) {
-      fireEvent.change(screen.getByLabelText("Level of Education"), { target: { value: "undergraduate" } });
+    if (!skip.includes("Level of study")) {
+      fireEvent.change(screen.getByLabelText("Level of study"), { target: { value: "undergraduate" } });
     }
   }
 
   it("collects every field an administrator reviews, and none of the removed institutional-ID fields", () => {
     openSignUp();
-    for (const label of ["Full name", "Username", "Email", "Phone", "Institution", "User Type", "Level of Education", "Password"]) {
+    for (const label of ["Full name", "Username", "Email", "Phone", "Institution", "I am a", "Level of study", "Password"]) {
       expect(screen.getByLabelText(label)).toBeInTheDocument();
     }
     expect(screen.queryByLabelText("Institutional ID")).not.toBeInTheDocument();
@@ -385,6 +389,12 @@ describe("registration", () => {
     openSignUp();
     fillSignUpForm();
     expect(screen.getByLabelText("Institution")).toHaveValue("");
+    expect(screen.getByRole("button", { name: "Create account" })).toBeEnabled();
+  });
+
+  it("asks only for name, username, email and password: phone, role and level are optional", () => {
+    openSignUp();
+    fillSignUpForm({ skip: ["Phone", "I am a", "Level of study"] });
     expect(screen.getByRole("button", { name: "Create account" })).toBeEnabled();
   });
 
@@ -421,7 +431,8 @@ describe("registration", () => {
 
     expect(await screen.findByText(/mobile number is already registered/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create account" })).toBeDisabled();
-    expect(checkPhoneAvailable).toHaveBeenCalledWith("+9779800000000");
+    // The country is preselected from the browser language (jsdom: en-US), not fixed to Nepal.
+    expect(checkPhoneAvailable).toHaveBeenCalledWith("+19800000000");
   });
 
   it("re-checks availability once more at submit time as a defense against a check that never ran", async () => {
@@ -473,7 +484,7 @@ describe("registration", () => {
       expect(signUp).toHaveBeenCalledWith(
         expect.objectContaining({
           phone: "9800000000",
-          phoneCountryCode: "+977",
+          phoneCountryCode: "+1",
           userType: "student",
           educationLevel: "undergraduate",
         })

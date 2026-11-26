@@ -56,7 +56,7 @@ export default function VisualPlanner({ deck, onUpdateDeck }: VisualPlannerProps
                       aria-checked={active}
                       title={opt.hint}
                       onClick={() => (opt.kind === 'image' && !slide.visualPlan ? fileRefs.current[slide.id]?.click() : apply(i, opt.kind))}
-                      className={`h-7 px-2.5 rounded-full text-[11px] font-semibold border cursor-pointer inline-flex items-center gap-1 ${
+                      className={`h-7 px-2.5 rounded-full text-xs font-semibold border cursor-pointer inline-flex items-center gap-1 ${
                         active
                           ? 'bg-neutral-900 text-white border-neutral-900 dark:bg-white dark:text-neutral-900 dark:border-white'
                           : 'border-neutral-200 dark:border-white/15 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5'
@@ -64,7 +64,7 @@ export default function VisualPlanner({ deck, onUpdateDeck }: VisualPlannerProps
                     >
                       {opt.kind === 'image' && <ImagePlus className="w-3 h-3" aria-hidden />}
                       {opt.label}
-                      {opt.kind === rec && !active && <span className="text-[9px] uppercase tracking-wide opacity-60">suggested</span>}
+                      {opt.kind === rec && !active && <span className="text-xs uppercase tracking-wide opacity-60">suggested</span>}
                     </button>
                   );
                 })}

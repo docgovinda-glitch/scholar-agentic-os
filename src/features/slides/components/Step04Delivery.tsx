@@ -137,7 +137,7 @@ export default function Step04Delivery({ deck, onPrevStep, onStartPresentation }
     <div className="space-y-6" data-testid="step-04-delivery">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500 dark:text-neutral-400">Step 04 · Delivery &amp; Presentation</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500 dark:text-neutral-400">Step 04 · Delivery &amp; Presentation</p>
           <h1 className="mt-1.5 text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50 truncate">{deck.title}</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -255,7 +255,7 @@ export default function Step04Delivery({ deck, onPrevStep, onStartPresentation }
 
           {viewMode === 'standalone' && (
             <aside className="rounded-2xl bg-white dark:bg-[#212121] ring-1 ring-neutral-900/[0.07] dark:ring-white/[0.07] p-5" data-testid="presenter-notes-drawer">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500 dark:text-neutral-400">Speaker notes</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500 dark:text-neutral-400">Speaker notes</p>
               <p className="mt-2 text-sm leading-relaxed text-neutral-800 dark:text-neutral-200 whitespace-pre-wrap">{slide.speakerNotes || 'No notes for this slide yet.'}</p>
             </aside>
           )}

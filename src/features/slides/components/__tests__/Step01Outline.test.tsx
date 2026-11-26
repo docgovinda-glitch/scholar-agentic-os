@@ -32,7 +32,7 @@ describe("Step 01: Gamma-style outline", () => {
 
   it("uploading the QNT-4020 brief writes a clean title and a full 10-slide outline automatically", async () => {
     render(<Host />);
-    fireEvent.click(screen.getByRole("button", { name: /Upload Document/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Upload a file/i }));
     fireEvent.change(screen.getByLabelText("Slide Count"), { target: { value: "10" } });
     const file = new File([QNT], "QNT-4020-brief.txt", { type: "text/plain" });
     fireEvent.change(screen.getByTestId("presentation-file-input"), { target: { files: [file] } });

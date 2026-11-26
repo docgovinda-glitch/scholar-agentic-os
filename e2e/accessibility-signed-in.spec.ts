@@ -8,7 +8,8 @@ const A = { email: process.env.E2E_A_EMAIL, password: process.env.E2E_A_PASSWORD
 test.skip(!A.email || !A.password, "E2E_A_* test account not configured");
 test.use({ storageState: AUTH_FILES.A });
 
-const WIDTHS = [375, 1280];
+// 768 too: the Journal header overflowed only at tablet width.
+const WIDTHS = [375, 768, 1280];
 const PAGES = ["/projects", "/vault", "/ai-access", "/settings"];
 const WORKSPACES = [
   { name: "coursework", outputTypeId: "OT-01" },

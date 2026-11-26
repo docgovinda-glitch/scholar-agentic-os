@@ -73,7 +73,7 @@ export function WorkspaceAutosaveBadge({
       data-testid="autosave-status"
       title={defaultTitle}
       aria-label={`Autosave status: ${statusLabel}${version ? `, version ${version}` : ""}`}
-      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap shrink-0 transition-colors ${
+      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 transition-colors ${
         isSaving || isOffline
           ? "bg-[color:var(--state-warning-subtle)] text-[color:var(--state-warning)]"
           : isError
@@ -100,14 +100,6 @@ export function WorkspaceAutosaveBadge({
       <span className={compactOnSmall === "2xl" ? "hidden 2xl:inline" : compactOnSmall ? "hidden lg:inline" : undefined}>{statusLabel}</span>
       {lastSavedTime && !isSaving && !isError && (
         <span className={`font-normal ${compactOnSmall === "2xl" ? "hidden 2xl:inline" : compactOnSmall ? "hidden xl:inline" : ""}`}>({lastSavedTime})</span>
-      )}
-      {version !== undefined && (
-        <span
-          className={`font-mono text-[10px] px-1 py-0.2 rounded bg-black/5 dark:bg-white/10 ${compactOnSmall === "2xl" ? "hidden 2xl:inline" : compactOnSmall ? "hidden lg:inline" : ""}`}
-          title={`Revision version ${version}`}
-        >
-          v{version}
-        </span>
       )}
     </div>
   );

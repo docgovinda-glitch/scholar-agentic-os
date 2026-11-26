@@ -119,7 +119,7 @@ describe("Scholar Core Assignment Workspace", () => {
       />
     );
 
-    expect(await screen.findByText(/Please provide the assignment question, word count, and citation style to continue/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Still needed: the assignment question/i)).toBeInTheDocument();
   });
 
   it("renders a minimalist, decluttered workspace header", async () => {
@@ -133,15 +133,15 @@ describe("Scholar Core Assignment Workspace", () => {
       />
     );
 
-    // 1. One back button: the studio header's. The assignment bar below it
-    // no longer repeats it.
-    const header = await screen.findByRole("banner");
-    expect(within(header).queryByRole("button", { name: /back/i })).not.toBeInTheDocument();
+    // 1. One back button and one title: the studio header's.
+    const header = await screen.findByTestId("apple-studio-header");
+    expect(screen.getAllByRole("button", { name: /back to projects/i })).toHaveLength(1);
     fireEvent.click(screen.getByTestId("studio-back-to-desk-btn"));
     expect(handleClose).toHaveBeenCalledTimes(1);
 
     // Inline-editable title with auto-save
-    const titleInput = await within(header).findByLabelText("Assignment Title");
+    fireEvent.click(within(header).getByTestId("studio-project-title"));
+    const titleInput = await within(header).findByLabelText("Edit project title");
     expect(titleInput).toBeInTheDocument();
     fireEvent.change(titleInput, { target: { value: "Renamed Assignment" } });
     fireEvent.blur(titleInput);
@@ -172,8 +172,9 @@ describe("Scholar Core Assignment Workspace", () => {
 
     // 4. Duplicate counter removed from top header; lives exclusively in stage navigation
     expect(within(header).queryByText(/0 \/ 2,000 words/i)).not.toBeInTheDocument();
+    // No word meter until something is drafted.
     const nav = screen.getByRole("navigation", { name: /Assignment Workflow Phases/i });
-    expect(within(nav).getByText(/2,000 words/i)).toBeInTheDocument();
+    expect(within(nav).queryByText(/2,000 words/i)).not.toBeInTheDocument();
   });
 
   it("completes full brief upload and sequential analysis flow with exact line citations without visual regressions", async () => {
@@ -349,6 +350,6 @@ describe("Scholar Core Assignment Workspace", () => {
     expect(await screen.findByTestId("drafting-needs-brief", undefined, { timeout: 4000 })).toBeInTheDocument();
     expect(screen.queryByText(/Core Analytical Subject|Theoretical Foundations of/i)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Go to Extract/i }));
-    expect(await screen.findByText(/Please provide the assignment question/i, undefined, { timeout: 4000 })).toBeInTheDocument();
+    expect(await screen.findByText(/Still needed: the assignment question/i, undefined, { timeout: 4000 })).toBeInTheDocument();
   });
 });

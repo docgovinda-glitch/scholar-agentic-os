@@ -474,7 +474,7 @@ export default function EvidenceMatrixMode() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[color:var(--accent)] text-[color:var(--text-inverse)]">
+              <span className="px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-[color:var(--accent)] text-[color:var(--text-inverse)]">
                 Evidence
               </span>
             </div>
@@ -579,7 +579,7 @@ export default function EvidenceMatrixMode() {
               <p className="text-xs font-bold text-[color:var(--text-primary)]">
                 {isUploadingFile ? "Parsing document in memory…" : "Drop primary research files here, or click to browse"}
               </p>
-              <p className="text-[11px] text-[color:var(--text-muted)] mt-0.5">
+              <p className="text-xs text-[color:var(--text-muted)] mt-0.5">
                 Supports Quantitative (.csv, .xlsx, .xls) and Qualitative (.pdf, .docx, .pptx, .txt, .md) up to 25MB
               </p>
             </div>
@@ -594,7 +594,7 @@ export default function EvidenceMatrixMode() {
           {/* User Data Badges */}
           {userDatasets.length > 0 && (
             <div className="space-y-2 pt-2">
-              <span className="text-[11px] font-bold text-[color:var(--text-muted)] uppercase tracking-wider">
+              <span className="text-xs font-bold text-[color:var(--text-muted)] uppercase tracking-wider">
                 Ingested Primary User Datasets ({userDatasets.length})
               </span>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -608,24 +608,24 @@ export default function EvidenceMatrixMode() {
                         <span className="font-bold text-[color:var(--text-primary)] truncate block">
                           {d.title}
                         </span>
-                        <span className="text-[10px] text-[color:var(--text-muted)] font-mono">
+                        <span className="text-xs text-[color:var(--text-muted)] font-mono">
                           Format: {d.format.toUpperCase()} · {d.sourceType}
                         </span>
                       </div>
-                      <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border border-emerald-500/30 shrink-0">
+                      <span className="px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border border-emerald-500/30 shrink-0">
                         User Data
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between text-[11px]">
+                    <div className="flex items-center justify-between text-xs">
                       <code
                         onClick={() => copyToken(d.citationToken)}
-                        className="px-1.5 py-0.5 rounded bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] font-mono text-[10px] text-[color:var(--accent)] cursor-pointer hover:bg-[color:var(--surface-hover)]"
+                        className="px-1.5 py-0.5 rounded bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] font-mono text-xs text-[color:var(--accent)] cursor-pointer hover:bg-[color:var(--surface-hover)]"
                         title="Click to copy citation token"
                       >
                         {copiedToken === d.citationToken ? "✓ Copied!" : d.citationToken}
                       </code>
-                      <span className="text-[10px] text-[color:var(--text-muted)] font-mono">
+                      <span className="text-xs text-[color:var(--text-muted)] font-mono">
                         {d.keyMetrics?.[0] || d.summary.slice(0, 25)}
                       </span>
                     </div>
@@ -687,7 +687,7 @@ export default function EvidenceMatrixMode() {
 
             {/* Portal Filter Pills */}
             <div className="flex flex-wrap items-center gap-1.5 text-xs">
-              <span className="text-[10px] font-bold text-[color:var(--text-muted)] uppercase tracking-wider mr-1">
+              <span className="text-xs font-bold text-[color:var(--text-muted)] uppercase tracking-wider mr-1">
                 Portal:
               </span>
               {(["all", "openalex", "crossref", "arxiv", "web"] as const).map((p) => (
@@ -695,7 +695,7 @@ export default function EvidenceMatrixMode() {
                   key={p}
                   type="button"
                   onClick={() => setSelectedPortal(p)}
-                  className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                  className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
                     selectedPortal === p
                       ? "bg-[color:var(--accent)] text-[color:var(--text-inverse)]"
                       : "bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
@@ -728,14 +728,14 @@ export default function EvidenceMatrixMode() {
                         <h4 className="font-bold text-[color:var(--text-primary)] text-xs">
                           {item.title}
                         </h4>
-                        <p className="text-[11px] text-[color:var(--text-secondary)] mt-0.5">
+                        <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">
                           {item.authors?.join(", ") || "[Author unknown]"} ({item.year ?? "n.d."})
                         </p>
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
                         {item.doi && (
-                          <span className="px-2 py-0.5 rounded text-[9px] font-mono bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] text-[color:var(--text-secondary)]">
+                          <span className="px-2 py-0.5 rounded text-xs font-mono bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] text-[color:var(--text-secondary)]">
                             DOI: {item.doi}
                           </span>
                         )}
@@ -749,7 +749,7 @@ export default function EvidenceMatrixMode() {
                       </div>
                     </div>
 
-                    <p className="text-[11px] text-[color:var(--text-muted)] line-clamp-2">
+                    <p className="text-xs text-[color:var(--text-muted)] line-clamp-2">
                       {item.abstract || "Peer-reviewed scholarly evidence."}
                     </p>
                   </div>
@@ -765,7 +765,7 @@ export default function EvidenceMatrixMode() {
                 Already have a DOI? Add a source by DOI
               </summary>
               <div className="space-y-1.5 mt-3">
-                <p className="text-[11px] text-[color:var(--text-muted)]">
+                <p className="text-xs text-[color:var(--text-muted)]">
                   Authors, year, journal, volume and pages come from the DOI registry (Crossref or DataCite), with any retraction on record.
                 </p>
                 <AddByDoi projectId={effectiveProjectId} onAdded={handleAddByDoi} />
@@ -795,7 +795,7 @@ export default function EvidenceMatrixMode() {
           {/* Matrix Filter & Controls Bar */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-[color:var(--text-muted)] uppercase tracking-wider">
+              <span className="text-xs font-bold text-[color:var(--text-muted)] uppercase tracking-wider">
                 Filter:
               </span>
               <div className="flex items-center gap-1">
@@ -804,7 +804,7 @@ export default function EvidenceMatrixMode() {
                     key={f}
                     type="button"
                     onClick={() => setMatrixFilter(f)}
-                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer ${
                       matrixFilter === f
                         ? "bg-[color:var(--surface-sunken)] border border-[color:var(--border-control)] text-[color:var(--text-primary)] font-bold shadow-xs"
                         : "text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
@@ -818,7 +818,7 @@ export default function EvidenceMatrixMode() {
 
             {subSectionOptions.length > 0 && (
               <div className="flex items-center gap-2 text-xs">
-                <label htmlFor="matrix-section-filter-select" className="text-[10px] font-bold text-[color:var(--text-muted)] uppercase tracking-wider">
+                <label htmlFor="matrix-section-filter-select" className="text-xs font-bold text-[color:var(--text-muted)] uppercase tracking-wider">
                   Target Sub-Section:
                 </label>
                 <select
@@ -843,7 +843,7 @@ export default function EvidenceMatrixMode() {
             <div className="border border-[color:var(--border-subtle)] rounded-xl overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="bg-[color:var(--surface-sunken)] border-b border-[color:var(--border-subtle)] text-[10px] uppercase tracking-wider text-[color:var(--text-muted)]">
+                  <tr className="bg-[color:var(--surface-sunken)] border-b border-[color:var(--border-subtle)] text-xs uppercase tracking-wider text-[color:var(--text-muted)]">
                     <th className="py-2.5 px-4 font-bold w-36">Citation Token</th>
                     <th className="py-2.5 px-4 font-bold w-64">Source & Author (Year)</th>
                     <th className="py-2.5 px-4 font-bold w-48">Epistemic Stance</th>
@@ -862,13 +862,13 @@ export default function EvidenceMatrixMode() {
                       <td className="py-3 px-4 align-top">
                         <code
                           onClick={() => copyToken(row.citationToken)}
-                          className="px-2 py-0.5 rounded bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] font-mono text-[10px] text-[color:var(--accent)] font-bold cursor-pointer hover:bg-[color:var(--surface-hover)] block text-center"
+                          className="px-2 py-0.5 rounded bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] font-mono text-xs text-[color:var(--accent)] font-bold cursor-pointer hover:bg-[color:var(--surface-hover)] block text-center"
                           title="Click to copy citation token"
                         >
                           {copiedToken === row.citationToken ? "✓ Copied" : row.citationToken}
                         </code>
                         <span
-                          className={`mt-1.5 block text-[9px] font-bold text-center px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                          className={`mt-1.5 block text-xs font-bold text-center px-1.5 py-0.5 rounded uppercase tracking-wider ${
                             row.isUserData
                               ? "bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border border-emerald-500/30"
                               : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/30"
@@ -883,11 +883,11 @@ export default function EvidenceMatrixMode() {
                         <span className="font-bold text-[color:var(--text-primary)] block line-clamp-2">
                           {row.title}
                         </span>
-                        <span className="text-[11px] text-[color:var(--text-muted)] block">
+                        <span className="text-xs text-[color:var(--text-muted)] block">
                           {row.authors.join(", ")} ({row.year ?? "n.d."})
                         </span>
                         {row.doi && (
-                          <span className="text-[9px] font-mono text-[color:var(--text-secondary)] block">
+                          <span className="text-xs font-mono text-[color:var(--text-secondary)] block">
                             DOI: {row.doi}
                           </span>
                         )}
@@ -918,13 +918,13 @@ export default function EvidenceMatrixMode() {
 
                       {/* Extracted Findings */}
                       <td className="py-3 px-4 align-top">
-                        <p className="text-[11px] text-[color:var(--text-secondary)] line-clamp-3 leading-relaxed">
+                        <p className="text-xs text-[color:var(--text-secondary)] line-clamp-3 leading-relaxed">
                           {row.extractedFindings}
                         </p>
                         <button
                           type="button"
                           onClick={() => setInspectingItem(row)}
-                          className="text-[10px] text-[color:var(--accent)] hover:underline mt-1 cursor-pointer font-semibold"
+                          className="text-xs text-[color:var(--accent)] hover:underline mt-1 cursor-pointer font-semibold"
                         >
                           View Full Details →
                         </button>
@@ -977,7 +977,7 @@ export default function EvidenceMatrixMode() {
               <p className="text-xs font-bold text-[color:var(--text-primary)]">
                 No sources or user datasets in evidence ledger yet.
               </p>
-              <p className="text-[11px] text-[color:var(--text-muted)]">
+              <p className="text-xs text-[color:var(--text-muted)]">
                 Upload primary research data above or search OpenAlex/CrossRef to build your synthesis matrix.
               </p>
             </div>
@@ -1162,7 +1162,7 @@ export default function EvidenceMatrixMode() {
               </div>
 
               <div className="space-y-1.5">
-                <span className="text-[10px] font-bold text-[color:var(--text-muted)] uppercase tracking-wider">
+                <span className="text-xs font-bold text-[color:var(--text-muted)] uppercase tracking-wider">
                   Extracted Findings & Methodology
                 </span>
                 <div className="p-3 bg-[color:var(--surface-sunken)] rounded-xl border border-[color:var(--border-subtle)] text-xs text-[color:var(--text-primary)] whitespace-pre-wrap font-mono leading-relaxed max-h-96 overflow-y-auto">

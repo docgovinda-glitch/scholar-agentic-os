@@ -149,7 +149,7 @@ export function AskPromptBox({
               ) : (
                 <FileText className="h-3.5 w-3.5 text-amber-500" aria-hidden="true" />
               )}
-              <span className="max-w-[160px] truncate text-[11px] font-medium">{att.name}</span>
+              <span className="max-w-[160px] truncate text-xs font-medium">{att.name}</span>
               <button
                 type="button"
                 onClick={() => onRemoveAttachment(att.id)}
@@ -161,7 +161,7 @@ export function AskPromptBox({
             </div>
           ))}
           {isUploading && (
-            <span role="status" className="flex items-center gap-1.5 text-[11px] text-neutral-500">
+            <span role="status" className="flex items-center gap-1.5 text-xs text-neutral-500">
               <Loader2 className="h-3 w-3 animate-spin text-blue-500" aria-hidden="true" /> Reading file…
             </span>
           )}
@@ -231,7 +231,7 @@ export function AskPromptBox({
                 )}
               </button>
             )}
-            <span className="pointer-events-none absolute bottom-full right-0 z-30 mb-2 hidden whitespace-nowrap rounded bg-neutral-900 px-2 py-1 text-[11px] text-white shadow-md group-hover:block dark:bg-neutral-800">
+            <span className="pointer-events-none absolute bottom-full right-0 z-30 mb-2 hidden whitespace-nowrap rounded bg-neutral-900 px-2 py-1 text-xs text-white shadow-md group-hover:block dark:bg-neutral-800">
               {stopping ? "Stop generating" : `${sendLabel} (Enter)`}
             </span>
           </div>

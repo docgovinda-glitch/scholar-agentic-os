@@ -1,3 +1,5 @@
+import { AlertTriangle, BarChart3, BookOpen, Cloud, Copy, FileText, Folder, Globe, Library, Lightbulb, MessageSquare, Search, ShieldCheck } from "lucide-react";
+import { getProjectDisplayName } from "../projectNaming";
 /**
  * Source Library — Core Product Screen
  *
@@ -122,13 +124,10 @@ export default function SourceLibraryScreen({
     try {
       const projRes = await listProjects();
       if (projRes?.items) {
+        // Same name the sidebar and project list show (never an id fragment).
         const mapped = projRes.items.map((p) => ({
           id: p.projectId,
-          title:
-            p.answers?.title ||
-            p.answers?.working_title ||
-            p.answers?.research_question ||
-            `Project ${p.projectId.slice(0, 6)}`,
+          title: getProjectDisplayName(p, projRes.items),
         }));
         setActiveProjects(mapped);
       }
@@ -350,18 +349,19 @@ export default function SourceLibraryScreen({
   return (
     <div className="relative w-full min-h-[70vh] bg-[color:var(--surface-canvas)] flex flex-col text-[color:var(--text-primary)]">
       {/* ================= MAIN HEADER ================= */}
-      <header className="px-6 py-4 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] flex items-center justify-between shadow-xs">
+      <header className="px-4 sm:px-6 py-4 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] flex flex-wrap items-center justify-between gap-3 shadow-xs">
         <div className="flex items-center gap-4">
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-[color:var(--text-primary)] flex items-center gap-2">
+            <h2 className="text-xl font-bold tracking-tight text-[color:var(--text-primary)] flex items-center gap-2">
               <span>Source Library</span>
+              <span className="text-sm font-medium text-[color:var(--text-muted)]">{sources.length}</span>
               {/* Only when a drive is really connected (this badge was always shown). */}
               {connectedDrives.length > 0 && (
-                <span data-testid="cloud-connected-badge" className="text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border border-emerald-500/20">
+                <span data-testid="cloud-connected-badge" className="text-xs font-semibold tracking-wide uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border border-emerald-500/20">
                   {Array.from(new Set(connectedDrives.map((d) => (d.provider === "google_drive" ? "Google Drive" : "OneDrive")))).join(" + ")} connected
                 </span>
               )}
-            </h1>
+            </h2>
             <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">
               Save your sources. Find them when you write.
             </p>
@@ -374,8 +374,8 @@ export default function SourceLibraryScreen({
             onClick={() => setShowAddModal(true)}
             className="inline-flex items-center gap-1.5 px-4 py-2 bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded-[var(--radius-md)] text-xs font-bold hover:bg-[color:var(--accent-hover)] transition-colors shadow-xs cursor-pointer"
           >
-            <span>+</span>
-            <span>Add Source</span>
+            <span aria-hidden="true">+</span>
+            <span className="whitespace-nowrap">Add Source</span>
           </button>
 
           {/* Backward compatibility accessible trigger for existing test suite asserting "Add material" */}
@@ -400,44 +400,11 @@ export default function SourceLibraryScreen({
             </button>
           )}
 
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="text-xs font-semibold px-3 py-1.5 rounded-[var(--radius-md)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] cursor-pointer"
-          >
-            ✕ Close
-          </button>
         </div>
       </header>
 
       {/* ================= SECONDARY NAVIGATION (SOURCES, PROJECTS, SETTINGS) ================= */}
-      <nav aria-label="Source library views" className="px-6 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)] flex items-center justify-between text-xs font-semibold">
-        <div className="flex items-center gap-6">
-          <button
-            type="button"
-            onClick={() => setActiveTab("sources")}
-            className={`py-3 border-b-2 transition-colors cursor-pointer ${
-              activeTab === "sources"
-                ? "border-[color:var(--accent)] text-[color:var(--accent)] font-bold"
-                : "border-transparent text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
-            }`}
-          >
-            Sources ({sources.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("settings")}
-            className={`py-3 border-b-2 transition-colors cursor-pointer ${
-              activeTab === "settings"
-                ? "border-[color:var(--accent)] text-[color:var(--accent)] font-bold"
-                : "border-transparent text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
-            }`}
-          >
-            Settings
-          </button>
-        </div>
-
+      <nav aria-label="Source library views" className="sr-only">
         {/* Hidden button for test compatibility with "Semantic Search" */}
         <button
           type="button"
@@ -459,12 +426,12 @@ export default function SourceLibraryScreen({
                 role="alert"
                 className="p-4 bg-red-500/10 border border-red-500/25 rounded-[var(--radius-lg)] text-xs text-red-700 dark:text-red-300 flex items-start gap-3 shadow-xs"
               >
-                <span className="text-lg">⚠️</span>
+                <AlertTriangle className="w-5 h-5 shrink-0" aria-hidden="true" />
                 <div className="flex-1">
                   <div className="font-bold text-sm">
                     Academic Integrity Alert: {retractedSources.length} item(s) in your Source Library are flagged with official Retractions
                   </div>
-                  <p className="mt-1 text-[11px] leading-relaxed opacity-90">
+                  <p className="mt-1 text-xs leading-relaxed opacity-90">
                     One or more papers in your library have received post-publication alerts.
                     Check the flagged items below to prevent citing invalidated findings in your writing.
                   </p>
@@ -475,7 +442,7 @@ export default function SourceLibraryScreen({
             {/* Reassurance banner */}
             <div className="p-3.5 bg-[color:var(--accent-subtle)]/30 border border-[color:var(--border-subtle)] rounded-[var(--radius-lg)] flex items-center justify-between text-xs text-[color:var(--text-secondary)]">
               <div className="flex items-center gap-2">
-                <span className="text-base">🛡️</span>
+                <ShieldCheck className="w-4 h-4 shrink-0" aria-hidden="true" />
                 <span>
                   Your source files stay in your Google Drive or OneDrive. Source Library helps you organize and cite them without creating another copy.
                 </span>
@@ -561,7 +528,7 @@ export default function SourceLibraryScreen({
             {/* Search and Filters Bar */}
             <div className="flex flex-col gap-3">
               <div className="relative flex items-center">
-                <span className="absolute left-3.5 text-sm text-[color:var(--text-muted)]">🔍</span>
+                <Search className="absolute left-3.5 text-[color:var(--text-muted)] w-4 h-4 shrink-0" aria-hidden="true" />
                 <input
                   type="search"
                   aria-label="Search your Vault"
@@ -586,14 +553,14 @@ export default function SourceLibraryScreen({
                 <div className="flex flex-col gap-1.5 pt-1">
                   <div className="flex items-center justify-between text-xs font-semibold text-[color:var(--text-secondary)]">
                     <span className="flex items-center gap-1.5">
-                      <span>📁</span>
+                      <Folder className="w-4 h-4 shrink-0" aria-hidden="true" />
                       <span>Filter by Project:</span>
                     </span>
                     {selectedProjectFilter !== "all" && (
                       <button
                         type="button"
                         onClick={() => setSelectedProjectFilter("all")}
-                        className="text-[11px] text-[color:var(--accent)] hover:underline font-normal cursor-pointer"
+                        className="text-xs text-[color:var(--accent)] hover:underline font-normal cursor-pointer"
                       >
                         Reset project filter
                       </button>
@@ -627,9 +594,9 @@ export default function SourceLibraryScreen({
                               : "bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)]"
                           }`}
                         >
-                          <span>📁</span>
+                          <Folder className="w-4 h-4 shrink-0" aria-hidden="true" />
                           <span className="truncate max-w-[160px]">{proj}</span>
-                          <span className="text-[10px]">({count})</span>
+                          <span className="text-xs">({count})</span>
                         </button>
                       );
                     })}
@@ -652,7 +619,7 @@ export default function SourceLibraryScreen({
               {selectedProjectFilter !== "all" && (
                 <div className="p-3 bg-[color:var(--surface-inset)] border border-[color:var(--accent-border)] rounded-[var(--radius-lg)] flex items-center justify-between text-xs animate-in fade-in duration-150">
                   <div className="flex items-center gap-2">
-                    <span className="text-base">📁</span>
+                    <Folder className="w-4 h-4 shrink-0" aria-hidden="true" />
                     <div>
                       <span className="text-[color:var(--text-secondary)]">Showing sources for project: </span>
                       <span className="font-bold text-[color:var(--text-primary)]">{selectedProjectFilter}</span>
@@ -671,7 +638,7 @@ export default function SourceLibraryScreen({
                         }}
                         className="px-2.5 py-1 text-xs font-bold bg-[color:var(--accent-subtle)]/40 text-[color:var(--accent)] border border-[color:var(--accent-border)] rounded-[var(--radius-md)] hover:bg-[color:var(--accent-solid)] hover:text-[color:var(--text-inverse)] transition-colors cursor-pointer flex items-center gap-1"
                       >
-                        <span>📊</span>
+                        <BarChart3 className="w-4 h-4 shrink-0" aria-hidden="true" />
                         <span>Synthesize Matrix</span>
                       </button>
                     )}
@@ -780,7 +747,7 @@ export default function SourceLibraryScreen({
                     }}
                     className="px-3 py-1.5 text-xs font-bold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded-[var(--radius-md)] hover:bg-[color:var(--accent-hover)] transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
                   >
-                    <span>📊</span>
+                    <BarChart3 className="w-4 h-4 shrink-0" aria-hidden="true" />
                     <span>Literature Matrix</span>
                   </button>
 
@@ -792,7 +759,7 @@ export default function SourceLibraryScreen({
                     }}
                     className="px-3 py-1.5 text-xs font-bold bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] text-[color:var(--text-primary)] rounded-[var(--radius-md)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer flex items-center gap-1.5"
                   >
-                    <span>💬</span>
+                    <MessageSquare className="w-4 h-4 shrink-0" aria-hidden="true" />
                     <span>Ask Selected</span>
                   </button>
 
@@ -864,7 +831,7 @@ export default function SourceLibraryScreen({
             ) : filteredSources.length === 0 ? (
               /* Empty State */
               <div className="p-12 text-center rounded-[var(--radius-xl)] border border-dashed border-[color:var(--border-default)] bg-[color:var(--surface-raised)] flex flex-col items-center justify-center gap-3 my-4">
-                <span className="text-4xl">📚</span>
+                <Library className="w-9 h-9 shrink-0" aria-hidden="true" />
                 <h2 className="text-base font-bold text-[color:var(--text-primary)]">
                   {searchQuery || activeTag || selectedProjectFilter !== "all"
                     ? "No sources match your filter"
@@ -883,7 +850,7 @@ export default function SourceLibraryScreen({
                 >
                   + Add Source
                 </button>
-                <span className="text-[11px] text-[color:var(--text-muted)]">
+                <span className="text-xs text-[color:var(--text-muted)]">
                   Your files remain in your own cloud storage.
                 </span>
               </div>
@@ -920,14 +887,14 @@ export default function SourceLibraryScreen({
                             />
                             <span className="text-base shrink-0">
                               {source.cloudReference?.provider === "google_drive"
-                                ? "📁"
+                                ? <Folder className="w-4 h-4 shrink-0" aria-hidden="true" />
                                 : source.cloudReference?.provider === "onedrive"
-                                ? "☁️"
+                                ? <Cloud className="w-4 h-4 shrink-0" aria-hidden="true" />
                                 : source.metadata.type === "website"
-                                ? "🌐"
+                                ? <Globe className="w-4 h-4 shrink-0" aria-hidden="true" />
                                 : source.metadata.type === "book"
-                                ? "📖"
-                                : "📄"}
+                                ? <BookOpen className="w-4 h-4 shrink-0" aria-hidden="true" />
+                                : <FileText className="w-4 h-4 shrink-0" aria-hidden="true" />}
                             </span>
                             <h3 className="text-sm font-bold text-[color:var(--text-primary)] leading-snug">
                               <span
@@ -962,7 +929,7 @@ export default function SourceLibraryScreen({
                               className="px-2.5 py-1 text-xs font-semibold bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] transition-colors inline-flex items-center gap-1 shadow-2xs"
                             >
                               <span>Open</span>
-                              <span className="text-[10px]">↗</span>
+                              <span className="text-xs">↗</span>
                             </a>
                           )}
                           <button
@@ -992,18 +959,18 @@ export default function SourceLibraryScreen({
                               onClick={() => handleToggleExpandKeyPoints(source.id)}
                               className="flex items-center gap-1.5 font-semibold text-[color:var(--text-primary)] hover:text-[color:var(--accent)] cursor-pointer"
                             >
-                              <span>💡</span>
+                              <Lightbulb className="w-4 h-4 shrink-0" aria-hidden="true" />
                               <span>{keyPoints.length} key sentence{keyPoints.length > 1 ? "s" : ""} from the abstract</span>
-                              <span className="text-[10px] text-[color:var(--text-muted)]">
+                              <span className="text-xs text-[color:var(--text-muted)]">
                                 {isKeyPointsExpanded ? "▲ Hide" : "▼ Show"}
                               </span>
                             </button>
                             <button
                               type="button"
                               onClick={() => handleCopyKeyPoints(source)}
-                              className="text-[10px] font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--accent)] cursor-pointer flex items-center gap-1"
+                              className="text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--accent)] cursor-pointer flex items-center gap-1"
                             >
-                              <span>{copiedKeyPointsId === source.id ? "✓" : "📋"}</span>
+                              <span>{copiedKeyPointsId === source.id ? "✓" : <Copy className="w-4 h-4 shrink-0" aria-hidden="true" />}</span>
                               <span>{copiedKeyPointsId === source.id ? "Copied" : "Copy"}</span>
                             </button>
                           </div>
@@ -1022,7 +989,7 @@ export default function SourceLibraryScreen({
                       )}
 
                       {/* Middle Row: Tags, Projects, and Integrity Badge */}
-                      <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-[color:var(--border-subtle)] text-[11px]">
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-[color:var(--border-subtle)] text-xs">
                         <div className="flex flex-wrap items-center gap-1.5">
                           {/* Project badges */}
                           {source.projects.map((proj) => (
@@ -1035,12 +1002,12 @@ export default function SourceLibraryScreen({
                                 className="hover:text-[color:var(--accent)] cursor-pointer"
                                 title={`Filter by ${proj}`}
                               >
-                                📁 {proj}
+                                <Folder className="inline-block w-3.5 h-3.5 mr-1 align-[-2px]" aria-hidden="true" />{proj}
                               </span>
                               <button
                                 type="button"
                                 onClick={() => handleToggleProjectLink(source.id, proj)}
-                                className="text-[10px] text-[color:var(--text-muted)] hover:text-red-500 cursor-pointer ml-0.5"
+                                className="text-xs text-[color:var(--text-muted)] hover:text-red-500 cursor-pointer ml-0.5"
                                 title={`Remove from ${proj}`}
                               >
                                 ✕
@@ -1057,13 +1024,13 @@ export default function SourceLibraryScreen({
                                   projectMenuSourceId === source.id ? null : source.id
                                 )
                               }
-                              className="px-2 py-0.5 rounded-[var(--radius-sm)] bg-[color:var(--surface-inset)] text-[10px] font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--accent)] border border-[color:var(--border-subtle)] hover:border-[color:var(--accent-border)] cursor-pointer"
+                              className="px-2 py-0.5 rounded-[var(--radius-sm)] bg-[color:var(--surface-inset)] text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--accent)] border border-[color:var(--border-subtle)] hover:border-[color:var(--accent-border)] cursor-pointer"
                             >
                               + Link Project
                             </button>
                             {projectMenuSourceId === source.id && (
                               <div className="absolute left-0 bottom-full mb-1 z-30 w-56 p-2 rounded-[var(--radius-md)] bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] shadow-xl flex flex-col gap-1.5 animate-in fade-in duration-100">
-                                <div className="flex items-center justify-between text-[10px] font-bold text-[color:var(--text-muted)] uppercase">
+                                <div className="flex items-center justify-between text-xs font-bold text-[color:var(--text-muted)] uppercase">
                                   <span>Link to project:</span>
                                   <button
                                     type="button"
@@ -1136,11 +1103,11 @@ export default function SourceLibraryScreen({
                               RETRACTION NOTICE
                             </span>
                           ) : source.integrityStatus === "clean" ? (
-                            <span className="text-[10px] text-[color:var(--text-muted)] font-medium" title="Checked at Crossref">
+                            <span className="text-xs text-[color:var(--text-muted)] font-medium" title="Checked at Crossref">
                               No retraction on record
                             </span>
                           ) : (
-                            <span className="text-[10px] text-[color:var(--text-muted)] font-medium" title={source.metadata.doi ? "Crossref could not be reached; it is checked again next time" : "Only sources with a DOI can be checked"}>
+                            <span className="text-xs text-[color:var(--text-muted)] font-medium" title={source.metadata.doi ? "Crossref could not be reached; it is checked again next time" : "Only sources with a DOI can be checked"}>
                               Retractions not checked
                             </span>
                           )}
@@ -1190,7 +1157,7 @@ export default function SourceLibraryScreen({
                           <button
                             type="button"
                             onClick={() => setConfirmDeleteId(source.id)}
-                            className="text-[11px] text-[color:var(--text-muted)] hover:text-[color:var(--state-danger)] cursor-pointer"
+                            className="text-xs text-[color:var(--text-muted)] hover:text-[color:var(--state-danger)] cursor-pointer"
                           >
                             Delete
                           </button>

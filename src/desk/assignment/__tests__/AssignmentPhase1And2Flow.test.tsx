@@ -166,7 +166,7 @@ describe("Assignment Phase 1 Wiring & Phase 2 Sources Workspace", () => {
 
       const proceedBtn = await screen.findByRole("button", { name: /Proceed to Sources/i });
       expect(proceedBtn).toBeDisabled();
-      expect(screen.getByText(/Please provide the assignment question, word count, and citation style to continue/i)).toBeInTheDocument();
+      expect(screen.getByText(/Still needed: the assignment question/i)).toBeInTheDocument();
     });
   });
 

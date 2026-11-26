@@ -569,7 +569,7 @@ describe("AddSourceModal — Streamlined 1-Step Intake", () => {
 
     await waitFor(() => {
       expect(screen.getByText(/✓ Found at the DOI registry/i)).toBeInTheDocument();
-      expect(screen.getByText(/✨ 2 from the abstract/i)).toBeInTheDocument();
+      expect(screen.getByText(/2 from the abstract/i)).toBeInTheDocument();
     });
 
     // Expand writing notes accordion
@@ -638,7 +638,7 @@ describe("AddSourceModal — Streamlined 1-Step Intake", () => {
     fireEvent.change(projectInput, { target: { value: "Chapter 3" } });
     fireEvent.click(screen.getByRole("button", { name: "Assign" }));
 
-    expect(screen.getByText("📁 Chapter 3")).toBeInTheDocument();
+    expect(screen.getByText("Chapter 3")).toBeInTheDocument();
 
     // Save Source
     fireEvent.click(screen.getByRole("button", { name: "Save Source" }));
@@ -706,7 +706,7 @@ describe("AddSourceModal — Streamlined 1-Step Intake", () => {
 
     // Verify assigned summary box shows active citation and references readiness
     expect(screen.getByText(/✓ Integrated for citations & references/i)).toBeInTheDocument();
-    expect(screen.getByText(/📁 Master's Thesis in AI/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Master's Thesis in AI/i).length).toBeGreaterThan(1);
 
     // Fill title and save
     fireEvent.change(screen.getByLabelText(/^Title/i), {

@@ -206,11 +206,11 @@ export default function LiteratureDiscoveryWorkspace({
               <h1 className="text-sm font-bold text-neutral-900 dark:text-white leading-none">
                 Literature Discovery Workspace
               </h1>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-300/40">
+              <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-300/40">
                 Layer B · Citation Graph
               </span>
             </div>
-            <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
               Automated Snowball Sampling, Citation Networks & Bibliographic Clustering
             </p>
           </div>
@@ -321,7 +321,7 @@ export default function LiteratureDiscoveryWorkspace({
             <button
               type="button"
               onClick={() => setSnowballDirection("backward")}
-              className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+              className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
                 snowballDirection === "backward"
                   ? "bg-sky-500 text-white font-semibold"
                   : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
@@ -333,7 +333,7 @@ export default function LiteratureDiscoveryWorkspace({
             <button
               type="button"
               onClick={() => setSnowballDirection("bidirectional")}
-              className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+              className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
                 snowballDirection === "bidirectional"
                   ? "bg-indigo-600 text-white font-semibold"
                   : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
@@ -345,7 +345,7 @@ export default function LiteratureDiscoveryWorkspace({
             <button
               type="button"
               onClick={() => setSnowballDirection("forward")}
-              className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+              className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
                 snowballDirection === "forward"
                   ? "bg-emerald-500 text-white font-semibold"
                   : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
@@ -361,7 +361,7 @@ export default function LiteratureDiscoveryWorkspace({
             aria-label="Papers to add per node"
             value={snowballBreadth}
             onChange={(e) => setSnowballBreadth(Number(e.target.value))}
-            className="px-2 py-1 rounded-lg border border-neutral-200 dark:border-white/10 bg-white dark:bg-neutral-800 text-[11px] cursor-pointer"
+            className="px-2 py-1 rounded-lg border border-neutral-200 dark:border-white/10 bg-white dark:bg-neutral-800 text-xs cursor-pointer"
             title="Snowball expansion breadth per node"
           >
             <option value={4}>4 papers/node</option>
@@ -564,7 +564,7 @@ export default function LiteratureDiscoveryWorkspace({
                     <text
                       y={baseRadius + 14}
                       textAnchor="middle"
-                      className="text-[10px] font-semibold fill-neutral-800 dark:fill-neutral-200 pointer-events-none select-none"
+                      className="text-xs font-semibold fill-neutral-800 dark:fill-neutral-200 pointer-events-none select-none"
                     >
                       {graphNodeLabel(node.authors, node.year)}
                     </text>
@@ -591,7 +591,7 @@ export default function LiteratureDiscoveryWorkspace({
             {/* Header info */}
             <div>
               <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                   selectedNode.nodeType === "seed"
                     ? "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
                     : selectedNode.nodeType === "discovered_backward"
@@ -606,7 +606,7 @@ export default function LiteratureDiscoveryWorkspace({
                 </span>
 
                 {selectedNode.isLandmark && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-300/40">
+                  <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-300/40">
                     ★ Landmark Paper
                   </span>
                 )}
@@ -620,7 +620,7 @@ export default function LiteratureDiscoveryWorkspace({
                 {[selectedNode.authors.join(", ") || "Authors not reported", selectedNode.year || "n.d."].join(" · ")}
               </p>
               {(selectedNode.journal || selectedNode.venue) && (
-                <p className="text-[11px] text-neutral-400 italic">{selectedNode.journal || selectedNode.venue}</p>
+                <p className="text-xs text-neutral-400 italic">{selectedNode.journal || selectedNode.venue}</p>
               )}
             </div>
 
@@ -714,7 +714,7 @@ export default function LiteratureDiscoveryWorkspace({
                   {graphState.researchGaps.slice(0, 2).map((gap) => (
                     <div
                       key={gap.id}
-                      className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] space-y-1"
+                      className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs space-y-1"
                     >
                       <div className="font-semibold text-neutral-800 dark:text-neutral-200">
                         {gap.title}

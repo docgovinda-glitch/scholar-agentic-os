@@ -10,10 +10,11 @@ import { groupBriefQuestions, parseBriefQuestions, shortQuestionLabel, stripPage
 /** The placeholder a deck carries until it has a title of its own. */
 export const UNTITLED_PRESENTATION = "Untitled Presentation";
 
-/** True for an empty deck title or any untitled placeholder ("Untitled presentation", "... (Blank Sheet)"). */
+/** True for an empty deck title or any untitled placeholder ("Untitled presentation", "... (Blank Sheet)", the old "Academic Presentation"). */
 export function isUntitledDeckTitle(title: string | null | undefined): boolean {
   const t = (title ?? "").trim().toLowerCase();
-  return !t || t.startsWith("untitled presentation");
+  // "Academic Presentation" is the generic name older builds wrote when a deck had no title.
+  return !t || t.startsWith("untitled presentation") || t === "academic presentation";
 }
 
 export const VISUAL_TYPES = [

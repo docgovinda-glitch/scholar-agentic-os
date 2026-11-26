@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+import { BarChart3, FileText, Library, Microscope, Puzzle, Scale } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import type {
   RefereeRole,
@@ -21,42 +23,42 @@ export const REFEREE_PERSONAS: Array<{
   role: RefereeRole;
   title: string;
   lens: string;
-  avatarIcon: string;
+  avatarIcon: ReactNode;
   description: string;
 }> = [
   {
     role: "Methodologist",
     title: "Prof. H. Vance (Methodologist)",
     lens: "Methodological Rigor & Experimental Design",
-    avatarIcon: "🔬",
+    avatarIcon: <Microscope className="w-4 h-4 shrink-0" aria-hidden="true" />,
     description: "Evaluates controls, boundary conditions, algorithmic complexity, and procedural threats to validity.",
   },
   {
     role: "Domain Specialist",
     title: "Dr. A. Thorne (Domain Specialist)",
     lens: "Domain Alignment & Literature Grounding",
-    avatarIcon: "📚",
+    avatarIcon: <Library className="w-4 h-4 shrink-0" aria-hidden="true" />,
     description: "Evaluates theoretical novelty, state of the art comparison, and landmark citations.",
   },
   {
     role: "Biostatistician",
     title: "Dr. S. Chen (Biostatistician / Quantitative Analyst)",
     lens: "Quantitative Rigor & Telemetry Calibration",
-    avatarIcon: "📊",
+    avatarIcon: <BarChart3 className="w-4 h-4 shrink-0" aria-hidden="true" />,
     description: "Audits statistical power, confidence intervals, sample sizes, and variance distributions.",
   },
   {
     role: "Synthesizer",
     title: "Prof. E. Sterling (Theoretical Synthesizer)",
     lens: "Cross-Source Synthesis & Validity Threats",
-    avatarIcon: "🧩",
+    avatarIcon: <Puzzle className="w-4 h-4 shrink-0" aria-hidden="true" />,
     description: "Evaluates argument coherence, contradictory evidence resolution, and claim-evidence linkage.",
   },
   {
     role: "Formal Editor",
     title: "Dr. M. Pemberton (Journal Managing Editor)",
     lens: "Scholarly Voice, Orthography & Standards Compliance",
-    avatarIcon: "⚖️",
+    avatarIcon: <Scale className="w-4 h-4 shrink-0" aria-hidden="true" />,
     // Completed with the project's own spelling convention (personaDescription).
     description: "Checks terminology precision and 2026 ICMJE/COPE declarations.",
   },
@@ -283,7 +285,7 @@ export default function RefereeRebuttalMode() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[color:var(--accent)] text-[color:var(--text-inverse)]">
+              <span className="px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-[color:var(--accent)] text-[color:var(--text-inverse)]">
                 Review
               </span>
             </div>
@@ -303,7 +305,7 @@ export default function RefereeRebuttalMode() {
               onClick={() => setExportModalOpen(true)}
               className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[color:var(--surface-sunken)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-control)] text-[color:var(--text-primary)] transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
             >
-              <span>📄 Rebuttal Letter</span>
+              <span><FileText className="inline-block w-3.5 h-3.5 mr-1 align-[-2px]" aria-hidden="true" />Rebuttal Letter</span>
             </button>
 
             {/* Back to Studio */}
@@ -400,7 +402,7 @@ export default function RefereeRebuttalMode() {
                       <span className="text-lg">{p.avatarIcon}</span>
                       {matchedCritique ? (
                         <span
-                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                          className={`text-xs font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
                             matchedCritique.severity === "Major"
                               ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30"
                               : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30"
@@ -409,7 +411,7 @@ export default function RefereeRebuttalMode() {
                           {matchedCritique.severity}
                         </span>
                       ) : (
-                        <span className="text-[9px] text-[color:var(--text-muted)] font-mono">
+                        <span className="text-xs text-[color:var(--text-muted)] font-mono">
                           Ready
                         </span>
                       )}
@@ -418,12 +420,12 @@ export default function RefereeRebuttalMode() {
                     <h4 className="text-xs font-bold text-[color:var(--text-primary)]">
                       {p.role}
                     </h4>
-                    <p className="text-[11px] text-[color:var(--text-secondary)] font-medium">
+                    <p className="text-xs text-[color:var(--text-secondary)] font-medium">
                       {p.lens}
                     </p>
                   </div>
 
-                  <p className="text-[11px] leading-snug text-[color:var(--text-muted)] mt-2">
+                  <p className="text-xs leading-snug text-[color:var(--text-muted)] mt-2">
                     {personaDescription(p, answers["orthography"])}
                   </p>
                 </div>
@@ -464,14 +466,14 @@ export default function RefereeRebuttalMode() {
 
           {/* Filter Bar */}
           <div className="flex items-center gap-2 text-xs">
-            <span className="text-[10px] font-bold text-[color:var(--text-muted)] uppercase tracking-wider">
+            <span className="text-xs font-bold text-[color:var(--text-muted)] uppercase tracking-wider">
               Filter by Reviewer:
             </span>
             <div className="flex flex-wrap items-center gap-1">
               <button
                 type="button"
                 onClick={() => setSelectedRefereeRole("all")}
-                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors cursor-pointer ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer ${
                   selectedRefereeRole === "all"
                     ? "bg-[color:var(--surface-sunken)] border border-[color:var(--border-control)] text-[color:var(--text-primary)]"
                     : "text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
@@ -484,7 +486,7 @@ export default function RefereeRebuttalMode() {
                   key={p.role}
                   type="button"
                   onClick={() => setSelectedRefereeRole(p.role)}
-                  className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors cursor-pointer ${
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer ${
                     selectedRefereeRole === p.role
                       ? "bg-[color:var(--surface-sunken)] border border-[color:var(--border-control)] text-[color:var(--text-primary)]"
                       : "text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
@@ -525,17 +527,17 @@ export default function RefereeRebuttalMode() {
                         <span className="text-xs font-bold text-[color:var(--text-primary)]">
                           {item.referee}
                         </span>
-                        <span className="text-[10px] font-semibold text-[color:var(--text-muted)]">
+                        <span className="text-xs font-semibold text-[color:var(--text-muted)]">
                           · {item.lens}
                         </span>
-                        <span className="text-[10px] font-mono text-[color:var(--text-secondary)] bg-[color:var(--surface-sunken)] px-2 py-0.5 rounded border border-[color:var(--border-subtle)]">
+                        <span className="text-xs font-mono text-[color:var(--text-secondary)] bg-[color:var(--surface-sunken)] px-2 py-0.5 rounded border border-[color:var(--border-subtle)]">
                           § {item.section}
                         </span>
                       </div>
 
                       <div className="flex items-center gap-2">
                         <span
-                          className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
+                          className={`text-xs font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
                             item.severity === "Major"
                               ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30"
                               : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30"
@@ -545,7 +547,7 @@ export default function RefereeRebuttalMode() {
                         </span>
 
                         <span
-                          className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
+                          className={`text-xs font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
                             isResolved
                               ? "bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border border-emerald-500/30"
                               : "bg-[color:var(--surface-sunken)] text-[color:var(--text-secondary)] border border-[color:var(--border-control)]"
@@ -558,7 +560,7 @@ export default function RefereeRebuttalMode() {
 
                     {/* Critique Content */}
                     <div className="p-3.5 rounded-xl bg-[color:var(--surface-sunken)]/60 border border-[color:var(--border-subtle)] space-y-1">
-                      <span className="text-[10px] font-bold text-[color:var(--text-muted)] uppercase tracking-wider block">
+                      <span className="text-xs font-bold text-[color:var(--text-muted)] uppercase tracking-wider block">
                         Referee Critique:
                       </span>
                       <p className="text-xs text-[color:var(--text-primary)] leading-relaxed italic">
@@ -570,7 +572,7 @@ export default function RefereeRebuttalMode() {
                     <div className="space-y-1.5">
                       <label
                         htmlFor={`author-response-${item.id}`}
-                        className="text-[10px] font-bold text-[color:var(--text-muted)] uppercase tracking-wider block"
+                        className="text-xs font-bold text-[color:var(--text-muted)] uppercase tracking-wider block"
                       >
                         Author Response & Rebuttal Rationale:
                       </label>
@@ -588,12 +590,12 @@ export default function RefereeRebuttalMode() {
                     {/* Surgical Find/Replace Diff Patch */}
                     {item.diff && (
                       <div className="space-y-2 pt-1">
-                        <span className="text-[10px] font-bold text-[color:var(--text-muted)] uppercase tracking-wider block">
+                        <span className="text-xs font-bold text-[color:var(--text-muted)] uppercase tracking-wider block">
                           Proposed Manuscript Surgical Patch:
                         </span>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs font-mono">
                           <div className="p-3 rounded-xl bg-rose-500/5 border border-rose-500/20 space-y-1">
-                            <span className="text-[9px] font-bold text-rose-500 uppercase tracking-wider block">
+                            <span className="text-xs font-bold text-rose-500 uppercase tracking-wider block">
                               Find (Current):
                             </span>
                             <p className="text-[color:var(--text-secondary)] whitespace-pre-wrap">
@@ -602,7 +604,7 @@ export default function RefereeRebuttalMode() {
                           </div>
 
                           <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20 space-y-1">
-                            <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-wider block">
+                            <span className="text-xs font-bold text-emerald-500 uppercase tracking-wider block">
                               Replace (Revised):
                             </span>
                             <p className="text-[color:var(--text-primary)] whitespace-pre-wrap font-semibold">
@@ -613,7 +615,7 @@ export default function RefereeRebuttalMode() {
 
                         {/* Action buttons */}
                         <div className="flex items-center justify-between pt-2">
-                          <span className="text-[10px] text-[color:var(--text-muted)]">
+                          <span className="text-xs text-[color:var(--text-muted)]">
                             {item.revisionAction}
                           </span>
 

@@ -33,7 +33,7 @@ export default function ResearchQuestionsEditor({
         <ol className="space-y-2">
           {questions.map((q, i) => (
             <li key={i} className="flex items-start gap-2">
-              <span className="mt-2 text-[11px] font-bold text-tertiary w-8 shrink-0">RQ{i + 1}</span>
+              <span className="mt-2 text-xs font-bold text-tertiary w-8 shrink-0">RQ{i + 1}</span>
               <textarea
                 aria-label={`Research question ${i + 1}`}
                 rows={2}

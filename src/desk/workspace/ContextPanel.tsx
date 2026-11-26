@@ -365,7 +365,7 @@ export default function ContextPanel({
               )}
               <div>
                 <h3 className="font-bold text-[color:var(--text-primary)]">{agent.name}</h3>
-                <p className="text-[10px] uppercase tracking-wider text-[color:var(--text-muted)] font-bold">
+                <p className="text-xs uppercase tracking-wider text-[color:var(--text-muted)] font-bold">
                   {agent.role}
                 </p>
               </div>
@@ -395,11 +395,11 @@ export default function ContextPanel({
               {/* Clean Minimalist Suggested Prompts */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-semibold text-[color:var(--text-muted)] uppercase tracking-wider block">
+                  <span className="text-xs font-semibold text-[color:var(--text-muted)] uppercase tracking-wider block">
                     {dynamicActions ? "Tone Calibration Suggestions" : "Suggested Actions"}
                   </span>
                   {dynamicActions && (
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium">
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium">
                       Active Section
                     </span>
                   )}
@@ -426,7 +426,7 @@ export default function ContextPanel({
             <div className="flex flex-col gap-4">
               {history.map((msg, idx) => (
                 <div key={idx} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
-                  <div className={`text-[10px] uppercase font-bold tracking-wider mb-1 text-[color:var(--text-muted)]`}>
+                  <div className={`text-xs uppercase font-bold tracking-wider mb-1 text-[color:var(--text-muted)]`}>
                     {msg.role === "user" ? "You" : agent.name}
                   </div>
                   <div className={`text-sm p-3 rounded-lg max-w-[90%] whitespace-pre-wrap leading-relaxed ${
@@ -443,7 +443,7 @@ export default function ContextPanel({
               ))}
               {isTyping && (
                 <div className="flex flex-col items-start">
-                  <div className="text-[10px] uppercase font-bold tracking-wider mb-1 text-[color:var(--text-muted)]">
+                  <div className="text-xs uppercase font-bold tracking-wider mb-1 text-[color:var(--text-muted)]">
                     {agent.name}
                   </div>
                   <div className="bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] rounded-lg rounded-tl-none p-3 flex gap-1">
@@ -461,7 +461,7 @@ export default function ContextPanel({
         {/* Dynamic Contextual Suggestion Chips (when chatting) */}
         {dynamicActions && dynamicActions.length > 0 && history.length > 0 && (
           <div className="px-4 py-2 border-t border-[color:var(--border-subtle)] bg-[color:var(--surface-sunken)] flex flex-wrap gap-1.5 shrink-0">
-            <span className="w-full text-[9px] font-semibold text-[color:var(--text-muted)] uppercase tracking-wider block mb-0.5">
+            <span className="w-full text-xs font-semibold text-[color:var(--text-muted)] uppercase tracking-wider block mb-0.5">
               Tone Suggestions
             </span>
             {dynamicActions.map((action, idx) => (

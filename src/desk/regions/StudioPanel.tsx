@@ -1,3 +1,4 @@
+import { AlertTriangle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { authedJsonFetch } from "../api";
 import { getWritingHistory, enableWritingHistory, disableWritingHistory, clearWritingHistory, summarizeWritingHistory, recordRefinement } from "../../app/studio/writingHistory";
@@ -162,8 +163,8 @@ export default function StudioPanel({
   return (
     <div className="border-b border-[color:var(--color-border-subtle)]">
       <div className="flex items-center justify-between px-3 py-2 text-xs text-[color:var(--text-secondary)]">
-        <span>▤ Studio</span>
-        <label className="flex items-center gap-1 cursor-pointer text-[10px] font-normal">
+        <span>Studio</span>
+        <label className="flex items-center gap-1 cursor-pointer text-xs font-normal">
           <input
             type="checkbox"
             checked={writingHistoryEnabled}
@@ -177,6 +178,7 @@ export default function StudioPanel({
         {/* Intervention level selection with description */}
         <div className="rounded bg-[color:var(--color-navy-2)] border border-[color:var(--color-border-subtle)]">
           <select
+            aria-label="Editing level"
             value={level}
             onChange={(e) => setLevel(e.target.value as InterventionLevel)}
             className="border-0 bg-transparent w-full text-xs text-[color:var(--text-primary)] px-2 py-1 focus:outline-none"
@@ -188,10 +190,10 @@ export default function StudioPanel({
             ))}
           </select>
         </div>
-        <p className="text-[10px] text-[color:var(--text-muted)]">{activeLevel.description}</p>
+        <p className="text-xs text-[color:var(--text-muted)]">{activeLevel.description}</p>
 
         {activeLevel.needsProvider && (
-          <p className="text-[10px] text-[color:var(--text-muted)]">
+          <p className="text-xs text-[color:var(--text-muted)]">
             Runs on the AI you set up in AI Access. Switch models from the AI status indicator.
           </p>
         )}
@@ -200,6 +202,7 @@ export default function StudioPanel({
         <div className="flex gap-1.5 items-end">
           <div className="flex-1 rounded bg-[color:var(--color-navy-2)] border border-[color:var(--color-border-subtle)]">
             <select
+              aria-label="First language (optional)"
               value={l1}
               onChange={(e) => setL1(e.target.value)}
               className="border-0 bg-transparent w-full text-xs text-[color:var(--text-primary)] px-2 py-1 focus:outline-none"
@@ -223,14 +226,14 @@ export default function StudioPanel({
         {/* Voice Profile builder */}
         {showVoiceBuilder && (
           <div className="rounded border border-[color:var(--color-luminous-blue-dim)] bg-[color:var(--color-navy-2)] p-2">
-            <p className="text-[10px] text-[color:var(--text-secondary)] mb-1">Paste 1-3 writing samples (separate by blank lines):</p>
+            <p className="text-xs text-[color:var(--text-secondary)] mb-1">Paste 1-3 writing samples (separate by blank lines):</p>
             <div className="rounded bg-[color:var(--color-navy-3)] border border-[color:var(--color-border-subtle)] mb-1">
               <textarea
                 value={voiceSamples}
                 onChange={(e) => setVoiceSamples(e.target.value)}
                 rows={3}
                 placeholder="Your prior essays, thesis chapters, or writing samples..."
-                className="border-0 bg-transparent w-full text-[10px] text-[color:var(--text-primary)] p-1 font-serif focus:outline-none"
+                className="border-0 bg-transparent w-full text-xs text-[color:var(--text-primary)] p-1 font-serif focus:outline-none"
               />
             </div>
             <div className="flex gap-1">
@@ -251,7 +254,7 @@ export default function StudioPanel({
           </div>
         )}
         {voiceProfile && !showVoiceBuilder && (
-          <p className="text-[10px] text-[color:var(--color-luminous-blue-dim)]">✓ Voice profile active (mean sentence: {Math.round(voiceProfile.meanSentenceLength)} words)</p>
+          <p className="text-xs text-[color:var(--color-luminous-blue-dim)]">✓ Voice profile active (mean sentence: {Math.round(voiceProfile.meanSentenceLength)} words)</p>
         )}
 
         <div className="rounded bg-[color:var(--color-navy-2)] border border-[color:var(--color-border-subtle)]">
@@ -259,7 +262,7 @@ export default function StudioPanel({
             value={text}
             onChange={(e) => setText(e.target.value)}
             rows={4}
-            placeholder="Paste a passage to refine — no select-in-editor flow yet."
+            placeholder="Paste a passage to refine"
             className="border-0 bg-transparent w-full text-xs text-[color:var(--text-primary)] p-2 font-serif focus:outline-none"
           />
         </div>
@@ -272,22 +275,22 @@ export default function StudioPanel({
           {busy ? "Running…" : "Refine"}
         </button>
 
-        {error && <p className="text-[11px] text-red-400">{error}</p>}
+        {error && <p className="text-xs text-red-400">{error}</p>}
 
         {result && (
           <div className="flex flex-col gap-2">
             {/* Summary */}
             <div className="rounded border border-[color:var(--color-border-subtle)] bg-[color:var(--color-navy-2)] px-2 py-1.5">
-              <p className="text-[10px] text-[color:var(--text-muted)]">
+              <p className="text-xs text-[color:var(--text-muted)]">
                 {result.diff.changes.length} changes — {result.contentChangeCount} content, {result.languageChangeCount} language
               </p>
               {result.voiceDrift?.drifted && (
-                <p className="text-[10px] text-amber-400 mt-1">
-                  ⚠ Voice drift detected: {result.voiceDrift.notes.join(" · ")}
+                <p className="text-xs text-amber-400 mt-1">
+                  <AlertTriangle className="inline-block w-3.5 h-3.5 mr-1 align-[-2px]" aria-hidden="true" />Voice drift detected: {result.voiceDrift.notes.join(" · ")}
                 </p>
               )}
               {answeredBy && (
-                <p className="mt-1.5 pt-1.5 border-t border-[color:var(--color-border-subtle)] text-[10px] text-[color:var(--text-muted)]">
+                <p className="mt-1.5 pt-1.5 border-t border-[color:var(--color-border-subtle)] text-xs text-[color:var(--text-muted)]">
                   AI used: {answeredBy.provider}{answeredBy.model ? ` (${answeredBy.model})` : ""}
                 </p>
               )}
@@ -295,30 +298,30 @@ export default function StudioPanel({
 
             {/* Diff display */}
             {result.diff.changes.length === 0 ? (
-              <p className="text-[11px] text-[color:var(--text-muted)]">No changes suggested.</p>
+              <p className="text-xs text-[color:var(--text-muted)]">No changes suggested.</p>
             ) : (
               <ul className="flex flex-col gap-1.5 max-h-80 overflow-y-auto">
                 {/* Content changes first (docs 32 §7) */}
                 {result.diff.changes
                   .filter((c) => c.category === "content")
                   .map((c) => (
-                    <li key={c.id} className={`rounded border px-2 py-1.5 text-[11px] ${CATEGORY_COLOR[c.category]}`}>
-                      <div className="text-[9px] mb-1">⚠ {CATEGORY_LABEL[c.category]}</div>
+                    <li key={c.id} className={`rounded border px-2 py-1.5 text-xs ${CATEGORY_COLOR[c.category]}`}>
+                      <div className="text-xs mb-1"><AlertTriangle className="inline-block w-3.5 h-3.5 mr-1 align-[-2px]" aria-hidden="true" />{CATEGORY_LABEL[c.category]}</div>
                       <div className="line-through opacity-60">{c.originalText}</div>
                       <div className="font-semibold">{c.replacementText}</div>
-                      <div className="text-[10px] opacity-90 mt-1">{c.reason}</div>
-                      {c.meaningNote && <div className="text-[10px] opacity-75 mt-1 italic">Note: {c.meaningNote}</div>}
+                      <div className="text-xs opacity-90 mt-1">{c.reason}</div>
+                      {c.meaningNote && <div className="text-xs opacity-75 mt-1 italic">Note: {c.meaningNote}</div>}
                     </li>
                   ))}
                 {/* Language changes */}
                 {result.diff.changes
                   .filter((c) => c.category !== "content")
                   .map((c) => (
-                    <li key={c.id} className={`rounded border px-2 py-1.5 text-[11px] ${CATEGORY_COLOR[c.category]}`}>
-                      <div className="text-[9px] mb-1">{CATEGORY_LABEL[c.category]}</div>
+                    <li key={c.id} className={`rounded border px-2 py-1.5 text-xs ${CATEGORY_COLOR[c.category]}`}>
+                      <div className="text-xs mb-1">{CATEGORY_LABEL[c.category]}</div>
                       <div className="line-through opacity-60">{c.originalText}</div>
                       <div>{c.replacementText}</div>
-                      <div className="text-[10px] opacity-80 mt-1">{c.reason}</div>
+                      <div className="text-xs opacity-80 mt-1">{c.reason}</div>
                     </li>
                   ))}
               </ul>
@@ -329,10 +332,10 @@ export default function StudioPanel({
         {/* Writing History summary (docs 32 §8) */}
         {writingHistoryEnabled && historySummary && (
           <div className="rounded border border-[color:var(--color-luminous-blue-dim)] bg-[color:var(--color-navy-2)] px-2 py-1.5">
-            <p className="text-[10px] text-[color:var(--color-luminous-blue)]">{historySummary}</p>
+            <p className="text-xs text-[color:var(--color-luminous-blue)]">{historySummary}</p>
             <button
               onClick={() => clearWritingHistory(sessionId)}
-              className="mt-1 text-[10px] text-[color:var(--text-muted)] hover:text-red-400 font-mono"
+              className="mt-1 text-xs text-[color:var(--text-muted)] hover:text-red-400 font-mono"
             >
               Clear history
             </button>

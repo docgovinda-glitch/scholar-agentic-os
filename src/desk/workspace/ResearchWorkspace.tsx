@@ -15,6 +15,7 @@ import EvidenceMatrixMode from "./EvidenceMatrixMode";
 import ManuscriptStudioMode from "./ManuscriptStudioMode";
 import RefereeRebuttalMode from "./RefereeRebuttalMode";
 import AuditExportMode from "./AuditExportMode";
+import { getProjectDisplayName } from "../projectNaming";
 
 function ResearchWorkspaceInner({
   onClose,
@@ -29,7 +30,6 @@ function ResearchWorkspaceInner({
   const {
     projectId,
     project,
-    outputType,
     currentStage,
     currentMode,
     setMode,
@@ -38,8 +38,10 @@ function ResearchWorkspaceInner({
   } = useResearchWorkspace();
 
 
+  // Opens on wide screens only (>= 1680 px); below that the page needs the width
+  // more than the assistant, which is one click away under Inspector.
   const [contextPanelOpen, setContextPanelOpen] = useState(() =>
-    typeof window !== "undefined" ? window.innerWidth >= 1440 : false
+    typeof window !== "undefined" ? window.innerWidth >= 1680 : false
   );
   const [trayOpen, setTrayOpen] = useState(false);
   const [isZenMode, setIsZenMode] = useState(false);
@@ -114,14 +116,7 @@ function ResearchWorkspaceInner({
     <div className="h-screen flex flex-col bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)]">
       {/* One header: back, title, the five views, save state, and the journal's own controls */}
       <AppleStudioHeader
-        deliverableCode={project.outputTypeId || "OT-10"}
-        deliverableLabel={outputType?.label || "Journal Article"}
-        projectTitle={String(
-          project.answers?.["working_title"] ||
-            project.answers?.["title"] ||
-            outputType?.label ||
-            "Journal Article"
-        )}
+        projectTitle={String(project.answers?.["working_title"] || getProjectDisplayName(project))}
         activePhase={
           currentMode === "protocol"
             ? "blueprint"
@@ -172,7 +167,7 @@ function ResearchWorkspaceInner({
 
       <div className="flex-1 flex overflow-hidden relative">
         {/* The current view of the manuscript */}
-        <div className="flex-1 flex flex-col min-w-0 bg-[color:var(--surface-canvas)] h-full overflow-hidden">
+        <main className="flex-1 flex flex-col min-w-0 bg-[color:var(--surface-canvas)] h-full overflow-hidden">
           <Suspense
             fallback={
               <div className="flex-1 flex items-center justify-center">
@@ -197,7 +192,7 @@ function ResearchWorkspaceInner({
               <ProtocolBlueprintMode key={project.answers?.["journal_profile_saved_at"] || "blueprint"} />
             )}
           </Suspense>
-        </div>
+        </main>
 
         {/* Assistant panel: docked on wide screens, an overlay on phones */}
         {!isZenMode && contextPanelOpen && (

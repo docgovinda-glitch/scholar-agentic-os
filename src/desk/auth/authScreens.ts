@@ -5,7 +5,7 @@ import {
   userTypeProblem,
   usernameProblem,
 } from "../../config/accountSchema";
-import { DEFAULT_COUNTRY_ISO2, e164Problem, findCountry } from "../../config/countries";
+import { DEFAULT_COUNTRY_ISO2, e164Problem, findCountry, preferredCountryIso2 } from "../../config/countries";
 
 /**
  * Password rule, applied at the form so the failure is immediate rather than a
@@ -49,7 +49,7 @@ export const EMPTY_SIGN_UP: SignUpFields = {
   username: "",
   fullName: "",
   email: "",
-  phoneCountryCode: findCountry(DEFAULT_COUNTRY_ISO2)?.dialCode ?? "+977",
+  phoneCountryCode: findCountry(preferredCountryIso2())?.dialCode ?? findCountry(DEFAULT_COUNTRY_ISO2)?.dialCode ?? "+977",
   phone: "",
   affiliation: "",
   userType: "",
@@ -58,7 +58,7 @@ export const EMPTY_SIGN_UP: SignUpFields = {
 };
 
 /**
- * Every REQUIRED field, using the exact same validators Account Settings
+ * Every field, using the exact same validators Account Settings
  * uses for the fields the two screens share (accountSchema.ts,
  * countries.ts) — this is what keeps "what makes a submission valid" from
  * drifting between the two screens. Institution is deliberately absent from
@@ -70,9 +70,11 @@ export function signUpProblem(fields: SignUpFields): string | null {
     fullNameProblem(fields.fullName) ||
     usernameProblem(fields.username) ||
     emailProblem(fields.email) ||
-    e164Problem(fields.phoneCountryCode, fields.phone) ||
-    userTypeProblem(fields.userType) ||
-    educationLevelProblem(fields.educationLevel) ||
+    // Phone, user type and education are optional at sign-up (they can be
+    // added later in Account Settings); each is checked only when given.
+    (fields.phone.trim() ? e164Problem(fields.phoneCountryCode, fields.phone) : null) ||
+    (fields.userType ? userTypeProblem(fields.userType) : null) ||
+    (fields.educationLevel ? educationLevelProblem(fields.educationLevel) : null) ||
     passwordProblem(fields.password)
   );
 }

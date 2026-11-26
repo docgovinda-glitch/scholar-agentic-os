@@ -55,7 +55,11 @@ export default function JournalMatcher({
           {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Search className="w-3.5 h-3.5" aria-hidden="true" />}
           {busy ? "Searching journals…" : "Find best-fit journals"}
         </button>
-        <span className="text-[11px] text-[color:var(--text-muted)]">Ranked by how many recent articles on your topic each journal published (OpenAlex or Crossref). No AI.</span>
+        <span className="text-xs text-[color:var(--text-muted)]">
+          {query.trim().length < 3
+            ? "Add your topic in Step 1 first."
+            : "Ranked by how many recent articles on your topic each journal published (OpenAlex or Crossref). No AI."}
+        </span>
       </div>
       {error && (
         <p role="alert" className="text-xs text-[color:var(--state-danger)]">

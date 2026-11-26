@@ -122,7 +122,7 @@ function PlannedStructureList({ sections, depth = 0 }: { sections: SectionSpec[]
             className={`px-2 py-1 truncate text-[color:var(--text-secondary)] ${depth > 0 ? "pl-4 text-xs" : ""}`}
           >
             {s.title}
-            {!s.required && <span className="ml-1.5 text-[10px] text-[color:var(--text-muted)]">optional</span>}
+            {!s.required && <span className="ml-1.5 text-xs text-[color:var(--text-muted)]">optional</span>}
           </div>
           {s.children && s.children.length > 0 && <PlannedStructureList sections={s.children} depth={depth + 1} />}
         </li>

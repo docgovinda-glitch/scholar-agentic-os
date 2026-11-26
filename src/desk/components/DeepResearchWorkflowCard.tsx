@@ -172,7 +172,7 @@ export function DeepResearchWorkflowCard({
         </div>
         <span
           data-testid="deep-research-state-badge"
-          className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-200 border border-purple-200 dark:border-purple-800/50"
+          className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-200 border border-purple-200 dark:border-purple-800/50"
         >
           {DEEP_RESEARCH_STATE_LABELS[effectiveState]}
         </span>
@@ -206,24 +206,24 @@ export function DeepResearchWorkflowCard({
       {/* Discipline & Source Budget Summary */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs bg-neutral-50 dark:bg-white/[0.03] p-2.5 rounded-xl border border-neutral-200/60 dark:border-white/10">
         <div>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block">
+          <span className="text-xs font-bold uppercase tracking-wider text-neutral-400 block">
             Discipline & Source Types
           </span>
           <span className="font-semibold text-neutral-800 dark:text-neutral-200">
             {resolvedPlan.disciplineLabel}
           </span>
-          <span className="block text-[11px] text-neutral-500 dark:text-neutral-400 truncate">
+          <span className="block text-xs text-neutral-500 dark:text-neutral-400 truncate">
             {resolvedPlan.sourceTypes.slice(0, 4).join(", ")}
           </span>
         </div>
         <div>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block">
+          <span className="text-xs font-bold uppercase tracking-wider text-neutral-400 block">
             Source Budget
           </span>
           <span className="font-semibold text-neutral-800 dark:text-neutral-200">
             {resolvedPlan.budgetLabel}
           </span>
-          <span className="block text-[11px] text-neutral-500 dark:text-neutral-400">
+          <span className="block text-xs text-neutral-500 dark:text-neutral-400">
             Runs in background · Notifies when ready
           </span>
         </div>
@@ -232,11 +232,11 @@ export function DeepResearchWorkflowCard({
       {/* Editable Sub-Questions when in plan_proposed state */}
       {effectiveState === "plan_proposed" ? (
         <div className="space-y-2">
-          <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">
+          <label className="block text-xs font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">
             Research Sub-Questions (Edit or add before starting)
           </label>
           {planSource && (
-            <p data-testid="deep-research-plan-source" role="status" className="text-[11px] text-neutral-500 dark:text-neutral-400">
+            <p data-testid="deep-research-plan-source" role="status" className="text-xs text-neutral-500 dark:text-neutral-400">
               {PLAN_SOURCE_NOTE[planSource]}
             </p>
           )}
@@ -292,21 +292,21 @@ export function DeepResearchWorkflowCard({
 
           {(previewStatus || (previewSources && previewSources.length > 0)) && (
             <div className="space-y-1.5 pt-1" data-testid="plan-source-preview">
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">
+              <label className="block text-xs font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">
                 Sources found so far (pin to keep, exclude to drop)
               </label>
               {previewStatus === "loading" && (
-                <p className="text-[11px] text-neutral-500">Searching for a preview of likely sources…</p>
+                <p className="text-xs text-neutral-500">Searching for a preview of likely sources…</p>
               )}
               {previewStatus === "failed" && (
-                <p className="text-[11px] text-neutral-500">Source preview unavailable. The run will still search on its own.</p>
+                <p className="text-xs text-neutral-500">Source preview unavailable. The run will still search on its own.</p>
               )}
               <ul className="space-y-1 max-h-56 overflow-y-auto scholar-scrollbar pr-1">
                 {(previewSources || []).map((src, idx) => (
                   <li
                     key={`${src.doi || src.url || src.title}-${idx}`}
                     data-choice={src.choice || "none"}
-                    className={`flex items-start gap-2 rounded-lg border px-2 py-1.5 text-[11px] ${
+                    className={`flex items-start gap-2 rounded-lg border px-2 py-1.5 text-xs ${
                       src.choice === "excluded"
                         ? "border-neutral-200 bg-neutral-50 opacity-60 dark:border-white/10 dark:bg-white/5"
                         : src.choice === "pinned"

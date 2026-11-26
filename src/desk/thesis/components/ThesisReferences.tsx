@@ -79,7 +79,7 @@ export default function ThesisReferences({
             writes the citation and the reference list in your style.
           </p>
         </div>
-        <label className="text-[11px] font-semibold text-secondary">
+        <label className="text-xs font-semibold text-secondary">
           Citation style
           <select
             value={style}
@@ -115,9 +115,9 @@ export default function ThesisReferences({
                     <Entry text={formatEntry(r, style)} />
                   </p>
                   <div className="flex items-center gap-2 flex-wrap">
-                    {status && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${status.tone}`}>{status.text}</span>}
-                    {uncited.has(r.id) && <span className="text-[10px] text-[color:var(--text-muted)]">Not cited in any chapter yet</span>}
-                    <code className="text-[10px] text-secondary">{citeTag(r.id)}</code>
+                    {status && <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${status.tone}`}>{status.text}</span>}
+                    {uncited.has(r.id) && <span className="text-xs text-[color:var(--text-muted)]">Not cited in any chapter yet</span>}
+                    <code className="text-xs text-secondary">{citeTag(r.id)}</code>
                     <button type="button" onClick={() => copy(r.id)} aria-label={`Copy citation tag for ${r.title}`} className="p-1 rounded hover:bg-surface cursor-pointer">
                       <Copy className="w-3 h-3" aria-hidden="true" />
                     </button>

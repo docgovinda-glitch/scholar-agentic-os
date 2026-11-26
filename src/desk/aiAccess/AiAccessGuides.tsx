@@ -25,7 +25,7 @@ export function FreeTierRecipes({ onOpen }: { onOpen: (id: string) => void }) {
           </li>
         ))}
       </ul>
-      <p className="mt-3 text-[11px] text-[color:var(--text-muted)]">Free allowances change. Each provider&apos;s own page has the current limits.</p>
+      <p className="mt-3 text-xs text-[color:var(--text-muted)]">Free allowances change. Each provider&apos;s own page has the current limits.</p>
     </details>
   );
 }
@@ -42,7 +42,7 @@ export function GrantsPanel() {
       <div className="mt-3 space-y-4">
         {AUDIENCES.map((aud) => (
           <section key={aud} aria-label={GRANT_AUDIENCE_LABEL[aud]}>
-            <h4 className="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">{GRANT_AUDIENCE_LABEL[aud]}</h4>
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">{GRANT_AUDIENCE_LABEL[aud]}</h4>
             <ul className="mt-1.5 space-y-2">
               {GRANT_PROGRAMS.filter((g) => g.audience === aud).map((g) => (
                 <li key={g.id} className="text-xs text-[color:var(--text-secondary)]">

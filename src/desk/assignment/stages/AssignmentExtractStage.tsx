@@ -5,6 +5,7 @@ import { ExtractAgentPanel } from "../components/AgentPanels";
 import React,{ useState,useRef,useEffect,useMemo } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
 import { authedFetch } from "../../api";
+import { useActiveAi } from "../../ai/useActiveAi";
 import {
 type AcademicLevel,
 type AssignmentType,
@@ -86,9 +87,11 @@ class DropzoneErrorBoundary extends React.Component<
 
 export interface AssignmentExtractStageProps {
   onProceed?: () => void;
+  /** Opens AI Access when the build needs an AI and none is connected. */
+  onOpenAiAccess?: () => void;
 }
 
-export default function AssignmentExtractStage({ onProceed }: AssignmentExtractStageProps) {
+export default function AssignmentExtractStage({ onProceed, onOpenAiAccess }: AssignmentExtractStageProps) {
   const {
     project,
     question,
@@ -218,6 +221,9 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
   const [saveError, setStructureError] = useState<string | null>(null);
   // What went wrong: saving the brief, or the build itself (its own message).
   const structureError = saveError || (build.state.status === "error" ? build.state.error || "Your brief could not be read. Try again." : null);
+  // No AI connected is an expected state, not a failure: say so calmly and offer AI Access.
+  const structureNeedsAi = Boolean(structureError && /connect an ai|no ai|ai provider|ai_unavailable|ai_provider_required/i.test(structureError));
+  const activeAi = useActiveAi();
   const [uploadingBrief, setUploadingBrief] = useState<boolean>(false);
   const [showCourseDetails, setShowCourseDetails] = useState<boolean>(false);
 
@@ -281,7 +287,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
     Boolean(localLevel) &&
     Boolean(localType);
   const missingFields = [
-    localQuestion.trim().length < 10 && "the assignment question (10+ characters)",
+    localQuestion.trim().length < 10 && (localQuestion.trim() ? "a longer assignment question" : "the assignment question"),
     !(localWordCount > 0) && "a word count",
     !localCitation && "a citation style",
     !localLevel && "an academic level",
@@ -972,14 +978,13 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
             {!canGenerate ? (
               <p className="text-[color:var(--text-muted)] flex items-start gap-1.5">
                 <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" aria-hidden="true" />
-                <span>
-                  Please provide the assignment question, word count, and citation style to continue.
-                  {missingFields.length > 0 && <span className="block text-xs mt-0.5">Still needed: {missingFields.join(", ")}.</span>}
-                </span>
+                <span>Still needed: {missingFields.join(", ")}.</span>
               </p>
             ) : (
               <p className="text-[color:var(--text-muted)]">
-                Ready to extract assignment brief and proceed to thesis &amp; outline calibration.
+                {activeAi.isConfigured
+                  ? "Ready: your AI reads the brief, then drafts the plan and outline."
+                  : "Reading the brief needs an AI. Connect one in AI Access first."}
               </p>
             )}
           </div>
@@ -1017,7 +1022,19 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
           </button>
         </div>
 
-        {structureError && (
+        {structureError && structureNeedsAi && (
+          <div role="status" className="p-3 bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] rounded-xl text-xs text-[color:var(--text-primary)] flex items-center justify-between gap-2">
+            <span>Reading the brief needs an AI. Your brief and settings are saved.</span>
+            <button
+              type="button"
+              onClick={() => (onOpenAiAccess ? onOpenAiAccess() : window.location.assign("/ai-access"))}
+              className="px-3 py-1 rounded-lg bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] text-xs font-semibold hover:opacity-90 cursor-pointer shrink-0"
+            >
+              Connect an AI
+            </button>
+          </div>
+        )}
+        {structureError && !structureNeedsAi && (
           <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-600 dark:text-red-400 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />

@@ -41,7 +41,7 @@ export default function ResearchDefinitionPanel({ projectId, project, onSaved }:
           Research Definition
         </h2>
         <p className="text-[var(--text-secondary)] text-base font-sans">
-          Define the boundaries and goals of your journal article. These parameters will guide the autonomous research and manuscript generation phases.
+          Set out what your research will do and how. The later steps build on what you write here.
         </p>
       </header>
 
@@ -59,7 +59,7 @@ export default function ResearchDefinitionPanel({ projectId, project, onSaved }:
             value={objectives}
             onChange={(e) => setObjectives(e.target.value)}
             placeholder="What is the primary goal of this research? e.g., To evaluate the efficacy of X in conditions Y."
-            className="w-full bg-transparent resize-y border-0 p-0 text-[var(--text-primary)] text-base placeholder-[var(--text-secondary)]/50 focus:ring-0 outline-none leading-relaxed font-sans"
+            className="w-full bg-transparent resize-y border-0 p-0 text-[var(--text-primary)] text-base placeholder:text-[color:var(--text-muted)] focus:ring-0 outline-none leading-relaxed font-sans"
           />
         </div>
 
@@ -76,7 +76,7 @@ export default function ResearchDefinitionPanel({ projectId, project, onSaved }:
             value={questions}
             onChange={(e) => setQuestions(e.target.value)}
             placeholder="1. How does X impact Y?&#10;2. What are the underlying mechanisms?"
-            className="w-full bg-transparent resize-y border-0 p-0 text-[var(--text-primary)] text-base placeholder-[var(--text-secondary)]/50 focus:ring-0 outline-none leading-relaxed font-sans"
+            className="w-full bg-transparent resize-y border-0 p-0 text-[var(--text-primary)] text-base placeholder:text-[color:var(--text-muted)] focus:ring-0 outline-none leading-relaxed font-sans"
           />
         </div>
 
@@ -93,7 +93,7 @@ export default function ResearchDefinitionPanel({ projectId, project, onSaved }:
             value={methodology}
             onChange={(e) => setMethodology(e.target.value)}
             placeholder="Describe your intended methodology: Literature review, empirical study, computational modeling, etc."
-            className="w-full bg-transparent resize-y border-0 p-0 text-[var(--text-primary)] text-base placeholder-[var(--text-secondary)]/50 focus:ring-0 outline-none leading-relaxed font-sans"
+            className="w-full bg-transparent resize-y border-0 p-0 text-[var(--text-primary)] text-base placeholder:text-[color:var(--text-muted)] focus:ring-0 outline-none leading-relaxed font-sans"
           />
         </div>
 

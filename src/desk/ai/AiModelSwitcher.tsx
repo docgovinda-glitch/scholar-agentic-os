@@ -70,14 +70,14 @@ export function AiModelSwitcher({ workspace, className = "", compact = false }: 
         <ChevronDown className="w-3 h-3" aria-hidden="true" />
       </button>
       {answer && !compact && (
-        <span role="status" className={`ml-1.5 hidden 2xl:inline-block max-w-[180px] truncate align-middle text-[10px] ${answer.switched ? "text-[color:var(--state-warning)]" : "text-[color:var(--text-muted)]"}`} title="Which model answered your last AI step">
+        <span role="status" className={`ml-1.5 hidden 2xl:inline-block max-w-[180px] truncate align-middle text-xs ${answer.switched ? "text-[color:var(--state-warning)]" : "text-[color:var(--text-muted)]"}`} title="Which model answered your last AI step">
           {answer.switched ? "Backup answered: " : "Answered by "}{answer.label}
         </span>
       )}
       {open && (
         <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto p-3 rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] shadow-xl z-50 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--text-muted)]">AI model</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)]">AI model</span>
             <button type="button" onClick={() => void load(true)} disabled={loading} aria-label="Refresh models" className="p-1 rounded hover:bg-[color:var(--surface-hover)] disabled:opacity-50">
               <RefreshCw className={`w-3 h-3 ${loading ? "animate-spin" : ""}`} aria-hidden="true" />
             </button>
@@ -89,8 +89,8 @@ export function AiModelSwitcher({ workspace, className = "", compact = false }: 
             const { recommended, why, ranked } = recommendFor(workspace, p.models);
             return (
               <div key={p.provider}>
-                <p className="text-[11px] font-semibold text-[color:var(--text-primary)] capitalize">{p.provider}</p>
-                {p.error && <p className="text-[11px] text-[color:var(--state-danger)]">{p.error}</p>}
+                <p className="text-xs font-semibold text-[color:var(--text-primary)] capitalize">{p.provider}</p>
+                {p.error && <p className="text-xs text-[color:var(--state-danger)]">{p.error}</p>}
                 <ul className="mt-1 space-y-0.5">
                   {ranked.map((m) => {
                     const isActive = (active?.via ?? active?.provider) === p.provider && active?.model === m.id;
@@ -104,9 +104,9 @@ export function AiModelSwitcher({ workspace, className = "", compact = false }: 
                         >
                           <span>{m.displayName ?? m.id}</span>
                           {recommended?.id === m.id && (
-                            <span className="ml-1.5 rounded bg-emerald-500/15 px-1 py-0.5 text-[10px] text-emerald-800 dark:text-emerald-300" title={`Suits ${why}`}>Recommended here</span>
+                            <span className="ml-1.5 rounded bg-emerald-500/15 px-1 py-0.5 text-xs text-emerald-800 dark:text-emerald-300" title={`Suits ${why}`}>Recommended here</span>
                           )}
-                          {m.badges.map((b) => <span key={b.id} title={b.evidence} className="ml-1 text-[10px] text-[color:var(--text-muted)]">{b.label}</span>)}
+                          {m.badges.map((b) => <span key={b.id} title={b.evidence} className="ml-1 text-xs text-[color:var(--text-muted)]">{b.label}</span>)}
                         </button>
                       </li>
                     );

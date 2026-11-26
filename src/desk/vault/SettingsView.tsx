@@ -1,3 +1,4 @@
+import { AlertTriangle, Cloud, Folder, Lightbulb, ShieldCheck } from "lucide-react";
 /**
  * Settings View for Source Library / Knowledge Vault
  *
@@ -203,7 +204,7 @@ export default function SettingsView({
           role="alert"
           className="p-3.5 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 rounded-[var(--radius-md)] text-xs leading-relaxed flex items-start gap-2 animate-in fade-in"
         >
-          <span>⚠️</span>
+          <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
           <span>{error}</span>
         </div>
       )}
@@ -240,20 +241,20 @@ export default function SettingsView({
         {showSetupGuide && (
           <div className="p-4 bg-[color:var(--surface-inset)] rounded-[var(--radius-lg)] border border-[color:var(--border-subtle)] text-xs flex flex-col gap-3 animate-in fade-in">
             <h4 className="font-bold text-[color:var(--text-primary)] flex items-center gap-1.5">
-              <span>💡</span>
+              <Lightbulb className="w-4 h-4 shrink-0" aria-hidden="true" />
               <span>Quick Setup & How It Works</span>
             </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px] text-[color:var(--text-secondary)]">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-[color:var(--text-secondary)]">
               <div className="p-2.5 bg-[color:var(--surface-raised)] rounded-[var(--radius-md)] border border-[color:var(--border-subtle)]">
-                <span className="font-bold text-[color:var(--text-primary)] block mb-1">📁 Google Drive Setup</span>
+                <span className="font-bold text-[color:var(--text-primary)] block mb-1"><Folder className="inline-block w-3.5 h-3.5 mr-1 align-[-2px]" aria-hidden="true" />Google Drive Setup</span>
                 <p>Click "Connect" to authenticate with Google. Approves read-only access to view and index documents. Your source files stay strictly in your Drive.</p>
               </div>
               <div className="p-2.5 bg-[color:var(--surface-raised)] rounded-[var(--radius-md)] border border-[color:var(--border-subtle)]">
-                <span className="font-bold text-[color:var(--text-primary)] block mb-1">☁️ OneDrive Setup</span>
+                <span className="font-bold text-[color:var(--text-primary)] block mb-1"><Cloud className="inline-block w-3.5 h-3.5 mr-1 align-[-2px]" aria-hidden="true" />OneDrive Setup</span>
                 <p>Click "Connect" to log in with your Microsoft account (personal or institution). Approves Files.Read to index Word docs, PDFs, and notes.</p>
               </div>
             </div>
-            <p className="text-[11px] text-[color:var(--text-muted)] leading-relaxed">
+            <p className="text-xs text-[color:var(--text-muted)] leading-relaxed">
               <strong>Direct Link Alternative:</strong> Even if you don't connect an account, you can always paste any public or shareable link directly in the Add Source modal.
             </p>
           </div>
@@ -263,22 +264,22 @@ export default function SettingsView({
           {/* Google Drive Item */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 p-4 rounded-[var(--radius-lg)] border border-[color:var(--border-default)] bg-[color:var(--surface-inset)]">
             <div className="flex items-start sm:items-center gap-3 min-w-0">
-              <span className="text-2xl shrink-0 mt-0.5 sm:mt-0">📁</span>
+              <Folder className="shrink-0 mt-0.5 sm:mt-0 w-6 h-6 shrink-0" aria-hidden="true" />
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h4 className="text-xs font-bold text-[color:var(--text-primary)]">Google Drive</h4>
                   {isGoogleConnected ? (
-                    <span className="text-[10px] font-semibold text-emerald-800 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-500/20 shrink-0">
+                    <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-500/20 shrink-0">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                       Connected &amp; Synced
                     </span>
                   ) : (
-                    <span className="text-[10px] font-medium text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800/80 px-2 py-0.5 rounded-full border border-neutral-200/60 dark:border-neutral-700/60 shrink-0">
+                    <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800/80 px-2 py-0.5 rounded-full border border-neutral-200/60 dark:border-neutral-700/60 shrink-0">
                       ○ Not connected
                     </span>
                   )}
                 </div>
-                <p className="text-[11px] text-[color:var(--text-muted)] mt-0.5 truncate max-w-sm">
+                <p className="text-xs text-[color:var(--text-muted)] mt-0.5 truncate max-w-sm">
                   {googleAccount?.accountEmail || "Sync Google Docs, PDFs, & Sheets with zero file copies"}
                 </p>
               </div>
@@ -327,22 +328,22 @@ export default function SettingsView({
           {/* OneDrive Item */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 p-4 rounded-[var(--radius-lg)] border border-[color:var(--border-default)] bg-[color:var(--surface-inset)]">
             <div className="flex items-start sm:items-center gap-3 min-w-0">
-              <span className="text-2xl shrink-0 mt-0.5 sm:mt-0">☁️</span>
+              <Cloud className="shrink-0 mt-0.5 sm:mt-0 w-6 h-6 shrink-0" aria-hidden="true" />
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h4 className="text-xs font-bold text-[color:var(--text-primary)]">Microsoft OneDrive</h4>
                   {isOneDriveConnected ? (
-                    <span className="text-[10px] font-semibold text-emerald-800 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-500/20 shrink-0">
+                    <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-500/20 shrink-0">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                       Connected &amp; Synced
                     </span>
                   ) : (
-                    <span className="text-[10px] font-medium text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800/80 px-2 py-0.5 rounded-full border border-neutral-200/60 dark:border-neutral-700/60 shrink-0">
+                    <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800/80 px-2 py-0.5 rounded-full border border-neutral-200/60 dark:border-neutral-700/60 shrink-0">
                       ○ Not connected
                     </span>
                   )}
                 </div>
-                <p className="text-[11px] text-[color:var(--text-muted)] mt-0.5 truncate max-w-sm">
+                <p className="text-xs text-[color:var(--text-muted)] mt-0.5 truncate max-w-sm">
                   {oneDriveAccount?.accountEmail || "Sync Office 365, Word documents, & OneDrive"}
                 </p>
               </div>
@@ -412,12 +413,12 @@ export default function SettingsView({
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-xs font-bold text-[color:var(--text-primary)]">Universal Cloud Sync</span>
                 {storageMode === "synced" && (
-                  <span className="text-[10px] font-bold text-emerald-800 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                  <span className="text-xs font-bold text-emerald-800 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
                     Active
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-[color:var(--text-secondary)] leading-relaxed">
+              <p className="text-xs text-[color:var(--text-secondary)] leading-relaxed">
                 Metadata is synced to your Scholar account via Supabase. Available across all your computers, browsers, and mobile devices.
               </p>
             </div>
@@ -460,12 +461,12 @@ export default function SettingsView({
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-xs font-bold text-[color:var(--text-primary)]">Local Device Encrypted</span>
                 {storageMode === "local" && (
-                  <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20">
+                  <span className="text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20">
                     Active
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-[color:var(--text-secondary)] leading-relaxed">
+              <p className="text-xs text-[color:var(--text-secondary)] leading-relaxed">
                 Stored exclusively in this device's IndexedDB, encrypted with AES-GCM-256 and passphrase. Zero metadata leaves this machine.
               </p>
             </div>
@@ -514,7 +515,7 @@ export default function SettingsView({
               <label htmlFor="citation-style-select" className="text-xs font-bold text-[color:var(--text-primary)] block">
                 Default Citation Style
               </label>
-              <p className="text-[11px] text-[color:var(--text-muted)] mt-0.5">
+              <p className="text-xs text-[color:var(--text-muted)] mt-0.5">
                 Automatically formats newly saved sources in this style.
               </p>
             </div>
@@ -536,7 +537,7 @@ export default function SettingsView({
           <div className="flex items-center justify-between gap-3 p-3.5 rounded-[var(--radius-lg)] border border-[color:var(--border-default)] bg-[color:var(--surface-inset)]">
             <div>
               <div className="text-xs font-bold text-[color:var(--text-primary)]">Academic Integrity Sentinel</div>
-              <p className="text-[11px] text-[color:var(--text-muted)] mt-0.5">
+              <p className="text-xs text-[color:var(--text-muted)] mt-0.5">
                 Automatically check CrossRef and OpenAlex for retracted papers or expressions of concern.
               </p>
             </div>
@@ -557,7 +558,7 @@ export default function SettingsView({
               <label htmlFor="duplicate-sensitivity-select" className="text-xs font-bold text-[color:var(--text-primary)] block">
                 Duplicate Detection Sensitivity
               </label>
-              <p className="text-[11px] text-[color:var(--text-muted)] mt-0.5">
+              <p className="text-xs text-[color:var(--text-muted)] mt-0.5">
                 Warns if a newly added paper is already present in your Knowledge Vault.
               </p>
             </div>
@@ -594,7 +595,7 @@ export default function SettingsView({
               className="accent-[color:var(--accent)]"
             />
             <span className="text-xs font-bold text-[color:var(--text-primary)]">Google Drive</span>
-            <span className="text-[11px] text-[color:var(--text-muted)] ml-auto font-mono">
+            <span className="text-xs text-[color:var(--text-muted)] ml-auto font-mono">
               Source Library/
             </span>
           </label>
@@ -609,7 +610,7 @@ export default function SettingsView({
               className="accent-[color:var(--accent)]"
             />
             <span className="text-xs font-bold text-[color:var(--text-primary)]">Microsoft OneDrive</span>
-            <span className="text-[11px] text-[color:var(--text-muted)] ml-auto font-mono">
+            <span className="text-xs text-[color:var(--text-muted)] ml-auto font-mono">
               Source Library/
             </span>
           </label>
@@ -619,7 +620,7 @@ export default function SettingsView({
       {/* SECTION 5: STORAGE & PRIVACY TRANSPARENCY */}
       <div className="p-5 rounded-[var(--radius-xl)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]/50 flex flex-col gap-3">
         <div className="flex items-center gap-2">
-          <span className="text-base">🛡️</span>
+          <ShieldCheck className="w-4 h-4 shrink-0" aria-hidden="true" />
           <h3 className="text-xs font-bold text-[color:var(--text-primary)] uppercase tracking-wider">
             Storage &amp; Privacy Architecture
           </h3>
@@ -630,10 +631,10 @@ export default function SettingsView({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
           <div className="p-3 rounded-[var(--radius-md)] bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] flex flex-col gap-1.5">
-            <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
+            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
               Source Library Stores:
             </span>
-            <ul className="text-[11px] text-[color:var(--text-secondary)] space-y-1 list-disc list-inside">
+            <ul className="text-xs text-[color:var(--text-secondary)] space-y-1 list-disc list-inside">
               <li>Lightweight metadata</li>
               <li>Project assignments</li>
               <li>Tags</li>
@@ -645,10 +646,10 @@ export default function SettingsView({
           </div>
 
           <div className="p-3 rounded-[var(--radius-md)] bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] flex flex-col gap-1.5">
-            <span className="text-[11px] font-bold text-[color:var(--state-danger)] uppercase tracking-wide">
+            <span className="text-xs font-bold text-[color:var(--state-danger)] uppercase tracking-wide">
               Source Library Does Not Store:
             </span>
-            <ul className="text-[11px] text-[color:var(--text-secondary)] space-y-1 list-disc list-inside">
+            <ul className="text-xs text-[color:var(--text-secondary)] space-y-1 list-disc list-inside">
               <li>Document binaries</li>
               <li>Permanent document copies</li>
               <li>Permanent extracted full text</li>
@@ -664,7 +665,7 @@ export default function SettingsView({
         <div className="pt-4 border-t border-[color:var(--border-subtle)] flex items-center justify-between">
           <div>
             <div className="text-xs font-bold text-[color:var(--state-danger)]">Reset Library</div>
-            <div className="text-[11px] text-[color:var(--text-muted)]">
+            <div className="text-xs text-[color:var(--text-muted)]">
               Clear your metadata and start fresh. Your cloud files are never deleted.
             </div>
           </div>

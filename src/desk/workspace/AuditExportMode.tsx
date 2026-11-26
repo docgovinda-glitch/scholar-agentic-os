@@ -618,7 +618,7 @@ export default function AuditExportMode() {
       <div className="border-b border-[color:var(--border-control)] bg-[color:var(--surface-raised)] px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[color:var(--accent-subtle)] text-[color:var(--accent)]">
+            <span className="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[color:var(--accent-subtle)] text-[color:var(--accent)]">
               Delivery
             </span>
             <h2 className="text-lg font-bold text-[color:var(--text-primary)]">
@@ -638,8 +638,8 @@ export default function AuditExportMode() {
                 : "bg-[color:var(--state-warning-subtle)] text-[color:var(--state-warning)] border-[color:var(--state-warning)]"
             }`}
           >
-            <span>{g7CertifiedReady ? "✓ Ready to submit" : "⚠ Action required"}</span>
-            <span className="px-1.5 py-0.2 rounded bg-[color:var(--surface-raised)] text-[11px]">
+            <span>{g7CertifiedReady ? "✓ Ready to submit" : "Action required"}</span>
+            <span className="px-1.5 py-0.2 rounded bg-[color:var(--surface-raised)] text-xs">
               {g7Passed} of {g7Checks.length} checks pass
             </span>
           </div>
@@ -698,19 +698,19 @@ export default function AuditExportMode() {
 
             <div className="grid grid-cols-3 gap-3 text-xs">
               <div className="p-2.5 rounded bg-[color:var(--surface-canvas)] border border-[color:var(--border-control)]">
-                <div className="text-[11px] text-[color:var(--text-muted)]">Actual Manuscript Words</div>
+                <div className="text-xs text-[color:var(--text-muted)]">Actual Manuscript Words</div>
                 <div className="text-base font-bold text-[color:var(--text-primary)] mt-0.5">
                   {actualWords.toLocaleString()}
                 </div>
               </div>
               <div className="p-2.5 rounded bg-[color:var(--surface-canvas)] border border-[color:var(--border-control)]">
-                <div className="text-[11px] text-[color:var(--text-muted)]">Blueprint Target</div>
+                <div className="text-xs text-[color:var(--text-muted)]">Blueprint Target</div>
                 <div className="text-base font-bold text-[color:var(--text-primary)] mt-0.5">
                   {targetWords.toLocaleString()}
                 </div>
               </div>
               <div className="p-2.5 rounded bg-[color:var(--surface-canvas)] border border-[color:var(--border-control)]">
-                <div className="text-[11px] text-[color:var(--text-muted)]">Tolerance Band (±5%)</div>
+                <div className="text-xs text-[color:var(--text-muted)]">Tolerance Band (±5%)</div>
                 <div className="text-base font-bold text-[color:var(--text-primary)] mt-0.5">
                   {`${Math.round(targetWords * 0.95).toLocaleString()} – ${Math.round(targetWords * 1.05).toLocaleString()}`}
                 </div>
@@ -719,7 +719,7 @@ export default function AuditExportMode() {
 
             {blueprint?.sections && (
               <div className="mt-1 border-t border-[color:var(--border-control)] pt-2">
-                <div className="text-[11px] font-bold text-[color:var(--text-secondary)] mb-1.5">
+                <div className="text-xs font-bold text-[color:var(--text-secondary)] mb-1.5">
                   Section Budget Allocation Breakdown:
                 </div>
                 <div className="space-y-1 max-h-32 overflow-y-auto pr-1">
@@ -833,7 +833,7 @@ export default function AuditExportMode() {
                   <button
                     type="button"
                     onClick={() => setDataAvailabilityStatement(datasetDraft)}
-                    className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[color:var(--accent-subtle)] text-[color:var(--accent)] cursor-pointer"
+                    className="text-xs font-bold px-1.5 py-0.5 rounded bg-[color:var(--accent-subtle)] text-[color:var(--accent)] cursor-pointer"
                   >
                     Start from my datasets
                   </button>
@@ -893,7 +893,7 @@ export default function AuditExportMode() {
                 <button
                   type="button"
                   onClick={() => setCreditStatement(creditFromRoles(authorList))}
-                  className="self-start px-2.5 py-1 rounded-md text-[11px] font-semibold border border-[color:var(--border-control)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] cursor-pointer"
+                  className="self-start px-2.5 py-1 rounded-md text-xs font-semibold border border-[color:var(--border-control)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] cursor-pointer"
                 >
                   Write from the authors' CRediT roles
                 </button>
@@ -977,7 +977,7 @@ export default function AuditExportMode() {
                   }`}
                 >
                   <div className="text-xs font-bold">1-Column Double-Spaced</div>
-                  <div className="text-[10px] text-[color:var(--text-muted)] mt-0.5">
+                  <div className="text-xs text-[color:var(--text-muted)] mt-0.5">
                     12 pt Times, double-spaced, one column: the review copy most journals ask for
                   </div>
                 </button>
@@ -996,12 +996,12 @@ export default function AuditExportMode() {
                   }`}
                 >
                   <div className="text-xs font-bold">2-Column Camera-Ready</div>
-                  <div className="text-[10px] text-[color:var(--text-muted)] mt-0.5">
+                  <div className="text-xs text-[color:var(--text-muted)] mt-0.5">
                     10 pt Times, single-spaced, two columns (IEEE Transactions style)
                   </div>
                 </button>
               </div>
-              <label className="mt-2 flex items-center gap-2 text-[11px] text-[color:var(--text-secondary)]">
+              <label className="mt-2 flex items-center gap-2 text-xs text-[color:var(--text-secondary)]">
                 <input
                   type="checkbox"
                   checked={lineNumbers}
@@ -1056,7 +1056,7 @@ export default function AuditExportMode() {
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-[11px] text-[color:var(--text-muted)]">
+              <p className="mt-1 text-xs text-[color:var(--text-muted)]">
                 Switching journal? Pick its publisher's class and citation style; the LaTeX and Word files are rebuilt from the same text.
               </p>
             </div>
@@ -1071,7 +1071,7 @@ export default function AuditExportMode() {
             <div>
               <label
                 htmlFor="meta-title"
-                className="block text-[11px] font-bold text-[color:var(--text-primary)] mb-1"
+                className="block text-xs font-bold text-[color:var(--text-primary)] mb-1"
               >
                 Full Article Title
               </label>
@@ -1088,7 +1088,7 @@ export default function AuditExportMode() {
             <div>
               <label
                 htmlFor="meta-running-head"
-                className="block text-[11px] font-bold text-[color:var(--text-primary)] mb-1"
+                className="block text-xs font-bold text-[color:var(--text-primary)] mb-1"
               >
                 Running Head (Max 50 Characters)
               </label>
@@ -1118,7 +1118,7 @@ export default function AuditExportMode() {
             <div>
               <label
                 htmlFor="meta-keywords"
-                className="block text-[11px] font-bold text-[color:var(--text-primary)] mb-1"
+                className="block text-xs font-bold text-[color:var(--text-primary)] mb-1"
               >
                 Keywords (5–7 Comma-Separated)
               </label>
@@ -1147,7 +1147,7 @@ export default function AuditExportMode() {
               className="w-full py-2.5 px-4 rounded-lg bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:opacity-90 font-bold text-xs flex items-center justify-between transition shadow-sm disabled:opacity-50"
             >
               <span>Download Journal Manuscript (.docx)</span>
-              <span className="text-[10px] font-normal px-2 py-0.5 rounded bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)]">
+              <span className="text-xs font-normal px-2 py-0.5 rounded bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)]">
                 Word AST • Dedicated Title Page
               </span>
             </button>
@@ -1160,7 +1160,7 @@ export default function AuditExportMode() {
               className="w-full py-2.5 px-4 rounded-lg border border-[color:var(--border-control)] bg-[color:var(--surface-canvas)] hover:border-[color:var(--border-strong)] text-[color:var(--text-primary)] font-bold text-xs flex items-center justify-between transition disabled:opacity-50"
             >
               <span>Download Camera-Ready Manuscript (.pdf)</span>
-              <span className="text-[10px] text-[color:var(--text-muted)]">
+              <span className="text-xs text-[color:var(--text-muted)]">
                 Typeset PDF
               </span>
             </button>
@@ -1173,14 +1173,14 @@ export default function AuditExportMode() {
               className="w-full py-2.5 px-4 rounded-lg border border-[color:var(--border-control)] bg-[color:var(--surface-canvas)] hover:border-[color:var(--border-strong)] text-[color:var(--text-primary)] font-bold text-xs flex items-center justify-between transition disabled:opacity-50"
             >
               <span>Download Point-by-Point Referee Response Letter (.docx)</span>
-              <span className="text-[10px] text-[color:var(--text-muted)]">
+              <span className="text-xs text-[color:var(--text-muted)]">
                 Review Rebuttal Letter
               </span>
             </button>
 
             {/* Secondary Formats */}
             <div className="border-t border-[color:var(--border-control)] pt-3 mt-1">
-              <div className="text-[11px] font-bold text-[color:var(--text-muted)] mb-2">
+              <div className="text-xs font-bold text-[color:var(--text-muted)] mb-2">
                 Secondary Formats:
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">

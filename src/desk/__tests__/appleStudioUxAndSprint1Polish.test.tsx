@@ -44,8 +44,6 @@ describe("Apple-Grade Studio UX Unification & Sprint 1 Production Polish", () =>
 
       render(
         <AppleStudioHeader
-          deliverableCode="OT-10"
-          deliverableLabel="Journal Article"
           projectTitle="Empirical Verification of Multi-Agent Systems"
           onProjectTitleChange={onProjectTitleChange}
           activePhase="studio"
@@ -63,13 +61,13 @@ describe("Apple-Grade Studio UX Unification & Sprint 1 Production Polish", () =>
       );
 
       expect(screen.getByTestId("apple-studio-header")).toBeInTheDocument();
-      expect(screen.getByTestId("studio-deliverable-badge")).toHaveTextContent("OT-10");
+      expect(screen.queryByTestId("studio-deliverable-badge")).not.toBeInTheDocument();
       expect(screen.getByTestId("studio-project-title")).toHaveTextContent(
         "Empirical Verification of Multi-Agent Systems"
       );
 
       // Verify all 5 stage pills exist inside role="tablist"
-      const tablist = screen.getByRole("tablist", { name: /Studio cognitive stages/i });
+      const tablist = screen.getByRole("tablist", { name: /Workspace stages/i });
       expect(tablist).toBeInTheDocument();
       expect(APPLE_STUDIO_STAGES).toHaveLength(5);
 
@@ -105,7 +103,7 @@ describe("Apple-Grade Studio UX Unification & Sprint 1 Production Polish", () =>
 
       const autosaveBadge = screen.getByTestId("autosave-status");
       expect(autosaveBadge).toHaveTextContent(/All changes saved/i);
-      expect(autosaveBadge).toHaveTextContent("v4");
+      expect(autosaveBadge).toHaveAttribute("aria-label", expect.stringContaining("version 4"));
 
       // Verify inline title editing
       fireEvent.click(screen.getByTestId("studio-project-title"));

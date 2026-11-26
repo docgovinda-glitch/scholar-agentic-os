@@ -73,7 +73,7 @@ export function AddBlockMenu({
                 className="flex-1 text-left cursor-pointer min-w-0"
               >
                 <span className="block text-xs font-semibold text-neutral-900 dark:text-white">{b.label}</span>
-                <span className="block text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">{b.guidance}</span>
+                <span className="block text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">{b.guidance}</span>
               </button>
               {b.kind !== 'media' && (
                 <button
@@ -84,7 +84,7 @@ export function AddBlockMenu({
                     setOpen(false);
                   }}
                   title={canWriteWithAi ? 'Add this block and have your AI write it' : 'Save the project to use AI'}
-                  className="shrink-0 h-7 px-2 rounded-lg text-[11px] font-semibold inline-flex items-center gap-1 text-amber-700 dark:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                  className="shrink-0 h-7 px-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1 text-amber-700 dark:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                 >
                   {busyKind === b.kind ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
                   Write with AI
@@ -94,7 +94,7 @@ export function AddBlockMenu({
           ))}
         </div>
       )}
-      {error && <p role="alert" className="mt-1 text-[11px] text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p role="alert" className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>}
     </div>
   );
 }

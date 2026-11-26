@@ -273,14 +273,14 @@ export default function ManuscriptStudioMode({
             </span>
           )}
           {saveStatus === "error" ? (
-            <span className="inline-flex items-center gap-1.5 text-[11px] text-[color:var(--state-danger)]">
+            <span className="inline-flex items-center gap-1.5 text-xs text-[color:var(--state-danger)]">
               Not saved
               <button type="button" onClick={retry} className="inline-flex items-center gap-1 font-semibold underline cursor-pointer">
                 <RotateCw className="w-3 h-3" aria-hidden="true" /> Retry
               </button>
             </span>
           ) : inWorkspace ? null : (
-            <span className="text-[11px] text-[color:var(--text-muted)]">
+            <span className="text-xs text-[color:var(--text-muted)]">
               {saveStatus === "saving"
                 ? "Saving…"
                 : lastSavedAt
@@ -321,7 +321,7 @@ export default function ManuscriptStudioMode({
       </div>
 
       {isDefaultOutline(units) && !focus && (
-        <p className="shrink-0 px-4 py-1.5 text-[11px] text-[color:var(--text-muted)] border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-sunken)]">
+        <p className="shrink-0 px-4 py-1.5 text-xs text-[color:var(--text-muted)] border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-sunken)]">
           These are standard IMRaD sections with a share of your word target.{" "}
           <button type="button" onClick={() => setMode("protocol")} className="font-semibold underline text-[color:var(--text-secondary)] cursor-pointer">
             Set your own outline in Blueprint
@@ -337,7 +337,7 @@ export default function ManuscriptStudioMode({
           </aside>
         )}
 
-        <main className="flex-1 min-w-0 overflow-y-auto">
+        <div className="flex-1 min-w-0 overflow-y-auto">
           {/* Phones and narrow windows: the outline as a picker */}
           <div className={`${showOutline ? "md:hidden" : ""} px-4 pt-4`}>
             <label htmlFor="studio-section-picker" className="sr-only">Section</label>
@@ -406,7 +406,7 @@ export default function ManuscriptStudioMode({
               )}
             </>
           )}
-        </main>
+        </div>
 
         {showSources && (
           <>

@@ -3,7 +3,7 @@ import { CREDIT_ROLES, checkAuthors, isValidOrcid, newAuthor, normalizeOrcid, ty
 
 const input =
   "w-full text-xs p-2 rounded border border-[color:var(--border-control)] bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)] focus:outline-none focus:border-[color:var(--border-strong)]";
-const label = "block text-[11px] font-bold text-[color:var(--text-primary)] mb-1";
+const label = "block text-xs font-bold text-[color:var(--text-primary)] mb-1";
 
 /**
  * Every author in byline order, with affiliation, email, ORCID iD, the
@@ -57,7 +57,7 @@ export default function AuthorsEditor({
           return (
             <li key={a.id} className="p-3 rounded-lg border border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] flex flex-col gap-2">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-[color:var(--text-muted)]">Author {n}</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)]">Author {n}</span>
                 <div className="flex items-center gap-1">
                   <button type="button" aria-label={`Move author ${n} up`} disabled={i === 0} onClick={() => move(i, -1)} className="p-1 rounded hover:bg-[color:var(--surface-hover)] disabled:opacity-30 cursor-pointer">
                     <ArrowUp className="w-3.5 h-3.5" aria-hidden="true" />
@@ -108,12 +108,12 @@ export default function AuthorsEditor({
                   />
                 </div>
               </div>
-              <label className="flex items-center gap-2 text-[11px] text-[color:var(--text-secondary)]">
+              <label className="flex items-center gap-2 text-xs text-[color:var(--text-secondary)]">
                 <input type="radio" name="corresponding-author" checked={a.isCorresponding} onChange={() => commit(authors.map((x, j) => ({ ...x, isCorresponding: j === i })))} />
                 Corresponding author
               </label>
               <fieldset>
-                <legend className="text-[11px] font-bold text-[color:var(--text-primary)] mb-1">Author {n} CRediT roles</legend>
+                <legend className="text-xs font-bold text-[color:var(--text-primary)] mb-1">Author {n} CRediT roles</legend>
                 <div className="flex flex-wrap gap-1">
                   {CREDIT_ROLES.map((r) => {
                     const on = a.creditRoles.includes(r);
@@ -123,7 +123,7 @@ export default function AuthorsEditor({
                         type="button"
                         aria-pressed={on}
                         onClick={() => toggleRole(i, r)}
-                        className={`px-2 py-0.5 rounded-full text-[10px] border cursor-pointer ${on ? "bg-[color:var(--accent-subtle)] border-[color:var(--accent)] text-[color:var(--accent)]" : "border-[color:var(--border-subtle)] text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"}`}
+                        className={`px-2 py-0.5 rounded-full text-xs border cursor-pointer ${on ? "bg-[color:var(--accent-subtle)] border-[color:var(--accent)] text-[color:var(--accent)]" : "border-[color:var(--border-subtle)] text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"}`}
                       >
                         {r}
                       </button>
@@ -145,10 +145,10 @@ export default function AuthorsEditor({
           <Plus className="w-3.5 h-3.5" aria-hidden="true" />
           Add author
         </button>
-        {saveState === "saving" && <span role="status" className="text-[11px] text-[color:var(--text-muted)]">Saving…</span>}
-        {saveState === "saved" && <span role="status" className="text-[11px] text-[color:var(--state-success)]">Authors saved.</span>}
+        {saveState === "saving" && <span role="status" className="text-xs text-[color:var(--text-muted)]">Saving…</span>}
+        {saveState === "saved" && <span role="status" className="text-xs text-[color:var(--state-success)]">Authors saved.</span>}
         {saveState === "error" && (
-          <span role="alert" className="text-[11px] text-[color:var(--state-danger)]">
+          <span role="alert" className="text-xs text-[color:var(--state-danger)]">
             The authors could not be saved.{" "}
             <button type="button" onClick={() => onSave(authors)} className="underline cursor-pointer">
               Try again
@@ -158,7 +158,7 @@ export default function AuthorsEditor({
       </div>
 
       {problems.length > 0 && (
-        <ul aria-label="Author details still needed" className="text-[11px] text-[color:var(--state-warning)] list-disc pl-4 space-y-0.5">
+        <ul aria-label="Author details still needed" className="text-xs text-[color:var(--state-warning)] list-disc pl-4 space-y-0.5">
           {problems.map((p, i) => (
             <li key={i}>{p.message}</li>
           ))}

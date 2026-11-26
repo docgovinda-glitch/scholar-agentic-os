@@ -489,7 +489,7 @@ export default function DeskApp() {
   const location = useLocation();
   const background = location.pathname === "/settings" ? (location.state as CameFrom | null)?.backgroundLocation : undefined;
   return (
-    <div className="min-h-screen w-full bg-ink-850 text-neutral-200">
+    <div className="min-h-screen w-full bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)]">
       <LoadingProvider>
         <Suspense fallback={<GlobalLoader />}>
           <Routes location={background ?? location}>
@@ -516,7 +516,8 @@ export default function DeskApp() {
                   <Route path="projects" element={<ProjectsIndexRoute />} />
                   <Route path="projects/:projectId" element={<ProjectRoute />} />
                   <Route path="projects/:projectId/:view" element={<ProjectRoute />} />
-                  <Route path="settings" element={<SettingsRoute />} />
+                  {/* Opened by URL there is no page behind the dialog: show the projects under it. */}
+                  <Route path="settings" element={<><ProjectsIndexRoute /><SettingsRoute /></>} />
                   <Route path="vault" element={<VaultRoute />} />
                   <Route path="ai-access" element={<AiAccessRoute />} />
                   <Route path="ai-access/:section" element={<AiAccessRoute />} />

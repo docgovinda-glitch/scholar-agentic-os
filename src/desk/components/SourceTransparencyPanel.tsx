@@ -104,7 +104,7 @@ export function SourceTransparencyPanel({
         <section aria-label={heading} data-testid="reference-list-section" className="space-y-2">
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
             <h3 className="text-[13px] font-semibold text-neutral-900 dark:text-neutral-100">{heading}</h3>
-            <span data-testid="search-read-cited-banner" className="text-[11px] text-neutral-500 dark:text-neutral-400">
+            <span data-testid="search-read-cited-banner" className="text-xs text-neutral-500 dark:text-neutral-400">
               Searched {effectiveSearched} · Read {effectiveRead} · Cited {effectiveCited}.
               {" "}Full text ({fullTextCount}) · Abstract only ({citations.length - fullTextCount}).
             </span>

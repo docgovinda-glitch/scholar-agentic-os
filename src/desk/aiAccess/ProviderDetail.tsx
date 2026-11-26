@@ -1,3 +1,4 @@
+import { XCircle, Zap } from "lucide-react";
 import { useState } from "react";
 import { providerAccessFacts, type CloudProviderSpec } from "../../config/providerCatalog";
 import ModelSelectField from "./ModelSelectField";
@@ -348,11 +349,11 @@ export default function ProviderDetail({
                 : "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300"
             }`}>
               <div className="flex items-center gap-2">
-                <span>{pingResult.ok ? "⚡" : "❌"}</span>
+                <span>{pingResult.ok ? <Zap className="w-4 h-4 shrink-0" aria-hidden="true" /> : <XCircle className="w-4 h-4 shrink-0" aria-hidden="true" />}</span>
                 <span>{pingResult.message}</span>
               </div>
               {pingResult.latencyMs !== undefined && pingResult.latencyMs > 0 && (
-                <span className="shrink-0 px-2 py-0.5 rounded bg-black/5 dark:bg-white/10 text-[11px]">
+                <span className="shrink-0 px-2 py-0.5 rounded bg-black/5 dark:bg-white/10 text-xs">
                   {pingResult.latencyMs}ms
                 </span>
               )}
@@ -464,7 +465,7 @@ export function Chip({ tone, children }: { tone: "good" | "warn" | "neutral"; ch
       : tone === "warn"
         ? "border-[color:var(--state-warning)] bg-[color:var(--state-warning-subtle)] text-[color:var(--state-warning)]"
         : "border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]";
-  return <span className={`inline-block rounded-full border px-2 py-0.5 text-[11px] font-medium ${cls}`}>{children}</span>;
+  return <span className={`inline-block rounded-full border px-2 py-0.5 text-xs font-medium ${cls}`}>{children}</span>;
 }
 
 const ROLE_LABEL: Record<string, string> = { recommended: "Recommended", most_capable: "Most capable", fastest: "Fastest", option: "Also good" };
@@ -483,8 +484,8 @@ function RecommendationPanel({ found, selected, onPick, providerName }: { found:
                 <div className="min-w-0">
                   <p className="text-sm text-[color:var(--text-primary)]">
                     <span className="font-medium">{o.displayName || o.id}</span>{" "}
-                    <span className="rounded bg-[color:var(--surface-sunken)] px-1.5 py-0.5 text-[11px] font-semibold text-[color:var(--text-secondary)]">{ROLE_LABEL[o.role]}</span>
-                    {found.tested?.model === o.id && <span className="ml-1.5 text-[11px] text-[color:var(--state-success)]">answered a test request</span>}
+                    <span className="rounded bg-[color:var(--surface-sunken)] px-1.5 py-0.5 text-xs font-semibold text-[color:var(--text-secondary)]">{ROLE_LABEL[o.role]}</span>
+                    {found.tested?.model === o.id && <span className="ml-1.5 text-xs text-[color:var(--state-success)]">answered a test request</span>}
                   </p>
                   <p className="text-xs text-[color:var(--text-muted)]">{o.why}</p>
                 </div>

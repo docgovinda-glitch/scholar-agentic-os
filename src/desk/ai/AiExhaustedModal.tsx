@@ -1,4 +1,6 @@
 
+import { PlugZap } from "lucide-react";
+
 interface AiExhaustedModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -15,8 +17,8 @@ export default function AiExhaustedModal({
   onClose,
   onOpenAiAccess,
   errorMessage,
-  title = "All Configured AI Services Are Unavailable",
-  explanation = "All available AI providers or API keys configured on this workspace have either exceeded their rate/quota limits, failed authentication, or are unreachable.",
+  title = "Your AI services are unavailable",
+  explanation = "Every AI you connected is out of quota, rejected its key, or could not be reached.",
 }: AiExhaustedModalProps) {
   if (!isOpen) return null;
 
@@ -28,18 +30,18 @@ export default function AiExhaustedModal({
       data-testid="ai-unavailable-dialog"
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
     >
-      <div className="bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-scale-in">
+      <div className="bg-[color:var(--surface-raised)] text-left border border-[color:var(--border-default)] rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-scale-in">
         {/* Warning Icon & Header */}
         <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-xl bg-[color:var(--state-warning-subtle)] text-[color:var(--state-warning)] border border-[color:var(--state-warning)]/30 flex items-center justify-center shrink-0 text-xl font-bold">
-            ⚠️
+          <div className="w-10 h-10 rounded-xl bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] flex items-center justify-center shrink-0" aria-hidden="true">
+            <PlugZap className="w-5 h-5" />
           </div>
           <div>
             <h3 id="ai-exhausted-title" className="text-base font-bold text-[color:var(--text-primary)]">
               {title}
             </h3>
             <p className="text-xs text-[color:var(--text-secondary)] mt-1">
-              Your workflow and current results are completely safe.
+              Your work is saved.
             </p>
           </div>
         </div>
@@ -47,9 +49,10 @@ export default function AiExhaustedModal({
         {/* Informational Body */}
         <div className="p-3.5 rounded-xl bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] text-xs text-[color:var(--text-primary)] leading-relaxed space-y-2">
           <p>{explanation}</p>
-          {errorMessage && (
-            <p className="font-mono text-[11px] text-[color:var(--state-danger)] border-t border-[color:var(--border-subtle)] pt-2">
-              Details: {errorMessage}
+          {/* Show the server's detail only when it adds something to the explanation. */}
+          {errorMessage && !explanation.toLowerCase().includes(errorMessage.toLowerCase().slice(0, 30)) && !/connect an ai/i.test(errorMessage) && (
+            <p className="text-xs text-[color:var(--text-secondary)] border-t border-[color:var(--border-subtle)] pt-2">
+              {errorMessage}
             </p>
           )}
         </div>
@@ -61,7 +64,7 @@ export default function AiExhaustedModal({
             onClick={onClose}
             className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[color:var(--surface-sunken)] hover:bg-[color:var(--surface-hover)] text-[color:var(--text-secondary)] text-xs font-semibold border border-[color:var(--border-subtle)] transition-colors cursor-pointer"
           >
-            Dismiss & Keep State
+            Not now
           </button>
 
           <button
@@ -72,7 +75,7 @@ export default function AiExhaustedModal({
             }}
             className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[color:var(--accent)] hover:bg-[color:var(--accent-hover)] text-[color:var(--text-inverse)] text-xs font-bold shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
           >
-            <span>⚙️</span> Configure AI Access
+            Open AI Access
           </button>
         </div>
       </div>

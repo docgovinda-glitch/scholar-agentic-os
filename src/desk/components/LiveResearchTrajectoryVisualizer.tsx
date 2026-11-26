@@ -1,18 +1,7 @@
 import { classifyResearchPrompt } from "../../config/askScholarConfig";
 import { frameworkForDiscipline } from "../../domain/ask/evidenceFramework";
 import React, { useState, useEffect } from "react";
-import {
-  Compass,
-  CheckCircle2,
-  Loader2,
-  ChevronDown,
-  ChevronUp,
-  Search,
-  Filter,
-  BarChart3,
-  ShieldCheck,
-  Square,
-} from "lucide-react";
+import { BarChart3, CheckCircle2, ChevronDown, ChevronUp, Compass, Filter, Loader2, Search, ShieldCheck, Square, Zap } from "lucide-react";
 import type { ResearchStageTelemetry } from "../api/types";
 import ScholarCoreLogo from "../../components/ScholarCoreLogo";
 
@@ -166,11 +155,11 @@ export const LiveResearchTrajectoryVisualizer: React.FC<LiveResearchTrajectoryVi
                   ? "Autonomous Deep Research Trajectory"
                   : "Live Multi-Source Literature Retrieval"}
               </span>
-              <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[10px] font-mono font-medium bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20 shrink-0">
+              <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-xs font-mono font-medium bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20 shrink-0">
                 {isLive ? `${secondsElapsed}s · Active` : `${stages.length || totalSteps} Stages Completed`}
               </span>
             </div>
-            <p className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate mt-0.5">
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate mt-0.5">
               {isLive
                 ? currentStep === "searching"
                   ? "Querying external academic indices and OpenAlex metadata..."
@@ -199,7 +188,7 @@ export const LiveResearchTrajectoryVisualizer: React.FC<LiveResearchTrajectoryVi
                   onStop();
                 }
               }}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 transition-opacity cursor-pointer shadow-2xs"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 transition-opacity cursor-pointer shadow-2xs"
               title="Stop research generation"
             >
               <Square className="w-2.5 h-2.5 fill-current" />
@@ -232,14 +221,14 @@ export const LiveResearchTrajectoryVisualizer: React.FC<LiveResearchTrajectoryVi
           >
             <div className="flex items-center justify-between gap-2 mb-1.5">
               <div className="flex items-center gap-2 min-w-0">
-                <span className="w-5 h-5 rounded-md bg-sky-500/10 text-sky-600 dark:text-sky-400 font-mono text-[11px] font-bold flex items-center justify-center shrink-0">
+                <span className="w-5 h-5 rounded-md bg-sky-500/10 text-sky-600 dark:text-sky-400 font-mono text-xs font-bold flex items-center justify-center shrink-0">
                   {activeStepIndex + 1}
                 </span>
                 <span className="text-[12.5px] font-semibold text-neutral-900 dark:text-neutral-100 truncate">
                   Stage {activeStepIndex + 1}: {currentStepData.label}
                 </span>
               </div>
-              <span className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/40 font-medium shrink-0 animate-pulse">
+              <span className="inline-flex items-center gap-1 text-xs font-mono px-2 py-0.5 rounded-full bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/40 font-medium shrink-0 animate-pulse">
                 <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
                 <span>Running</span>
               </span>
@@ -250,7 +239,7 @@ export const LiveResearchTrajectoryVisualizer: React.FC<LiveResearchTrajectoryVi
             </p>
 
             {foundCount > 0 && (
-              <div className="mt-2 pt-2 border-t border-neutral-100 dark:border-white/5 flex items-center gap-1.5 text-[11px] font-medium text-sky-700 dark:text-sky-300">
+              <div className="mt-2 pt-2 border-t border-neutral-100 dark:border-white/5 flex items-center gap-1.5 text-xs font-medium text-sky-700 dark:text-sky-300">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                 <span>
                   Found {foundCount} verified scholarly candidate{foundCount === 1 ? "" : "s"}
@@ -306,12 +295,12 @@ export const LiveResearchTrajectoryVisualizer: React.FC<LiveResearchTrajectoryVi
                         Stage {idx + 1}: {step.label}
                       </span>
                       {isCurrent && (
-                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-sky-500/20 text-sky-700 dark:text-sky-300 font-semibold animate-pulse">
+                        <span className="text-xs font-mono px-1.5 py-0.2 rounded-full bg-sky-500/20 text-sky-700 dark:text-sky-300 font-semibold animate-pulse">
                           Running
                         </span>
                       )}
                       {isPast && (
-                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-emerald-500/10 text-emerald-800 dark:text-emerald-300">
+                        <span className="text-xs font-mono px-1.5 py-0.2 rounded-full bg-emerald-500/10 text-emerald-800 dark:text-emerald-300">
                           Complete
                         </span>
                       )}
@@ -331,10 +320,10 @@ export const LiveResearchTrajectoryVisualizer: React.FC<LiveResearchTrajectoryVi
               <span className="text-[10.5px] font-bold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider block">
                 Decomposed Sub-Questions & Search Trajectory:
               </span>
-              <ul className="space-y-1 text-neutral-600 dark:text-neutral-400 text-[11px] pl-1">
+              <ul className="space-y-1 text-neutral-600 dark:text-neutral-400 text-xs pl-1">
                 {plan.map((step, sIdx) => (
                   <li key={sIdx} className="flex items-start gap-1.5">
-                    <span className="text-sky-500 font-bold shrink-0">⚡</span>
+                    <Zap className="font-bold shrink-0 w-4 h-4 shrink-0" aria-hidden="true" />
                     <span>{step}</span>
                   </li>
                 ))}

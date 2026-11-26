@@ -52,33 +52,39 @@ export function AuthHeading({
   title,
   subtitle,
   badge = "SCHOLAR CORE",
+  inDialog = false,
 }: {
   title: string;
   subtitle?: string;
   badge?: string;
+  /** Inside the sign-in dialog: the page behind already has its h1 and brand, so neither repeats. */
+  inDialog?: boolean;
 }) {
+  const Heading = inDialog ? "h2" : "h1";
   return (
     <header className="mb-4 text-left">
+      {!inDialog && (
       <div className="flex items-center gap-2">
         <div className="w-7 h-7 rounded-md bg-neutral-100 dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 flex items-center justify-center shrink-0">
           <ScholarCoreLogo size="sm" className="text-[color:var(--text-primary)]" />
         </div>
         <div className="flex flex-col">
           <div className="flex items-center gap-1.5">
-            <span className="text-[10.5px] font-bold tracking-wider uppercase text-neutral-800 dark:text-neutral-200 leading-none">
+            <span className="text-xs font-bold tracking-wider uppercase text-neutral-800 dark:text-neutral-200 leading-none">
               {badge}
             </span>
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
           </div>
-          <span className="text-[10.5px] text-neutral-500 dark:text-neutral-400 font-medium leading-tight mt-0.5">
+          <span className="text-xs text-neutral-500 dark:text-neutral-400 font-medium leading-tight mt-0.5">
             Research & Academic Workspace
           </span>
         </div>
       </div>
-      {/* h1 is the screen's own title for accessibility and page structure */}
-      <h1 className="mt-3 text-[22px] sm:text-[26px] font-semibold tracking-[-0.02em] leading-tight text-neutral-900 dark:text-white">
+      )}
+      {/* The screen's own title: h1 on a page, h2 inside the dialog */}
+      <Heading className={`${inDialog ? "" : "mt-3 "}text-[22px] sm:text-[26px] font-semibold tracking-[-0.02em] leading-tight text-neutral-900 dark:text-white`}>
         {title}
-      </h1>
+      </Heading>
       {subtitle && (
         <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
           {subtitle}
@@ -337,7 +343,7 @@ export function PhoneField({
           autoComplete="tel-national"
           value={number}
           required={required}
-          placeholder="e.g., 5551234567"
+          placeholder="Mobile number"
           onChange={(e) => onNumberChange(e.target.value)}
           onBlur={onBlur}
           className="prompt-bare-input border-0 bg-transparent w-full h-full px-3 text-sm text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 focus:outline-hidden"
@@ -454,7 +460,7 @@ export function AuthDivider() {
   return (
     <div className="relative flex items-center py-1.5">
       <div className="flex-grow border-t border-neutral-200 dark:border-white/10"></div>
-      <span className="shrink-0 px-3 text-[11px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+      <span className="shrink-0 px-3 text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
         Or continue with
       </span>
       <div className="flex-grow border-t border-neutral-200 dark:border-white/10"></div>

@@ -419,7 +419,7 @@ describe("Journal Rebuild Step B — 5-Mode Navigation, Mode 1 Word Budgeter & M
 
       // Target words matches blueprint 6,000 words
       expect(screen.getByTitle("Actual Words / Target Words")).toHaveTextContent("6,000");
-      expect(screen.getByTitle(/Autosave Status v3/i)).toHaveTextContent(/v3/);
+      expect(screen.getByTitle(/Autosave Status v3/i)).toHaveAttribute("aria-label", expect.stringContaining("version 3"));
     });
   });
 });

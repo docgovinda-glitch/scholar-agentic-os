@@ -1,3 +1,4 @@
+import { FileText } from "lucide-react";
 import { useDisplayName } from '../useDisplayIdentity';
 import { useState, useCallback, useEffect } from 'react';
 import type { SlideDeck, PresentationStudioStep } from '../../features/slides';
@@ -20,6 +21,7 @@ import ScholarSidebar, { type ScholarSidebarProject } from '../../components/nav
 import { useDeviceClass } from '../../hooks/useDeviceClass';
 import { useDeskSession } from '../useDeskSession';
 import { useProjectDocumentTitle } from '../documentTitle';
+import UserAccountMenu from '../components/UserAccountMenu';
 import { listProjects } from '../api/projectsApi';
 import { normalizeProjectList } from '../sidebarProjects';
 import GammaPlayer from '../../features/slides/gamma/GammaPlayer';
@@ -288,7 +290,7 @@ export default function PresentationWorkspace({
         data-testid="slide-card-empty-state"
       >
         <div className="max-w-xl w-full bg-white dark:bg-ink-750 p-8 rounded-3xl border border-neutral-200/80 dark:border-white/10 shadow-xl space-y-6 text-center">
-          <div className="text-4xl">📄</div>
+          <div className="text-4xl"><FileText className="inline-block w-3.5 h-3.5 mr-1 align-[-2px]" aria-hidden="true" /></div>
           <div className="space-y-1">
             <h2 className="text-xl font-bold">No Coursework Content Loaded</h2>
             <p className="text-xs text-neutral-500 dark:text-neutral-400">
@@ -372,15 +374,16 @@ export default function PresentationWorkspace({
         onSearchChange={setSidebarSearch}
         onSelectProject={(p) => goTo(`/projects/${p.id}`)}
         footer={
+          // The same account menu the main screen's sidebar uses.
           sessionEmail ? (
-            <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl bg-neutral-50 dark:bg-white/5 border border-neutral-200/60 dark:border-white/5" data-testid="user-profile-card">
-              <div className="w-7 h-7 rounded-full bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 flex items-center justify-center text-[11px] font-bold shrink-0">
-                {(displayName || sessionEmail).slice(0, 2).toUpperCase()}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold text-neutral-900 dark:text-white truncate">{displayName || sessionEmail}</p>
-                {displayName && <p className="text-[10px] text-neutral-600 dark:text-neutral-400 truncate">{sessionEmail}</p>}
-              </div>
+            <div data-testid="user-profile-card">
+            <UserAccountMenu
+              userEmail={sessionEmail}
+              userFullName={displayName || null}
+              onOpenAccountSettings={() => (onOpenAccountSettings ? onOpenAccountSettings() : goTo('/settings'))}
+              dropUp={true}
+              variant="sidebar"
+            />
             </div>
           ) : null
         }

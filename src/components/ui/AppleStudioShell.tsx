@@ -35,10 +35,6 @@ export const APPLE_STUDIO_STAGES: readonly AppleStudioStageItem[] = [
 ];
 
 export interface AppleStudioHeaderProps {
-  /** Deliverable code e.g. OT-01, OT-10, OT-07, OT-22 */
-  deliverableCode: string;
-  /** Deliverable human-readable badge label */
-  deliverableLabel: string;
   /** Project title */
   projectTitle: string;
   /** Optional handler when user edits title inline */
@@ -97,8 +93,6 @@ const PHASE_ICONS: Record<AppleStudioPhaseId, React.ComponentType<{ className?: 
  *   `<WorkspaceAutosaveBadge />`, Zen Focus Mode Toggle, and Inspector Toggle.
  */
 export function AppleStudioHeader({
-  deliverableCode,
-  deliverableLabel,
   projectTitle,
   onProjectTitleChange,
   activePhase,
@@ -143,33 +137,26 @@ export function AppleStudioHeader({
       role="toolbar"
       aria-label="Studio Workspace Chrome"
       data-testid="apple-studio-header"
-      // Below 640px the bar is two rows: Back, title and controls on top, the five
-      // mode tabs on their own full-width row, so nothing is pushed off-screen.
-      className="apple-glass-header px-3 sm:px-4 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2 sm:py-0 sm:h-14 flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-3 gap-y-2 shrink-0 z-30 select-none"
+      // Below 1280px the bar is two rows: Back, title and controls on top, the five
+      // mode tabs on their own full-width row, so nothing is pushed off-screen
+      // (one row overflowed at tablet width).
+      className="apple-glass-header px-3 sm:px-4 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2 xl:py-0 xl:h-14 flex flex-wrap xl:flex-nowrap items-center justify-between gap-x-3 gap-y-2 shrink-0 z-30 select-none"
     >
       {/* Left Zone: Back to Desk + Deliverable Type Badge + Inline Editable Project Title */}
-      <div className="flex items-center gap-2.5 min-w-[2rem] flex-1 sm:max-w-[32%] overflow-hidden">
+      <div className="flex items-center gap-2.5 min-w-[2rem] flex-1 xl:max-w-[32%] overflow-hidden">
         {onBack && (
           <button
             type="button"
             onClick={onBack}
             data-testid="studio-back-to-desk-btn"
-            aria-label="Back to Desk"
-            title="Back to Desk"
+            aria-label="Back to projects"
+            title="Back to projects"
             className="w-8 h-8 rounded-lg flex items-center justify-center text-secondary hover:text-primary hover:bg-surface-hover border border-transparent hover:border-border/70 transition-all duration-200 ease-out shrink-0 cursor-pointer"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
         )}
 
-        <span
-          data-testid="studio-deliverable-badge"
-          className="hidden xl:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-surface-hover text-primary border border-border/70 shrink-0"
-        >
-          <span className="font-mono text-accent">{deliverableCode}</span>
-          <span className="text-border">·</span>
-          <span>{deliverableLabel}</span>
-        </span>
 
         {isEditingTitle && onProjectTitleChange ? (
           <div className="flex items-center gap-1 min-w-0 flex-1">
@@ -225,9 +212,9 @@ export function AppleStudioHeader({
       {hidePhaseTabs ? <div className="flex-1" /> : (
       <div
         role="tablist"
-        aria-label="Studio cognitive stages"
+        aria-label="Workspace stages"
         data-testid="apple-studio-stage-pills"
-        className="apple-segmented-pill order-last basis-full sm:order-none sm:basis-auto min-w-0 shrink md:shrink-0 overflow-x-auto max-w-full"
+        className="apple-segmented-pill order-last basis-full xl:order-none xl:basis-auto min-w-0 shrink xl:shrink-0 overflow-x-auto max-w-full"
       >
         {APPLE_STUDIO_STAGES.map((stage) => {
           const Icon = PHASE_ICONS[stage.id];
@@ -248,7 +235,7 @@ export function AppleStudioHeader({
                 if (!isLocked) onPhaseSelect(stage.id);
               }}
               title={`${stage.number}. ${stage.label} — ${subtitle}${isLocked ? " (Complete prior stage first)" : ""}`}
-              className={`relative flex flex-1 sm:flex-none justify-center items-center gap-1.5 px-2.5 sm:px-3 py-2 sm:py-1 rounded-lg text-xs font-semibold tracking-tight transition-all duration-200 ease-out cursor-pointer ${
+              className={`relative flex flex-1 xl:flex-none justify-center items-center gap-1.5 px-2.5 sm:px-3 py-2 sm:py-1 rounded-lg text-xs font-semibold tracking-tight transition-all duration-200 ease-out cursor-pointer ${
                 isActive
                   ? "bg-surface text-primary shadow-xs border border-border/80"
                   : isLocked
@@ -257,8 +244,8 @@ export function AppleStudioHeader({
               }`}
             >
               <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-accent" : "text-tertiary"}`} />
-              {/* Icons only on phones; the tab keeps its name via aria-label. */}
-              <span className="hidden sm:inline">{stage.label}</span>
+              {/* On phones only the current stage shows its name, so the row fits. */}
+              <span className={isActive ? "inline" : "hidden sm:inline"}>{stage.label}</span>
             </button>
           );
         })}
@@ -274,7 +261,7 @@ export function AppleStudioHeader({
         {metricLabel && (
           <span
             data-testid="studio-live-metric-pill"
-            className="hidden 2xl:inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-mono font-medium bg-surface-hover text-secondary border border-border/60 shrink-0 whitespace-nowrap"
+            className="hidden 2xl:inline-flex items-center px-2.5 py-1 rounded-full text-xs font-mono font-medium bg-surface-hover text-secondary border border-border/60 shrink-0 whitespace-nowrap"
           >
             {metricLabel}
           </span>
@@ -286,7 +273,7 @@ export function AppleStudioHeader({
             onClick={onOpenAiAccess}
             data-testid="studio-ai-model-pill"
             title="Active AI Model & Routing Settings"
-            className="hidden 2xl:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-surface-hover hover:bg-surface text-secondary hover:text-primary border border-border/60 transition-all duration-200 ease-out shrink-0 cursor-pointer whitespace-nowrap"
+            className="hidden 2xl:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-surface-hover hover:bg-surface text-secondary hover:text-primary border border-border/60 transition-all duration-200 ease-out shrink-0 cursor-pointer whitespace-nowrap"
           >
             <Cpu className="w-3 h-3 text-accent shrink-0" />
             <span className="truncate max-w-[120px]">{aiModelLabel}</span>
@@ -315,7 +302,7 @@ export function AppleStudioHeader({
             }`}
           >
             {zenMode ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-            <span className="hidden md:inline text-[11px] font-semibold">Zen</span>
+            <span className="hidden md:inline text-xs font-semibold">Zen</span>
           </button>
         )}
 
@@ -334,7 +321,7 @@ export function AppleStudioHeader({
             }`}
           >
             <PanelRight className="w-3.5 h-3.5" />
-            <span className="hidden md:inline text-[11px] font-semibold">Inspector</span>
+            <span className="hidden md:inline text-xs font-semibold">Inspector</span>
           </button>
         )}
 

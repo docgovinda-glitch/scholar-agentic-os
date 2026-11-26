@@ -50,7 +50,7 @@ export default function QuestionsAndTitle({
         <ol className="space-y-2">
           {list.map((q, i) => (
             <li key={i} className="flex gap-2 items-start">
-              <span className="text-[11px] font-mono text-[color:var(--text-muted)] pt-2 w-8 shrink-0">RQ{i + 1}</span>
+              <span className="text-xs font-mono text-[color:var(--text-muted)] pt-2 w-8 shrink-0">RQ{i + 1}</span>
               <textarea aria-label={`Research question ${i + 1}`} rows={2} value={q} onChange={(e) => setAt(i, e.target.value)} placeholder="What do you want to find out?" className={`${field} resize-y`} />
               {list.length > 1 && (
                 <button type="button" aria-label={`Remove research question ${i + 1}`} onClick={() => onQuestions(list.filter((_, j) => j !== i))} className="p-2 rounded-lg hover:bg-[color:var(--surface-hover)] cursor-pointer">
@@ -81,7 +81,7 @@ export default function QuestionsAndTitle({
                 type="button"
                 onClick={() => onTitle(t)}
                 aria-pressed={t === title}
-                className="px-2.5 py-1 rounded-lg text-[11px] text-left border border-[color:var(--border-subtle)] bg-[color:var(--surface-sunken)] hover:bg-[color:var(--surface-hover)] text-[color:var(--text-secondary)] cursor-pointer"
+                className="px-2.5 py-1 rounded-lg text-xs text-left border border-[color:var(--border-subtle)] bg-[color:var(--surface-sunken)] hover:bg-[color:var(--surface-hover)] text-[color:var(--text-secondary)] cursor-pointer"
               >
                 {t}
               </button>

@@ -92,7 +92,7 @@ export default function PhoneProjectsList({
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block text-[13px] font-semibold text-neutral-900 dark:text-white truncate">{item.title}</span>
-                      {tile && <span className="block text-[11px] text-neutral-600 dark:text-neutral-400">{tile.label}</span>}
+                      {tile && <span className="block text-xs text-neutral-600 dark:text-neutral-400">{tile.label}</span>}
                     </span>
                     <ArrowRight className="w-4 h-4 shrink-0 text-neutral-500" aria-hidden="true" />
                   </button>

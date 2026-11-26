@@ -122,7 +122,7 @@ function SortableThumb({ slide, index, total, active, theme, onSelect, onMove, o
       >
         {/* Named by words, not by the miniature slide, whose text would be read out in full. */}
         <span className="sr-only">{`Slide ${index + 1}: ${slide.actionHeadline}`}</span>
-        <span aria-hidden="true" className={`w-4 pt-1 text-[11px] tabular-nums text-right shrink-0 ${active ? 'text-neutral-900 dark:text-white font-semibold' : 'text-neutral-400'}`}>{index + 1}</span>
+        <span aria-hidden="true" className={`w-4 pt-1 text-xs tabular-nums text-right shrink-0 ${active ? 'text-neutral-900 dark:text-white font-semibold' : 'text-neutral-400'}`}>{index + 1}</span>
         <span
           aria-hidden="true"
           className={`block flex-1 rounded-[10px] transition-shadow pointer-events-none ${
@@ -349,7 +349,7 @@ export default function Step03StudioCanvas({ projectId, deck, onUpdateDeck, onPr
       {/* Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500 dark:text-neutral-400">03 · Edit slides</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500 dark:text-neutral-400">03 · Edit slides</p>
           <p className="text-sm text-neutral-600 dark:text-neutral-300 mt-1">
             Slide {index + 1} of {slides.length} · click any text on the card to edit it
           </p>
@@ -503,7 +503,7 @@ export default function Step03StudioCanvas({ projectId, deck, onUpdateDeck, onPr
           )}
 
           <div className="rounded-2xl bg-white dark:bg-[#212121] ring-1 ring-neutral-900/[0.07] dark:ring-white/[0.07] p-4">
-            <label htmlFor={`notes-${slide.id}`} className="text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-500 dark:text-neutral-400">
+            <label htmlFor={`notes-${slide.id}`} className="text-xs font-semibold uppercase tracking-[0.12em] text-neutral-500 dark:text-neutral-400">
               Speaker notes
             </label>
             <textarea

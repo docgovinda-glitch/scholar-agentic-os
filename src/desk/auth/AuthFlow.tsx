@@ -176,6 +176,11 @@ export function SignInScreen({
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    // The button stays enabled; an empty form says what is missing instead of greying out.
+    if (!username.trim() || !password) {
+      setError(!username.trim() ? "Enter your username, email or mobile number." : "Enter your password.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -195,7 +200,7 @@ export function SignInScreen({
 
   return (
     <AuthShell className={embedded ? "w-full" : undefined} maxWidth={embedded ? "w-full" : "max-w-md"}>
-      <AuthHeading title="Sign in" subtitle="Reach your work." />
+      <AuthHeading title="Sign in" subtitle="Reach your work." inDialog={embedded} />
       <AuthForm onSubmit={handleSubmit}>
         <Field
           id="username"
@@ -203,7 +208,7 @@ export function SignInScreen({
           value={username}
           onChange={setUsername}
           autoComplete="username"
-          hint="Enter your username, email address, or mobile number in E.164 format (e.g., +15551234567)"
+          hint="For a mobile number, include the country code, e.g. +15551234567."
           autoFocus
         />
         <div>
@@ -222,7 +227,7 @@ export function SignInScreen({
         </div>
         <CaptchaWidget ref={captchaRef} onTokenReady={setCaptchaToken} />
         {error && <AuthError>{error}</AuthError>}
-        <SubmitButton busy={busy} busyLabel="Signing in…" disabled={!username.trim() || !password}>
+        <SubmitButton busy={busy} busyLabel="Signing in…" disabled={false}>
           Sign in
         </SubmitButton>
       </AuthForm>
@@ -388,6 +393,7 @@ export function SignUpScreen({
       <AuthHeading
         title="Create your account"
         subtitle="Verify your email to get started."
+        inDialog={embedded}
       />
       <AuthForm onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3.5 gap-y-2.5 items-start">
@@ -431,21 +437,27 @@ export function SignUpScreen({
             number={fields.phone}
             onNumberChange={set("phone")}
             onBlur={checkPhoneField}
+            required={false}
+            hint="Optional. Lets you sign in with your number."
             error={phoneStatus?.status === "taken" ? PHONE_TAKEN_MESSAGE : null}
           />
           <SelectField
             id="signup-userType"
-            label="User Type"
+            label="I am a"
             value={fields.userType}
             onChange={set("userType")}
             options={USER_TYPES}
+            required={false}
+            placeholder="Optional"
           />
           <SelectField
             id="signup-educationLevel"
-            label="Level of Education"
+            label="Level of study"
             value={fields.educationLevel}
             onChange={set("educationLevel")}
             options={EDUCATION_LEVELS}
+            required={false}
+            placeholder="Optional"
           />
           <Field
             id="signup-affiliation"
@@ -543,7 +555,7 @@ export function ForgotScreen({
 
   return (
     <AuthShell className={embedded ? "w-full" : undefined} maxWidth={embedded ? "w-full" : "max-w-md"}>
-      <AuthHeading title="Reset your password" subtitle="We will email you a link to set a new one." />
+      <AuthHeading title="Reset your password" subtitle="We will email you a link to set a new one." inDialog={embedded} />
       <AuthForm onSubmit={handleSubmit}>
         <Field id="reset-email" label="Email" type="email" value={email} onChange={setEmail} autoComplete="email" autoFocus />
         <CaptchaWidget ref={captchaRef} onTokenReady={setCaptchaToken} />

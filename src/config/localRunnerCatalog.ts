@@ -71,7 +71,7 @@ export const LOCAL_RUNNERS: LocalRunnerSpec[] = [
       "Ollama blocks browser requests from other origins by default. Set the environment variable OLLAMA_ORIGINS=* (or to this app's exact address) and fully quit and restart Ollama. On macOS: `launchctl setenv OLLAMA_ORIGINS \"*\"`, then quit Ollama from the menu bar and reopen it.",
     difficulty: "Easy",
     hasGui: false,
-    icon: "🦙",
+    icon: "◐",
   },
   {
     id: "lmstudio",
@@ -87,7 +87,7 @@ export const LOCAL_RUNNERS: LocalRunnerSpec[] = [
       "In LM Studio's Local Server tab, enable the 'Enable CORS' toggle before starting the server.",
     difficulty: "Easy",
     hasGui: true,
-    icon: "🖥",
+    icon: "▣",
   },
   {
     id: "jan",
@@ -103,7 +103,7 @@ export const LOCAL_RUNNERS: LocalRunnerSpec[] = [
       "In Jan's Settings → Local API Server, enable CORS before starting the server.",
     difficulty: "Easy",
     hasGui: true,
-    icon: "🌐",
+    icon: "◎",
   },
   {
     id: "localai",
@@ -119,7 +119,7 @@ export const LOCAL_RUNNERS: LocalRunnerSpec[] = [
       "Start LocalAI with the environment variable LOCALAI_CORS=true (add `-e LOCALAI_CORS=true` to the docker run command).",
     difficulty: "Moderate",
     hasGui: false,
-    icon: "📦",
+    icon: "▤",
   },
   {
     id: "llamacpp",
@@ -135,7 +135,7 @@ export const LOCAL_RUNNERS: LocalRunnerSpec[] = [
       "llama-server allows cross-origin requests by default. If you put it behind a reverse proxy, that proxy must forward the Access-Control-Allow-Origin header.",
     difficulty: "Advanced",
     hasGui: false,
-    icon: "⚙",
+    icon: "✱",
   },
   {
     id: "koboldcpp",
@@ -151,7 +151,7 @@ export const LOCAL_RUNNERS: LocalRunnerSpec[] = [
       "KoboldCPP permits cross-origin requests by default; no extra configuration is normally needed.",
     difficulty: "Easy",
     hasGui: true,
-    icon: "🐉",
+    icon: "◆",
   },
   {
     id: "vllm",
@@ -167,7 +167,7 @@ export const LOCAL_RUNNERS: LocalRunnerSpec[] = [
       "Start vLLM with `--allowed-origins '[\"*\"]'` (or your exact app address) so the browser's request is accepted.",
     difficulty: "Advanced",
     hasGui: false,
-    icon: "⚡",
+    icon: "▶",
   },
   {
     id: "textgenwebui",

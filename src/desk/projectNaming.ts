@@ -59,13 +59,14 @@ export const DEFAULT_FORMAT_LABELS: Record<string, string> = {
   "OT-06": "Thesis / Dissertation",
   "OT-07": "Thesis / Dissertation",
   "OT-10": "Journal Article",
+  "OT-15": "Research Proposal",
   "OT-20": "Dissertation",
   "OT-22": "Presentation",
 };
 
 export function getFormatLabel(outputTypeId?: string): string {
   if (!outputTypeId) return "Project";
-  return DEFAULT_FORMAT_LABELS[outputTypeId] || outputTypeId;
+  return DEFAULT_FORMAT_LABELS[outputTypeId] || "Project";
 }
 
 /** The first non-empty trimmed string among a project's answer keys, in order. */

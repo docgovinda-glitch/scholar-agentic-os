@@ -275,7 +275,7 @@ export default function Step01Understand({ projectId, deck, onUpdateDeck, onNext
   return (
     <div className="max-w-4xl mx-auto space-y-6 p-4 sm:p-6 text-neutral-900 dark:text-neutral-100 font-sans" data-testid="step-01-understand">
       <div>
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wide uppercase bg-neutral-100 dark:bg-white/10 text-neutral-800 dark:text-neutral-200">
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide uppercase bg-neutral-100 dark:bg-white/10 text-neutral-800 dark:text-neutral-200">
           Phase 1 · Understand
         </span>
         <h1 className="mt-1.5 text-xl sm:text-2xl font-semibold tracking-tight">Outline your presentation</h1>
@@ -295,7 +295,7 @@ export default function Step01Understand({ projectId, deck, onUpdateDeck, onNext
                 inputMode === mode ? 'bg-white dark:bg-[#2C2C2E] shadow-2xs font-semibold text-neutral-900 dark:text-white' : 'text-neutral-600 dark:text-neutral-400'
               }`}
             >
-              {mode === 'topic' ? 'Enter Topic or Question' : 'Upload Document (.pdf, .docx)'}
+              {mode === 'topic' ? 'Type a topic' : 'Upload a file'}
             </button>
           ))}
         </div>
@@ -318,7 +318,7 @@ export default function Step01Understand({ projectId, deck, onUpdateDeck, onNext
             <div className="flex items-center gap-2 min-w-0">
               <FileText className="w-4 h-4 text-emerald-600 shrink-0" />
               <span className="text-xs font-medium truncate">{fileName}</span>
-              {fileWords > 0 && <span className="text-[11px] text-neutral-600 shrink-0">{fileWords.toLocaleString()} words read</span>}
+              {fileWords > 0 && <span className="text-xs text-neutral-600 shrink-0">{fileWords.toLocaleString()} words read</span>}
             </div>
             <button type="button" onClick={removeFile} aria-label="Remove file" className="text-neutral-400 hover:text-red-500 cursor-pointer">
               <Trash2 className="w-4 h-4" />
@@ -378,6 +378,7 @@ export default function Step01Understand({ projectId, deck, onUpdateDeck, onNext
           </div>
           <div className="flex min-w-0 flex-col gap-1.5">
             <label htmlFor="talk-duration" className="block text-xs font-semibold">Talk duration</label>
+            <div className="relative">
             <select
               id="talk-duration"
               value={duration}
@@ -386,25 +387,30 @@ export default function Step01Understand({ projectId, deck, onUpdateDeck, onNext
                 setDuration(minutes);
                 onUpdateDeck({ ...deck, talkMinutes: minutes });
               }}
-              className="h-9 w-full sm:w-28 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#2C2C2E] px-3 text-xs font-medium cursor-pointer"
+              className="h-9 w-full sm:w-28 appearance-none rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#2C2C2E] px-3 pr-8 text-xs font-medium cursor-pointer"
             >
               {TALK_DURATION_OPTIONS.map((n) => (
                 <option key={n} value={n}>{n} min</option>
               ))}
             </select>
+            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-400" />
+            </div>
           </div>
           <div className="col-span-2 flex min-w-0 flex-col gap-1.5 sm:col-span-1">
             <label htmlFor="talk-context" className="block text-xs font-semibold">Presentation context</label>
+            <div className="relative">
             <select
               id="talk-context"
               value={context}
               onChange={(e) => setContext(e.target.value)}
-              className="h-9 w-full sm:w-auto sm:min-w-[11rem] rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#2C2C2E] px-3 text-xs font-medium cursor-pointer"
+              className="h-9 w-full sm:w-auto sm:min-w-[11rem] appearance-none rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#2C2C2E] px-3 pr-8 text-xs font-medium cursor-pointer"
             >
               {PRESENTATION_CONTEXTS.map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
+            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-400" />
+            </div>
           </div>
           <button
             type="button"
@@ -440,10 +446,8 @@ export default function Step01Understand({ projectId, deck, onUpdateDeck, onNext
               Write outline manually
             </button>
           )}
-          {!busy && (
-            <button type="button" onClick={() => setInputMode('upload')} className="h-8 rounded-xl px-3 text-neutral-600 dark:text-neutral-400 underline-offset-2 hover:underline cursor-pointer">
-              Import from a document instead
-            </button>
+          {!busy && !hasOutline && !topic.trim() && !rawText.trim() && (
+            <span className="text-neutral-600 dark:text-neutral-400">Type a topic or upload a file to generate an outline.</span>
           )}
         </div>
         {error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">{error}</p>}

@@ -36,7 +36,7 @@ function StepHeading({ n, title, done, hint }: { n: number; title: string; done:
       {done ? (
         <CheckCircle2 className="w-5 h-5 shrink-0 text-[color:var(--state-success)]" aria-label="Done" />
       ) : (
-        <span className="w-5 h-5 shrink-0 rounded-full border border-[color:var(--border-control)] text-[10px] font-bold flex items-center justify-center text-[color:var(--text-secondary)]">{n}</span>
+        <span className="w-5 h-5 shrink-0 rounded-full border border-[color:var(--border-control)] text-xs font-bold flex items-center justify-center text-[color:var(--text-secondary)]">{n}</span>
       )}
       <div>
         <h2 className="text-sm font-bold text-[color:var(--text-primary)]">
@@ -353,14 +353,14 @@ export default function ProtocolBlueprintMode() {
       aria-checked={path === p}
       onClick={() => setPath(p)}
       className={`flex-1 text-left p-4 rounded-xl border cursor-pointer transition-colors ${
-        path === p ? "border-[color:var(--accent)] ring-1 ring-[color:var(--accent)] bg-[color:var(--surface-raised)]" : "border-[color:var(--border-subtle)] bg-[color:var(--surface-sunken)] hover:border-[color:var(--border-control)]"
+        path === p ? "border-[color:var(--accent)] ring-1 ring-[color:var(--accent)] bg-[color:var(--surface-raised)]" : "border-[color:var(--border-default)] bg-[color:var(--surface-raised)] hover:border-[color:var(--border-control)]"
       }`}
     >
       <span className="flex items-center gap-2 text-xs font-bold text-[color:var(--text-primary)]">
         <Icon className="w-4 h-4" aria-hidden="true" />
         {label}
       </span>
-      <span className="block mt-1 text-[11px] text-[color:var(--text-secondary)]">{hint}</span>
+      <span className="block mt-1 text-xs text-[color:var(--text-secondary)]">{hint}</span>
     </button>
   );
 
@@ -375,16 +375,21 @@ export default function ProtocolBlueprintMode() {
       <div className="shrink-0 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-6 py-5">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[color:var(--accent)] text-[color:var(--text-inverse)]">Blueprint</span>
+            <span className="px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-[color:var(--accent)] text-[color:var(--text-inverse)]">Blueprint</span>
             <h1 className="text-xl font-bold text-[color:var(--text-primary)] mt-1">Plan your article</h1>
             <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">From an interest or your own topic to a locked plan: gap, questions, title, journal and word budget.</p>
           </div>
           <ol className="flex items-center gap-3 flex-wrap" aria-label="Blueprint steps">
             {steps.map((s, i) => (
-              <li key={s.label} className="flex items-center gap-1.5 text-[11px] font-semibold text-[color:var(--text-secondary)]">
-                {s.done ? <CheckCircle2 className="w-4 h-4 text-[color:var(--state-success)]" aria-hidden="true" /> : <Circle className="w-4 h-4" aria-hidden="true" />}
+              <li key={s.label} className="flex items-center gap-1.5 text-xs font-semibold text-[color:var(--text-secondary)]">
+                {/* A step marker, not an input: numbered until done, then a check. */}
+                {s.done ? (
+                  <CheckCircle2 className="w-4 h-4 text-[color:var(--state-success)]" aria-hidden="true" />
+                ) : (
+                  <span aria-hidden="true" className="inline-flex w-4 h-4 items-center justify-center rounded bg-[color:var(--surface-inset)] text-xs font-bold text-[color:var(--text-secondary)]">{i + 1}</span>
+                )}
                 <span>
-                  {i + 1}. {s.label}
+                  {s.label}
                   <span className="sr-only">{s.done ? " (done)" : " (to do)"}</span>
                 </span>
               </li>
@@ -447,7 +452,7 @@ export default function ProtocolBlueprintMode() {
                 suggestError={suggestError}
               />
               {suggestedQuestions.length > 0 && questions.some((q) => q.trim()) && (
-                <div className="text-[11px] text-[color:var(--text-secondary)] space-y-1" aria-label="Suggested questions">
+                <div className="text-xs text-[color:var(--text-secondary)] space-y-1" aria-label="Suggested questions">
                   <p className="font-semibold">Suggested questions (click to add):</p>
                   {suggestedQuestions
                     .filter((s) => !questions.includes(s))
@@ -495,7 +500,7 @@ export default function ProtocolBlueprintMode() {
           <details className="group rounded-xl border border-[color:var(--border-subtle)]" data-testid="manuscript-settings">
             <summary className="cursor-pointer select-none list-none px-4 py-3 flex flex-wrap items-center justify-between gap-2">
               <span className="text-xs font-bold text-[color:var(--text-primary)]">Customize manuscript defaults</span>
-              <span className="text-[11px] text-[color:var(--text-secondary)]">
+              <span className="text-xs text-[color:var(--text-secondary)]">
                 {(ARTICLE_TYPES.find((a) => a.id === articleType)?.label ?? "Article type not chosen")} · {targetTotalWords.toLocaleString()} words · {citationStyle} · {spellingLabel(orthography)}
                 <span className="ml-2 underline group-open:hidden">Change</span>
               </span>
@@ -522,7 +527,7 @@ export default function ProtocolBlueprintMode() {
                   </option>
                 ))}
               </select>
-              <span className="block text-[10px] text-[color:var(--text-muted)]">Structure: {template === "SystematicReview" ? "Systematic review" : template}</span>
+              <span className="block text-xs text-[color:var(--text-muted)]">Structure: {template === "SystematicReview" ? "Systematic review" : template}</span>
             </div>
             <div className="space-y-1.5">
               <label htmlFor="target-words-select" className="text-xs font-bold text-[color:var(--text-primary)]">
@@ -568,7 +573,7 @@ export default function ProtocolBlueprintMode() {
               </select>
             </div>
           </div>
-          <p className="px-4 pb-4 text-[11px] text-[color:var(--text-muted)]">
+          <p className="px-4 pb-4 text-xs text-[color:var(--text-muted)]">
             Saving a journal profile sets these from its guidelines; change them here if you know better.
             {answers["peer_review_format"] ? ` Review model: ${answers["peer_review_format"]}.` : ""}
           </p>
@@ -653,13 +658,13 @@ export default function ProtocolBlueprintMode() {
               </form>
               <div className="flex flex-wrap gap-1.5" aria-label="Example changes">
                 {["Add a section on policy implications", "Shorten the literature review", "Merge results and discussion", "Make it 8,000 words"].map((ex) => (
-                  <button key={ex} type="button" disabled={outlineBusy} onClick={() => void runOutline(ex)} className="px-2 py-0.5 rounded-md text-[11px] border border-[color:var(--border-subtle)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] cursor-pointer disabled:opacity-50">
+                  <button key={ex} type="button" disabled={outlineBusy} onClick={() => void runOutline(ex)} className="px-2 py-0.5 rounded-md text-xs border border-[color:var(--border-subtle)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] cursor-pointer disabled:opacity-50">
                     {ex}
                   </button>
                 ))}
               </div>
               {!isAiOutline(blueprint) && !blueprint.sections.every((s) => s.id.startsWith("jp-")) && (
-                <p className="text-[11px] text-[color:var(--state-warning)]">This is a generic starting outline, not one written for your article. Use “Write for my article with AI”.</p>
+                <p className="text-xs text-[color:var(--state-warning)]">This is a generic starting outline, not one written for your article. Use “Write for my article with AI”.</p>
               )}
 
               <div className="border border-[color:var(--border-subtle)] rounded-xl overflow-hidden divide-y divide-[color:var(--border-subtle)]">
@@ -674,7 +679,7 @@ export default function ProtocolBlueprintMode() {
                     {sec.subSections.map((sub, sIdx) => (
                       <div key={sub.id} className="px-4 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <span className="flex items-center gap-2 min-w-0 flex-1">
-                          <span className="text-[10px] font-mono text-[color:var(--text-muted)] shrink-0">
+                          <span className="text-xs font-mono text-[color:var(--text-muted)] shrink-0">
                             § {sec.order}.{sIdx + 1}
                           </span>
                           <input
@@ -702,7 +707,7 @@ export default function ProtocolBlueprintMode() {
                             }}
                             className="w-20 bg-[color:var(--surface-raised)] border border-[color:var(--border-control)] rounded-lg px-2 py-1 text-xs font-mono text-right text-[color:var(--text-primary)] outline-none"
                           />
-                          <span className="text-[10px] text-[color:var(--text-muted)] font-mono">words</span>
+                          <span className="text-xs text-[color:var(--text-muted)] font-mono">words</span>
                         </span>
                       </div>
                     ))}
@@ -719,7 +724,7 @@ export default function ProtocolBlueprintMode() {
               <button type="button" onClick={() => void runOutline()} disabled={outlineBusy || (!title.trim() && !problem.trim())} className="studio-btn studio-btn-primary">
                 {outlineBusy ? "Writing the table of contents…" : "Write my table of contents with AI"}
               </button>
-              {!title.trim() && !problem.trim() && <p className="text-[11px] text-[color:var(--text-muted)]">Add a working title or a research problem in step 1 first.</p>}
+              {!title.trim() && !problem.trim() && <p className="text-xs text-[color:var(--text-muted)]">Add a working title or a research problem in step 1 first.</p>}
             </div>
           )}
 
@@ -734,9 +739,9 @@ export default function ProtocolBlueprintMode() {
               Lock blueprint and continue to Evidence
             </button>
             {missing.length > 0 ? (
-              <span className="text-[11px] text-[color:var(--text-muted)]">Still needed: {missing.join(", ")}.</span>
+              <span className="text-xs text-[color:var(--text-muted)]">Still needed: {missing.join(", ")}.</span>
             ) : locked ? (
-              <span className="text-[11px] text-[color:var(--state-success)]">Locked. Editing any field above reopens it.</span>
+              <span className="text-xs text-[color:var(--state-success)]">Locked. Editing any field above reopens it.</span>
             ) : null}
           </div>
         </section>

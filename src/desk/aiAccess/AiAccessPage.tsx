@@ -1,3 +1,4 @@
+import { Globe } from "lucide-react";
 import { useMemo, useState, useEffect } from "react";
 import { isUndersizedForProse } from "../../platform/router/taskAffinity";
 import { routeDecision } from "./aiAccessApi";
@@ -73,6 +74,7 @@ export default function AiAccessPage({
   onSectionChange?: (section: SectionId) => void;
 }) {
   const access = useAiAccess();
+  const headerConnected = access.connected.length;
   const [internalSection, setInternalSection] = useState<SectionId>(normalizeSectionId(initialSection));
   const activeSection = normalizeSectionId(controlledSection ?? internalSection);
 
@@ -128,10 +130,16 @@ export default function AiAccessPage({
               >
                 Skip for now
               </button>
+              {/* Continue stays available (every stage is skippable) but is the main, filled
+                  action only once an AI is connected; before that it is a plain button. */}
               <button
                 type="button"
                 onClick={onContinue}
-                className="rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-4 py-2 text-sm font-semibold text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)]"
+                className={
+                  headerConnected > 0
+                    ? "rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-4 py-2 text-sm font-semibold text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)]"
+                    : "rounded-[var(--radius-md)] border border-[color:var(--border-control)] px-4 py-2 text-sm font-medium text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)]"
+                }
               >
                 Continue
               </button>
@@ -338,7 +346,7 @@ function ConnectionBadge({ kind, reach }: { kind: "cloud" | "local"; reach: Runn
   const label = kind === "cloud" ? "Connected" : reach === "reachable" ? "On this device" : reach === "unreachable" ? "Not reachable" : "Not checked";
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold border whitespace-nowrap ${
+      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold border whitespace-nowrap ${
         ok
           ? "border-[color:var(--state-success)] bg-[color:var(--state-success-subtle)] text-[color:var(--state-success)]"
           : "border-[color:var(--state-warning)] bg-[color:var(--state-warning-subtle)] text-[color:var(--state-warning)]"
@@ -396,8 +404,14 @@ function OverviewSection({
             <span className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">
               Providers
             </span>
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/60 whitespace-nowrap shrink-0">
-              {totalConnected > 0 ? `${totalConnected} connected` : "None"}
+            <span
+              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 border ${
+                totalConnected > 0
+                  ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-400 border-emerald-200/80 dark:border-emerald-800/60"
+                  : "bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-400 border-slate-200 dark:border-neutral-700"
+              }`}
+            >
+              {totalConnected > 0 ? `${totalConnected} connected` : "None yet"}
             </span>
           </div>
           <p className="text-xs text-slate-500 dark:text-neutral-400 leading-normal">
@@ -479,7 +493,7 @@ function OverviewSection({
                         {p.name}
                       </span>
                       {p.isDefault && (
-                        <span className="inline-flex items-center rounded-md px-1.5 py-0.25 text-[10px] font-bold uppercase tracking-wider bg-slate-100 dark:bg-neutral-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-neutral-700 shrink-0">
+                        <span className="inline-flex items-center rounded-md px-1.5 py-0.25 text-xs font-bold uppercase tracking-wider bg-slate-100 dark:bg-neutral-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-neutral-700 shrink-0">
                           Default
                         </span>
                       )}
@@ -638,7 +652,7 @@ function ProvidersSection({
     <div className="space-y-5">
       <SectionHeading
         title="Providers"
-        blurb="Connect local runners or cloud providers. Minimal cards display only essentials with unified connection setup."
+        blurb="Connect an AI that runs on your computer or a cloud provider you have a key for."
       />
 
       {/* Auto-detected Local Runner Banner */}
@@ -762,7 +776,7 @@ function ProvidersSection({
                 </div>
                 <div className="shrink-0 ml-auto flex items-center gap-1.5">
                   {isDefault && provider.connected && (provider.kind === "cloud" || runnerReach(provider.id) === "reachable") && (
-                    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold border border-amber-400/40 bg-amber-500/10 text-amber-600 dark:text-amber-400 shadow-2xs">
+                    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold border border-amber-400/40 bg-amber-500/10 text-amber-600 dark:text-amber-400 shadow-2xs">
                       ★ Primary
                     </span>
                   )}
@@ -770,7 +784,7 @@ function ProvidersSection({
                     <ConnectionBadge kind={provider.kind} reach={runnerReach(provider.id)} />
                   ) : (
                     <span
-                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium border ${
+                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium border ${
                         provider.tierBadge === "Free"
                           ? "border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]"
                           : provider.tierBadge === "Local"
@@ -1005,7 +1019,7 @@ function PreferencesSection({
           <div className="relative inline-block">
             <button
               type="button"
-              className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-[color:var(--border-control)] bg-[color:var(--surface-inset)] text-[11px] font-bold text-[color:var(--text-muted)] hover:border-[color:var(--accent-solid)] hover:text-[color:var(--text-primary)] focus:outline-none cursor-help"
+              className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-[color:var(--border-control)] bg-[color:var(--surface-inset)] text-xs font-bold text-[color:var(--text-muted)] hover:border-[color:var(--accent-solid)] hover:text-[color:var(--text-primary)] focus:outline-none cursor-help"
               aria-label="Learn more about encryption and privacy"
               onClick={() => setShowPrivacyTooltip((v) => !v)}
               onMouseEnter={() => setShowPrivacyTooltip(true)}
@@ -1019,7 +1033,7 @@ function PreferencesSection({
                 className="absolute bottom-full left-0 mb-2 w-80 rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-3 text-xs text-[color:var(--text-secondary)] shadow-lg z-30 space-y-1.5"
               >
                 <p className="font-semibold text-[color:var(--text-primary)]">Data Privacy & Key Encryption</p>
-                <ul className="space-y-1 text-[11px] text-[color:var(--text-muted)] list-disc pl-3">
+                <ul className="space-y-1 text-xs text-[color:var(--text-muted)] list-disc pl-3">
                   <li>Your API keys are saved to your account, each encrypted with its own key that is wrapped by a server-held master key, so they work on every device you sign in on. Each device keeps an encrypted copy in its browser storage. Removing a provider deletes its key from your account and, at their next sign-in, from your other devices.</li>
                   <li>When an AI step runs on Scholar Core&apos;s server (project agents, drafting, Ask Scholar and Deep Research), your key is sent over HTTPS in a request header for that request only, used in memory, and never logged or stored. Other requests never include it.</li>
                   <li>Local runners receive your text directly from this device; it never reaches Scholar Core&apos;s servers.</li>
@@ -1069,13 +1083,13 @@ function PreferencesSection({
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-sm font-semibold tracking-tight text-[color:var(--text-primary)]">
-              🌐 Live Web Search Grounding
+              <Globe className="inline-block w-3.5 h-3.5 mr-1 align-[-2px]" aria-hidden="true" />Live Web Search Grounding
             </h3>
             <p className="mt-0.5 text-xs text-[color:var(--text-muted)]">
               Answers in Ask Scholar are based on the latest search results.
             </p>
           </div>
-          <span className="text-[11px] font-mono text-sky-600 dark:text-sky-400 border border-sky-300 dark:border-sky-800/60 px-2 py-0.5 rounded-full bg-sky-50 dark:bg-sky-950/40">
+          <span className="text-xs font-mono text-sky-600 dark:text-sky-400 border border-sky-300 dark:border-sky-800/60 px-2 py-0.5 rounded-full bg-sky-50 dark:bg-sky-950/40">
             Always on
           </span>
         </div>

@@ -22,13 +22,13 @@ export default function JournalHeaderActions({
   return (
     <div className="flex items-center gap-1.5">
       <span
-        className="hidden 2xl:inline-flex items-center whitespace-nowrap px-2 py-1 rounded-lg text-[11px] font-mono tabular-nums text-[color:var(--text-secondary)] bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)]"
+        className="hidden 2xl:inline-flex items-center whitespace-nowrap px-2 py-1 rounded-lg text-xs font-mono tabular-nums text-[color:var(--text-secondary)] bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)]"
         title="Actual Words / Target Words"
       >
         {actualWords.toLocaleString()} / {targetWords.toLocaleString()} words
       </span>
       <span
-        className="hidden 2xl:inline-flex items-center whitespace-nowrap px-2 py-1 rounded-lg text-[11px] font-mono tabular-nums text-[color:var(--text-secondary)] bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)]"
+        className="hidden 2xl:inline-flex items-center whitespace-nowrap px-2 py-1 rounded-lg text-xs font-mono tabular-nums text-[color:var(--text-secondary)] bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)]"
         title="Verified Sources & User Datasets"
       >
         {sourcesCount} sources

@@ -1,3 +1,4 @@
+import { Lightbulb } from "lucide-react";
 import { useState, useMemo } from "react";
 import { resolveRunnerEndpoint, type LocalRunnerSpec } from "../../config/localRunnerCatalog";
 import { isRemoteHttpsEndpoint } from "../../platform/router/baseUrl";
@@ -245,7 +246,7 @@ export default function LocalRunnerDetail({
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-semibold text-[color:var(--text-primary)] truncate">{chk.label}</p>
-                  <p className="text-[11px] text-[color:var(--text-muted)] truncate">{chk.detail}</p>
+                  <p className="text-xs text-[color:var(--text-muted)] truncate">{chk.detail}</p>
                 </div>
               </div>
             ))}
@@ -272,14 +273,14 @@ export default function LocalRunnerDetail({
 
             {originSetupCommand && originSetupOs && (
               <div className="min-w-0 max-w-full rounded-lg bg-neutral-900 text-neutral-100 p-3 text-xs font-mono relative group">
-                <div className="flex items-center justify-between mb-1 text-[10px] text-neutral-400">
+                <div className="flex items-center justify-between mb-1 text-xs text-neutral-400">
                   <span className="uppercase font-bold">{originSetupOs} Command</span>
                   <button
                     type="button"
                     onClick={() => handleCopyCommand(originSetupCommand)}
                     className="text-emerald-400 hover:text-emerald-300 font-sans font-bold flex items-center gap-1"
                   >
-                    {copiedCmd ? "✓ Copied!" : "📋 Copy Command"}
+                    {copiedCmd ? "✓ Copied!" : "Copy Command"}
                   </button>
                 </div>
                 <div className="max-w-full overflow-x-auto whitespace-pre-wrap break-all text-emerald-400">
@@ -395,7 +396,7 @@ export default function LocalRunnerDetail({
               >
                 {filteredModels.map((m) => (
                   <option key={m.name} value={m.name}>
-                    {m.name} {m.formattedSize ? `(${m.formattedSize})` : ""} {m.isLocal ? "— 💻 Local" : "— ☁️ Cloud"}
+                    {m.name} {m.formattedSize ? `(${m.formattedSize})` : ""} {m.isLocal ? "— 💻 Local" : "— Cloud"}
                   </option>
                 ))}
               </select>
@@ -403,7 +404,7 @@ export default function LocalRunnerDetail({
               {diagnosis?.recommendedModel && (
                 <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs">
                   <span className="text-emerald-700 dark:text-emerald-300">
-                    💡 <strong>Recommended:</strong> {diagnosis.recommendedModel}
+                    <Lightbulb className="inline-block w-3.5 h-3.5 mr-1 align-[-2px]" aria-hidden="true" /><strong>Recommended:</strong> {diagnosis.recommendedModel}
                   </span>
                   {model !== diagnosis.recommendedModel && (
                     <button
@@ -492,7 +493,7 @@ export default function LocalRunnerDetail({
                 onClick={handleCopyDiagnostics}
                 className="text-xs font-bold text-[color:var(--accent-solid)] hover:underline flex items-center gap-1"
               >
-                {copiedReport ? "✓ Copied Report!" : "📋 Copy Diagnostics Report"}
+                {copiedReport ? "✓ Copied Report!" : "Copy Diagnostics Report"}
               </button>
             </div>
             <div className="text-xs font-mono space-y-1 text-[color:var(--text-secondary)] bg-[color:var(--surface-inset)] p-3 rounded-lg border border-[color:var(--border-subtle)] overflow-x-auto">

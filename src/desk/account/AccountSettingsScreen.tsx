@@ -4,7 +4,7 @@ import { resolveDisplayName } from "../../shared/userIdentity";
 import { getProfile, saveProfileFields, updatePassword, type ProfileFields } from "../../services/supabaseAuthService";
 import { EDUCATION_LEVELS, USER_TYPES } from "../../config/accountSchema";
 import { Field, PhoneField, SelectField } from "../auth/AuthLayout";
-import { e164Problem, DEFAULT_COUNTRY_ISO2, findCountry } from "../../config/countries";
+import { e164Problem, preferredCountryIso2, findCountry } from "../../config/countries";
 import CredentialResetNotice from "../security/CredentialResetNotice";
 
 export type SettingsTab = "personal" | "security" | "subscription";
@@ -97,7 +97,7 @@ export default function AccountSettingsScreen({
         if (result.success) {
           setProfile(result.profile);
           setFullName(result.profile.fullName);
-          const dialCode = result.profile.phoneCountryCode || findCountry(DEFAULT_COUNTRY_ISO2)?.dialCode || "+977";
+          const dialCode = result.profile.phoneCountryCode || findCountry(preferredCountryIso2())?.dialCode || "+977";
           setPhoneCountryCode(dialCode);
           // Strip duplicate dial code from stored phone
           setPhone(stripDialCode(dialCode, result.profile.phone || ""));
@@ -208,7 +208,7 @@ export default function AccountSettingsScreen({
             <h1 id="settings-dialog-title" className="text-base font-semibold tracking-tight text-[color:var(--text-primary)]">
               Account Settings
             </h1>
-            <span className="text-[10px] font-medium text-[color:var(--text-muted)] bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] px-2 py-0.5 rounded-full">
+            <span className="text-xs font-medium text-[color:var(--text-muted)] bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] px-2 py-0.5 rounded-full">
               Free Plan
             </span>
           </div>
@@ -296,7 +296,7 @@ export default function AccountSettingsScreen({
                 </svg>
                 <span>Subscription</span>
               </div>
-              <span className="text-[10px] px-1.5 py-0.2 rounded font-semibold bg-[color:var(--surface-raised)] text-[color:var(--text-muted)]">FREE</span>
+              <span className="text-xs px-1.5 py-0.2 rounded font-semibold bg-[color:var(--surface-raised)] text-[color:var(--text-muted)]">FREE</span>
             </button>
           </nav>
 
@@ -373,7 +373,7 @@ export default function AccountSettingsScreen({
                       </div>
                       <p
                         data-testid="profile-update-disabled-notice"
-                        className="mt-2.5 text-[11px] text-[color:var(--text-muted)] border-t border-[color:var(--border-subtle)] pt-2"
+                        className="mt-2.5 text-xs text-[color:var(--text-muted)] border-t border-[color:var(--border-subtle)] pt-2"
                       >
                         <span>Username cannot be changed.</span> <span>Email changes are paused for now.</span>
                       </p>

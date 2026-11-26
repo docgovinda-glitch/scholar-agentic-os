@@ -272,7 +272,7 @@ export function PostResponseActionBar({
             className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-800 dark:text-neutral-200 cursor-pointer flex items-center justify-between"
           >
             <span className="font-medium">BibTeX (.bib)</span>
-            <span className="text-[10px] text-neutral-400">LaTeX / Overleaf</span>
+            <span className="text-xs text-neutral-400">LaTeX / Overleaf</span>
           </button>
           <button
             type="button"
@@ -281,7 +281,7 @@ export function PostResponseActionBar({
             className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-800 dark:text-neutral-200 cursor-pointer flex items-center justify-between"
           >
             <span className="font-medium">RIS (.ris)</span>
-            <span className="text-[10px] text-neutral-400">Zotero / Mendeley / EndNote</span>
+            <span className="text-xs text-neutral-400">Zotero / Mendeley / EndNote</span>
           </button>
         </div>
       )}
@@ -294,7 +294,7 @@ export function PostResponseActionBar({
           data-testid="continue-workspace-picker"
           className="absolute right-0 bottom-full mb-1.5 z-40 w-72 max-w-[calc(100vw-2rem)] p-2 rounded-2xl bg-white dark:bg-ink-800 border border-neutral-200 dark:border-white/15 shadow-2xl space-y-1"
         >
-          <div className="px-2 py-1 text-[11px] font-medium text-neutral-500">
+          <div className="px-2 py-1 text-xs font-medium text-neutral-500">
             Continue in Workspace
           </div>
           {CONTINUE_WORKSPACE_OPTIONS.map((ws) => {

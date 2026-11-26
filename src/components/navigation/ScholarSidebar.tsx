@@ -171,7 +171,7 @@ export default function ScholarSidebar({
             </span>
             <span className="flex flex-col min-w-0 justify-center">
               <span className="font-extrabold text-sm tracking-tight text-neutral-900 dark:text-neutral-100 leading-tight truncate">Scholar Core</span>
-              <span className="text-[10px] font-medium text-neutral-600 dark:text-neutral-400 mt-0.5">Workspace</span>
+              <span className="text-xs font-medium text-neutral-600 dark:text-neutral-400 mt-0.5">Workspace</span>
             </span>
           </button>
 
@@ -246,7 +246,7 @@ export default function ScholarSidebar({
                     type="button"
                     onClick={onOpenCommandPalette}
                     data-compact="true"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 h-6 min-w-7 px-1.5 rounded bg-neutral-200 dark:bg-white/10 hover:bg-neutral-300 dark:hover:bg-white/20 text-[10px] font-mono font-semibold text-neutral-700 dark:text-neutral-200 cursor-pointer"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 h-6 min-w-7 px-1.5 rounded bg-neutral-200 dark:bg-white/10 hover:bg-neutral-300 dark:hover:bg-white/20 text-xs font-mono font-semibold text-neutral-700 dark:text-neutral-200 cursor-pointer"
                     title="Open Command Palette (⌘K)"
                   >
                     ⌘K

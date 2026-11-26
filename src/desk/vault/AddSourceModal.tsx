@@ -1,3 +1,5 @@
+import { AlertTriangle, BarChart3, Cloud, FileText, Folder, Lightbulb, Link2, NotebookPen, ShieldCheck, Sparkles } from "lucide-react";
+import { getProjectDisplayName } from "../projectNaming";
 /**
  * Add Source Modal — Streamlined 1-Step Fast Intake for Knowledge Vault.
  *
@@ -146,13 +148,7 @@ export default function AddSourceModal({
           const mapped = list
             .map((p: any) => ({
               id: p.projectId || p.id || p.title,
-              title:
-                p.title ||
-                p.answers?.working_title ||
-                p.answers?.title ||
-                p.answers?.research_question ||
-                p.name ||
-                (p.projectId ? `Project ${p.projectId.slice(0, 6)}` : undefined),
+              title: getProjectDisplayName(p, list),
             }))
             .filter((p: any) => Boolean(p.title));
           setOngoingProjects(mapped);
@@ -768,7 +764,7 @@ export default function AddSourceModal({
                 : "border-transparent text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
             }`}
           >
-            <span>🔗</span>
+            <Link2 className="w-4 h-4 shrink-0" aria-hidden="true" />
             <span>Link / DOI / Reference</span>
           </button>
 
@@ -781,7 +777,7 @@ export default function AddSourceModal({
                 : "border-transparent text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
             }`}
           >
-            <span className="text-sm">📁</span>
+            <Folder className="w-4 h-4 shrink-0" aria-hidden="true" />
             <span>Google Drive</span>
             {isGoogleConnected && (
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="Connected" />
@@ -797,7 +793,7 @@ export default function AddSourceModal({
                 : "border-transparent text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
             }`}
           >
-            <span className="text-sm">☁️</span>
+            <Cloud className="w-4 h-4 shrink-0" aria-hidden="true" />
             <span>OneDrive</span>
             {isOneDriveConnected && (
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="Connected" />
@@ -841,22 +837,22 @@ export default function AddSourceModal({
 
               {/* Quick Cloud Buttons Row */}
               <div className="flex items-center gap-2 pt-1">
-                <span className="text-[11px] text-[color:var(--text-muted)]">Or fetch from:</span>
+                <span className="text-xs text-[color:var(--text-muted)]">Or fetch from:</span>
                 <button
                   type="button"
                   onClick={() => setSourceMode("google_drive")}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-[color:var(--text-secondary)] bg-[color:var(--surface-inset)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-subtle)] rounded-[var(--radius-sm)] transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-[color:var(--text-secondary)] bg-[color:var(--surface-inset)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-subtle)] rounded-[var(--radius-sm)] transition-colors cursor-pointer"
                 >
-                  <span>📁</span>
+                  <Folder className="w-4 h-4 shrink-0" aria-hidden="true" />
                   <span>Google Drive</span>
                   {isGoogleConnected && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
                 </button>
                 <button
                   type="button"
                   onClick={() => setSourceMode("onedrive")}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-[color:var(--text-secondary)] bg-[color:var(--surface-inset)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-subtle)] rounded-[var(--radius-sm)] transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-[color:var(--text-secondary)] bg-[color:var(--surface-inset)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-subtle)] rounded-[var(--radius-sm)] transition-colors cursor-pointer"
                 >
-                  <span>☁️</span>
+                  <Cloud className="w-4 h-4 shrink-0" aria-hidden="true" />
                   <span>OneDrive</span>
                   {isOneDriveConnected && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
                 </button>
@@ -871,9 +867,9 @@ export default function AddSourceModal({
                 <>
                   <div className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-1.5 font-bold text-[color:var(--text-primary)]">
-                      <span>📁</span>
+                      <Folder className="w-4 h-4 shrink-0" aria-hidden="true" />
                       <span>Google Drive</span>
-                      <span className="text-[10px] font-semibold text-emerald-800 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded-full">
+                      <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded-full">
                         Connected ({googleAccount?.accountEmail})
                       </span>
                     </div>
@@ -882,7 +878,7 @@ export default function AddSourceModal({
                         href="https://drive.google.com"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-[11px] text-[color:var(--accent)] hover:underline flex items-center gap-0.5 cursor-pointer font-medium"
+                        className="text-xs text-[color:var(--accent)] hover:underline flex items-center gap-0.5 cursor-pointer font-medium"
                       >
                         <span>↗ Open Google Drive</span>
                       </a>
@@ -890,7 +886,7 @@ export default function AddSourceModal({
                         type="button"
                         onClick={() => loadFilesForProvider("google_drive")}
                         disabled={driveLoading}
-                        className="text-[11px] text-[color:var(--accent)] hover:underline cursor-pointer"
+                        className="text-xs text-[color:var(--accent)] hover:underline cursor-pointer"
                       >
                         {driveLoading ? "Refreshing…" : "↻ Refresh files"}
                       </button>
@@ -937,18 +933,18 @@ export default function AddSourceModal({
                             >
                               <span className="text-sm shrink-0">
                                 {file.mimeType?.includes("pdf")
-                                  ? "📄"
+                                  ? <FileText className="w-4 h-4 shrink-0" aria-hidden="true" />
                                   : file.mimeType?.includes("document")
-                                  ? "📝"
+                                  ? <NotebookPen className="w-4 h-4 shrink-0" aria-hidden="true" />
                                   : file.mimeType?.includes("spreadsheet")
-                                  ? "📊"
-                                  : "📁"}
+                                  ? <BarChart3 className="w-4 h-4 shrink-0" aria-hidden="true" />
+                                  : <Folder className="w-4 h-4 shrink-0" aria-hidden="true" />}
                               </span>
                               <span className="text-xs font-medium text-[color:var(--text-primary)] truncate">
                                 {file.name}
                               </span>
                               {isSelected && (
-                                <span className="text-[10px] font-bold text-emerald-800 dark:text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded-full shrink-0">
+                                <span className="text-xs font-bold text-emerald-800 dark:text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded-full shrink-0">
                                   ✓ Selected
                                 </span>
                               )}
@@ -960,7 +956,7 @@ export default function AddSourceModal({
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={(e) => e.stopPropagation()}
-                                className="px-2 py-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 rounded-[var(--radius-sm)] transition-colors flex items-center gap-0.5 cursor-pointer"
+                                className="px-2 py-0.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 rounded-[var(--radius-sm)] transition-colors flex items-center gap-0.5 cursor-pointer"
                                 title="Open directly in Google Drive"
                               >
                                 <span>↗ Open in Drive</span>
@@ -968,7 +964,7 @@ export default function AddSourceModal({
                               <button
                                 type="button"
                                 onClick={() => handleSelectDriveFile(file, "google_drive", true)}
-                                className={`px-2.5 py-0.5 text-[10px] font-semibold rounded-[var(--radius-sm)] transition-colors cursor-pointer ${
+                                className={`px-2.5 py-0.5 text-xs font-semibold rounded-[var(--radius-sm)] transition-colors cursor-pointer ${
                                   isSelected
                                     ? "bg-[color:var(--accent)] text-[color:var(--text-inverse)]"
                                     : "text-[color:var(--accent)] hover:bg-[color:var(--accent-subtle)]"
@@ -1006,10 +1002,10 @@ export default function AddSourceModal({
                 /* Google Drive Not Connected Setup Card */
                 <div className="flex flex-col gap-3 py-1">
                   <div className="flex items-center gap-2.5">
-                    <span className="text-2xl">📁</span>
+                    <Folder className="w-6 h-6 shrink-0" aria-hidden="true" />
                     <div>
                       <h3 className="text-xs font-bold text-[color:var(--text-primary)]">Connect Google Drive</h3>
-                      <p className="text-[11px] text-[color:var(--text-muted)]">
+                      <p className="text-xs text-[color:var(--text-muted)]">
                         Select and cite your research papers, notes, and datasets with zero document storage.
                       </p>
                     </div>
@@ -1021,7 +1017,7 @@ export default function AddSourceModal({
                     disabled={busy}
                     className="w-full py-2 bg-[color:var(--accent-solid)] hover:bg-[color:var(--accent-hover)] text-[color:var(--text-inverse)] text-xs font-bold rounded-[var(--radius-md)] flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-50 transition-colors"
                   >
-                    <span>📁</span>
+                    <Folder className="w-4 h-4 shrink-0" aria-hidden="true" />
                     <span>{busy ? "Connecting…" : "Connect Google Drive"}</span>
                   </button>
 
@@ -1054,9 +1050,9 @@ export default function AddSourceModal({
                 <>
                   <div className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-1.5 font-bold text-[color:var(--text-primary)]">
-                      <span>☁️</span>
+                      <Cloud className="w-4 h-4 shrink-0" aria-hidden="true" />
                       <span>Microsoft OneDrive</span>
-                      <span className="text-[10px] font-semibold text-emerald-800 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded-full">
+                      <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded-full">
                         Connected ({oneDriveAccount?.accountEmail})
                       </span>
                     </div>
@@ -1065,7 +1061,7 @@ export default function AddSourceModal({
                         href="https://onedrive.live.com"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-[11px] text-[color:var(--accent)] hover:underline flex items-center gap-0.5 cursor-pointer font-medium"
+                        className="text-xs text-[color:var(--accent)] hover:underline flex items-center gap-0.5 cursor-pointer font-medium"
                       >
                         <span>↗ Open OneDrive</span>
                       </a>
@@ -1073,7 +1069,7 @@ export default function AddSourceModal({
                         type="button"
                         onClick={() => loadFilesForProvider("onedrive")}
                         disabled={driveLoading}
-                        className="text-[11px] text-[color:var(--accent)] hover:underline cursor-pointer"
+                        className="text-xs text-[color:var(--accent)] hover:underline cursor-pointer"
                       >
                         {driveLoading ? "Refreshing…" : "↻ Refresh files"}
                       </button>
@@ -1120,18 +1116,18 @@ export default function AddSourceModal({
                             >
                               <span className="text-sm shrink-0">
                                 {file.mimeType?.includes("pdf")
-                                  ? "📄"
+                                  ? <FileText className="w-4 h-4 shrink-0" aria-hidden="true" />
                                   : file.mimeType?.includes("word") || file.name.endsWith(".docx")
-                                  ? "📝"
+                                  ? <NotebookPen className="w-4 h-4 shrink-0" aria-hidden="true" />
                                   : file.mimeType?.includes("sheet") || file.name.endsWith(".xlsx")
-                                  ? "📊"
-                                  : "☁️"}
+                                  ? <BarChart3 className="w-4 h-4 shrink-0" aria-hidden="true" />
+                                  : <Cloud className="w-4 h-4 shrink-0" aria-hidden="true" />}
                               </span>
                               <span className="text-xs font-medium text-[color:var(--text-primary)] truncate">
                                 {file.name}
                               </span>
                               {isSelected && (
-                                <span className="text-[10px] font-bold text-emerald-800 dark:text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded-full shrink-0">
+                                <span className="text-xs font-bold text-emerald-800 dark:text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded-full shrink-0">
                                   ✓ Selected
                                 </span>
                               )}
@@ -1143,7 +1139,7 @@ export default function AddSourceModal({
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={(e) => e.stopPropagation()}
-                                className="px-2 py-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 rounded-[var(--radius-sm)] transition-colors flex items-center gap-0.5 cursor-pointer"
+                                className="px-2 py-0.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 rounded-[var(--radius-sm)] transition-colors flex items-center gap-0.5 cursor-pointer"
                                 title="Open directly in OneDrive"
                               >
                                 <span>↗ Open in OneDrive</span>
@@ -1151,7 +1147,7 @@ export default function AddSourceModal({
                               <button
                                 type="button"
                                 onClick={() => handleSelectDriveFile(file, "onedrive", true)}
-                                className={`px-2.5 py-0.5 text-[10px] font-semibold rounded-[var(--radius-sm)] transition-colors cursor-pointer ${
+                                className={`px-2.5 py-0.5 text-xs font-semibold rounded-[var(--radius-sm)] transition-colors cursor-pointer ${
                                   isSelected
                                     ? "bg-[color:var(--accent)] text-[color:var(--text-inverse)]"
                                     : "text-[color:var(--accent)] hover:bg-[color:var(--accent-subtle)]"
@@ -1189,10 +1185,10 @@ export default function AddSourceModal({
                 /* OneDrive Not Connected Setup Card */
                 <div className="flex flex-col gap-3 py-1">
                   <div className="flex items-center gap-2.5">
-                    <span className="text-2xl">☁️</span>
+                    <Cloud className="w-6 h-6 shrink-0" aria-hidden="true" />
                     <div>
                       <h3 className="text-xs font-bold text-[color:var(--text-primary)]">Connect Microsoft OneDrive</h3>
-                      <p className="text-[11px] text-[color:var(--text-muted)]">
+                      <p className="text-xs text-[color:var(--text-muted)]">
                         Select and cite your Word documents, OneDrive PDFs, and research notes with zero file copies.
                       </p>
                     </div>
@@ -1200,7 +1196,7 @@ export default function AddSourceModal({
 
                   {/* Option A: Direct share link (zero setup required) */}
                   <div className="p-2.5 bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] flex flex-col gap-1.5">
-                    <label className="text-[11px] font-semibold text-[color:var(--text-primary)]">
+                    <label className="text-xs font-semibold text-[color:var(--text-primary)]">
                       Option 1: Paste OneDrive / SharePoint Link (Instant & Zero Setup)
                     </label>
                     <div className="flex items-center gap-2">
@@ -1224,7 +1220,7 @@ export default function AddSourceModal({
 
                   {/* Option B: Connect Workspace with Email */}
                   <div className="p-2.5 bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] flex flex-col gap-1.5">
-                    <label className="text-[11px] font-semibold text-[color:var(--text-primary)]">
+                    <label className="text-xs font-semibold text-[color:var(--text-primary)]">
                       Option 2: Connect with Microsoft / Institutional Email
                     </label>
                     <div className="flex items-center gap-2">
@@ -1254,7 +1250,7 @@ export default function AddSourceModal({
                       disabled={busy}
                       className="w-full py-2 bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] hover:bg-[color:var(--surface-hover)] text-[color:var(--text-primary)] text-xs font-semibold rounded-[var(--radius-md)] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 transition-colors"
                     >
-                      <span>☁️</span>
+                      <Cloud className="w-4 h-4 shrink-0" aria-hidden="true" />
                       <span>{busy ? "Connecting…" : "Sign In with Microsoft OAuth"}</span>
                     </button>
                   </div>
@@ -1265,12 +1261,12 @@ export default function AddSourceModal({
 
           {/* Fetch feedback or error */}
           {fetchStatus && (
-            <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+            <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
               {fetchStatus}
             </p>
           )}
           {error && (
-            <p className="text-[11px] text-[color:var(--state-danger)] font-medium">
+            <p className="text-xs text-[color:var(--state-danger)] font-medium">
               {error}
             </p>
           )}
@@ -1279,11 +1275,11 @@ export default function AddSourceModal({
           {cloudReference && (
             <div className="p-2.5 bg-[color:var(--accent-subtle)]/30 border border-[color:var(--border-subtle)] rounded-[var(--radius-md)] flex items-center justify-between text-xs">
               <div className="flex items-center gap-2 truncate">
-                <span>{cloudReference.provider === "google_drive" ? "📁" : "☁️"}</span>
+                <span>{cloudReference.provider === "google_drive" ? <Folder className="w-4 h-4 shrink-0" aria-hidden="true" /> : <Cloud className="w-4 h-4 shrink-0" aria-hidden="true" />}</span>
                 <span className="font-semibold text-[color:var(--text-primary)] truncate">
                   {cloudReference.fileName}
                 </span>
-                <span className="text-[10px] text-[color:var(--text-muted)] uppercase tracking-wide">
+                <span className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
                   ({cloudReference.provider === "google_drive" ? "Google Drive" : "OneDrive"})
                 </span>
               </div>
@@ -1293,7 +1289,7 @@ export default function AddSourceModal({
                     href={cloudReference.webUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 rounded-[var(--radius-sm)] transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 rounded-[var(--radius-sm)] transition-colors cursor-pointer"
                     title={`Open in ${cloudReference.provider === "google_drive" ? "Google Drive" : "OneDrive"}`}
                   >
                     <span>↗ Open in {cloudReference.provider === "google_drive" ? "Google Drive" : "OneDrive"}</span>
@@ -1302,7 +1298,7 @@ export default function AddSourceModal({
                 <button
                   type="button"
                   onClick={() => setCloudReference(undefined)}
-                  className="text-[11px] text-[color:var(--text-muted)] hover:text-red-500 cursor-pointer"
+                  className="text-xs text-[color:var(--text-muted)] hover:text-red-500 cursor-pointer"
                 >
                   ✕ Detach
                 </button>
@@ -1314,7 +1310,7 @@ export default function AddSourceModal({
           {duplicateWarning?.isDuplicate && !bypassDuplicate && (
             <div className="p-3 bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 rounded-[var(--radius-md)] text-xs flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 truncate">
-                <span>⚠️</span>
+                <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
                 <span className="truncate">
                   Already in Vault: <strong>"{duplicateWarning.existingItem?.title}"</strong>
                 </span>
@@ -1322,7 +1318,7 @@ export default function AddSourceModal({
               <button
                 type="button"
                 onClick={() => setBypassDuplicate(true)}
-                className="shrink-0 px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-[11px] font-semibold cursor-pointer"
+                className="shrink-0 px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-xs font-semibold cursor-pointer"
               >
                 Save Anyway
               </button>
@@ -1438,13 +1434,13 @@ export default function AddSourceModal({
               <span>{showExtras ? "▼" : "▶"}</span>
               <span>{showExtras ? "Hide tags and writing notes" : "+ Add tags or notes (optional)"}</span>
               {keyPoints.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.2 text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 rounded-full border border-amber-500/30">
-                  ✨ {keyPoints.length} from the abstract
+                <span className="ml-1 px-1.5 py-0.2 text-xs font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 rounded-full border border-amber-500/30">
+                  <Sparkles className="inline-block w-3.5 h-3.5 mr-1 align-[-2px]" aria-hidden="true" />{keyPoints.length} from the abstract
                 </span>
               )}
               {selectedProjects.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.2 text-[10px] font-semibold bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] rounded-full border border-[color:var(--border-subtle)]">
-                  📁 {selectedProjects.length}
+                <span className="ml-1 px-1.5 py-0.2 text-xs font-semibold bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] rounded-full border border-[color:var(--border-subtle)]">
+                  <Folder className="inline-block w-3.5 h-3.5 mr-1 align-[-2px]" aria-hidden="true" />{selectedProjects.length}
                 </span>
               )}
             </button>
@@ -1454,22 +1450,22 @@ export default function AddSourceModal({
                 {/* Tags */}
                 <div className="flex flex-col gap-1.5">
                   <div className="flex items-center justify-between">
-                    <label htmlFor="tag-input-field" className="text-[11px] font-bold text-[color:var(--text-secondary)] flex items-center gap-1.5">
+                    <label htmlFor="tag-input-field" className="text-xs font-bold text-[color:var(--text-secondary)] flex items-center gap-1.5">
                       <span>🏷️</span>
                       <span>Thematic Tags</span>
                     </label>
-                    <span className="text-[10px] text-[color:var(--text-muted)]">
+                    <span className="text-xs text-[color:var(--text-muted)]">
                       For library-wide search & AI synthesis
                     </span>
                   </div>
-                  <p className="text-[10px] text-[color:var(--text-muted)]">
+                  <p className="text-xs text-[color:var(--text-muted)]">
                     Cross-project keywords, methodologies, or research paradigms (e.g. <em>#mixed-methods</em>, <em>#climate-policy</em>, <em>#decoloniality</em>). Tags help you categorize and retrieve sources across all research projects.
                   </p>
                   <div className="flex flex-wrap gap-1 mb-1">
                     {tags.map((t) => (
                       <span
                         key={t}
-                        className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] text-[color:var(--text-secondary)]"
+                        className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] text-[color:var(--text-secondary)]"
                       >
                         #{t}
                         <button
@@ -1510,7 +1506,7 @@ export default function AddSourceModal({
 
                 {/* Writing note / why saved */}
                 <div className="flex flex-col gap-1">
-                  <label htmlFor="why-saved-input" className="text-[11px] font-bold text-[color:var(--text-secondary)]">
+                  <label htmlFor="why-saved-input" className="text-xs font-bold text-[color:var(--text-secondary)]">
                     Why are you saving this source?
                   </label>
                   <input
@@ -1525,7 +1521,7 @@ export default function AddSourceModal({
 
                 {/* Key quote */}
                 <div className="flex flex-col gap-1">
-                  <label htmlFor="key-quote-input" className="text-[11px] font-bold text-[color:var(--text-secondary)]">
+                  <label htmlFor="key-quote-input" className="text-xs font-bold text-[color:var(--text-secondary)]">
                     Key Quote
                   </label>
                   <textarea
@@ -1542,11 +1538,11 @@ export default function AddSourceModal({
                 <div className="flex flex-col gap-2 pt-2 border-t border-[color:var(--border-subtle)]">
                   <div className="flex items-center justify-between">
                     <div>
-                      <label className="text-[11px] font-bold text-[color:var(--text-secondary)] flex items-center gap-1.5">
-                        <span>💡</span>
+                      <label className="text-xs font-bold text-[color:var(--text-secondary)] flex items-center gap-1.5">
+                        <Lightbulb className="w-4 h-4 shrink-0" aria-hidden="true" />
                         <span>Key sentences from the abstract</span>
                       </label>
-                      <p className="text-[10px] text-[color:var(--text-muted)]">
+                      <p className="text-xs text-[color:var(--text-muted)]">
                         Core arguments and claims auto-fetched or saved for project writing and evidence.
                       </p>
                     </div>
@@ -1554,9 +1550,9 @@ export default function AddSourceModal({
                       type="button"
                       onClick={handleAutoExtractKeyPoints}
                       disabled={isAutoExtracting || !title.trim()}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold text-[color:var(--accent)] bg-[color:var(--surface-raised)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-default)] rounded-[var(--radius-sm)] transition-colors cursor-pointer disabled:opacity-40"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold text-[color:var(--accent)] bg-[color:var(--surface-raised)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-default)] rounded-[var(--radius-sm)] transition-colors cursor-pointer disabled:opacity-40"
                     >
-                      <span>✨</span>
+                      <Sparkles className="w-4 h-4 shrink-0" aria-hidden="true" />
                       <span>{isAutoExtracting ? "Extracting…" : "Auto-extract"}</span>
                     </button>
                   </div>
@@ -1612,15 +1608,15 @@ export default function AddSourceModal({
                 {/* Assign to Project(s) */}
                 <div className="flex flex-col gap-2 pt-2 border-t border-[color:var(--border-subtle)]">
                   <div className="flex items-center justify-between">
-                    <label htmlFor="project-selector-dropdown" className="text-[11px] font-bold text-[color:var(--text-secondary)] flex items-center gap-1.5">
-                      <span>📁</span>
+                    <label htmlFor="project-selector-dropdown" className="text-xs font-bold text-[color:var(--text-secondary)] flex items-center gap-1.5">
+                      <Folder className="w-4 h-4 shrink-0" aria-hidden="true" />
                       <span>Assign to Ongoing Project(s)</span>
                     </label>
-                    <span className="text-[10px] text-[color:var(--text-muted)] font-medium">
+                    <span className="text-xs text-[color:var(--text-muted)] font-medium">
                       In-text citations & reference lists
                     </span>
                   </div>
-                  <p className="text-[10px] text-[color:var(--text-muted)] leading-relaxed">
+                  <p className="text-xs text-[color:var(--text-muted)] leading-relaxed">
                     Select from your active research projects or assignments. Sources assigned to a project become directly available in that workspace for AI evidence extraction, literature matrix synthesis, in-text citations (e.g. <em>(Author, Year)</em>), and manuscript bibliographies.
                   </p>
 
@@ -1664,7 +1660,7 @@ export default function AddSourceModal({
                             type="button"
                             onClick={() => handleToggleProject(p)}
                             aria-label={`${isSelected ? "Remove from" : "Assign to"} ${p}`}
-                            className={`inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full border transition-all cursor-pointer ${
+                            className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border transition-all cursor-pointer ${
                               isSelected
                                 ? "bg-[color:var(--accent)] border-[color:var(--accent)] text-[color:var(--text-inverse)] font-bold shadow-xs"
                                 : "bg-[color:var(--surface-raised)] border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:border-[color:var(--border-strong)] hover:text-[color:var(--text-primary)]"
@@ -1682,10 +1678,10 @@ export default function AddSourceModal({
                   {selectedProjects.length > 0 && (
                     <div className="p-2.5 bg-[color:var(--accent-subtle)]/30 border border-[color:var(--accent)]/30 rounded-[var(--radius-md)] text-xs flex flex-col gap-1.5 animate-in fade-in duration-100">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-[color:var(--accent)] uppercase tracking-wider">
+                        <span className="text-xs font-bold text-[color:var(--accent)] uppercase tracking-wider">
                           Assigned to {selectedProjects.length} Project{selectedProjects.length > 1 ? "s" : ""}:
                         </span>
-                        <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-0.5">
+                        <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-0.5">
                           ✓ Integrated for citations & references
                         </span>
                       </div>
@@ -1693,9 +1689,9 @@ export default function AddSourceModal({
                         {selectedProjects.map((p) => (
                           <span
                             key={p}
-                            className="inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full bg-[color:var(--accent)] text-[color:var(--text-inverse)] font-medium"
+                            className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full bg-[color:var(--accent)] text-[color:var(--text-inverse)] font-medium"
                           >
-                            <span>📁 {p}</span>
+                            <span><Folder className="inline-block w-3.5 h-3.5 mr-1 align-[-2px]" aria-hidden="true" />{p}</span>
                             <button
                               type="button"
                               onClick={() => handleToggleProject(p)}
@@ -1741,8 +1737,8 @@ export default function AddSourceModal({
 
           {/* Footer Actions */}
           <div className="flex items-center justify-between pt-3 border-t border-[color:var(--border-subtle)]">
-            <span className="text-[11px] text-[color:var(--text-muted)] flex items-center gap-1">
-              <span>🛡️</span>
+            <span className="text-xs text-[color:var(--text-muted)] flex items-center gap-1">
+              <ShieldCheck className="w-4 h-4 shrink-0" aria-hidden="true" />
               <span>Zero document storage</span>
             </span>
             <div className="flex items-center gap-2">

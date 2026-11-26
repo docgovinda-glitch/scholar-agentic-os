@@ -75,7 +75,7 @@ export function UnderstandAngleAndVoice({ activeThesis, coreTopic, dispatchToneA
                           : "border-[color:var(--border-subtle)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)]"
                       }`}
                     >
-                      <span className="block text-[11px] font-semibold uppercase tracking-wide text-[color:var(--text-muted)]">AI suggestion{st.title ? ` · ${st.title}` : ""}</span>
+                      <span className="block text-xs font-semibold uppercase tracking-wide text-[color:var(--text-muted)]">AI suggestion{st.title ? ` · ${st.title}` : ""}</span>
                       <span className="block mt-0.5 text-[color:var(--text-primary)]">{st.statement}</span>
                     </button>
                   );
@@ -140,7 +140,7 @@ export function UnderstandAngleAndVoice({ activeThesis, coreTopic, dispatchToneA
               )}
               {suggestion && (
                 <div className="rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]/70 p-3 space-y-2" data-testid="thesis-suggestion">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--text-muted)]">AI suggestion</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-muted)]">AI suggestion</p>
                   <p className="text-sm text-[color:var(--text-primary)]">{suggestion.thesis}</p>
                   {suggestion.note && <p className="text-xs text-[color:var(--text-muted)]">{suggestion.note}</p>}
                   <div className="flex gap-2">

@@ -361,7 +361,7 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
 
           {!showNotesEditor && source.userNotes && (
             <p className="mt-1.5 text-xs text-[color:var(--text-secondary)] bg-amber-500/[0.07] p-2.5 rounded-lg border border-amber-500/20 italic">
-              "📝 {source.userNotes}"
+              "{source.userNotes}"
             </p>
           )}
         </div>

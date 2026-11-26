@@ -98,7 +98,7 @@ export default function PolishDialog({
         <div className="px-5 py-3 border-b border-[color:var(--border-subtle)] flex items-center justify-between gap-3">
           <div className="min-w-0">
             <h3 id="polish-heading" className="text-sm font-semibold text-[color:var(--text-primary)]">Polished text: review before applying</h3>
-            <p id="polish-summary" className="text-[11px] text-[color:var(--text-muted)]">
+            <p id="polish-summary" className="text-xs text-[color:var(--text-muted)]">
               {unchanged
                 ? `No changes were suggested for ${scopeLabel}.`
                 : changes
@@ -112,11 +112,11 @@ export default function PolishDialog({
         </div>
         <div className="grid md:grid-cols-2 gap-4 p-5 overflow-y-auto text-sm leading-relaxed">
           <div>
-            <div className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--text-muted)] mb-1">Yours</div>
+            <div className="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)] mb-1">Yours</div>
             <p className="whitespace-pre-wrap text-[color:var(--text-secondary)]">{marked("original")}</p>
           </div>
           <div>
-            <div className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--text-muted)] mb-1">Polished</div>
+            <div className="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)] mb-1">Polished</div>
             <p className="whitespace-pre-wrap text-[color:var(--text-primary)]">{marked("revised")}</p>
           </div>
           {notes.length > 0 && (
