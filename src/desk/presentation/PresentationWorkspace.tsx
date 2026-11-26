@@ -13,6 +13,7 @@ import {
 } from '../../features/slides';
 import { authedFetch, getProject, isEphemeralProject, saveIntakeAnswers } from '../api';
 import { useDeckAutosave } from './useDeckAutosave';
+import { readSavedQaQuestions } from './savedQa';
 import { composeDeckFromText, composeDeckFromTopic } from '../../features/slides/gamma/composer';
 import { normalizeDeck } from '../../features/slides/gamma/content';
 import ScholarSidebar, { type ScholarSidebarProject } from '../../components/navigation/ScholarSidebar';
@@ -171,13 +172,7 @@ export default function PresentationWorkspace({
         const a = project.answers || {};
 
         // Hydrate Q&A history if available
-        if (a['presentationQaHistory']) {
-          try {
-            const raw = a['presentationQaHistory'];
-            if (Array.isArray(raw)) setSavedQaQuestions(raw);
-            else if (typeof raw === 'string') setSavedQaQuestions(JSON.parse(raw));
-          } catch {}
-        }
+        if (a['presentationQaHistory']) setSavedQaQuestions(readSavedQaQuestions(a['presentationQaHistory']));
 
         // Check if saved deck exists in project answers or backend deck endpoint
         let savedDeck: SlideDeck | null = null;

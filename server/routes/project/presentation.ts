@@ -22,6 +22,7 @@ import {
   normalizeUnicodeNFC,
 } from "../../src/utils/scholarlyVoiceGuard.ts";
 import { scholarBrain } from "../../src/services/scholarBrain.ts";
+import { abortOnClose } from "../../src/utils/abortOnClose.ts";
 import {
   BrowserAiRequiredError,
   InvalidLlmChallengeError,
@@ -360,6 +361,7 @@ router.post(
           visualTypes: VISUAL_TYPES,
           instruction: instruction || undefined,
           current,
+          signal: abortOnClose(req),
         });
         const parsed = outlineSchema.safeParse(raw);
         if (parsed.success) {
@@ -387,6 +389,8 @@ router.post(
         if (aiErr instanceof BrowserAiRequiredError || aiErr instanceof InvalidLlmChallengeError) {
           return sendAiFailure(res, aiErr, "Presentation outline");
         }
+        // The presenter stopped it or left: nothing more to do for a closed request.
+        if (abortOnClose(req).aborted) return;
         console.warn("[project/presentation.ts] AI outline fallback:", aiErr);
       }
     }
@@ -410,7 +414,7 @@ router.post(
     const slideTitle = str(body.slideTitle, 200).trim();
     const context = str(body.context, 4000);
     try {
-      const raw = (await scholarBrain.writeSlideBlock({ req, kind, slideTitle, context, existing: str(body.existing, 400) || undefined })) as { title?: unknown; body?: unknown } | null;
+      const raw = (await scholarBrain.writeSlideBlock({ req, kind, slideTitle, context, existing: str(body.existing, 400) || undefined, signal: abortOnClose(req) })) as { title?: unknown; body?: unknown } | null;
       const title = typeof raw?.title === "string" ? raw.title.trim() : "";
       const text = typeof raw?.body === "string" ? raw.body.trim() : "";
       if (!title && !text) throw new UnusableAiResponseError("slide block");
@@ -420,6 +424,7 @@ router.post(
         body: normalizeUnicodeNFC(sanitizeScholarlyText(stripCourseCodes(text))),
       });
     } catch (err) {
+      if (abortOnClose(req).aborted) return;
       return sendAiFailure(res, err, "Slide block");
     }
   })
@@ -549,6 +554,7 @@ router.post(
           systemPrompt,
           userPrompt,
           responseFormat: "json",
+          signal: abortOnClose(req),
         });
 
         const rawJson = brainRes.parsedJson || (brainRes.text ? JSON.parse(brainRes.text.replace(/```json/g, "").replace(/```/g, "").trim()) : null);
@@ -578,6 +584,8 @@ router.post(
         if (aiErr instanceof BrowserAiRequiredError || aiErr instanceof InvalidLlmChallengeError) {
           return sendAiFailure(res, aiErr, "Presentation deck");
         }
+        // The presenter stopped it or left: do not build and save a fallback deck nobody is waiting for.
+        if (abortOnClose(req).aborted) return;
         console.warn("[project/presentation.ts] AI deck generation fallback:", aiErr);
       }
     }
@@ -711,6 +719,7 @@ router.post(
           systemPrompt,
           userPrompt,
           responseFormat: "json",
+          signal: abortOnClose(req),
         });
 
         const rawJson = brainRes.parsedJson || (brainRes.text ? JSON.parse(brainRes.text.replace(/```json/g, "").replace(/```/g, "").trim()) : null);
@@ -736,6 +745,7 @@ router.post(
         }
       } catch (aiErr) {
         // No stand-in questions: the user sees that nothing was generated.
+        if (abortOnClose(req).aborted) return;
         return sendAiFailure(res, aiErr, "Audience questions");
       }
     }

@@ -208,4 +208,17 @@ describe("Presentation Studio Endpoints (/api/projects/:id/presentation)", () =>
     expect(saved?.answers["speaker_notes_style"]).toBe("short");
     expect(saved?.answers["presentation_deck"]).toBeTruthy();
   });
+
+  it("passes an abort signal to the model on the routes that call it, so closing the request stops it", async () => {
+    const projectId = await createPresentationProject();
+    const complete = vi.spyOn(scholarBrain, "complete").mockResolvedValue({ text: "", parsedJson: { title: "t", body: "b", qaScenarios: [] } } as never);
+    await request(app).post(`/api/projects/${projectId}/presentation/write-block`).send({ kind: "Key Insight Card", slideTitle: "Sleep", context: "Sleep matters." });
+    await request(app).post(`/api/projects/${projectId}/presentation/qa-simulate`).send({ title: "Sleep", deck: { slides: [{ actionHeadline: "Sleep", blocks: [] }] } });
+    expect(complete.mock.calls.length).toBeGreaterThanOrEqual(2);
+    for (const [options] of complete.mock.calls) {
+      expect((options as { signal?: unknown }).signal, "a model call without an abort signal").toBeInstanceOf(AbortSignal);
+    }
+    complete.mockRestore();
+  });
 });
+

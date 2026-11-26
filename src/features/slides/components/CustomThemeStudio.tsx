@@ -28,6 +28,8 @@ import { applyDeckTheme } from '../services/deckProgressionService';
 import {
   getStoredCustomThemes,
   saveCustomThemeToStorage,
+  removeCustomThemeFromStorage,
+  parseThemeJson,
   generateThemeFromPrompt,
 } from '../services/themeExtractorService';
 import { recreateDeckFromFile, type RecreatedDeckResult } from '../services/deckRecreatorService';
@@ -294,20 +296,21 @@ export default function CustomThemeStudio({
 
   const handleSaveToStorage = () => {
     const theme = buildCurrentThemeObject();
-    saveCustomThemeToStorage(theme);
+    if (!saveCustomThemeToStorage(theme)) {
+      showAppToast('Your browser would not store the theme (storage is full or switched off), so it was not saved.', 'warning', 7000);
+      return;
+    }
     setSavedThemes(getStoredCustomThemes());
     showToast(`✓ Saved "${theme.name}" to your Library!`);
   };
 
   const handleDeleteSavedTheme = (themeId: string) => {
-    const filtered = savedThemes.filter((t) => t.id !== themeId);
-    try {
-      localStorage.setItem('scholar_os_custom_slide_themes', JSON.stringify(filtered));
-      setSavedThemes(filtered);
-      showToast('Deleted custom theme from library.');
-    } catch (err) {
-      console.error(err);
+    if (!removeCustomThemeFromStorage(themeId)) {
+      showAppToast('The theme could not be removed: your browser would not update its storage.', 'warning', 7000);
+      return;
     }
+    setSavedThemes(getStoredCustomThemes());
+    showToast('Deleted custom theme from library.');
   };
 
   const handleExportJson = (themeToExport?: SlideTheme) => {
@@ -337,31 +340,26 @@ export default function CustomThemeStudio({
   };
 
   const handleImportJson = () => {
-    try {
-      const parsed = JSON.parse(jsonInput);
-      const data = parsed.theme || parsed;
-
-      if (!data.name || !data.accent) {
-        throw new Error('Invalid theme JSON structure. Must contain name and accent.');
-      }
-
-      setThemeName(data.name || 'Imported Custom Theme');
-      if (data.mode) setMode(data.mode);
-      if (data.canvasBg) setCanvasBg(data.canvasBg);
-      if (data.cardBg) setCardBg(data.cardBg);
-      if (data.accent) setAccent(data.accent);
-      if (data.textPrimary) setTextPrimary(data.textPrimary);
-      if (data.textSecondary) setTextSecondary(data.textSecondary);
-      if (data.fontFamily) setFontFamily(data.fontFamily);
-      if (data.visualMotif) setVisualMotif(data.visualMotif);
-      if (data.category) setCategory(data.category);
-
-      setShowJsonModal(false);
-      setJsonInput('');
-      showToast(`✓ Successfully imported "${data.name}"!`);
-    } catch (err: any) {
-      showAppToast(`Import Failed: ${err.message || 'Invalid JSON format'}`, 'error');
+    const result = parseThemeJson(jsonInput);
+    if (!result.ok) {
+      showAppToast(`Import failed: ${result.error}`, 'error');
+      return;
     }
+    const data = result.theme;
+    setThemeName(data.name);
+    if (data.mode) setMode(data.mode);
+    if (data.canvasBg) setCanvasBg(data.canvasBg);
+    if (data.cardBg) setCardBg(data.cardBg);
+    setAccent(data.accent);
+    if (data.textPrimary) setTextPrimary(data.textPrimary);
+    if (data.textSecondary) setTextSecondary(data.textSecondary);
+    if (data.fontFamily) setFontFamily(data.fontFamily);
+    if (data.visualMotif) setVisualMotif(data.visualMotif);
+    if (data.category) setCategory(data.category);
+
+    setShowJsonModal(false);
+    setJsonInput('');
+    showToast(`✓ Successfully imported "${data.name}"!`);
   };
 
   const applyPreset = (preset: typeof DESIGNER_PRESETS[0]) => {

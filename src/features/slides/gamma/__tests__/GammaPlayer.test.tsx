@@ -80,5 +80,45 @@ describe('GammaPlayer (full-screen presenter)', () => {
     render(<GammaPlayer deck={{ ...deck, talkMinutes: undefined }} initialPresenter onClose={vi.fn()} />);
     expect(screen.queryByTestId('rehearsal-pace')).not.toBeInTheDocument();
   });
-});
 
+  it('leaves browser shortcuts alone: Ctrl/Cmd/Alt combinations neither move slides nor toggle full screen', () => {
+    const requestFullscreen = vi.fn().mockResolvedValue(undefined);
+    HTMLElement.prototype.requestFullscreen = requestFullscreen;
+    render(<GammaPlayer deck={deck} initialSlideIndex={1} onClose={vi.fn()} />);
+    for (const init of [{ key: 'f', ctrlKey: true }, { key: 'f', metaKey: true }, { key: 'ArrowLeft', altKey: true }, { key: 'ArrowRight', ctrlKey: true }, { key: 'r', ctrlKey: true }]) {
+      fireEvent.keyDown(window, init);
+    }
+    expect(requestFullscreen).not.toHaveBeenCalled();
+    expect(screen.getAllByText('2 / 3').length).toBeGreaterThan(0);
+    // The plain keys still work.
+    fireEvent.keyDown(window, { key: 'f' });
+    expect(requestFullscreen).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets Space and Enter press the focused button instead of also advancing the slide', () => {
+    const onClose = vi.fn();
+    render(<GammaPlayer deck={deck} initialSlideIndex={0} onClose={onClose} />);
+    const exit = screen.getByRole('button', { name: 'Exit Presentation' });
+    exit.focus();
+    fireEvent.keyDown(exit, { key: ' ' });
+    fireEvent.keyDown(exit, { key: 'Enter' });
+    expect(screen.getAllByText('1 / 3').length).toBeGreaterThan(0);
+    // Off a control, Space still advances.
+    fireEvent.keyDown(window, { key: ' ' });
+    expect(screen.getAllByText('2 / 3').length).toBeGreaterThan(0);
+  });
+
+  it('brings the control bar back on a touch, not only on a mouse move', () => {
+    vi.useFakeTimers();
+    try {
+      render(<GammaPlayer deck={deck} onClose={vi.fn()} />);
+      const bar = () => screen.getByText(/Audience Mode/i).parentElement!;
+      act(() => { vi.advanceTimersByTime(3000); });
+      expect(bar().className).toContain('opacity-0');
+      act(() => { fireEvent.pointerDown(window); });
+      expect(bar().className).toContain('opacity-100');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

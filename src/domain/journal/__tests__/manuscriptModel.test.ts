@@ -58,6 +58,13 @@ describe("manuscriptModel", () => {
     expect(sectionKind("Related Work")).toBe("literature");
   });
 
+  it("calls a section an abstract only when it is one: 'Summary of Findings' is a results section", () => {
+    for (const title of ["Abstract", "Structured Abstract", "Summary", "Executive Summary", "Plain Language Summary"]) expect(sectionKind(title), title).toBe("abstract");
+    expect(sectionKind("Summary of Findings")).toBe("results");
+    expect(sectionKind("Summary and Conclusions")).toBe("conclusion");
+    expect(sectionKind("Summary of the Evidence")).not.toBe("abstract");
+  });
+
   it("splits an earlier single-document draft by its sub-section headings and keeps unmatched text", () => {
     const units = manuscriptUnits(blueprint);
     const legacy = [

@@ -21,6 +21,21 @@ describe("section word budgets", () => {
   });
 });
 
+describe("trimToSentenceWithinWords: abbreviations at the cut", () => {
+  it("does not stop on 'et al.' or 'e.g.' as if it ended a sentence", () => {
+    const text = "The first finding is clear and well supported. Later work confirmed it, as shown by Smith et al. and then by many others across the field.";
+    // Cut falls right after "et al.", which is not the end of that sentence.
+    const out = trimToSentenceWithinWords(text, 18);
+    expect(out).toBe("The first finding is clear and well supported.");
+    const eg = trimToSentenceWithinWords("Sleep matters for recall. Many factors matter, e.g. caffeine intake and light exposure at night.", 8);
+    expect(eg).toBe("Sleep matters for recall.");
+  });
+
+  it("still ends on a real sentence that finishes with etc. or a normal word", () => {
+    expect(trimToSentenceWithinWords("We measured sleep, mood, memory, etc. The rest follows from that and more words here.", 6)).toBe("We measured sleep, mood, memory, etc.");
+  });
+});
+
 describe("repeatsDraft", () => {
   it("accepts new analysis and rejects a restatement", () => {
     const draft = "Central banks set the policy rate through a committee vote. The rate then moves market rates.";

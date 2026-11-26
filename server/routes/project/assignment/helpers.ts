@@ -198,24 +198,7 @@ export async function autoUpdateProjectTitleIfUntitled(
 
 export const upload = createUploadInstance({ enforceHeavyParseLimit: true });
 
-const requestSignals = new WeakMap<object, AbortSignal>();
-
-/**
- * Aborted when the client goes away before the response is sent (the student
- * left, or the browser gave up waiting), so the AI call stops instead of
- * running on, spending the student's credit, for nobody.
- */
-export function abortOnClose(req: express.Request<unknown>): AbortSignal {
-  const known = requestSignals.get(req);
-  if (known) return known;
-  const ctl = new AbortController();
-  const res = req.res;
-  res?.on("close", () => {
-    if (!res.writableEnded) ctl.abort();
-  });
-  requestSignals.set(req, ctl.signal);
-  return ctl.signal;
-}
+export { abortOnClose } from "../../../src/utils/abortOnClose.ts";
 
 /** Answers as they were when each project was loaded by getProjectSafe. */
 const answersAtLoad = new WeakMap<object, Record<string, unknown>>();
