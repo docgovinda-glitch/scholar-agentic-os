@@ -43,25 +43,25 @@ export function AnswerReviewPanel({ prompt, answerText, retrieved, cited, audit 
           ["Abstract only", t.abstractOnly],
         ].map(([label, value]) => (
           <div key={label} className={card}>
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">{label}</div>
+            <div className="text-xs font-semibold uppercase tracking-wider text-neutral-500">{label}</div>
             <div className="text-sm font-bold text-neutral-900 dark:text-neutral-100">{value}</div>
           </div>
         ))}
       </div>
 
       {t.looksTruncated && (
-        <div className="flex items-start gap-2 text-[11px] text-amber-800 dark:text-amber-300">
+        <div className="flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300">
           <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
           <span>This answer ends mid-sentence and may be incomplete.</span>
         </div>
       )}
 
       <div className={`${card} space-y-2`}>
-        <div className="text-[11px] font-semibold text-neutral-800 dark:text-neutral-200">Query coverage check</div>
+        <div className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">Query coverage check</div>
         {t.covered.length === 0 && t.missing.length === 0 ? (
-          <p className="text-[11px] text-neutral-500">No distinct topics could be identified in the question.</p>
+          <p className="text-xs text-neutral-500">No distinct topics could be identified in the question.</p>
         ) : (
-          <ul className="space-y-1 text-[11px]">
+          <ul className="space-y-1 text-xs">
             {t.covered.map((topic) => (
               <li key={`c-${topic}`} className="flex items-center gap-1.5 text-neutral-700 dark:text-neutral-300">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
@@ -82,14 +82,14 @@ export function AnswerReviewPanel({ prompt, answerText, retrieved, cited, audit 
 
       {audit ? (
         <div className={`${card} space-y-2`}>
-          <div className="text-[11px] font-semibold text-neutral-800 dark:text-neutral-200">
+          <div className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">
             Peer Reviewer 2 stress-test (model-verified): {audit.overallVerdict}
           </div>
           {audit.critiques.map((c, i) => (
             <div key={i} className="p-2.5 rounded-lg bg-white dark:bg-neutral-800/60 border border-neutral-200/60 dark:border-white/5">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] font-bold text-neutral-900 dark:text-neutral-100">{c.title}</span>
-                <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${SEVERITY[c.severity]}`}>{c.severity.toUpperCase()}</span>
+                <span className="text-xs font-bold text-neutral-900 dark:text-neutral-100">{c.title}</span>
+                <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${SEVERITY[c.severity]}`}>{c.severity.toUpperCase()}</span>
               </div>
               <p className="text-[10.5px] text-neutral-600 dark:text-neutral-300 leading-relaxed">{c.explanation}</p>
             </div>

@@ -99,10 +99,10 @@ export default function AskScholarPresentationDrawer({
       });
 
       if (totalViolations === 0) {
-        return `✅ **6x6 Rule Audit Passed!**\n\nAll ${slideCount} slides strictly adhere to the collegiate 6x6 rule: no slide exceeds 6 bullets, and all bullets remain crisp (≤ 6 words). Your presentation will maintain exceptional audience cognitive focus.`;
+        return `**6x6 Rule Audit Passed!**\n\nAll ${slideCount} slides strictly adhere to the collegiate 6x6 rule: no slide exceeds 6 bullets, and all bullets remain crisp (≤ 6 words). Your presentation will maintain exceptional audience cognitive focus.`;
       }
 
-      return `⚠️ **6x6 Rule Audit: ${totalViolations} slide(s) require tightening:**\n\n${reportLines.join('\n')}\n\n*Recommendation: Condense compound clauses and split multi-layered arguments across adjacent slides.*`;
+      return `**6x6 Rule Audit: ${totalViolations} slide(s) require tightening:**\n\n${reportLines.join('\n')}\n\n*Recommendation: Condense compound clauses and split multi-layered arguments across adjacent slides.*`;
     }
 
     if (q.includes('pacing') || q.includes('visual') || q.includes('flow')) {
@@ -110,7 +110,7 @@ export default function AskScholarPresentationDrawer({
       const bulletCount = layouts.filter((l) => l === 'bullets').length;
       const visualCount = layouts.filter((l) => l !== 'bullets').length;
 
-      return `📊 **Visual Pacing Assessment (${slideCount} Slides)**:\n\n` +
+      return `**Visual Pacing Assessment (${slideCount} Slides)**:\n\n` +
         `• **Text-Heavy / Bullets**: ${bulletCount} slides\n` +
         `• **Visual / Metrics / Split**: ${visualCount} slides\n\n` +
         (bulletCount > visualCount * 2
@@ -122,7 +122,7 @@ export default function AskScholarPresentationDrawer({
       const activeIdx = (deck.activeSlideIndex || 0) + 1;
       const currentLayout = activeSlide?.layoutType || 'bullets';
 
-      return `💡 **Layout & Image Recommendations for Slide ${activeIdx}**:\n\n` +
+      return `**Layout & Image Recommendations for Slide ${activeIdx}**:\n\n` +
         `• Current Layout: \`${currentLayout}\`\n` +
         `• **Recommendation 1**: Switch to **Split Image + Text** with 50% image dropzone for visual grounding.\n` +
         `• **Recommendation 2**: Switch to **Big Metric Focus** for quantitative proof points.\n` +
@@ -180,7 +180,7 @@ export default function AskScholarPresentationDrawer({
             <h3 className="font-bold text-sm text-neutral-900 dark:text-white truncate">
               Ask Scholar
             </h3>
-            <p className="text-[10px] uppercase tracking-wider text-neutral-500 dark:text-neutral-400 font-bold truncate">
+            <p className="text-xs uppercase tracking-wider text-neutral-500 dark:text-neutral-400 font-bold truncate">
               Slide &amp; Outline Advisor
             </p>
           </div>
@@ -214,7 +214,7 @@ export default function AskScholarPresentationDrawer({
 
             {/* Suggested Action Pills */}
             <div className="space-y-2">
-              <span className="text-[10px] font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider block">
+              <span className="text-xs font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider block">
                 Suggested Actions
               </span>
               <div className="flex flex-col gap-1.5">
@@ -240,7 +240,7 @@ export default function AskScholarPresentationDrawer({
                 key={msg.id}
                 className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
               >
-                <span className="text-[10px] uppercase font-bold tracking-wider mb-1 text-neutral-400">
+                <span className="text-xs uppercase font-bold tracking-wider mb-1 text-neutral-400">
                   {msg.role === 'user' ? 'You' : 'Scholar Advisor'}
                 </span>
                 <div
@@ -257,7 +257,7 @@ export default function AskScholarPresentationDrawer({
 
             {isTyping && (
               <div className="flex flex-col items-start">
-                <span className="text-[10px] uppercase font-bold tracking-wider mb-1 text-neutral-400">
+                <span className="text-xs uppercase font-bold tracking-wider mb-1 text-neutral-400">
                   Scholar Advisor
                 </span>
                 <div className="bg-neutral-100 dark:bg-white/5 border border-neutral-200/60 dark:border-white/10 rounded-2xl rounded-tl-none p-3 flex gap-1 items-center">
@@ -280,7 +280,7 @@ export default function AskScholarPresentationDrawer({
               key={idx}
               type="button"
               onClick={() => handleSendMessage(pill)}
-              className="text-[11px] whitespace-nowrap px-2.5 py-1 rounded-full bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer shrink-0"
+              className="text-xs whitespace-nowrap px-2.5 py-1 rounded-full bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer shrink-0"
             >
               {pill}
             </button>

@@ -158,7 +158,7 @@ export default function AudienceQaSimulator({
                 className="text-base font-bold text-neutral-900 dark:text-neutral-100 flex items-center gap-2"
               >
                 <span>Audience Q&amp;A &amp; Defense Simulator</span>
-                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-purple-100 text-purple-900 dark:bg-purple-950/60 dark:text-purple-200">
+                <span className="text-xs uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-purple-100 text-purple-900 dark:bg-purple-950/60 dark:text-purple-200">
                   AI Referee Engine
                 </span>
               </h2>
@@ -302,7 +302,7 @@ export default function AudienceQaSimulator({
                       {q.persona}
                     </span>
                     <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                      className={`text-xs font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
                         q.difficulty === 'adversarial'
                           ? 'bg-rose-100 text-rose-900 dark:bg-rose-950/60 dark:text-rose-200'
                           : q.difficulty === 'rigorous'
@@ -367,7 +367,7 @@ export default function AudienceQaSimulator({
                   {isRebuttalOpen && (
                     <div className="mt-3 p-4 rounded-xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-500/20 space-y-3 text-xs">
                       <div>
-                        <span className="font-bold text-purple-900 dark:text-purple-200 uppercase tracking-wide text-[10px]">
+                        <span className="font-bold text-purple-900 dark:text-purple-200 uppercase tracking-wide text-xs">
                           Candidate Model Response:
                         </span>
                         <p className="text-neutral-800 dark:text-neutral-200 italic mt-0.5">
@@ -377,7 +377,7 @@ export default function AudienceQaSimulator({
 
                       {q.modelRebuttalPoints && q.modelRebuttalPoints.length > 0 && (
                         <div>
-                          <span className="font-bold text-purple-900 dark:text-purple-200 uppercase tracking-wide text-[10px]">
+                          <span className="font-bold text-purple-900 dark:text-purple-200 uppercase tracking-wide text-xs">
                             Key Grounded Evidence Points:
                           </span>
                           <ul className="list-disc pl-4 space-y-1 mt-1 text-neutral-700 dark:text-neutral-300">

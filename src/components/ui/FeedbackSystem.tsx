@@ -24,6 +24,8 @@ export interface ConfirmDialogOptions {
   confirmLabel?: string;
   cancelLabel?: string;
   variant?: "danger" | "primary";
+  /** Asks for one line of text (an in-app replacement for window.prompt). */
+  input?: { label: string; defaultValue?: string };
 }
 
 interface ToastContextValue {
@@ -32,6 +34,13 @@ interface ToastContextValue {
   showError: (message: string, duration?: number) => void;
   showWarning: (message: string, duration?: number) => void;
   showInfo: (message: string, duration?: number) => void;
+}
+
+export interface PromptDialogOptions {
+  title: string;
+  label: string;
+  defaultValue?: string;
+  confirmLabel?: string;
 }
 
 interface ConfirmContextValue {
@@ -44,6 +53,8 @@ const ConfirmContext = createContext<ConfirmContextValue | null>(null);
 // Non-hook imperative global dispatchers for headless/utility callbacks
 let globalShowToast: ((message: string, variant?: ToastVariant, duration?: number) => void) | null = null;
 let globalRequestConfirm: ((optionsOrMessage: string | ConfirmDialogOptions) => Promise<boolean>) | null = null;
+// The text typed into the most recent prompt dialog, read when it resolves.
+let lastPromptValue = "";
 
 export function showAppToast(
   message: string,
@@ -70,6 +81,21 @@ export function requestAppConfirm(
   }
   // Default to non-blocking confirmation if invoked before provider mounts
   return Promise.resolve(true);
+}
+
+/** In-app text prompt: resolves to the trimmed text, or null when cancelled or empty. */
+export async function requestAppPrompt(options: PromptDialogOptions): Promise<string | null> {
+  if (!globalRequestConfirm) return null;
+  lastPromptValue = options.defaultValue ?? "";
+  const ok = await globalRequestConfirm({
+    title: options.title,
+    message: "",
+    confirmLabel: options.confirmLabel ?? "Save",
+    variant: "primary",
+    input: { label: options.label, defaultValue: options.defaultValue },
+  });
+  const value = lastPromptValue.trim();
+  return ok && value ? value : null;
 }
 
 export function useToast(): ToastContextValue {
@@ -149,16 +175,20 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
     };
   }, [showToast, confirm]);
 
+  const promptInputRef = useRef<HTMLInputElement>(null);
   // Focus management for confirm dialog
   useEffect(() => {
-    if (confirmState?.isOpen) {
+    if (confirmState?.isOpen && confirmState.input) {
+      promptInputRef.current?.focus();
+      promptInputRef.current?.select();
+    } else if (confirmState?.isOpen) {
       if (confirmState.variant === "danger") {
         cancelBtnRef.current?.focus();
       } else {
         confirmBtnRef.current?.focus();
       }
     }
-  }, [confirmState?.isOpen, confirmState?.variant]);
+  }, [confirmState?.isOpen, confirmState?.variant, confirmState?.input]);
 
   // Escape key cancels confirmation modal
   useEffect(() => {
@@ -273,6 +303,32 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
               className="relative w-full max-w-md rounded-2xl bg-[color:var(--surface-raised)] p-6 shadow-2xl border border-[color:var(--border-control)] space-y-4"
               data-testid="confirm-dialog"
             >
+              {confirmState.input ? (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    confirmState.resolve(true);
+                  }}
+                  className="space-y-3"
+                >
+                  <h3 id="confirm-dialog-title" className="text-base font-bold text-[color:var(--text-primary)]">
+                    {confirmState.title}
+                  </h3>
+                  <label className="block space-y-1.5">
+                    <span id="confirm-dialog-desc" className="block text-xs font-semibold text-[color:var(--text-secondary)]">
+                      {confirmState.input.label}
+                    </span>
+                    <input
+                      ref={promptInputRef}
+                      defaultValue={confirmState.input.defaultValue}
+                      onChange={(e) => {
+                        lastPromptValue = e.target.value;
+                      }}
+                      className="w-full rounded-lg border border-[color:var(--border-control)] bg-[color:var(--surface-input)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+                    />
+                  </label>
+                </form>
+              ) : (
               <div className="flex items-center gap-3">
                 <div
                   className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
@@ -294,6 +350,7 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
                   </p>
                 </div>
               </div>
+              )}
 
               <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[color:var(--border-subtle)]">
                 <button

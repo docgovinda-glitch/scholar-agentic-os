@@ -1,3 +1,4 @@
+import { Lightbulb } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   addManualSource,
@@ -344,29 +345,29 @@ export default function EvidenceLedgerPanel({
                           <div className="flex items-center gap-1.5">
                             <p className="truncate text-xs font-semibold text-[color:var(--text-primary)]">{item.title}</p>
                             {isProjectItem && (
-                              <span className="shrink-0 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wider bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded">
+                              <span className="shrink-0 px-1 py-0.5 text-xs font-bold uppercase tracking-wider bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded">
                                 Project
                               </span>
                             )}
                           </div>
                           {item.citation && (
-                            <p className="truncate text-[10px] text-[color:var(--text-muted)] mt-0.5">{item.citation}</p>
+                            <p className="truncate text-xs text-[color:var(--text-muted)] mt-0.5">{item.citation}</p>
                           )}
                           {keyPoints.length > 0 && (
-                            <p className="truncate text-[10px] text-[color:var(--text-secondary)] italic mt-0.5">
-                              💡 "{keyPoints[0]}"
+                            <p className="truncate text-xs text-[color:var(--text-secondary)] italic mt-0.5">
+                              <Lightbulb className="inline-block w-3.5 h-3.5 mr-1 align-[-2px]" aria-hidden="true" />"{keyPoints[0]}"
                             </p>
                           )}
                         </div>
                         {addedVaultItemIds.has(item.id) ? (
-                          <span className="shrink-0 text-[10px] font-semibold text-[color:var(--state-success)]">Added</span>
+                          <span className="shrink-0 text-xs font-semibold text-[color:var(--state-success)]">Added</span>
                         ) : (
                           <button
                             type="button"
                             onClick={() => handleAddFromVault(item)}
                             disabled={busy}
                             aria-label="Add"
-                            className="shrink-0 rounded bg-[color:var(--accent-subtle)] text-[color:var(--accent)] hover:bg-[color:var(--accent-hover)] hover:text-[color:var(--text-inverse)] border border-transparent px-2.5 py-1 text-[10px] font-bold cursor-pointer transition-colors"
+                            className="shrink-0 rounded bg-[color:var(--accent-subtle)] text-[color:var(--accent)] hover:bg-[color:var(--accent-hover)] hover:text-[color:var(--text-inverse)] border border-transparent px-2.5 py-1 text-xs font-bold cursor-pointer transition-colors"
                           >
                             Add
                           </button>
@@ -453,7 +454,7 @@ export default function EvidenceLedgerPanel({
                   </div>
                   <span
                     className={[
-                      "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium",
+                      "shrink-0 rounded-full px-2 py-0.5 text-xs font-medium",
                       item.state === "citable" ? "bg-[color:var(--state-success-subtle)] text-[color:var(--state-success)]" : "bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]",
                     ].join(" ")}
                   >

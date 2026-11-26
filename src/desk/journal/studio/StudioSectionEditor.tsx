@@ -128,7 +128,7 @@ export default function StudioSectionEditor({
     <article className="max-w-3xl mx-auto w-full px-4 sm:px-8 py-6 space-y-4">
       <header className="space-y-1.5">
         {unit && !unit.isWholeSection && (
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--text-muted)]">{unit.sectionTitle}</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-[color:var(--text-muted)]">{unit.sectionTitle}</p>
         )}
         <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-[color:var(--text-primary)]">{heading}</h2>
         {hint && <p className="text-sm leading-relaxed text-[color:var(--text-secondary)]">{hint}</p>}
@@ -212,7 +212,7 @@ export default function StudioSectionEditor({
               {busy === "draft" ? "Drafting…" : words > 0 ? `Redraft ${heading} with AI` : `Draft ${heading} with AI`}
             </button>
           </form>
-          <p className="text-[11px] text-[color:var(--text-muted)]">
+          <p className="text-xs text-[color:var(--text-muted)]">
             {!canDraft && draftBlocker
               ? draftBlocker
               : "Uses your AI, this section's sources, and what you have already written in other sections. Citations come only from this section's sources."}

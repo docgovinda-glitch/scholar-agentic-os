@@ -663,7 +663,7 @@ router.post(
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
 
-    const rawTitle = (req.body && req.body.title) || (record.answers?.title as string) || "Academic Presentation";
+    const rawTitle = (req.body && req.body.title) || (record.answers?.title as string) || "Untitled Presentation";
     const projectTitle = normalizeUnicodeNFC(rawTitle);
 
     const answers = (record.answers || {}) as Record<string, unknown>;
@@ -798,7 +798,7 @@ router.get(
 
     // Synthesize clean initial starter deck from project state
     const fallbackSlides = generateProjectDerivedFallbackDeck(
-      (record.answers?.title as string) || "Academic Presentation",
+      (record.answers?.title as string) || "Untitled Presentation",
       20,
       "Academic Conference",
       [],
@@ -808,7 +808,7 @@ router.get(
     );
     const starterDeck = buildSlideDeckFromItems(
       deckId,
-      (record.answers?.title as string) || "Academic Presentation",
+      (record.answers?.title as string) || "Untitled Presentation",
       fallbackSlides
     );
 
@@ -857,8 +857,8 @@ router.put(
       id: deckId,
       user_id: record.ownerId,
       project_id: record.projectId,
-      title: (deck.title as string) || (record.answers?.title as string) || "Academic Presentation",
-      topic: (deck.topic as string) || (record.answers?.title as string) || "Academic Presentation",
+      title: (deck.title as string) || (record.answers?.title as string) || "Untitled Presentation",
+      topic: (deck.topic as string) || (record.answers?.title as string) || "Untitled Presentation",
       framework: (deck.framework as string) || "Standard-Narrative",
       theme_id: (deck.themeId as string) || "sand-academic",
       custom_theme: deck.customTheme || null,

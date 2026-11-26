@@ -1,20 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { showAppToast } from '../../../components/ui/FeedbackSystem';
-import {
-  Palette,
-  Sparkles,
-  Upload,
-  Trash2,
-  Check,
-  Copy,
-  FileCode,
-  CheckCircle2,
-  AlertTriangle,
-  FileUp,
-  Wand2,
-  RefreshCw,
-  ArrowRight,
-} from 'lucide-react';
+import { AlertTriangle, ArrowRight, Check, CheckCircle2, Copy, FileCode, FileUp, Lightbulb, Palette, RefreshCw, Sparkles, Trash2, Upload, Wand2, Zap } from 'lucide-react';
 import type { SlideDeck } from '../types/slides';
 import {
   type SlideTheme,
@@ -465,7 +451,7 @@ export default function CustomThemeStudio({
           <div>
             <div className="flex items-center gap-2">
               <span className="p-1.5 rounded-lg bg-blue-600 text-white font-bold text-xs">
-                ⚡ DECK &amp; DESIGN EXTRACTOR
+                <Zap className="inline-block w-3.5 h-3.5 mr-1 align-[-2px]" aria-hidden="true" />DECK &amp; DESIGN EXTRACTOR
               </span>
               <h4 className="text-sm font-bold text-neutral-900 dark:text-white">
                 Upload Existing Presentation to Recreate Design (.pptx, .ppt, .pdf, .html, slide images)
@@ -533,7 +519,7 @@ export default function CustomThemeStudio({
                 onClick={handleApplyRecreatedDeck}
                 className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
               >
-                <span>⚡ Recreate Deck &amp; Open in Studio</span>
+                <span><Zap className="inline-block w-3.5 h-3.5 mr-1 align-[-2px]" aria-hidden="true" />Recreate Deck &amp; Open in Studio</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -549,7 +535,7 @@ export default function CustomThemeStudio({
           {/* FEATURE 3: AI Prompt Aesthetic Styler (No hex code typing required!) */}
           <div className="space-y-2">
             <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider block">
-              ✨ AI Prompt Aesthetic Styler
+              <Sparkles className="inline-block w-3.5 h-3.5 mr-1 align-[-2px]" aria-hidden="true" />AI Prompt Aesthetic Styler
             </label>
             <div className="flex gap-2">
               <input
@@ -915,7 +901,7 @@ export default function CustomThemeStudio({
             />
 
             <div className="mt-4 p-3 rounded-xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-white/10 text-neutral-500 dark:text-neutral-400 text-[11px] leading-relaxed">
-              💡 <strong>Multi-Slide Progression</strong>: In Scholar OS, picking a theme doesn't just recolor 1 card—it formats your <strong>Cover Slide</strong>, <strong>Executive Synthesis</strong>, <strong>Signature 2D Framework</strong>, <strong>KPI Metrics</strong>, and <strong>Strategic Roadmap</strong>.
+              <Lightbulb className="inline-block w-3.5 h-3.5 mr-1 align-[-2px]" aria-hidden="true" /><strong>Multi-Slide Progression</strong>: In Scholar OS, picking a theme doesn't just recolor 1 card—it formats your <strong>Cover Slide</strong>, <strong>Executive Synthesis</strong>, <strong>Signature 2D Framework</strong>, <strong>KPI Metrics</strong>, and <strong>Strategic Roadmap</strong>.
             </div>
           </div>
 

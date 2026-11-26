@@ -134,9 +134,9 @@ export default function Primary({
                 Turns approved-evidence citation markers into real in-text citations and builds the References section.
               </span>
             </div>
-            {citationError && <p role="alert" className="mt-2 text-[10px] text-red-500">Error: {citationError}</p>}
+            {citationError && <p role="alert" className="mt-2 text-xs text-red-500">Error: {citationError}</p>}
             {citationOutcome && (
-              <p className="mt-2 text-[10px] text-[var(--text-secondary)]">
+              <p className="mt-2 text-xs text-[var(--text-secondary)]">
                 {citationOutcome.citedSourceIds.length === 0
                   ? "Nothing to resolve — no citation markers found."
                   : `Resolved ${citationOutcome.citedSourceIds.length} source(s) into the References section.`}
@@ -175,7 +175,7 @@ export default function Primary({
                 PDF
               </button>
             </div>
-            {exportError && <span className="text-[10px] text-red-500">Error: {exportError}</span>}
+            {exportError && <span className="text-xs text-red-500">Error: {exportError}</span>}
           </div>
         </div>
       </div>

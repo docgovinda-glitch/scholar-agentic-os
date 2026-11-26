@@ -25,12 +25,12 @@ function Row({ row, acknowledged, onAcknowledge }: { row: CitationAuditRow; ackn
   return (
     <li className="py-2 flex flex-col gap-1 border-b border-[color:var(--border-subtle)] last:border-0">
       <div className="flex items-start gap-2">
-        <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${TONE[s.tone]}`}>{s.label}</span>
+        <span className={`shrink-0 text-xs font-bold px-1.5 py-0.5 rounded ${TONE[s.tone]}`}>{s.label}</span>
         <span className="text-xs text-[color:var(--text-primary)] min-w-0">
-          {row.title || <code className="text-[11px]">[CITE:{row.id}]</code>}
+          {row.title || <code className="text-xs">[CITE:{row.id}]</code>}
         </span>
       </div>
-      <p className="text-[11px] text-[color:var(--text-muted)] pl-1">
+      <p className="text-xs text-[color:var(--text-muted)] pl-1">
         {s.text}
         {isWebUrl(row.notice) && (
           <>
@@ -42,7 +42,7 @@ function Row({ row, acknowledged, onAcknowledge }: { row: CitationAuditRow; ackn
         )}
       </p>
       {row.state === "retracted" && (
-        <label className="flex items-center gap-2 text-[11px] text-[color:var(--text-secondary)] pl-1">
+        <label className="flex items-center gap-2 text-xs text-[color:var(--text-secondary)] pl-1">
           <input type="checkbox" checked={acknowledged} onChange={(e) => onAcknowledge(row.id, e.target.checked)} />
           I cite this paper to discuss its retraction
         </label>
@@ -112,7 +112,7 @@ export default function ReferencesCheck({
             {checking ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />}
             {checking ? "Checking…" : "Check DOIs and retractions"}
           </button>
-          <span className="text-[11px] text-[color:var(--text-muted)]">
+          <span className="text-xs text-[color:var(--text-muted)]">
             {canCheck
               ? `Looks up each DOI at Crossref.${checkedAtLabel(lastChecked) ? ` Last checked ${checkedAtLabel(lastChecked)}.` : ""}`
               : "None of the cited sources has a DOI to check."}
@@ -134,7 +134,7 @@ export default function ReferencesCheck({
       )}
 
       {audit.uncited.length > 0 && (
-        <p className="text-[11px] text-[color:var(--text-muted)]">
+        <p className="text-xs text-[color:var(--text-muted)]">
           {audit.uncited.length} {audit.uncited.length === 1 ? "source is" : "sources are"} in Evidence but not cited; {audit.uncited.length === 1 ? "it stays" : "they stay"} out of the reference list.
         </p>
       )}
@@ -149,7 +149,7 @@ export default function ReferencesCheck({
               <li key={i}>{r.replace(/\*([^*]+)\*/g, "$1")}</li>
             ))}
           </ol>
-          <p className="mt-2 text-[11px] text-[color:var(--text-muted)]">
+          <p className="mt-2 text-xs text-[color:var(--text-muted)]">
             Exports use this list and turn each citation into its in-text form. A References section already in the text is replaced by it.
           </p>
         </details>

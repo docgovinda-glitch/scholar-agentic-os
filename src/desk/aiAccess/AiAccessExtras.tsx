@@ -77,7 +77,7 @@ export function LiveRouting({ refreshKey, privacy }: { refreshKey: string; priva
               <span className="text-xs font-semibold text-slate-700 dark:text-neutral-300">{t.label}</span>
               <span className="text-right">
                 <span className={`block text-xs ${ok ? "font-semibold text-slate-900 dark:text-white" : "text-amber-700 dark:text-amber-400"}`}>{main}</span>
-                {sub && <span className="block text-[11px] text-slate-500 dark:text-neutral-400">{sub}</span>}
+                {sub && <span className="block text-xs text-slate-500 dark:text-neutral-400">{sub}</span>}
               </span>
             </li>
           );
@@ -112,15 +112,14 @@ export function QuickStart({ onOpen }: { onOpen: (id: string) => void }) {
           const link = cloud?.getKeyUrl ?? local?.installUrl;
           return (
             <li key={q.id} className="rounded-xl border border-slate-200/90 dark:border-neutral-800 p-4 flex flex-col gap-2">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-bold text-slate-900 dark:text-white">
-                  {i === 0 ? "Recommended: " : ""}
-                  {name}
-                </span>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/60 shrink-0">{q.badge}</span>
+              {/* Badges wrap under the name rather than running past the card edge. */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-bold text-slate-900 dark:text-white">{name}</span>
+                {i === 0 && <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900">Recommended</span>}
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/60">{q.badge}</span>
               </div>
               <p className="text-xs text-slate-500 dark:text-neutral-400 flex-1">{description}</p>
-              <p className="text-[11px] text-slate-500 dark:text-neutral-400">{q.time}</p>
+              <p className="text-xs text-slate-500 dark:text-neutral-400">{q.time}</p>
               <div className="flex items-center gap-2 flex-wrap">
                 <button type="button" onClick={() => onOpen(q.id)} className="rounded-lg bg-slate-900 hover:bg-black dark:bg-white dark:text-slate-950 text-white px-3 py-1.5 text-xs font-semibold cursor-pointer">
                   Set up {name}

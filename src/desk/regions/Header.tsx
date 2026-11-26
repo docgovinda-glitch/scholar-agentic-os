@@ -13,8 +13,8 @@ import { useActiveAi } from "../ai/useActiveAi";
  * ?project=<id> in the URL" note this carried no longer applies. AI
  * configuration lives entirely under "AI Access" (the single source of truth
  * for it — there is no separate AI Settings anymore); "Account Settings" is
- * accessed strictly via the user profile popover. Search stays visibly
- * present but explicitly labelled not-yet-built.
+ * accessed strictly via the user profile popover. Below 768 px Search,
+ * Vault and Account move into a "More" menu so the header never overflows.
  */
 export default function Header({
   project,
@@ -25,7 +25,8 @@ export default function Header({
   onOpenAiAccess,
   onToggleRail,
   onRenameProject,
-  userEmail,
+  onToggleStudio,
+  studioOpen,
 }: {
   project: ProjectView;
   outputTypeLabel: string;
@@ -35,24 +36,30 @@ export default function Header({
   onOpenAiAccess?: () => void;
   onToggleRail?: () => void;
   onRenameProject?: (newTitle: string) => Promise<void> | void;
+  /** Opens the Studio / Compliance panel, which is a drawer below 1024 px. */
+  onToggleStudio?: () => void;
+  studioOpen?: boolean;
   userEmail?: string | null;
 }) {
   const aiConfig = useActiveAi();
-  const current = project.gates?.find((g) => g.status !== "signed_off") ?? project.gates?.[project.gates.length - 1];
   const [searchOpen, setSearchOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const displayTitle = project.answers?.title || outputTypeLabel;
+  const [editing, setEditing] = useState(false);
+  const [draftTitle, setDraftTitle] = useState(displayTitle);
 
-  const handleRename = () => {
-    if (!onRenameProject) return;
-    const currentTitle = project.answers?.title || "";
-    const newTitle = window.prompt("Rename research project:", currentTitle || outputTypeLabel);
-    if (newTitle && newTitle.trim()) {
-      onRenameProject(newTitle.trim());
-    }
+  const commitRename = () => {
+    const next = draftTitle.trim();
+    setEditing(false);
+    if (onRenameProject && next && next !== displayTitle) onRenameProject(next);
   };
+
+  const quietButton =
+    "rounded-[var(--radius-sm)] px-2 py-1 transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] cursor-pointer";
 
   return (
     <>
-    <header className="flex h-12 items-center gap-3 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-4 text-sm">
+    <header className="flex h-12 min-w-0 items-center gap-2 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-3 text-sm sm:gap-3 sm:px-4">
       <Link
         to="/"
         onClick={(e) => {
@@ -61,11 +68,11 @@ export default function Header({
             onClose();
           }
         }}
-        className="cursor-pointer transition-opacity duration-200 hover:opacity-70 flex items-center gap-2 rounded-[var(--radius-sm)] px-1.5 py-1 font-semibold text-[color:var(--text-primary)]"
-        title="Scholar Core Home"
+        className="shrink-0 cursor-pointer transition-opacity duration-200 hover:opacity-70 flex items-center gap-2 rounded-[var(--radius-sm)] px-1.5 py-1 font-semibold text-[color:var(--text-primary)]"
+        aria-label="Back to projects"
+        title="Back to projects"
       >
         <ScholarCoreLogo size="sm" className="text-[color:var(--text-primary)]" />
-        <span className="hidden sm:inline font-semibold text-[color:var(--text-primary)] text-xs">SCHOLAR CORE</span>
       </Link>
 
       {onToggleRail && (
@@ -80,85 +87,114 @@ export default function Header({
           </svg>
         </button>
       )}
-      <span className="text-[color:var(--text-muted)]" aria-hidden="true">
-        /
-      </span>
-      <div className="flex items-center gap-1.5 max-w-xs sm:max-w-md">
-        <span
-          className={`truncate font-medium text-[color:var(--text-secondary)] ${
-            onRenameProject ? "cursor-pointer hover:text-[color:var(--text-primary)] hover:underline" : ""
-          }`}
-          title={onRenameProject ? `Click to rename: ${project.answers?.title || outputTypeLabel}` : project.projectId}
-          onClick={onRenameProject ? handleRename : undefined}
-        >
-          {project.answers?.title || outputTypeLabel}
-        </span>
+      <div className="flex min-w-0 flex-1 items-center gap-1.5">
+        {editing ? (
+          <input
+            autoFocus
+            aria-label="Project name"
+            value={draftTitle}
+            onChange={(e) => setDraftTitle(e.target.value)}
+            onBlur={commitRename}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commitRename();
+              if (e.key === "Escape") {
+                setDraftTitle(displayTitle);
+                setEditing(false);
+              }
+            }}
+            className="min-w-0 flex-1 max-w-md rounded-[var(--radius-sm)] border border-[color:var(--border-control)] bg-[color:var(--surface-input)] px-2 py-1 text-sm text-[color:var(--text-primary)]"
+          />
+        ) : onRenameProject ? (
+          <button
+            type="button"
+            onClick={() => {
+              setDraftTitle(displayTitle);
+              setEditing(true);
+            }}
+            title="Rename project"
+            className="min-w-0 truncate rounded-[var(--radius-sm)] px-1 py-0.5 text-left font-medium text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] cursor-pointer"
+          >
+            {displayTitle}
+          </button>
+        ) : (
+          <span className="min-w-0 truncate font-medium text-[color:var(--text-primary)]">{displayTitle}</span>
+        )}
       </div>
 
-      {current && (
-        <span className="ml-2 rounded-full border border-[color:var(--accent-border)] bg-[color:var(--accent-subtle)] px-2 py-0.5 text-xs text-[color:var(--accent)]">
-          {current.gate} {current.name}
-        </span>
-      )}
-      <div className="ml-auto flex items-center gap-3 text-xs text-[color:var(--text-muted)]">
+      <div className="ml-auto flex shrink-0 items-center gap-1 text-xs text-[color:var(--text-secondary)] sm:gap-2">
+        <div className="hidden md:flex items-center gap-1">
+          <button type="button" onClick={() => setSearchOpen(true)} className={quietButton}>
+            Search
+          </button>
+          {onOpenVault && (
+            <button type="button" onClick={onOpenVault} className={quietButton}>
+              Vault
+            </button>
+          )}
+          {onOpenAccountSettings && (
+            <button type="button" onClick={onOpenAccountSettings} className={quietButton}>
+              Account
+            </button>
+          )}
+        </div>
         <button
           type="button"
-          onClick={() => setSearchOpen(true)}
-          className="rounded-[var(--radius-sm)] px-1 py-0.5 transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] cursor-pointer"
+          onClick={onOpenAiAccess}
+          className="flex items-center gap-1.5 rounded-full border border-[color:var(--border-default)] px-2.5 py-1 text-xs text-[color:var(--text-primary)] transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--surface-hover)] cursor-pointer max-w-[220px]"
+          title={aiConfig.isConfigured ? `AI: ${aiConfig.providerName} (${aiConfig.modelId}). Open AI Access` : "No AI connected. Open AI Access"}
         >
-          Search
+          <span
+            className={`w-1.5 h-1.5 rounded-full shrink-0 ${aiConfig.isConfigured ? "bg-[color:var(--state-success)]" : "bg-[color:var(--state-warning)]"}`}
+            aria-hidden="true"
+          />
+          <span className="hidden sm:inline truncate">{aiConfig.isConfigured ? aiConfig.providerName : "No AI connected"}</span>
+          <span className="sr-only sm:hidden">{aiConfig.isConfigured ? `AI: ${aiConfig.providerName}` : "No AI connected"}</span>
         </button>
-        {onOpenVault && (
+        {onToggleStudio && (
           <button
             type="button"
-            onClick={onOpenVault}
-            className="rounded-[var(--radius-sm)] px-1 py-0.5 transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] cursor-pointer"
+            onClick={onToggleStudio}
+            aria-expanded={studioOpen}
+            className={`lg:hidden ${quietButton} border border-[color:var(--border-default)]`}
           >
-            Vault
+            Studio
           </button>
         )}
-        {aiConfig.isConfigured ? (
+        <div className="relative md:hidden">
           <button
             type="button"
-            onClick={onOpenAiAccess}
-            className="flex items-center gap-1.5 rounded-[var(--radius-sm)] px-2.5 py-1 transition-colors duration-[var(--motion-fast)] border border-emerald-600/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-500/20 cursor-pointer font-medium text-xs max-w-[280px]"
-            title={`Active AI: ${aiConfig.providerName} (${aiConfig.modelId}) — Click to configure`}
-            aria-label={`Active AI: ${aiConfig.providerName} · ${aiConfig.modelId}`}
+            onClick={() => setMoreOpen((v) => !v)}
+            aria-expanded={moreOpen}
+            aria-haspopup="menu"
+            aria-label="More"
+            className={`${quietButton} px-2`}
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" aria-hidden="true" />
-            <span className="truncate">
-              {aiConfig.providerName} · {aiConfig.modelId}
-            </span>
+            <span aria-hidden="true">•••</span>
           </button>
-        ) : (
-          <button
-            type="button"
-            onClick={onOpenAiAccess}
-            className="flex items-center gap-1.5 rounded-[var(--radius-sm)] px-2.5 py-1 transition-colors duration-[var(--motion-fast)] border border-amber-600/30 bg-amber-500/10 text-amber-900 dark:text-amber-200 hover:bg-amber-500/20 cursor-pointer text-xs"
-            title="Offline Heuristic Mode — Click to connect an API Key or Local Runner in AI Access"
-            aria-label="Offline Heuristic Mode — Connect API Key in AI Access"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" aria-hidden="true" />
-            <span className="truncate">Offline Heuristic Mode — Connect API Key in AI Access</span>
-          </button>
-        )}
-        {onOpenAccountSettings ? (
-          <button
-            type="button"
-            onClick={onOpenAccountSettings}
-            className="rounded-[var(--radius-sm)] px-1 py-0.5 transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] cursor-pointer"
-          >
-            Account Settings
-          </button>
-        ) : (
-          <span title="Not yet built" className="cursor-not-allowed">
-            Account Settings
-          </span>
-        )}
+          {moreOpen && (
+            <div
+              role="menu"
+              className="absolute right-0 top-full z-50 mt-1 flex w-40 flex-col rounded-[var(--radius-md)] border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] p-1 shadow-lg"
+            >
+              <button role="menuitem" type="button" className={`${quietButton} text-left`} onClick={() => { setMoreOpen(false); setSearchOpen(true); }}>
+                Search
+              </button>
+              {onOpenVault && (
+                <button role="menuitem" type="button" className={`${quietButton} text-left`} onClick={() => { setMoreOpen(false); onOpenVault(); }}>
+                  Vault
+                </button>
+              )}
+              {onOpenAccountSettings && (
+                <button role="menuitem" type="button" className={`${quietButton} text-left`} onClick={() => { setMoreOpen(false); onOpenAccountSettings(); }}>
+                  Account
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </header>
     {searchOpen && <GlobalSearchModal onClose={() => setSearchOpen(false)} />}
     </>
   );
 }
-

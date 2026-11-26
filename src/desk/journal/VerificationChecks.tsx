@@ -33,9 +33,9 @@ function Check({ title, tone, status, children }: { title: string; tone: keyof t
     <li className="py-2.5 border-b border-[color:var(--border-subtle)] last:border-0 flex flex-col gap-1.5">
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-semibold text-[color:var(--text-primary)]">{title}</span>
-        <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${TONE[tone]}`}>{status}</span>
+        <span className={`shrink-0 text-xs font-bold px-1.5 py-0.5 rounded ${TONE[tone]}`}>{status}</span>
       </div>
-      {children && <div className="text-[11px] text-[color:var(--text-secondary)] space-y-1">{children}</div>}
+      {children && <div className="text-xs text-[color:var(--text-secondary)] space-y-1">{children}</div>}
     </li>
   );
 }
@@ -76,7 +76,7 @@ export default function VerificationChecks({ markdown, figures = [], title = "3.
                 <p>Each p-value is recomputed from the reported statistic and degrees of freedom, allowing for rounding.</p>
                 {statIssues.map((s) => (
                   <p key={s.index}>
-                    <code className="text-[11px]">{s.text}</code>: recomputed p {formatP(s.computedP)}
+                    <code className="text-xs">{s.text}</code>: recomputed p {formatP(s.computedP)}
                     {s.oneTailedFits ? " two-tailed; consistent if the test was one-tailed (say so in the text)." : s.decisionError ? ". This changes the conclusion at .05." : "."}
                   </p>
                 ))}

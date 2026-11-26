@@ -37,7 +37,7 @@ export const QUICK_MUTATION_CHIPS: Array<{
 }> = [
   {
     id: 'make-concise',
-    label: '⚡ Make More Concise (6x6 Rule)',
+    label: 'Make More Concise (6x6 Rule)',
     icon: <Zap className="w-3 h-3 text-amber-500" />,
     hint: 'Condense bullets to max 6 words per bullet',
   },
@@ -49,19 +49,19 @@ export const QUICK_MUTATION_CHIPS: Array<{
   },
   {
     id: 'highlight-as-big-metric',
-    label: '📊 Highlight as Big Metric',
+    label: 'Highlight as Big Metric',
     icon: <BarChart3 className="w-3 h-3 text-emerald-500" />,
     hint: 'Feature large quantitative metric callout',
   },
   {
     id: 'change-to-two-column',
-    label: '⚖️ Change to 2-Column Comparison',
+    label: 'Change to 2-column comparison',
     icon: <Columns className="w-3 h-3 text-indigo-500" />,
     hint: 'Split content into side-by-side comparison',
   },
   {
     id: 'strengthen-active-voice',
-    label: '✍️ Strengthen Active Voice',
+    label: 'Strengthen Active Voice',
     icon: <PenTool className="w-3 h-3 text-purple-500" />,
     hint: 'Convert passive headline into decisive action verb assertion',
   },
@@ -201,7 +201,7 @@ export default function InSlidePromptCopilot({
             <Sparkles className="w-3.5 h-3.5 text-amber-500" />
             <span>In-Slide AI Prompt Copilot</span>
           </span>
-          <span className="text-[11px] text-neutral-400 hidden sm:inline">
+          <span className="text-xs text-neutral-400 hidden sm:inline">
             Mutates slide structure and active tone instantly
           </span>
         </div>
@@ -222,7 +222,7 @@ export default function InSlidePromptCopilot({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="px-2.5 py-1 text-[11px] font-semibold rounded-lg border border-blue-500/30 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 flex items-center gap-1.5 transition-colors cursor-pointer"
+            className="px-2.5 py-1 text-xs font-semibold rounded-lg border border-blue-500/30 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 flex items-center gap-1.5 transition-colors cursor-pointer"
             title="Upload or paste a slide screenshot to replicate"
           >
             <Camera className="w-3.5 h-3.5" />
@@ -248,18 +248,18 @@ export default function InSlidePromptCopilot({
                 <span className="text-xs font-bold text-neutral-900 dark:text-neutral-100">
                   📸 Reference Screenshot Attached
                 </span>
-                <span className="text-[10px] font-mono text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded bg-blue-100/70 dark:bg-blue-900/40">
+                <span className="text-xs font-mono text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded bg-blue-100/70 dark:bg-blue-900/40">
                   Ready to Replicate
                 </span>
               </div>
-              <p className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate max-w-md">
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate max-w-md">
                 {referenceFileName || 'Attached slide capture'} · AI will replicate exact layout &amp; visual hierarchy
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-            <label className="text-[11px] font-medium text-neutral-600 dark:text-neutral-300 flex items-center gap-1.5 cursor-pointer">
+            <label className="text-xs font-medium text-neutral-600 dark:text-neutral-300 flex items-center gap-1.5 cursor-pointer">
               <input
                 type="checkbox"
                 checked={cloneThemeWithScreenshot}
@@ -338,7 +338,7 @@ export default function InSlidePromptCopilot({
             </>
           ) : (
             <>
-              <span>{referenceScreenshot ? '✨ Replicate' : 'Apply'}</span>
+              <span>{referenceScreenshot ? 'Replicate' : 'Apply'}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </>
           )}
@@ -348,10 +348,10 @@ export default function InSlidePromptCopilot({
       {/* Quick AI Transformation Chips */}
       <div className="space-y-1 pt-0.5">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+          <span className="text-xs font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
             Quick AI Transformations:
           </span>
-          <span className="text-[10px] text-neutral-400">One-click mutations</span>
+          <span className="text-xs text-neutral-400">One-click mutations</span>
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5">
@@ -367,7 +367,7 @@ export default function InSlidePromptCopilot({
                   ? 'AI Mutation: Side-by-Side Comparative Analysis'
                   : `AI Mutation: ${chip.label}`
               }
-              className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-neutral-100 dark:bg-white/5 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-neutral-700 dark:text-neutral-300 hover:text-blue-600 dark:hover:text-blue-400 border border-neutral-200/80 dark:border-white/10 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="px-2.5 py-1 rounded-lg text-xs font-medium bg-neutral-100 dark:bg-white/5 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-neutral-700 dark:text-neutral-300 hover:text-blue-600 dark:hover:text-blue-400 border border-neutral-200/80 dark:border-white/10 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               <span>{chip.icon}</span>
               <span>{chip.label}</span>

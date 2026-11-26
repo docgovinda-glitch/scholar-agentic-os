@@ -53,15 +53,15 @@ function FindingRow({
       </div>
       <div>{finding.message}</div>
       {finding.location?.sectionKey && (
-        <div className="mt-0.5 text-[10px] opacity-70">Section: {finding.location.sectionKey}</div>
+        <div className="mt-0.5 text-xs opacity-70">Section: {finding.location.sectionKey}</div>
       )}
-      {finding.remedy && <div className="mt-1 text-[10px] opacity-90">→ {finding.remedy}</div>}
+      {finding.remedy && <div className="mt-1 text-xs opacity-90">→ {finding.remedy}</div>}
 
       {canWaive && waiving === null && (
         <button
           type="button"
           onClick={onStartWaive}
-          className="mt-1.5 text-[10px] text-[color:var(--accent)] transition-colors duration-[var(--motion-fast)] hover:text-[color:var(--accent-hover)] cursor-pointer"
+          className="mt-1.5 text-xs text-[color:var(--accent)] transition-colors duration-[var(--motion-fast)] hover:text-[color:var(--accent-hover)] cursor-pointer"
         >
           Waive
         </button>
@@ -72,7 +72,7 @@ function FindingRow({
           submission, not a dismissal. */}
       {waiving !== null && (
         <div className="mt-2 flex flex-col gap-1.5">
-          <label htmlFor={`waive-${finding.ruleId}`} className="text-[10px] text-[color:var(--text-secondary)]">
+          <label htmlFor={`waive-${finding.ruleId}`} className="text-xs text-[color:var(--text-secondary)]">
             Why is this okay to waive?
           </label>
           <input
@@ -88,14 +88,14 @@ function FindingRow({
               type="button"
               onClick={onConfirmWaive}
               disabled={busy || waiving.trim() === ""}
-              className="rounded-[var(--radius-sm)] border border-[color:var(--border-control)] px-2 py-1 text-[10px] text-[color:var(--text-primary)] transition-colors duration-[var(--motion-fast)] hover:border-[color:var(--border-strong)] disabled:cursor-not-allowed disabled:opacity-55 cursor-pointer"
+              className="rounded-[var(--radius-sm)] border border-[color:var(--border-control)] px-2 py-1 text-xs text-[color:var(--text-primary)] transition-colors duration-[var(--motion-fast)] hover:border-[color:var(--border-strong)] disabled:cursor-not-allowed disabled:opacity-55 cursor-pointer"
             >
               {busy ? "Waiving…" : "Waive"}
             </button>
             <button
               type="button"
               onClick={onCancelWaive}
-              className="text-[10px] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] cursor-pointer"
+              className="text-xs text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] cursor-pointer"
             >
               Cancel
             </button>
@@ -115,7 +115,12 @@ export default function Aside({
   rubric,
   sessionId,
   onChanged,
+  open = false,
+  onClose,
 }: {
+  /** Below 1024 px the panel is a drawer shown only while `open`. */
+  open?: boolean;
+  onClose?: () => void;
   projectId: string;
   rubric: RubricReport | null;
   sessionId: string;
@@ -142,7 +147,34 @@ export default function Aside({
   }
 
   return (
-    <aside className="flex w-72 shrink-0 flex-col overflow-y-auto border-l border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)]">
+    <>
+    {open && (
+      <button
+        type="button"
+        aria-label="Close Studio panel"
+        onClick={onClose}
+        className="lg:hidden fixed inset-0 z-30 bg-black/30 cursor-default"
+      />
+    )}
+    <aside
+      aria-label="Studio and compliance"
+      className={[
+        "flex-col overflow-y-auto border-l border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)]",
+        "lg:static lg:flex lg:w-72 lg:shrink-0",
+        open ? "fixed inset-y-0 right-0 z-40 flex w-[min(20rem,90vw)] shadow-xl" : "hidden",
+      ].join(" ")}
+    >
+      {onClose && (
+        <div className="lg:hidden flex justify-end border-b border-[color:var(--border-subtle)] p-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-[var(--radius-sm)] px-2 py-1 text-xs text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] cursor-pointer"
+          >
+            Close Studio
+          </button>
+        </div>
+      )}
       <StudioPanel sessionId={sessionId} />
       <div className="flex flex-col">
         <div className="border-b border-[color:var(--border-subtle)] px-3 py-2 text-xs text-[color:var(--text-secondary)]">
@@ -185,5 +217,6 @@ export default function Aside({
         </div>
       </div>
     </aside>
+    </>
   );
 }

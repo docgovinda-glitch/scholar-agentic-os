@@ -106,7 +106,7 @@ export default function EmbeddedAuthModal({
       onClick={onClose}
     >
       <div
-        className={`relative w-full ${modalWidth} max-h-[94dvh] overflow-hidden bg-white dark:bg-ink-800 border border-neutral-200/90 dark:border-white/10 rounded-2xl shadow-2xl flex flex-col transition-all duration-200`}
+        className={`relative w-full ${modalWidth} max-h-[94dvh] overflow-hidden bg-white dark:bg-ink-800 border border-neutral-200/90 dark:border-white/10 rounded-2xl shadow-2xl flex flex-col transition-all duration-200 focus:outline-none focus-visible:outline-none`}
         ref={dialogRef}
         tabIndex={-1}
         role="dialog"
@@ -186,7 +186,7 @@ export default function EmbeddedAuthModal({
                 <span className="sm:hidden">Local mode — sign-in optional</span>
                 <span className="hidden sm:inline">Testing locally? Sign-in is optional</span>
               </span>
-              <span className="hidden sm:block text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5 truncate">
+              <span className="hidden sm:block text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 truncate">
                 Open {selectedFormatId === "OT-22" ? "Slides & Keynotes" : "workspace"} immediately as guest
               </span>
             </div>

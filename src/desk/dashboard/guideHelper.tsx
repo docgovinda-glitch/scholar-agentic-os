@@ -18,7 +18,7 @@ export function CodeBlockWithCopy({ lang, code }: { lang: string; code: string }
 
   return (
     <div className="my-2.5 rounded-xl bg-neutral-900 dark:bg-ink-900 border border-neutral-800 dark:border-white/10 overflow-hidden shadow-2xs">
-      <div className="flex items-center justify-between px-3 py-1.5 bg-white/5 border-b border-white/5 text-[10px] font-mono text-neutral-400">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-white/5 border-b border-white/5 text-xs font-mono text-neutral-400">
         <span className="uppercase tracking-wider font-semibold">{lang || "code"}</span>
         <button
           type="button"
@@ -329,18 +329,18 @@ export function InlineCitationBadge({
                   }}
                 />
               )}
-              <span className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200 truncate">
+              <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200 truncate">
                 {venue}
               </span>
             </span>
-            <span className="flex items-center gap-1 shrink-0 text-[10px]">
+            <span className="flex items-center gap-1 shrink-0 text-xs">
               {citation.year && (
                 <span className="font-mono text-neutral-500 dark:text-neutral-400">
                   {citation.year}
                 </span>
               )}
               <span
-                className={`px-1.5 py-0.5 rounded-full font-semibold text-[9px] border ${isPreprint
+                className={`px-1.5 py-0.5 rounded-full font-semibold text-xs border ${isPreprint
                     ? "bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200/60 dark:border-amber-800/40"
                     : "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200/50 dark:border-indigo-800/40"
                   }`}
@@ -348,7 +348,7 @@ export function InlineCitationBadge({
                 {isPreprint ? "Preprint (Not Peer-Reviewed)" : isPeerReviewed ? "Peer Reviewed" : sourceTypeBadge}
               </span>
               {isOpenAccess && (
-                <span className="px-1.5 py-0.5 rounded-full font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-800/40 text-[9px]">
+                <span className="px-1.5 py-0.5 rounded-full font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-800/40 text-xs">
                   Open Access
                 </span>
               )}
@@ -373,7 +373,7 @@ export function InlineCitationBadge({
               <span className="block text-[9.5px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 mb-0.5">
                 Supporting passage
               </span>
-              <span className="block text-[10px] text-neutral-700 dark:text-neutral-300 leading-relaxed italic bg-emerald-50/70 dark:bg-emerald-950/20 p-1.5 rounded-lg border border-emerald-100 dark:border-emerald-900/40">
+              <span className="block text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed italic bg-emerald-50/70 dark:bg-emerald-950/20 p-1.5 rounded-lg border border-emerald-100 dark:border-emerald-900/40">
                 "{highlightMatched(supporting.passage, supporting.matched)}"
               </span>
             </span>
@@ -385,14 +385,14 @@ export function InlineCitationBadge({
                   No sentence in the retrieved text clearly matches this claim. Excerpt:
                 </span>
               )}
-              <span className="block text-[10px] text-neutral-600 dark:text-neutral-400 line-clamp-2 leading-relaxed italic bg-neutral-50 dark:bg-neutral-800/60 p-1.5 rounded-lg border border-neutral-100 dark:border-white/5">
+              <span className="block text-xs text-neutral-600 dark:text-neutral-400 line-clamp-2 leading-relaxed italic bg-neutral-50 dark:bg-neutral-800/60 p-1.5 rounded-lg border border-neutral-100 dark:border-white/5">
                 "{snippet}"
               </span>
             </span>
           )}
 
           {/* Micro-Card Action Buttons Row */}
-          <span className="flex items-center justify-between pt-2 border-t border-neutral-100 dark:border-white/10 gap-1.5 text-[10px]">
+          <span className="flex items-center justify-between pt-2 border-t border-neutral-100 dark:border-white/10 gap-1.5 text-xs">
             <span className="flex items-center gap-1">
               {onFocusInGraph && (
                 <button
@@ -598,7 +598,7 @@ export function renderFormattedGuideText(
               onClick={(e) => e.stopPropagation()}
             >
               <span>{linkTitle}</span>
-              <span className="text-[10px]">↗</span>
+              <span className="text-xs">↗</span>
             </a>
           );
         }
@@ -637,7 +637,7 @@ export function renderFormattedGuideText(
         nodes.push(
           <code
             key={`c-${match.index}`}
-            className="px-1.5 py-0.5 rounded text-[11px] font-mono bg-neutral-200/80 dark:bg-white/10 text-neutral-800 dark:text-neutral-200 font-medium"
+            className="px-1.5 py-0.5 rounded text-xs font-mono bg-neutral-200/80 dark:bg-white/10 text-neutral-800 dark:text-neutral-200 font-medium"
           >
             {match[6]}
           </code>
@@ -855,7 +855,7 @@ export function renderFormattedGuideText(
                     }}
                     className="inline-flex min-h-8 items-center gap-1.5 text-neutral-700 transition-colors hover:text-neutral-950 dark:text-neutral-300 dark:hover:text-white"
                   >
-                    <span className="text-[11px] tabular-nums text-neutral-400">{hIdx + 1}</span>
+                    <span className="text-xs tabular-nums text-neutral-400">{hIdx + 1}</span>
                     <span>{h.content}</span>
                   </a>
                 </li>
@@ -999,7 +999,7 @@ export function renderFormattedGuideText(
                     {block.header.map((h, i) => (
                       <th
                         key={i}
-                        className="px-3 py-2 font-semibold text-neutral-900 dark:text-neutral-100 uppercase text-[11px] tracking-wider"
+                        className="px-3 py-2 font-semibold text-neutral-900 dark:text-neutral-100 uppercase text-xs tracking-wider"
                       >
                         {parseInline(h)}
                       </th>

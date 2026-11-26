@@ -98,12 +98,12 @@ export default function CitationSupportPanel({
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <span className="font-bold text-sm text-[color:var(--text-primary)]">Do sources support their sentences?</span>
         {saved && (
-          <span className="text-[11px] text-[color:var(--text-muted)]">
+          <span className="text-xs text-[color:var(--text-muted)]">
             {counts.does_not_support} don't · {counts.partly} partly · {counts.cannot_tell} can't tell · {counts.supports} support
           </span>
         )}
       </div>
-      <p className="text-[11px] text-[color:var(--text-secondary)]">
+      <p className="text-xs text-[color:var(--text-secondary)]">
         Your AI reads each sentence that cites a source next to what Evidence records about that source (its findings or abstract), and must quote that record for its verdict. A verdict whose quote isn't in the record is discarded. This is advice for you to check; it doesn't block export.
       </p>
       <div className="flex items-center gap-3 flex-wrap">
@@ -117,7 +117,7 @@ export default function CitationSupportPanel({
           {busy ? "Checking…" : saved ? "Check again" : "Check with my AI"}
         </button>
         {saved && (
-          <span className={`text-[11px] ${stale ? "text-[color:var(--state-warning)]" : "text-[color:var(--text-muted)]"}`}>
+          <span className={`text-xs ${stale ? "text-[color:var(--state-warning)]" : "text-[color:var(--text-muted)]"}`}>
             {stale ? "The text has changed since this check; run it again." : checkedAtLabel(saved.checkedAt) ? `Checked ${checkedAtLabel(saved.checkedAt)}.` : ""}
           </span>
         )}
@@ -127,25 +127,25 @@ export default function CitationSupportPanel({
           {error}
         </p>
       )}
-      {saved && saved.truncated > 0 && <p className="text-[11px] text-[color:var(--text-muted)]">The first 40 citations were checked; {saved.truncated} more were not.</p>}
+      {saved && saved.truncated > 0 && <p className="text-xs text-[color:var(--text-muted)]">The first 40 citations were checked; {saved.truncated} more were not.</p>}
       {saved && (
         <ul aria-label="Citation checks" className="max-h-80 overflow-y-auto space-y-2">
           {shown.map((r) => (
             <li key={r.key} className="p-2 rounded-lg border border-[color:var(--border-subtle)] space-y-1">
               <div className="flex items-start gap-2">
-                <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${VERDICT[r.verdict].tone}`}>{VERDICT[r.verdict].label}</span>
+                <span className={`shrink-0 text-xs font-bold px-1.5 py-0.5 rounded ${VERDICT[r.verdict].tone}`}>{VERDICT[r.verdict].label}</span>
                 <span className="text-xs text-[color:var(--text-primary)]">{r.sentence}</span>
               </div>
-              <p className="text-[11px] text-[color:var(--text-muted)]">
+              <p className="text-xs text-[color:var(--text-muted)]">
                 Source: {titleOf(r.citeId)}. {r.reason}
               </p>
-              {r.quote && <blockquote className="text-[11px] text-[color:var(--text-secondary)] border-l-2 border-[color:var(--border-strong)] pl-2">“{r.quote}”</blockquote>}
+              {r.quote && <blockquote className="text-xs text-[color:var(--text-secondary)] border-l-2 border-[color:var(--border-strong)] pl-2">“{r.quote}”</blockquote>}
             </li>
           ))}
         </ul>
       )}
       {saved && counts.supports > 0 && (
-        <button type="button" onClick={() => setShowSupported((v) => !v)} className="self-start text-[11px] underline text-[color:var(--text-secondary)] cursor-pointer">
+        <button type="button" onClick={() => setShowSupported((v) => !v)} className="self-start text-xs underline text-[color:var(--text-secondary)] cursor-pointer">
           {showSupported ? "Hide" : "Show"} the {counts.supports} that support their sentence
         </button>
       )}

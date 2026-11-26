@@ -296,7 +296,7 @@ export default function ManuscriptGenerationPanel({
                 Q1 Journal Style Compliance
               </span>
               <span
-                className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                   journalStyleAudit.isCompliant
                     ? "bg-[color:var(--state-success-subtle)] text-[color:var(--state-success)]"
                     : "bg-[color:var(--state-warning-subtle)] text-[color:var(--state-warning)]"
@@ -312,32 +312,32 @@ export default function ManuscriptGenerationPanel({
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
             <div className="p-2 rounded bg-[color:var(--surface-inset)]">
-              <div className="text-[10px] text-[color:var(--text-muted)]">Avg Sentence Length</div>
+              <div className="text-xs text-[color:var(--text-muted)]">Avg Sentence Length</div>
               <div className="font-semibold text-[color:var(--text-primary)]">
                 {journalStyleAudit.metrics.avgSentenceLength} words
               </div>
-              <div className="text-[10px] text-[color:var(--text-muted)]">Target: 20–32</div>
+              <div className="text-xs text-[color:var(--text-muted)]">Target: 20–32</div>
             </div>
             <div className="p-2 rounded bg-[color:var(--surface-inset)]">
-              <div className="text-[10px] text-[color:var(--text-muted)]">Passive Voice</div>
+              <div className="text-xs text-[color:var(--text-muted)]">Passive Voice</div>
               <div className="font-semibold text-[color:var(--text-primary)]">
                 {journalStyleAudit.metrics.passiveVoiceRatio.toFixed(1)}/sent
               </div>
-              <div className="text-[10px] text-[color:var(--text-muted)]">Max: ≤3.5</div>
+              <div className="text-xs text-[color:var(--text-muted)]">Max: ≤3.5</div>
             </div>
             <div className="p-2 rounded bg-[color:var(--surface-inset)]">
-              <div className="text-[10px] text-[color:var(--text-muted)]">Lexical Diversity</div>
+              <div className="text-xs text-[color:var(--text-muted)]">Lexical Diversity</div>
               <div className="font-semibold text-[color:var(--text-primary)]">
                 {journalStyleAudit.metrics.lexicalDiversity.toFixed(2)}
               </div>
-              <div className="text-[10px] text-[color:var(--text-muted)]">Min: ≥0.48</div>
+              <div className="text-xs text-[color:var(--text-muted)]">Min: ≥0.48</div>
             </div>
             <div className="p-2 rounded bg-[color:var(--surface-inset)]">
-              <div className="text-[10px] text-[color:var(--text-muted)]">Citation Density</div>
+              <div className="text-xs text-[color:var(--text-muted)]">Citation Density</div>
               <div className="font-semibold text-[color:var(--text-primary)]">
                 {journalStyleAudit.metrics.citationDensity.toFixed(1)}%
               </div>
-              <div className="text-[10px] text-[color:var(--text-muted)]">Min: ≥2.2%</div>
+              <div className="text-xs text-[color:var(--text-muted)]">Min: ≥2.2%</div>
             </div>
           </div>
         </div>
@@ -390,7 +390,7 @@ export default function ManuscriptGenerationPanel({
                 <li key={i} className="text-sm text-[color:var(--text-primary)]">
                   <span
                     className={[
-                      "mr-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium",
+                      "mr-1.5 rounded-full px-2 py-0.5 text-xs font-medium",
                       issue.severity === "major"
                         ? "bg-[color:var(--state-danger-subtle)] text-[color:var(--state-danger)]"
                         : issue.severity === "moderate"
@@ -457,7 +457,7 @@ export default function ManuscriptGenerationPanel({
                         <li key={i} className="text-xs text-[color:var(--text-primary)]">
                           <span
                             className={[
-                              "mr-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+                              "mr-1.5 rounded-full px-1.5 py-0.5 text-xs font-medium",
                               finding.severity === "critical" || finding.severity === "major"
                                 ? "bg-[color:var(--state-danger-subtle)] text-[color:var(--state-danger)]"
                                 : finding.severity === "moderate"
@@ -488,7 +488,7 @@ export default function ManuscriptGenerationPanel({
                 </span>
               </div>
               <span
-                className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                   journalStyleAudit.isCompliant
                     ? "bg-[color:var(--state-success-subtle)] text-[color:var(--state-success)]"
                     : "bg-[color:var(--state-warning-subtle)] text-[color:var(--state-warning)]"

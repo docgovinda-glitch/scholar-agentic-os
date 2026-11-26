@@ -179,7 +179,7 @@ export default function JournalProfileCard({
   const input = "w-full px-3 py-2 text-xs rounded-lg border border-[color:var(--border-control)] bg-[color:var(--surface-raised)] text-[color:var(--text-primary)] focus:outline-none focus:border-[color:var(--border-strong)]";
   const label = "text-xs font-semibold text-[color:var(--text-primary)]";
   const hint = (k: string) =>
-    notStated(k) ? <span className="block text-[11px] text-[color:var(--state-warning)]">Not stated in the guidelines: fill in if you know it.</span> : null;
+    notStated(k) ? <span className="block text-xs text-[color:var(--state-warning)]">Not stated in the guidelines: fill in if you know it.</span> : null;
 
   return (
     <section aria-labelledby="journal-profile-heading" className="rounded-2xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] p-6 space-y-4">
@@ -250,7 +250,7 @@ export default function JournalProfileCard({
               {busy === "extract" ? "Reading…" : "Fill from guidelines with AI"}
             </button>
             {guidelines.trim() && guidelines.trim().split(/\s+/).length < 40 && (
-              <span className="block text-[11px] text-[color:var(--text-muted)]">Paste at least 40 words of the guidelines.</span>
+              <span className="block text-xs text-[color:var(--text-muted)]">Paste at least 40 words of the guidelines.</span>
             )}
           </div>
 
@@ -263,7 +263,7 @@ export default function JournalProfileCard({
               <input id="jp-style" value={fields.citationStyle} onChange={set("citationStyle")} placeholder="e.g. APA 7, IEEE, Vancouver" className={input} />
               {hint("citationStyle")}
               {fields.citationStyle.trim() && !citationStyleOption(fields.citationStyle) && (
-                <span className="block text-[11px] text-[color:var(--text-muted)]">Not one the workspace formats yet; your current style stays.</span>
+                <span className="block text-xs text-[color:var(--text-muted)]">Not one the workspace formats yet; your current style stays.</span>
               )}
             </div>
             <div className="space-y-1">
@@ -287,7 +287,7 @@ export default function JournalProfileCard({
               {busy === "save" ? "Saving…" : "Save journal profile"}
             </button>
             <button type="button" onClick={() => setEditing(false)} className="studio-btn">Cancel</button>
-            <span className="text-[11px] text-[color:var(--text-muted)]">Saving sets the outline from the sections above, the word target and the citation style.</span>
+            <span className="text-xs text-[color:var(--text-muted)]">Saving sets the outline from the sections above, the word target and the citation style.</span>
           </div>
         </div>
       )}

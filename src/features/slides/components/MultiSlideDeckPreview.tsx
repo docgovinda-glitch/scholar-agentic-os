@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, Maximize2 } from 'lucide-react';
+import { Brain, ChevronLeft, ChevronRight, Lock, Maximize2, Zap } from 'lucide-react';
 import SlideMotifGraphic from './SlideMotifGraphic';
 import type { VisualMotif } from '../types/themes';
 import type { BestDesignCategory, DesignLayoutArchetype } from '../data/bestSlideDesigns100';
@@ -370,19 +370,19 @@ export default function MultiSlideDeckPreview({
                     <div className="p-1 rounded-lg border text-[6.5px] space-y-0.5 bg-white/5 backdrop-blur-md"
                       style={{ borderColor: `${theme.accent}40` }}
                     >
-                      <span className="font-bold block" style={{ color: theme.accent }}>⚡ Neural Core</span>
+                      <span className="font-bold block" style={{ color: theme.accent }}><Zap className="inline-block w-3.5 h-3.5 mr-1 align-[-2px]" aria-hidden="true" />Neural Core</span>
                       <p className="opacity-75 leading-tight">Sub-ms on-chip inference</p>
                     </div>
                     <div className="p-1 rounded-lg border text-[6.5px] space-y-0.5 bg-white/5 backdrop-blur-md"
                       style={{ borderColor: 'rgba(255,255,255,0.1)' }}
                     >
-                      <span className="font-bold block text-blue-400">🧠 Unified Bus</span>
+                      <span className="font-bold block text-blue-400"><Brain className="inline-block w-3.5 h-3.5 mr-1 align-[-2px]" aria-hidden="true" />Unified Bus</span>
                       <p className="opacity-75 leading-tight">Zero-copy shared memory</p>
                     </div>
                     <div className="p-1 rounded-lg border text-[6.5px] space-y-0.5 bg-white/5 backdrop-blur-md"
                       style={{ borderColor: 'rgba(255,255,255,0.1)' }}
                     >
-                      <span className="font-bold block text-purple-400">🔒 Enclave</span>
+                      <span className="font-bold block text-purple-400"><Lock className="inline-block w-3.5 h-3.5 mr-1 align-[-2px]" aria-hidden="true" />Enclave</span>
                       <p className="opacity-75 leading-tight">Hardware isolation boundary</p>
                     </div>
                   </div>
@@ -686,7 +686,7 @@ export default function MultiSlideDeckPreview({
                     {/* Top-Left: Quick Wins */}
                     <div className="p-1.5 rounded border border-emerald-500/30 bg-emerald-500/10 space-y-0.5">
                       <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400 font-bold text-[6px]">
-                        <span>⚡ QUICK WINS</span>
+                        <span><Zap className="inline-block w-3.5 h-3.5 mr-1 align-[-2px]" aria-hidden="true" />QUICK WINS</span>
                         <span>HIGH FEASIBILITY</span>
                       </div>
                       <div className="font-semibold text-[7px] leading-tight">Automated Research Ingestion</div>

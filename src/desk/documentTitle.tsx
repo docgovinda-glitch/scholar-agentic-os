@@ -32,7 +32,8 @@ export function useProjectDocumentTitle(name: string | null | undefined): void {
 }
 
 const ROUTE_TITLES: Array<[RegExp, string]> = [
-  [/^\/(signin)?$/, "Projects"],
+  [/^\/signin\/?$/, "Sign in"],
+  [/^\/$/, "Projects"],
   [/^\/projects\/?$/, "Projects"],
   [/^\/presentation\/?$/, "Presentation Studio"],
   [/^\/vault\/?$/, "Knowledge Vault"],
@@ -40,6 +41,7 @@ const ROUTE_TITLES: Array<[RegExp, string]> = [
   [/^\/settings\/?$/, "Account Settings"],
   [/^\/onboarding\/?$/, "Complete your profile"],
   [/^\/admin(\/|$)/, "Admin"],
+  [/^\/signup\/?$/, "Create account"],
   [/^\/(signup|reset-password|verify-email)(\/|$)/, "Account"],
 ];
 

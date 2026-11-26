@@ -90,8 +90,10 @@ function FilterMenu({ label, text, active, icon, testId, children }: {
         className={trigger(active)}
       >
         {icon}
-        <span>{text}</span>
-        <ChevronDown className="h-3 w-3 opacity-70" aria-hidden="true" />
+        {/* Phones show the icon only, so the composer keeps to two rows; the name stays for screen readers. */}
+        <span className="hidden sm:inline">{text}</span>
+        <span className="sr-only sm:hidden">{`${label}: ${text}`}</span>
+        <ChevronDown className="hidden sm:block h-3 w-3 opacity-70" aria-hidden="true" />
       </button>
       {open && (phone ? createPortal(panel, document.body) : panel)}
     </div>
@@ -191,7 +193,7 @@ export function ScholarFilterBar({ mode, onModeChange, filters, onFiltersChange 
                   {yearInput("yearFrom", "From year")}–{yearInput("yearTo", "To year")}
                 </div>
                 {yearsChecked && inverted && (
-                  <p role="alert" className="mt-1 text-[11px] text-[color:var(--state-danger)]">
+                  <p role="alert" className="mt-1 text-xs text-[color:var(--state-danger)]">
                     “From” is after “To”.{" "}
                     <button type="button" className="cursor-pointer underline" onClick={() => set({ yearFrom: filters.yearTo, yearTo: filters.yearFrom })}>
                       Swap
@@ -215,7 +217,7 @@ export function ScholarFilterBar({ mode, onModeChange, filters, onFiltersChange 
       </FilterMenu>
 
       {(filters.yearPreset !== "any" || filters.scopes.length > 0) && (
-        <button type="button" className="min-h-10 cursor-pointer px-1 text-[11px] text-neutral-500 underline sm:min-h-8" onClick={() => onFiltersChange(DEFAULT_SCHOLAR_FILTERS)}>
+        <button type="button" className="min-h-10 cursor-pointer px-1 text-xs text-neutral-500 underline sm:min-h-8" onClick={() => onFiltersChange(DEFAULT_SCHOLAR_FILTERS)}>
           Clear
         </button>
       )}

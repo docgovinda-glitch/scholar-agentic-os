@@ -124,7 +124,7 @@ export default function UserAccountMenu({
               <span className="text-xs font-semibold tracking-tight text-[var(--text-primary)] truncate leading-tight">
                 Guest Researcher
               </span>
-              <span className="text-[10px] text-slate-500 dark:text-neutral-400 leading-none mt-0.5 font-medium truncate">
+              <span className="text-xs text-slate-500 dark:text-neutral-400 leading-none mt-0.5 font-medium truncate">
                 Sign In / Register →
               </span>
             </div>
@@ -154,7 +154,7 @@ export default function UserAccountMenu({
               <span className="text-xs font-semibold tracking-tight text-[var(--theme-fg)] truncate leading-tight">
                 {displayName}
               </span>
-              <span className="text-[10px] text-[var(--theme-fg)]/60 leading-none mt-0.5 font-normal truncate">
+              <span className="text-xs text-[var(--theme-fg)]/60 leading-none mt-0.5 font-normal truncate">
                 {secondaryIdentifier}
               </span>
             </div>
@@ -177,14 +177,14 @@ export default function UserAccountMenu({
           onClick={() => setOpen(!open)}
           className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[var(--theme-bg)] border border-[var(--theme-fg)]/15 text-xs font-semibold tracking-tight text-[var(--theme-fg)] hover:bg-[var(--theme-fg)]/5 transition-all cursor-pointer shadow-2xs"
         >
-          <span className="w-5 h-5 rounded-full bg-[var(--theme-fg)] text-[var(--theme-bg)] flex items-center justify-center font-bold text-[11px] shadow-2xs">
+          <span className="w-5 h-5 rounded-full bg-[var(--theme-fg)] text-[var(--theme-bg)] flex items-center justify-center font-bold text-xs shadow-2xs">
             {initial}
           </span>
           <div className="flex flex-col text-left max-w-[150px] hidden sm:flex leading-tight">
             <span className="truncate font-semibold tracking-tight text-[var(--theme-fg)] text-xs">
               {displayName}
             </span>
-            <span className="truncate text-[9px] text-[var(--theme-fg)]/60 font-normal">
+            <span className="truncate text-xs text-[var(--theme-fg)]/60 font-normal">
               {secondaryIdentifier}
             </span>
           </div>
@@ -217,9 +217,9 @@ export default function UserAccountMenu({
 
           {/* Categorized Users / Switch Accounts Section */}
           <div className="pt-1 pb-1">
-            <div className="flex items-center justify-between px-3 py-1 text-[11px] font-semibold tracking-tight text-[var(--theme-fg)]/60 uppercase">
+            <div className="flex items-center justify-between px-3 py-1 text-xs font-semibold tracking-tight text-[var(--theme-fg)]/60 uppercase">
               <span>Switch Accounts</span>
-              {otherAccounts.length > 0 && <span className="text-[10px] text-[var(--theme-fg)]/40 font-normal">{otherAccounts.length} saved</span>}
+              {otherAccounts.length > 0 && <span className="text-xs text-[var(--theme-fg)]/40 font-normal">{otherAccounts.length} saved</span>}
             </div>
 
             {otherAccounts.length > 0 && (
@@ -235,7 +235,7 @@ export default function UserAccountMenu({
                       onClick={() => handleSwitch(acc.userId)}
                       className="flex items-center gap-2 min-w-0 text-left cursor-pointer flex-1"
                     >
-                      <span className="w-5 h-5 rounded-full bg-[var(--theme-fg)]/10 border border-[var(--theme-fg)]/15 flex items-center justify-center font-semibold text-[10px] text-[var(--theme-fg)]">
+                      <span className="w-5 h-5 rounded-full bg-[var(--theme-fg)]/10 border border-[var(--theme-fg)]/15 flex items-center justify-center font-semibold text-xs text-[var(--theme-fg)]">
                         {acc.email.charAt(0).toUpperCase()}
                       </span>
                       <span className="truncate text-xs text-[var(--theme-fg)]/80 font-semibold tracking-tight max-w-[140px]">

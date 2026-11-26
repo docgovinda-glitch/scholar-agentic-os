@@ -105,11 +105,21 @@ describe("Extract: Save & Build", () => {
   });
 
   it("shows the build's own error with Retry, and stays on Extract", async () => {
+    authedJsonFetch.mockResolvedValue(sse([{ step: "extract", status: "running" }, { error: "The model returned an empty answer.", step: "extract", recoverable: true }]));
+    const onProceed = mount();
+    fireEvent.click(await buildButton());
+    expect(await screen.findByText(/empty answer/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    expect(onProceed).not.toHaveBeenCalled();
+  });
+
+  it("treats no AI connected as an expected state: a calm notice with Connect an AI, not a red Retry", async () => {
     authedJsonFetch.mockResolvedValue(sse([{ step: "extract", status: "running" }, { error: "Connect an AI provider (your own key or a local model) in AI Access to run this.", step: "extract", recoverable: true }]));
     const onProceed = mount();
     fireEvent.click(await buildButton());
-    expect(await screen.findByText(/Connect an AI provider/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    expect(await screen.findByText(/Reading the brief needs an AI\. Your brief and settings are saved\./i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Connect an AI" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
     expect(onProceed).not.toHaveBeenCalled();
   });
 });

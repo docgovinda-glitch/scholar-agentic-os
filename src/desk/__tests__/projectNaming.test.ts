@@ -244,7 +244,8 @@ describe("projectNaming utilities", () => {
 
     it("falls back to Project for missing ID or returns unknown ID", () => {
       expect(getFormatLabel(undefined)).toBe("Project");
-      expect(getFormatLabel("CUSTOM-99")).toBe("CUSTOM-99");
+      // An unknown id is never shown to people; it reads as a plain "Project".
+      expect(getFormatLabel("CUSTOM-99")).toBe("Project");
     });
   });
 

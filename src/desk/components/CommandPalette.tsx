@@ -129,7 +129,7 @@ export function CommandPalette({
           title: `New ${ws.label}`,
           subtitle: ws.desc,
           icon: <Plus className="w-4 h-4 text-emerald-500" />,
-          badge: "Boot Workspace",
+          badge: "New project",
           action: () => {
             onClose();
             onCreateProject(ws.id);
@@ -162,7 +162,7 @@ export function CommandPalette({
       },
       {
         id: "act-copilot",
-        title: "Toggle Ask Scholar Copilot",
+        title: "Open Ask Scholar",
         subtitle: "Open the slide-in AI research assistant drawer",
         icon: <MessageSquare className="w-4 h-4 text-sky-500" />,
         action: () => {
@@ -262,7 +262,7 @@ export function CommandPalette({
               <X className="w-3.5 h-3.5" />
             </button>
           )}
-          <kbd className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-mono text-neutral-400 bg-neutral-100 dark:bg-white/10 rounded border border-neutral-200 dark:border-white/10">
+          <kbd className="hidden sm:inline-block px-2 py-0.5 text-xs font-mono text-neutral-400 bg-neutral-100 dark:bg-white/10 rounded border border-neutral-200 dark:border-white/10">
             ESC
           </kbd>
         </div>
@@ -297,7 +297,7 @@ export function CommandPalette({
                         {item.title}
                       </div>
                       {item.subtitle && (
-                        <div className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate mt-0.5">
+                        <div className="text-xs text-neutral-500 dark:text-neutral-400 truncate mt-0.5">
                           {item.subtitle}
                         </div>
                       )}
@@ -306,7 +306,7 @@ export function CommandPalette({
 
                   <div className="flex items-center gap-2 shrink-0">
                     {item.badge && (
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-neutral-200/60 dark:bg-white/10 font-medium text-neutral-600 dark:text-neutral-400">
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-neutral-200/60 dark:bg-white/10 font-medium text-neutral-600 dark:text-neutral-400">
                         {item.badge}
                       </span>
                     )}
@@ -321,15 +321,15 @@ export function CommandPalette({
         </div>
 
         {/* Footer Shortcut Hints */}
-        <div className="px-4 py-2.5 border-t border-neutral-200 dark:border-white/10 bg-neutral-50/80 dark:bg-white/[0.02] flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400">
+        <div className="px-4 py-2.5 border-t border-neutral-200 dark:border-white/10 bg-neutral-50/80 dark:bg-white/[0.02] flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400">
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1">
-              <kbd className="px-1.5 py-0.5 font-mono text-[9px] bg-neutral-200/60 dark:bg-white/10 rounded">↑</kbd>
-              <kbd className="px-1.5 py-0.5 font-mono text-[9px] bg-neutral-200/60 dark:bg-white/10 rounded">↓</kbd>
+              <kbd className="px-1.5 py-0.5 font-mono text-xs bg-neutral-200/60 dark:bg-white/10 rounded">↑</kbd>
+              <kbd className="px-1.5 py-0.5 font-mono text-xs bg-neutral-200/60 dark:bg-white/10 rounded">↓</kbd>
               <span>to navigate</span>
             </span>
             <span className="flex items-center gap-1">
-              <kbd className="px-1.5 py-0.5 font-mono text-[9px] bg-neutral-200/60 dark:bg-white/10 rounded">↵</kbd>
+              <kbd className="px-1.5 py-0.5 font-mono text-xs bg-neutral-200/60 dark:bg-white/10 rounded">↵</kbd>
               <span>to select</span>
             </span>
           </div>

@@ -50,7 +50,7 @@ describe('Theme Studio Enhancements (Step 02)', () => {
     // Segmented tab bar
     expect(screen.getByRole('tab', { name: /Curated \(\d+\)/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /Explore Library|Theme Library/i })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /Screenshot Cloner|Clone from Screenshot/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Theme from screenshot/i })).toBeInTheDocument();
 
     // Default tab is Curated (4)
     expect(screen.getByTestId('theme-card-sand-academic')).toBeInTheDocument();
@@ -116,7 +116,7 @@ describe('Theme Studio Enhancements (Step 02)', () => {
     );
 
     // Switch to cloner tab
-    const clonerTab = screen.getByRole('tab', { name: /Screenshot Cloner|Clone from Screenshot/i });
+    const clonerTab = screen.getByRole('tab', { name: /Theme from screenshot/i });
     fireEvent.click(clonerTab);
 
     expect(screen.getByTestId('theme-screenshot-cloner')).toBeInTheDocument();

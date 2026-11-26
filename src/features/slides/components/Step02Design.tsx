@@ -108,7 +108,7 @@ function AccentPicker({
         />
         <span className="text-xs tabular-nums text-neutral-500 dark:text-neutral-400 w-16">{value.toUpperCase()}</span>
         <span
-          className={`h-7 px-2.5 rounded-full text-[11px] font-semibold inline-flex items-center gap-1.5 ${
+          className={`h-7 px-2.5 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 ${
             pass ? 'bg-emerald-600/10 text-emerald-700 dark:text-emerald-400' : 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
           }`}
           title={`Contrast ratio ${ratio.toFixed(2)}:1 against the card surface`}
@@ -271,14 +271,14 @@ export default function Step02Design({ deck, onUpdateDeck, onPrevStep, onNextSte
     { id: 'curated', label: `Curated (${DECK_THEMES.length})`, testId: 'tab-curated-themes', icon: <Layers className="w-3.5 h-3.5" /> },
     { id: 'library', label: 'Explore Library', testId: 'tab-theme-library', icon: <Library className="w-3.5 h-3.5" />, aria: 'Explore Library' },
     { id: 'custom', label: 'Bring Your Own', testId: 'tab-custom-theme-studio', icon: <Palette className="w-3.5 h-3.5" /> },
-    { id: 'cloner', label: 'Screenshot Cloner', testId: 'tab-screenshot-cloner', icon: <Camera className="w-3.5 h-3.5" /> },
+    { id: 'cloner', label: 'Theme from screenshot', testId: 'tab-screenshot-cloner', icon: <Camera className="w-3.5 h-3.5" /> },
   ];
 
   return (
     <div className="max-w-6xl mx-auto space-y-7" data-testid="step-02-design">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500 dark:text-neutral-400">02 · Design</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500 dark:text-neutral-400">02 · Design</p>
           <h1 className="mt-1.5 text-2xl sm:text-[28px] font-bold tracking-tight text-neutral-900 dark:text-neutral-50">Choose Presentation Design</h1>
           <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
             Every theme below is rendered with your own slides. Switch any time; the layouts reflow instantly.

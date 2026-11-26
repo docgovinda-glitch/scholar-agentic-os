@@ -9,23 +9,26 @@ export default function StatusBar({ project, trayOpen, onToggleTray }: { project
   const blockingCount = project.gates.reduce((n, g) => n + g.outstandingBlocking.length, 0);
 
   return (
-    <div className="flex items-center gap-4 px-4 py-1.5 text-[11px] font-mono text-[color:var(--text-secondary)] border-t border-[color:var(--color-border-subtle)] bg-[color:var(--color-navy-1)]">
-      <span>
-        {current.gate} · {current.name} · {current.status.replace("_", " ")}
+    <footer className="flex min-w-0 items-center gap-3 px-4 py-1.5 text-xs text-[color:var(--text-secondary)] border-t border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)]">
+      <span className="truncate">
+        Stage: {current.name} ({current.status.replace("_", " ")})
       </span>
       <span aria-hidden="true">·</span>
-      <span className={blockingCount > 0 ? "text-amber-400" : ""}>
-        {blockingCount === 0 ? "no blocking findings" : `⚠ ${blockingCount} blocking`}
+      <span className={`truncate ${blockingCount > 0 ? "text-[color:var(--state-warning)]" : ""}`}>
+        {blockingCount === 0
+          ? "Nothing blocking"
+          : `${blockingCount} ${blockingCount === 1 ? "requirement" : "requirements"} to meet before the next stage`}
       </span>
       
       {onToggleTray && (
         <button 
+          type="button"
           onClick={onToggleTray}
-          className={`ml-auto px-2 py-0.5 rounded transition-colors cursor-pointer ${trayOpen ? 'bg-[color:var(--surface-hover)] text-[color:var(--text-primary)]' : 'hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)]'}`}
+          className={`ml-auto shrink-0 px-2 py-0.5 rounded transition-colors cursor-pointer ${trayOpen ? 'bg-[color:var(--surface-hover)] text-[color:var(--text-primary)]' : 'hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)]'}`}
         >
-          Activity Tray
+          Activity
         </button>
       )}
-    </div>
+    </footer>
   );
 }

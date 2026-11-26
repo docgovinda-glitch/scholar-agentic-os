@@ -98,7 +98,7 @@ describe("the document-type format selector", () => {
 
   it("cannot continue before a format is chosen", async () => {
     await openChooser();
-    expect(screen.getByRole("button", { name: /Select a Format to Boot/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Choose a format/i })).toBeDisabled();
   });
 
   it("creates the project for the selected format when Boot button is pressed", async () => {
@@ -110,7 +110,7 @@ describe("the document-type format selector", () => {
     fireEvent.click(journalCard);
 
     expect(createProject).not.toHaveBeenCalled();
-    const bootBtn = screen.getByRole("button", { name: /Boot Journal Article/i });
+    const bootBtn = screen.getByRole("button", { name: /Create Journal Article/i });
     expect(bootBtn).toBeEnabled();
 
     fireEvent.click(bootBtn);
@@ -711,7 +711,7 @@ describe("minimal website assistant", () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
-    const toggleBtn = screen.getByRole("button", { name: /Ask Scholar panel/i });
+    const toggleBtn = screen.getByRole("button", { name: /^Ask Scholar$/i });
     fireEvent.click(toggleBtn);
 
     // Assistant container exists in the slide-in sidebar with clean header and single one-liner above the 4 cards
@@ -755,7 +755,7 @@ describe("minimal website assistant", () => {
 
     renderScreen(<ProjectListScreen onOpen={onOpen} userEmail="scholar@research.edu" />);
 
-    const toggleBtn = screen.getByRole("button", { name: /Ask Scholar panel/i });
+    const toggleBtn = screen.getByRole("button", { name: /^Ask Scholar$/i });
     fireEvent.click(toggleBtn);
 
     const input = screen.getByPlaceholderText(/Ask a research question/i);
@@ -783,7 +783,7 @@ describe("minimal website assistant", () => {
     executeAgenticLLM.mockResolvedValueOnce("A browser-side answer about essay structure.");
 
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
-    fireEvent.click(screen.getByRole("button", { name: /Ask Scholar panel/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Ask Scholar$/i }));
     fireEvent.change(screen.getByPlaceholderText(/Ask a research question/i), { target: { value: "write an essay on biology" } });
     fireEvent.click(screen.getByRole("button", { name: "Send question" }));
 
@@ -797,7 +797,7 @@ describe("minimal website assistant", () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
-    const toggleBtn = screen.getByRole("button", { name: /Ask Scholar panel/i });
+    const toggleBtn = screen.getByRole("button", { name: /^Ask Scholar$/i });
     fireEvent.click(toggleBtn);
 
     const input = screen.getByPlaceholderText(/Ask a research question/i);
@@ -810,7 +810,7 @@ describe("minimal website assistant", () => {
 
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
-    const toggleBtn = screen.getByRole("button", { name: /Ask Scholar panel/i });
+    const toggleBtn = screen.getByRole("button", { name: /^Ask Scholar$/i });
     fireEvent.click(toggleBtn);
 
     const input = screen.getByPlaceholderText(/Ask a research question/i);
@@ -829,7 +829,7 @@ describe("minimal website assistant", () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
 
-    const toggleBtn = screen.getByRole("button", { name: /Ask Scholar panel/i });
+    const toggleBtn = screen.getByRole("button", { name: /^Ask Scholar$/i });
     fireEvent.click(toggleBtn);
 
     const input = screen.getByPlaceholderText(/Ask a research question/i);
@@ -843,26 +843,20 @@ describe("minimal website assistant", () => {
     expect(executeAgenticLLM).not.toHaveBeenCalled();
   });
 
-  it("renders minimalist Lightbulb icon with Ask Scholar tooltip, hides button when sidebar opens, and restores it on close", async () => {
+  it("shows one Ask Scholar entry: the sidebar's while it is open, the top-bar button only when the sidebar is collapsed", async () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
-    // 1. Initially closed: toggle button is visible in top navigation and has title="Ask Scholar" tooltip
-    const toggleBtn = screen.getByRole("button", { name: /Ask Scholar panel/i });
-    expect(toggleBtn).toBeInTheDocument();
-    expect(toggleBtn).toHaveAttribute("title", "Ask Scholar");
-
-    // 2. Open assistant: button triggers the sidebar to slide open
-    fireEvent.click(toggleBtn);
-    expect(await screen.findByRole("heading", { name: "Ask Scholar" })).toBeInTheDocument();
-
-    // 3. Conditional rendering: toggle button completely disappears from top navigation
+    // Sidebar open: its own Ask Scholar item is the one entry; no duplicate in the top bar.
+    expect(screen.getByRole("button", { name: /^Ask Scholar$/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Ask Scholar panel/i })).not.toBeInTheDocument();
 
-    // 4. Close assistant: toggle button reappears in top navigation
-    const closeBtn = screen.getByRole("button", { name: "Close Assistant" });
-    fireEvent.click(closeBtn);
-    expect(screen.getByRole("button", { name: /Ask Scholar panel/i })).toBeInTheDocument();
+    // Collapse the sidebar: the top-bar button stands in for it.
+    fireEvent.click(screen.getByRole("button", { name: /collapse sidebar/i }));
+    const toggleBtn = await screen.findByRole("button", { name: /Ask Scholar panel/i });
+    expect(toggleBtn).toHaveAttribute("title", "Ask Scholar");
+    fireEvent.click(toggleBtn);
+    expect(await screen.findByRole("heading", { name: "Ask Scholar" })).toBeInTheDocument();
   });
 
   it("toggles the Ask Scholar assistant sidebar both open and closed on click from left sidebar navigation", async () => {
@@ -960,8 +954,6 @@ describe("ghost project deletion & strict unique project naming", () => {
     const projectB = { ...SAMPLE_PROJECT, projectId: "p-2", answers: { title: "Quantum Simulation" } };
     listProjects.mockResolvedValue({ items: [projectA, projectB] });
 
-    const promptMock = vi.spyOn(window, "prompt").mockReturnValue("  quantum simulation  ");
-
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
     await screen.findByText("Neural Dynamics");
@@ -972,12 +964,16 @@ describe("ghost project deletion & strict unique project naming", () => {
     const renameBtn = screen.getByRole("button", { name: /^Rename$/i });
     fireEvent.click(renameBtn);
 
+    // Rename opens the in-app dialog (never window.prompt); type a duplicate name.
+    const nameInput = await screen.findByLabelText("Project name");
+    fireEvent.change(nameInput, { target: { value: "  quantum simulation  " } });
+    fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
+
     // Accessible toast should have triggered warning of duplicate
     expect(await screen.findByText(/already exists/i)).toBeInTheDocument();
     // saveIntakeAnswers should NOT have been called with duplicate title
     expect(saveIntakeAnswers).not.toHaveBeenCalledWith("p-1", { title: "quantum simulation" });
 
-    promptMock.mockRestore();
   });
 
   it("reuses existing zero-content Untitled Project draft instead of creating a duplicate", async () => {
@@ -1056,9 +1052,9 @@ describe("distinct academic format USPs & specs", () => {
     expect(
       screen.getByText(/Guides you through thesis formulation, marking rubric alignment, critical argument synthesis, and citation formatting\./i)
     ).toBeInTheDocument();
-    expect(screen.getByText("Structured Outline")).toBeInTheDocument();
-    expect(screen.getByText("Rubric Matched")).toBeInTheDocument();
-    expect(screen.getByText("800 – 4,000 words")).toBeInTheDocument();
+    expect(screen.getByText("Outline from your brief")).toBeInTheDocument();
+    expect(screen.getByText("Marking criteria")).toBeInTheDocument();
+    expect(screen.getByText("Any word limit")).toBeInTheDocument();
 
     // 2. Journal Article
     expect(screen.getByRole("heading", { name: "Journal Article" })).toBeInTheDocument();
@@ -1076,7 +1072,7 @@ describe("distinct academic format USPs & specs", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Slide Deck Outline")).toBeInTheDocument();
     expect(screen.getByText("Scripted Speaker Notes")).toBeInTheDocument();
-    expect(screen.getByText("10 – 35 slides")).toBeInTheDocument();
+    expect(screen.getByText("6 – 15 slides")).toBeInTheDocument();
   });
 
   it("lists each deliverable spec on its own line, with no stranded separator dots", async () => {
@@ -1086,7 +1082,7 @@ describe("distinct academic format USPs & specs", () => {
     const essayHeading = screen.getByRole("heading", { name: "Coursework & Essays" });
     const card = essayHeading.closest("button")!;
     const specs = Array.from(card.querySelectorAll("ul li")).map((li) => li.textContent);
-    expect(specs).toEqual(["Structured Outline", "Rubric Matched", "800 – 4,000 words"]);
+    expect(specs).toEqual(["Outline from your brief", "Marking criteria", "Any word limit"]);
     expect(card.textContent).not.toContain("·");
   });
 
@@ -1215,7 +1211,7 @@ describe("prompt isolation & rich markdown rendering", () => {
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
     // Open the sidebar
-    const toggleBtn = screen.getByRole("button", { name: /Ask Scholar panel/i });
+    const toggleBtn = screen.getByRole("button", { name: /^Ask Scholar$/i });
     fireEvent.click(toggleBtn);
 
     const mainTextarea = screen.getByPlaceholderText(/Ask a question, paste your brief, or drop files/i) as HTMLTextAreaElement;

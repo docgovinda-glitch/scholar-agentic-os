@@ -48,7 +48,12 @@ export interface ThesisProjectData {
   citationStyle?: StyleKey;
 }
 
-export const UNTITLED_THESIS = "Untitled Thesis & Dissertation";
+export const UNTITLED_THESIS = "Untitled Thesis / Dissertation";
+/** Older builds saved "Untitled Thesis & Dissertation"; both mean no title yet. */
+export function isUntitledThesis(title: string | null | undefined): boolean {
+  const t = (title ?? "").trim();
+  return !t || t === UNTITLED_THESIS || t === "Untitled Thesis & Dissertation";
+}
 
 export const emptyLiteratureMatrix = (): LiteratureMatrix => ({ foundations: "", debates: "", gap: "" });
 
@@ -114,7 +119,7 @@ export function standardChapters(budget: number): ThesisChapter[] {
 /** What still blocks a useful AI step, in plain words (empty when nothing does). */
 export function missingForViva(data: Pick<ThesisProjectData, "title" | "researchQuestions">): string[] {
   const missing: string[] = [];
-  if (!data.title.trim() || data.title === UNTITLED_THESIS) missing.push("a thesis title");
+  if (isUntitledThesis(data.title)) missing.push("a thesis title");
   if (data.researchQuestions.filter((q) => q.trim()).length === 0) missing.push("at least one research question");
   return missing;
 }

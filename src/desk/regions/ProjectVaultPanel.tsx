@@ -1,3 +1,4 @@
+import { Lock } from "lucide-react";
 import React, { useState, useEffect } from "react";
 import { searchVaultItems, type VaultItem, isVaultUnlocked } from "../../services/vaultContents";
 import { getEvidenceLedger, addManualSource, extractEvidenceQuote } from "../api";
@@ -110,11 +111,11 @@ export default function ProjectVaultPanel({
       <div className="p-4 flex flex-col items-center justify-center text-center text-[color:var(--text-muted)] h-full">
         <form onSubmit={handleInlineUnlock} className="flex flex-col gap-2.5 p-4 text-center max-w-xs mx-auto bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-[var(--radius-lg)] shadow-xs w-full">
           <div className="w-9 h-9 rounded-full bg-[color:var(--accent-subtle)] text-[color:var(--accent)] flex items-center justify-center mx-auto text-sm">
-            🔒
+            <Lock className="inline-block w-3.5 h-3.5 mr-1 align-[-2px]" aria-hidden="true" />
           </div>
           <div>
             <h4 className="text-xs font-bold text-[color:var(--text-primary)]">Unlock Knowledge Vault</h4>
-            <p className="text-[11px] text-[color:var(--text-muted)] mt-0.5">
+            <p className="text-xs text-[color:var(--text-muted)] mt-0.5">
               Enter your device passphrase to access research sources.
             </p>
           </div>
@@ -125,7 +126,7 @@ export default function ProjectVaultPanel({
             onChange={(e) => setPassphraseInput(e.target.value)}
             className="w-full px-2.5 py-1.5 text-xs bg-[color:var(--surface-sunken)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)]"
           />
-          {unlockError && <p role="alert" className="text-[10px] text-red-500">{unlockError}</p>}
+          {unlockError && <p role="alert" className="text-xs text-red-500">{unlockError}</p>}
           <button
             type="submit"
             disabled={!passphraseInput.trim() || unlocking}
@@ -285,12 +286,12 @@ export default function ProjectVaultPanel({
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                       {isLinkedToCurrent && (
-                        <span className="px-1 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded">
+                        <span className="px-1 py-0.5 text-xs font-bold uppercase tracking-wider bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded">
                           Project
                         </span>
                       )}
                       {isRetracted && (
-                        <span className="shrink-0 px-1 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-red-500 text-white rounded">
+                        <span className="shrink-0 px-1 py-0.5 text-xs font-bold uppercase tracking-wider bg-red-500 text-white rounded">
                           Retracted
                         </span>
                       )}
@@ -298,20 +299,20 @@ export default function ProjectVaultPanel({
                   </div>
 
                   {item.authors && item.authors.length > 0 && (
-                    <div className="text-[color:var(--text-muted)] truncate mt-0.5 text-[11px]">
+                    <div className="text-[color:var(--text-muted)] truncate mt-0.5 text-xs">
                       {item.authors.join(", ")} {item.year ? `(${item.year})` : ""}
                     </div>
                   )}
 
                   {item.journal && (
-                    <div className="text-[color:var(--text-secondary)] italic truncate text-[11px] mt-0.5">
+                    <div className="text-[color:var(--text-secondary)] italic truncate text-xs mt-0.5">
                       {item.journal}
                     </div>
                   )}
 
                   {/* Key points takeaways */}
                   {keyPoints.length > 0 && (
-                    <div className="mt-1.5 space-y-0.5 bg-[color:var(--surface-inset)]/60 p-1.5 rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] text-[11px] text-[color:var(--text-secondary)]">
+                    <div className="mt-1.5 space-y-0.5 bg-[color:var(--surface-inset)]/60 p-1.5 rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] text-xs text-[color:var(--text-secondary)]">
                       {keyPoints.slice(0, 2).map((kp, idx) => (
                         <div key={idx} className="flex items-start gap-1 leading-tight line-clamp-1">
                           <span className="text-[color:var(--accent)] font-bold">•</span>
@@ -325,13 +326,13 @@ export default function ProjectVaultPanel({
                     <button
                       type="button"
                       onClick={() => handleCopyCitation(item)}
-                      className="px-2 py-0.5 text-[10px] font-medium rounded border border-[color:var(--border-subtle)] hover:bg-[color:var(--surface-hover)] text-[color:var(--text-primary)] transition-colors cursor-pointer"
+                      className="px-2 py-0.5 text-xs font-medium rounded border border-[color:var(--border-subtle)] hover:bg-[color:var(--surface-hover)] text-[color:var(--text-primary)] transition-colors cursor-pointer"
                     >
-                      {copiedCitationId === item.id ? "✓ Copied" : "📋 Cite"}
+                      {copiedCitationId === item.id ? "✓ Copied" : "Cite"}
                     </button>
 
                     {inEvidence ? (
-                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-0.5">
+                      <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-0.5">
                         <span>✓</span> In Evidence
                       </span>
                     ) : (
@@ -339,7 +340,7 @@ export default function ProjectVaultPanel({
                         type="button"
                         onClick={() => handleAddToEvidence(item)}
                         disabled={addingEvidenceId === item.id}
-                        className="px-2 py-0.5 text-[10px] font-medium rounded bg-[color:var(--accent-subtle)] text-[color:var(--accent)] hover:bg-[color:var(--accent-hover)] hover:text-[color:var(--text-inverse)] transition-colors cursor-pointer disabled:opacity-50"
+                        className="px-2 py-0.5 text-xs font-medium rounded bg-[color:var(--accent-subtle)] text-[color:var(--accent)] hover:bg-[color:var(--accent-hover)] hover:text-[color:var(--text-inverse)] transition-colors cursor-pointer disabled:opacity-50"
                       >
                         {addingEvidenceId === item.id ? "Adding…" : "+ Evidence"}
                       </button>
@@ -350,7 +351,7 @@ export default function ProjectVaultPanel({
                         href={item.externalReference}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="ml-auto text-[10px] text-[color:var(--text-muted)] hover:text-[color:var(--accent)] hover:underline"
+                        className="ml-auto text-xs text-[color:var(--text-muted)] hover:text-[color:var(--accent)] hover:underline"
                       >
                         Open ↗
                       </a>

@@ -1,3 +1,4 @@
+import { FileText } from "lucide-react";
 import { useState, useEffect } from 'react';
 import type { SlideCard, SlideViewMode } from '../types/slides';
 
@@ -127,7 +128,7 @@ export default function PresentationController({
           <button
             type="button"
             onClick={handleResetTimer}
-            className="text-[10px] text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300 cursor-pointer"
+            className="text-xs text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300 cursor-pointer"
             title="Reset Timer"
           >
             ↺
@@ -190,7 +191,7 @@ export default function PresentationController({
             <button
               type="button"
               onClick={() => onViewModeChange('stage')}
-              className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all cursor-pointer ${
+              className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                 viewMode === 'stage'
                   ? 'bg-blue-600 text-white shadow-xs'
                   : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100'
@@ -202,7 +203,7 @@ export default function PresentationController({
             <button
               type="button"
               onClick={() => onViewModeChange('standalone')}
-              className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all cursor-pointer ${
+              className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                 viewMode === 'standalone'
                   ? 'bg-blue-600 text-white shadow-xs'
                   : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100'
@@ -232,11 +233,11 @@ export default function PresentationController({
           <button
             type="button"
             onClick={onExportPdf || (() => window.print())}
-            className="p-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-400 cursor-pointer transition-colors flex items-center gap-1 font-semibold text-[11px]"
+            className="p-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-400 cursor-pointer transition-colors flex items-center gap-1 font-semibold text-xs"
             title="Export Presentation to PDF (P)"
             aria-label="Export to PDF"
           >
-            <span>📄</span>
+            <FileText className="w-4 h-4 shrink-0" aria-hidden="true" />
             <span className="hidden sm:inline">PDF</span>
           </button>
 

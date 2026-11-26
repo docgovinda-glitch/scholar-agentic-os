@@ -1,3 +1,4 @@
+import { Cloud, Lock } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   createVault,
@@ -105,7 +106,7 @@ export default function VaultSetupScreen({
                 Connect your <strong>Google Drive</strong> and <strong>OneDrive</strong> to easily upload and sync all kinds of data across any browser and any computer.
               </p>
               <p className="text-xs text-[color:var(--text-muted)]">
-                ☁️ Sync seamlessly across devices with real-time academic citation extraction.
+                <Cloud className="inline-block w-3.5 h-3.5 mr-1 align-[-2px]" aria-hidden="true" />Sync seamlessly across devices with real-time academic citation extraction.
               </p>
             </div>
 
@@ -140,7 +141,7 @@ export default function VaultSetupScreen({
                 className="rounded-[var(--radius-lg)] border border-[color:var(--border-default)] px-5 py-4 text-left hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer"
               >
                 <span className="block text-sm font-medium text-[color:var(--text-primary)]">
-                  🔒 Create a Secure Vault (Private Browser-Only)
+                  <Lock className="inline-block w-3.5 h-3.5 mr-1 align-[-2px]" aria-hidden="true" />Create a Secure Vault (Private Browser-Only)
                 </span>
                 <span className="mt-1 block text-xs text-[color:var(--text-muted)] leading-relaxed">
                   Encrypt everything locally inside this browser with a private passphrase (does not sync across devices).
@@ -185,7 +186,7 @@ export default function VaultSetupScreen({
           This encrypts your Vault locally in this browser. It is <strong>not</strong> your account password.
         </p>
         <p className="mt-2 rounded-[var(--radius-md)] bg-[color:var(--surface-inset)] px-3 py-2 text-xs text-[color:var(--text-muted)]">
-          🔒 Private local mode stores data in this specific browser only.
+          <Lock className="inline-block w-3.5 h-3.5 mr-1 align-[-2px]" aria-hidden="true" />Private local mode stores data in this specific browser only.
         </p>
 
         <div className="mt-6 flex flex-col gap-4">
@@ -336,7 +337,7 @@ export default function VaultSetupScreen({
           Your research repository is initialized. You can upload PDFs, Word documents, Excel datasets, connect Google Drive & OneDrive, and auto-format citations at any time from the Vault screen.
         </p>
         <div className="mt-4 rounded-[var(--radius-md)] bg-[color:var(--surface-inset)] px-3.5 py-2.5 text-xs text-[color:var(--text-muted)]">
-          ☁️ Sync active · Ready for cross-device research and academic citations.
+          <Cloud className="inline-block w-3.5 h-3.5 mr-1 align-[-2px]" aria-hidden="true" />Sync active · Ready for cross-device research and academic citations.
         </div>
         <button
           type="button"

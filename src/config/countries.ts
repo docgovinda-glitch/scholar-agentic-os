@@ -148,6 +148,23 @@ export const COUNTRIES: readonly Country[] = [
 
 export const DEFAULT_COUNTRY_ISO2 = "NP";
 
+/**
+ * The country to preselect in a phone field: the region of the browser's
+ * language (en-GB → GB), else DEFAULT_COUNTRY_ISO2. Never asks for location.
+ */
+export function preferredCountryIso2(): string {
+  try {
+    const langs = typeof navigator !== "undefined" ? [...(navigator.languages ?? []), navigator.language] : [];
+    for (const lang of langs) {
+      const region = (lang || "").split(/[-_]/)[1]?.toUpperCase();
+      if (region && region.length === 2 && findCountry(region)) return region;
+    }
+  } catch {
+    // fall through
+  }
+  return DEFAULT_COUNTRY_ISO2;
+}
+
 export function findCountry(iso2: string): Country | undefined {
   return COUNTRIES.find((c) => c.iso2 === iso2);
 }

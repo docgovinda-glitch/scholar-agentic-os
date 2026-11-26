@@ -1,3 +1,4 @@
+import { AlertTriangle, Cloud, Copy, FileText, Folder, Link2 } from "lucide-react";
 /**
  * Source Detail Modal / Drawer — Clean academic inspection view.
  *
@@ -92,7 +93,7 @@ export default function SourceDetailModal({
           {/* Header Title & Author */}
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center gap-2">
-              <span className="text-xl">📄</span>
+              <FileText className="w-5 h-5 shrink-0" aria-hidden="true" />
               <h2
                 id="source-detail-title"
                 className="text-lg font-bold text-[color:var(--text-primary)] leading-snug"
@@ -119,7 +120,7 @@ export default function SourceDetailModal({
                 <span className="text-xs font-bold text-[color:var(--text-primary)] uppercase tracking-wider">
                   Citation
                 </span>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] text-[color:var(--text-muted)]">
+                <span className="text-xs font-semibold px-2 py-0.5 rounded bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] text-[color:var(--text-muted)]">
                   APA 7
                 </span>
               </div>
@@ -128,7 +129,7 @@ export default function SourceDetailModal({
                 onClick={handleCopyCitation}
                 className="text-xs text-[color:var(--accent)] hover:underline font-semibold flex items-center gap-1 cursor-pointer"
               >
-                <span>{copied ? "✓" : "📋"}</span>
+                <span>{copied ? "✓" : <Copy className="w-4 h-4 shrink-0" aria-hidden="true" />}</span>
                 <span>{copied ? "Copied" : "Copy Citation"}</span>
               </button>
             </div>
@@ -148,10 +149,10 @@ export default function SourceDetailModal({
               <div className="flex items-center gap-3">
                 <span className="text-2xl">
                   {source.cloudReference?.provider === "google_drive"
-                    ? "📁"
+                    ? <Folder className="w-4 h-4 shrink-0" aria-hidden="true" />
                     : source.cloudReference?.provider === "onedrive"
-                    ? "☁️"
-                    : "🔗"}
+                    ? <Cloud className="w-4 h-4 shrink-0" aria-hidden="true" />
+                    : <Link2 className="w-4 h-4 shrink-0" aria-hidden="true" />}
                 </span>
                 <div>
                   <div className="text-xs font-bold text-[color:var(--text-primary)]">
@@ -161,7 +162,7 @@ export default function SourceDetailModal({
                       ? "Microsoft OneDrive"
                       : "Website"}
                   </div>
-                  <div className="text-[11px] text-[color:var(--text-muted)] truncate max-w-sm">
+                  <div className="text-xs text-[color:var(--text-muted)] truncate max-w-sm">
                     {source.cloudReference?.fileName || source.metadata.url || "Cloud Document"}
                   </div>
                 </div>
@@ -194,7 +195,7 @@ export default function SourceDetailModal({
                   <button
                     type="button"
                     onClick={() => setShowAddProjectMenu(!showAddProjectMenu)}
-                    className="text-[11px] text-[color:var(--accent)] hover:underline font-semibold cursor-pointer"
+                    className="text-xs text-[color:var(--accent)] hover:underline font-semibold cursor-pointer"
                   >
                     {showAddProjectMenu ? "Done" : "+ Link Project"}
                   </button>
@@ -208,12 +209,12 @@ export default function SourceDetailModal({
                       key={p}
                       className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-[var(--radius-md)] bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] text-[color:var(--text-primary)]"
                     >
-                      <span>📁 {p}</span>
+                      <span><Folder className="inline-block w-3.5 h-3.5 mr-1 align-[-2px]" aria-hidden="true" />{p}</span>
                       {onToggleProject && (
                         <button
                           type="button"
                           onClick={() => onToggleProject(source.id, p)}
-                          className="text-[10px] text-[color:var(--text-muted)] hover:text-red-500 cursor-pointer ml-0.5"
+                          className="text-xs text-[color:var(--text-muted)] hover:text-red-500 cursor-pointer ml-0.5"
                           title={`Unlink from ${p}`}
                         >
                           ✕
@@ -229,7 +230,7 @@ export default function SourceDetailModal({
               {/* Add Project Quick Menu */}
               {showAddProjectMenu && onToggleProject && (
                 <div className="p-2.5 rounded-[var(--radius-md)] bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)] flex flex-col gap-1.5 mt-1 animate-in fade-in duration-150">
-                  <span className="text-[10px] font-bold text-[color:var(--text-muted)] uppercase">
+                  <span className="text-xs font-bold text-[color:var(--text-muted)] uppercase">
                     Select a project to link/unlink:
                   </span>
                   <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto">
@@ -265,7 +266,7 @@ export default function SourceDetailModal({
                   source.tags.map((t) => (
                     <span
                       key={t}
-                      className="px-2.5 py-0.5 text-[11px] font-medium rounded-full bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)] text-[color:var(--text-secondary)]"
+                      className="px-2.5 py-0.5 text-xs font-medium rounded-full bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)] text-[color:var(--text-secondary)]"
                     >
                       #{t}
                     </span>
@@ -287,7 +288,7 @@ export default function SourceDetailModal({
 
             {source.notes.whySaved && (
               <div className="flex flex-col gap-1">
-                <span className="text-[11px] font-bold text-[color:var(--text-secondary)]">
+                <span className="text-xs font-bold text-[color:var(--text-secondary)]">
                   Why I saved this:
                 </span>
                 <p className="text-xs text-[color:var(--text-primary)] leading-relaxed bg-[color:var(--surface-inset)] p-3 rounded-[var(--radius-md)] border border-[color:var(--border-subtle)]">
@@ -299,15 +300,15 @@ export default function SourceDetailModal({
             {source.notes.keyPoints && source.notes.keyPoints.length > 0 && (
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-[color:var(--text-secondary)]">
+                  <span className="text-xs font-bold text-[color:var(--text-secondary)]">
                     Key sentences from the abstract:
                   </span>
                   <button
                     type="button"
                     onClick={handleCopyKeyPoints}
-                    className="text-[11px] text-[color:var(--accent)] hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+                    className="text-xs text-[color:var(--accent)] hover:underline font-semibold flex items-center gap-1 cursor-pointer"
                   >
-                    <span>{copiedKeyPoints ? "✓" : "📋"}</span>
+                    <span>{copiedKeyPoints ? "✓" : <Copy className="w-4 h-4 shrink-0" aria-hidden="true" />}</span>
                     <span>{copiedKeyPoints ? "Copied" : "Copy Key Points"}</span>
                   </button>
                 </div>
@@ -325,9 +326,9 @@ export default function SourceDetailModal({
             {source.notes.keyQuote && (
               <div className="flex flex-col gap-1">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-[color:var(--text-secondary)]">Key Quote:</span>
+                  <span className="text-xs font-bold text-[color:var(--text-secondary)]">Key Quote:</span>
                   {source.notes.page && (
-                    <span className="text-[10px] text-[color:var(--text-muted)]">
+                    <span className="text-xs text-[color:var(--text-muted)]">
                       Page {source.notes.page}
                     </span>
                   )}
@@ -388,7 +389,7 @@ export default function SourceDetailModal({
             <div className="flex items-center gap-2 text-xs">
               {isRetracted ? (
                 <div className="p-2.5 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 rounded-[var(--radius-md)] flex items-center gap-2 w-full">
-                  <span>⚠️</span>
+                  <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
                   <span>Publication update: This work has received an official expression of concern or retraction notice.</span>
                 </div>
               ) : (

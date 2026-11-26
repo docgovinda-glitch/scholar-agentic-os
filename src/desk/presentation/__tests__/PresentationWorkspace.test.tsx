@@ -481,7 +481,7 @@ Multi-agent verification delivers 100% citation accuracy across 5,000 tested ref
     render(<PresentationWorkspace projectId="proj-hydrated-1" initialStep="studio" />);
 
     expect(await screen.findByDisplayValue("Neural Synthesizer Architecture")).toBeInTheDocument();
-    expect(screen.getByText("v4")).toBeInTheDocument();
+    expect(screen.getByLabelText(/version 4/)).toBeInTheDocument();
     expect(screen.getAllByText(/Empirical Lift: 4\.2x Faster Synthesis/i).length).toBeGreaterThan(0);
   });
 

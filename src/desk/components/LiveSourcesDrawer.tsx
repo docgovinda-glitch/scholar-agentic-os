@@ -12,6 +12,8 @@ export interface LiveSourcesDrawerProps {
   onSaveToVault?: (source: LiveSearchResult) => void;
   /** Map of source URLs or titles already saved to the Vault in this session. */
   savedUrls?: Record<string, boolean>;
+  /** Inside the answer's Sources panel: no second header, the list is shown directly. */
+  embedded?: boolean;
 }
 
 export default function LiveSourcesDrawer({
@@ -21,8 +23,10 @@ export default function LiveSourcesDrawer({
   searchedAt,
   onSaveToVault,
   savedUrls = {},
+  embedded = false,
 }: LiveSourcesDrawerProps) {
-  const [isOpen, setIsOpen] = useState(initialExpanded);
+  const [isOpenState, setIsOpen] = useState(initialExpanded);
+  const isOpen = embedded || isOpenState;
 
   if (!sources || sources.length === 0) return null;
 
@@ -33,9 +37,10 @@ export default function LiveSourcesDrawer({
 
   return (
     <div
-      className={`mt-3 rounded-xl border border-sky-200/80 dark:border-sky-900/50 bg-sky-50/40 dark:bg-sky-950/20 overflow-hidden text-left ${className}`}
+      className={embedded ? `text-left ${className}` : `mt-3 rounded-xl border border-sky-200/80 dark:border-sky-900/50 bg-sky-50/40 dark:bg-sky-950/20 overflow-hidden text-left ${className}`}
       data-testid="live-sources-drawer"
     >
+      {!embedded && (
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
@@ -49,18 +54,18 @@ export default function LiveSourcesDrawer({
             Sources ({sources.length})
           </span>
           {searchedAt && (
-            <span className="text-[10px] text-sky-700/80 dark:text-sky-300/80 shrink-0">
+            <span className="text-xs text-sky-700/80 dark:text-sky-300/80 shrink-0">
               Searched at {searchedAt}
             </span>
           )}
           {primaryCount > 0 && (
-            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-sky-100 dark:bg-sky-900/60 text-sky-700 dark:text-sky-300 border border-sky-200/60 dark:border-sky-800/50 shrink-0">
+            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-sky-100 dark:bg-sky-900/60 text-sky-700 dark:text-sky-300 border border-sky-200/60 dark:border-sky-800/50 shrink-0">
               {primaryCount} Primary · {secondaryCount} Secondary
             </span>
           )}
         </div>
         <div className="flex items-center gap-1 text-sky-700 dark:text-sky-300 shrink-0">
-          <span className="text-[11px] font-normal">{isOpen ? "Hide" : "Show"}</span>
+          <span className="text-xs font-normal">{isOpen ? "Hide" : "Show"}</span>
           {isOpen ? (
             <ChevronUp className="w-3.5 h-3.5" aria-hidden="true" />
           ) : (
@@ -68,11 +73,12 @@ export default function LiveSourcesDrawer({
           )}
         </div>
       </button>
+      )}
 
       {isOpen && (
         <div
           id="live-sources-content"
-          className="p-3 border-t border-sky-200/60 dark:border-sky-900/40 space-y-2.5 max-h-80 overflow-y-auto scholar-scrollbar"
+          className={embedded ? "px-3 pb-3 space-y-2.5 max-h-80 overflow-y-auto scholar-scrollbar" : "p-3 border-t border-sky-200/60 dark:border-sky-900/40 space-y-2.5 max-h-80 overflow-y-auto scholar-scrollbar"}
         >
           {sources.map((src, i) => {
             const key = src.url || src.title;
@@ -93,7 +99,7 @@ export default function LiveSourcesDrawer({
                 data-testid={`live-source-card-${i}`}
               >
                 <div className="flex items-start justify-between gap-2">
-                  <span className="text-[11px] font-mono font-semibold text-sky-700 dark:text-sky-300 shrink-0" aria-label={`Source ${i + 1}`}>
+                  <span className="text-xs font-mono font-semibold text-sky-700 dark:text-sky-300 shrink-0" aria-label={`Source ${i + 1}`}>
                     [{i + 1}]
                   </span>
                   <a
@@ -108,7 +114,7 @@ export default function LiveSourcesDrawer({
                   </a>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <span
-                      className={`text-[9px] uppercase font-mono px-1.5 py-0.5 rounded border ${
+                      className={`text-xs uppercase font-mono px-1.5 py-0.5 rounded border ${
                         isPrimary
                           ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border-emerald-300/40"
                           : "bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-300 border-neutral-200 dark:border-white/10"
@@ -121,7 +127,7 @@ export default function LiveSourcesDrawer({
                         type="button"
                         onClick={() => onSaveToVault(src)}
                         disabled={isSaved}
-                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border transition-colors cursor-pointer ${
+                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium border transition-colors cursor-pointer ${
                           isSaved
                             ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/40"
                             : "bg-neutral-50 dark:bg-white/[0.04] hover:bg-sky-50 dark:hover:bg-sky-950/40 text-neutral-600 dark:text-neutral-300 hover:text-sky-700 dark:hover:text-sky-300 border-neutral-200/80 dark:border-white/10"
@@ -142,7 +148,7 @@ export default function LiveSourcesDrawer({
                       </button>
                     )}
                     <span
-                      className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-white/10 text-neutral-700 dark:text-neutral-300 shrink-0"
+                      className="text-xs uppercase font-mono px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-white/10 text-neutral-700 dark:text-neutral-300 shrink-0"
                       title={domain || undefined}
                     >
                       {src.source || "web"}
@@ -150,11 +156,11 @@ export default function LiveSourcesDrawer({
                   </div>
                 </div>
 
-                <p className="text-[11px] text-neutral-700 dark:text-neutral-300 line-clamp-3 leading-relaxed">
+                <p className="text-xs text-neutral-700 dark:text-neutral-300 line-clamp-3 leading-relaxed">
                   {src.snippet}
                 </p>
 
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 text-[10px] text-neutral-500 dark:text-neutral-400 border-t border-neutral-100 dark:border-white/5">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 text-xs text-neutral-500 dark:text-neutral-400 border-t border-neutral-100 dark:border-white/5">
                   {src.authors && src.authors.length > 0 && (
                     <span className="flex items-center gap-1 truncate max-w-[220px]">
                       <User className="w-3 h-3 shrink-0" aria-hidden="true" />
@@ -167,7 +173,7 @@ export default function LiveSourcesDrawer({
                       <span>{src.publicationDate}</span>
                     </span>
                   )}
-                  <span className="truncate max-w-[240px] font-mono text-[9px] text-neutral-400 dark:text-neutral-500">
+                  <span className="truncate max-w-[240px] font-mono text-xs text-neutral-400 dark:text-neutral-500">
                     {src.url}
                   </span>
                 </div>

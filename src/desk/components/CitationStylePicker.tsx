@@ -63,7 +63,7 @@ export default function CitationStylePicker({
     >
       {groups.map(([label, styles]) => (
         <div key={label} role="group" aria-label={label}>
-          <div className="px-2 pt-1.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-400">{label}</div>
+          <div className="px-2 pt-1.5 pb-1 text-xs font-semibold uppercase tracking-wider text-neutral-400">{label}</div>
           {styles.map((s) => {
             const selected = s.id === value;
             return (
@@ -84,7 +84,7 @@ export default function CitationStylePicker({
                 <Check className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${selected ? "text-sky-600" : "opacity-0"}`} aria-hidden="true" />
                 <span className="min-w-0">
                   <span className="block text-xs font-semibold text-neutral-900 dark:text-neutral-100">{s.name}</span>
-                  <span className="block text-[11px] text-neutral-500 dark:text-neutral-400">
+                  <span className="block text-xs text-neutral-500 dark:text-neutral-400">
                     In text: <span className="font-mono">{s.exampleInText}</span>
                   </span>
                 </span>

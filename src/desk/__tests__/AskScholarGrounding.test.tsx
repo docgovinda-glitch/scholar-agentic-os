@@ -87,8 +87,9 @@ describe("Ask Scholar grounds every answer in a fresh search", () => {
     expect(sent.systemPrompt).toBeUndefined();
     expect(sent.preRetrievedSources[0].title).toBe("Social media and polarization: a review");
 
-    expect(await screen.findByText(/Sources \(2\)/)).toBeInTheDocument();
-    expect(screen.getByLabelText("Source 1")).toHaveTextContent("[1]");
+    // The found sources sit directly in the answer's one Sources panel (no second "Sources (2)" header inside it).
+    expect(await screen.findByLabelText("Source 1")).toHaveTextContent("[1]");
+    expect(screen.getByLabelText("Source 2")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Echo chambers online\?/ })).toHaveAttribute("href", "https://doi.org/10.2/def");
   });
 
@@ -97,7 +98,7 @@ describe("Ask Scholar grounds every answer in a fresh search", () => {
     open();
     await ask("Does social media increase political polarisation among young voters?");
     await waitFor(() => expect(executeAgenticQuery).toHaveBeenCalledTimes(1));
-    await screen.findByText(/Sources \(2\)/);
+    await screen.findByLabelText("Source 2");
 
     await ask("What about in Nepal?");
     await waitFor(() => expect(executeAgenticQuery).toHaveBeenCalledTimes(2));

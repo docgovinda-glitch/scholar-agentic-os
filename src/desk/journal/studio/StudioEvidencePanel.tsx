@@ -70,21 +70,21 @@ function StudioEvidencePanel({
           list.map((e) => (
             <article key={e.id} className="p-3 rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] space-y-1.5">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-[color:var(--surface-sunken)] text-[color:var(--text-secondary)]">
+                <span className="text-xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-[color:var(--surface-sunken)] text-[color:var(--text-secondary)]">
                   {e.isUserData ? "Your data" : "Literature"}
                 </span>
                 <button
                   type="button"
                   onClick={() => onInsert(e.citationToken)}
                   aria-label={`Cite ${e.title}`}
-                  className="text-[11px] font-semibold px-2 py-0.5 rounded-md border border-[color:var(--border-subtle)] hover:bg-[color:var(--surface-hover)] text-[color:var(--text-primary)] cursor-pointer"
+                  className="text-xs font-semibold px-2 py-0.5 rounded-md border border-[color:var(--border-subtle)] hover:bg-[color:var(--surface-hover)] text-[color:var(--text-primary)] cursor-pointer"
                 >
                   Cite
                 </button>
               </div>
               <h4 className="text-xs font-semibold text-[color:var(--text-primary)] leading-snug">{e.title}</h4>
-              <p className="text-[11px] text-[color:var(--text-muted)]">{e.author} · {e.year ?? "n.d."}</p>
-              <p className="text-[11px] leading-relaxed text-[color:var(--text-secondary)] line-clamp-4">
+              <p className="text-xs text-[color:var(--text-muted)]">{e.author} · {e.year ?? "n.d."}</p>
+              <p className="text-xs leading-relaxed text-[color:var(--text-secondary)] line-clamp-4">
                 {e.findings || <span className="italic text-[color:var(--text-muted)]">No findings recorded for this source yet.</span>}
               </p>
             </article>
@@ -94,12 +94,12 @@ function StudioEvidencePanel({
 
       {figures.length > 0 && onInsertText && (
         <section className="border-t border-[color:var(--border-subtle)] p-3 max-h-[30%] overflow-y-auto" aria-labelledby="studio-figures-heading">
-          <h3 id="studio-figures-heading" className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--text-muted)] mb-2">
+          <h3 id="studio-figures-heading" className="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)] mb-2">
             Figures and tables
           </h3>
           <ul className="space-y-1.5">
             {figures.map((f) => (
-              <li key={f.id} className="flex items-center justify-between gap-2 text-[11px] text-[color:var(--text-secondary)]">
+              <li key={f.id} className="flex items-center justify-between gap-2 text-xs text-[color:var(--text-secondary)]">
                 <span className="min-w-0 truncate">
                   <strong className="text-[color:var(--text-primary)]">{numbering.label[f.id] ?? (f.kind === "table" ? "Table (not yet referred to)" : "Figure (not yet referred to)")}</strong>
                   {f.caption ? ` · ${f.caption}` : ""}
@@ -108,32 +108,32 @@ function StudioEvidencePanel({
                   type="button"
                   onClick={() => onInsertText(figureToken(f))}
                   aria-label={`Refer to ${f.kind} ${f.id}`}
-                  className="shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-md border border-[color:var(--border-subtle)] hover:bg-[color:var(--surface-hover)] text-[color:var(--text-primary)] cursor-pointer"
+                  className="shrink-0 text-xs font-semibold px-2 py-0.5 rounded-md border border-[color:var(--border-subtle)] hover:bg-[color:var(--surface-hover)] text-[color:var(--text-primary)] cursor-pointer"
                 >
                   Refer
                 </button>
               </li>
             ))}
           </ul>
-          <p className="mt-2 text-[10px] text-[color:var(--text-muted)]">The reference becomes "Figure 1", "Table 2"… in exports, numbered by first mention.</p>
+          <p className="mt-2 text-xs text-[color:var(--text-muted)]">The reference becomes "Figure 1", "Table 2"… in exports, numbered by first mention.</p>
         </section>
       )}
 
       <section className="border-t border-[color:var(--border-subtle)] p-3 max-h-[40%] overflow-y-auto" aria-labelledby="studio-references-heading">
-        <h3 id="studio-references-heading" className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--text-muted)] mb-2">
+        <h3 id="studio-references-heading" className="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)] mb-2">
           References cited ({entries.length})
         </h3>
         {entries.length === 0 && unknownTokens.length === 0 ? (
-          <p className="text-[11px] text-[color:var(--text-muted)]">Citations you insert appear here.</p>
+          <p className="text-xs text-[color:var(--text-muted)]">Citations you insert appear here.</p>
         ) : (
-          <ol className="space-y-1.5 text-[11px] leading-snug text-[color:var(--text-secondary)]">
+          <ol className="space-y-1.5 text-xs leading-snug text-[color:var(--text-secondary)]">
             {entries.map(({ evidence, reference }) => (
               <li key={evidence.id}>{renderItalics(reference)}</li>
             ))}
           </ol>
         )}
         {unknownTokens.length > 0 && (
-          <p role="status" className="mt-2 text-[11px] text-[color:var(--state-warning)]">
+          <p role="status" className="mt-2 text-xs text-[color:var(--state-warning)]">
             {unknownTokens.length === 1 ? "1 citation matches" : `${unknownTokens.length} citations match`} no source in this project: {unknownTokens.join(", ")}
           </p>
         )}

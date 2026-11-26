@@ -75,7 +75,7 @@ export default function VivaVoceSimulator({ thesisData, questions, className = "
                       : "border-[color:var(--border-subtle)] bg-[color:var(--surface-sunken)] hover:bg-[color:var(--surface-canvas)]"
                   }`}
                 >
-                  <span className="text-[10px] font-bold text-[color:var(--accent)]">{q.category}</span>
+                  <span className="text-xs font-bold text-[color:var(--accent)]">{q.category}</span>
                   <span className="text-xs text-[color:var(--text-secondary)] line-clamp-2 leading-relaxed">
                     {q.examinerQuestion}
                   </span>
@@ -90,7 +90,7 @@ export default function VivaVoceSimulator({ thesisData, questions, className = "
                 {active.examinerQuestion}
               </p>
               {active.assessmentFocus && (
-                <span className="text-[11px] text-[color:var(--text-muted)]">
+                <span className="text-xs text-[color:var(--text-muted)]">
                   <strong>What the examiner is testing:</strong> {active.assessmentFocus}
                 </span>
               )}

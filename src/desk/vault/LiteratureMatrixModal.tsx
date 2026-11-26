@@ -1,3 +1,4 @@
+import { BarChart3, Folder, Lightbulb, MessageSquare, NotebookPen, Zap } from "lucide-react";
 /**
  * Literature Matrix Modal — Academic Comparative Synthesis Workspace
  *
@@ -97,19 +98,19 @@ export default function LiteratureMatrixModal({
         <header className="px-6 py-4 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-[var(--radius-lg)] bg-[color:var(--accent-subtle)]/30 border border-[color:var(--accent-border)] flex items-center justify-center text-xl shrink-0">
-              📊
+              <BarChart3 className="inline-block w-3.5 h-3.5 mr-1 align-[-2px]" aria-hidden="true" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <h2 id="matrix-modal-title" className="text-base font-bold text-[color:var(--text-primary)] truncate">
                   Literature Review Synthesis Matrix
                 </h2>
-                <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] shrink-0">
+                <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] shrink-0">
                   {matrix.rows.length} Sources
                 </span>
                 {activeProject && (
-                  <span className="px-2 py-0.5 text-[11px] font-medium rounded-full bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] text-[color:var(--text-secondary)] truncate">
-                    📁 {activeProject}
+                  <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] text-[color:var(--text-secondary)] truncate">
+                    <Folder className="inline-block w-3.5 h-3.5 mr-1 align-[-2px]" aria-hidden="true" />{activeProject}
                   </span>
                 )}
               </div>
@@ -126,7 +127,7 @@ export default function LiteratureMatrixModal({
               onClick={() => triggerCopyFeedback("copy-md", exportMatrixToMarkdown(matrix))}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-[var(--radius-md)] border border-[color:var(--border-default)] bg-[color:var(--surface-canvas)] hover:bg-[color:var(--surface-hover)] text-[color:var(--text-secondary)] transition-colors cursor-pointer"
             >
-              <span>{copiedAction === "copy-md" ? "✓ Copied" : "📋 Copy Markdown"}</span>
+              <span>{copiedAction === "copy-md" ? "✓ Copied" : "Copy Markdown"}</span>
             </button>
 
             <button
@@ -162,7 +163,7 @@ export default function LiteratureMatrixModal({
                 : "border-transparent text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
             }`}
           >
-            <span>📊 Comparative Matrix</span>
+            <span><BarChart3 className="inline-block w-3.5 h-3.5 mr-1 align-[-2px]" aria-hidden="true" />Comparative Matrix</span>
           </button>
 
           <button
@@ -174,7 +175,7 @@ export default function LiteratureMatrixModal({
                 : "border-transparent text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
             }`}
           >
-            <span>📝 Thematic Synthesis Narrative</span>
+            <span><NotebookPen className="inline-block w-3.5 h-3.5 mr-1 align-[-2px]" aria-hidden="true" />Thematic Synthesis Narrative</span>
           </button>
 
           <button
@@ -186,7 +187,7 @@ export default function LiteratureMatrixModal({
                 : "border-transparent text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
             }`}
           >
-            <span>💬 Ask Selected Sources</span>
+            <span><MessageSquare className="inline-block w-3.5 h-3.5 mr-1 align-[-2px]" aria-hidden="true" />Ask Selected Sources</span>
           </button>
         </nav>
 
@@ -198,26 +199,26 @@ export default function LiteratureMatrixModal({
               {/* Summary Stats Bar */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="p-3 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-[var(--radius-lg)]">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--text-muted)]">
+                  <span className="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)]">
                     Chronological Scope
                   </span>
                   <p className="text-base font-bold text-[color:var(--text-primary)] mt-0.5">
                     {matrix.summary.yearSpan.earliest} – {matrix.summary.yearSpan.latest}
                   </p>
-                  <p className="text-[11px] text-[color:var(--text-secondary)] mt-0.5">
+                  <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">
                     {matrix.rows.length} peer contributions analyzed
                   </p>
                 </div>
 
                 <div className="p-3 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-[var(--radius-lg)]">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--text-muted)]">
+                  <span className="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)]">
                     Methodological Diversity
                   </span>
                   <div className="flex flex-wrap gap-1 mt-1">
                     {Object.entries(matrix.summary.methodologyBreakdown).map(([method, count]) => (
                       <span
                         key={method}
-                        className="px-1.5 py-0.5 text-[10px] font-semibold bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] rounded text-[color:var(--text-secondary)]"
+                        className="px-1.5 py-0.5 text-xs font-semibold bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] rounded text-[color:var(--text-secondary)]"
                       >
                         {method.split(" ")[0]} ({count})
                       </span>
@@ -226,14 +227,14 @@ export default function LiteratureMatrixModal({
                 </div>
 
                 <div className="p-3 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-[var(--radius-lg)]">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--text-muted)]">
+                  <span className="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)]">
                     Primary Thematic Focus
                   </span>
                   <div className="flex flex-wrap gap-1 mt-1">
                     {matrix.summary.commonThemes.slice(0, 4).map((t) => (
                       <span
                         key={t}
-                        className="px-1.5 py-0.5 text-[10px] font-semibold bg-[color:var(--accent-subtle)]/30 text-[color:var(--accent)] rounded"
+                        className="px-1.5 py-0.5 text-xs font-semibold bg-[color:var(--accent-subtle)]/30 text-[color:var(--accent)] rounded"
                       >
                         #{t}
                       </span>
@@ -247,7 +248,7 @@ export default function LiteratureMatrixModal({
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
-                      <tr className="bg-[color:var(--surface-inset)] border-b border-[color:var(--border-default)] text-[11px] font-bold text-[color:var(--text-secondary)] uppercase tracking-wider">
+                      <tr className="bg-[color:var(--surface-inset)] border-b border-[color:var(--border-default)] text-xs font-bold text-[color:var(--text-secondary)] uppercase tracking-wider">
                         <th className="p-3 w-48 shrink-0">Source & Year</th>
                         <th className="p-3 w-56">Focus / Question</th>
                         <th className="p-3 w-44">Methodology</th>
@@ -263,17 +264,17 @@ export default function LiteratureMatrixModal({
                             {/* Source Column */}
                             <td className="p-3 align-top">
                               <div className="font-bold text-[color:var(--text-primary)]">{inText}</div>
-                              <div className="text-[11px] text-[color:var(--text-secondary)] mt-0.5 leading-snug line-clamp-2">
+                              <div className="text-xs text-[color:var(--text-secondary)] mt-0.5 leading-snug line-clamp-2">
                                 {row.title}
                               </div>
                               {row.journal && (
-                                <div className="text-[10px] text-[color:var(--text-muted)] italic mt-0.5">
+                                <div className="text-xs text-[color:var(--text-muted)] italic mt-0.5">
                                   {row.journal}
                                 </div>
                               )}
                               <div className="mt-1 flex flex-wrap gap-1">
                                 {row.tags.slice(0, 2).map((tag) => (
-                                  <span key={tag} className="text-[9px] px-1 py-0.2 bg-[color:var(--surface-inset)] rounded text-[color:var(--text-muted)]">
+                                  <span key={tag} className="text-xs px-1 py-0.2 bg-[color:var(--surface-inset)] rounded text-[color:var(--text-muted)]">
                                     #{tag}
                                   </span>
                                 ))}
@@ -287,7 +288,7 @@ export default function LiteratureMatrixModal({
 
                             {/* Methodology */}
                             <td className="p-3 align-top">
-                              <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-[color:var(--accent-subtle)]/40 text-[color:var(--accent)] border border-[color:var(--accent-border)]">
+                              <span className="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-[color:var(--accent-subtle)]/40 text-[color:var(--accent)] border border-[color:var(--accent-border)]">
                                 {row.methodology}
                               </span>
                             </td>
@@ -326,7 +327,7 @@ export default function LiteratureMatrixModal({
               {/* Actions below table */}
               <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
                 <p className="text-xs text-[color:var(--text-muted)]">
-                  💡 Tip: Use the tabs above to generate continuous literature review narratives or query selected papers.
+                  <Lightbulb className="inline-block w-3.5 h-3.5 mr-1 align-[-2px]" aria-hidden="true" />Tip: Use the tabs above to generate continuous literature review narratives or query selected papers.
                 </p>
                 <div className="flex items-center gap-2">
                   <button
@@ -334,7 +335,7 @@ export default function LiteratureMatrixModal({
                     onClick={() => triggerCopyFeedback("copy-md-2", exportMatrixToMarkdown(matrix))}
                     className="px-3 py-1.5 text-xs font-semibold rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] transition-colors cursor-pointer"
                   >
-                    {copiedAction === "copy-md-2" ? "✓ Table Copied" : "📋 Copy Table for Paper"}
+                    {copiedAction === "copy-md-2" ? "✓ Table Copied" : "Copy Table for Paper"}
                   </button>
                 </div>
               </div>
@@ -347,7 +348,7 @@ export default function LiteratureMatrixModal({
               <div className="p-4 bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-lg)]">
                 <div className="flex items-center justify-between pb-3 border-b border-[color:var(--border-subtle)]">
                   <div className="flex items-center gap-2">
-                    <span className="text-lg">📝</span>
+                    <NotebookPen className="w-5 h-5 shrink-0" aria-hidden="true" />
                     <h3 className="text-sm font-bold text-[color:var(--text-primary)]">
                       Publication-Ready Thematic Overview
                     </h3>
@@ -359,7 +360,7 @@ export default function LiteratureMatrixModal({
                     }
                     className="px-3 py-1.5 text-xs font-bold rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] transition-colors cursor-pointer"
                   >
-                    {copiedAction === "copy-narrative" ? "✓ Copied to Clipboard" : "📋 Copy Literature Review Text"}
+                    {copiedAction === "copy-narrative" ? "✓ Copied to Clipboard" : "Copy Literature Review Text"}
                   </button>
                 </div>
 
@@ -404,7 +405,7 @@ export default function LiteratureMatrixModal({
               {/* Presets Bar */}
               <div className="flex flex-col gap-1.5">
                 <span className="text-xs font-bold text-[color:var(--text-secondary)]">
-                  ⚡ Quick Analytical Presets:
+                  <Zap className="inline-block w-3.5 h-3.5 mr-1 align-[-2px]" aria-hidden="true" />Quick Analytical Presets:
                 </span>
                 <div className="flex flex-wrap gap-2">
                   {SYNTHESIS_PRESETS.map((preset) => (
@@ -458,12 +459,12 @@ export default function LiteratureMatrixModal({
                 <div className="p-5 bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-lg)] flex flex-col gap-4 animate-in fade-in duration-150">
                   <div className="flex items-center justify-between pb-2 border-b border-[color:var(--border-subtle)]">
                     <div className="flex items-center gap-2">
-                      <span className="text-base">💡</span>
+                      <Lightbulb className="w-4 h-4 shrink-0" aria-hidden="true" />
                       <span className="text-xs font-bold text-[color:var(--text-primary)]">
                         Grounded Synthesis for: "{qaResult.question}"
                       </span>
                     </div>
-                    <span className="px-2 py-0.5 text-[10px] font-bold rounded uppercase bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]">
+                    <span className="px-2 py-0.5 text-xs font-bold rounded uppercase bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]">
                       Consensus: {qaResult.consensusDegree}
                     </span>
                   </div>
@@ -474,16 +475,16 @@ export default function LiteratureMatrixModal({
 
                   {/* Sources Cited & Verbatim Anchors */}
                   <div className="pt-3 border-t border-[color:var(--border-subtle)] flex flex-col gap-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--text-muted)]">
+                    <span className="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)]">
                       Attributed Sources & Grounded Quotes:
                     </span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {qaResult.referencedSources.map((ref) => (
-                        <div key={ref.id} className="p-2.5 bg-[color:var(--surface-inset)] rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] text-[11px]">
+                        <div key={ref.id} className="p-2.5 bg-[color:var(--surface-inset)] rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] text-xs">
                           <div className="font-bold text-[color:var(--text-primary)]">{ref.inTextCitation}</div>
-                          <div className="text-[10px] text-[color:var(--text-muted)] truncate">{ref.title}</div>
+                          <div className="text-xs text-[color:var(--text-muted)] truncate">{ref.title}</div>
                           {ref.matchedQuotes.length > 0 && (
-                            <p className="mt-1 text-[10px] text-[color:var(--text-secondary)] italic">
+                            <p className="mt-1 text-xs text-[color:var(--text-secondary)] italic">
                               "{ref.matchedQuotes[0]}"
                             </p>
                           )}

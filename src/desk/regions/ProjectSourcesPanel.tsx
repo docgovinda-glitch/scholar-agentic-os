@@ -59,7 +59,7 @@ export default function ProjectSourcesPanel() {
           <div className="space-y-4">
             {results.projects.length > 0 && (
               <div>
-                <h3 className="text-[10px] font-bold text-[color:var(--text-muted)] uppercase tracking-wider mb-1">Projects</h3>
+                <h3 className="text-xs font-bold text-[color:var(--text-muted)] uppercase tracking-wider mb-1">Projects</h3>
                 <ul className="space-y-1">
                   {results.projects.map(p => (
                     <li key={p.id} className="p-1.5 text-xs rounded hover:bg-[color:var(--surface-hover)] cursor-pointer">
@@ -71,7 +71,7 @@ export default function ProjectSourcesPanel() {
             )}
             {results.claims.length > 0 && (
               <div>
-                <h3 className="text-[10px] font-bold text-[color:var(--text-muted)] uppercase tracking-wider mb-1">Claims</h3>
+                <h3 className="text-xs font-bold text-[color:var(--text-muted)] uppercase tracking-wider mb-1">Claims</h3>
                 <ul className="space-y-1">
                   {results.claims.map(c => (
                     <li key={c.id} className="p-1.5 text-xs rounded hover:bg-[color:var(--surface-hover)] cursor-pointer">

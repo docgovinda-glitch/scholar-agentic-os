@@ -67,6 +67,8 @@ describe("Journal workspace frame", () => {
   it("the assistant follows the view on screen, and Activity opens the project log", async () => {
     render(<ResearchWorkspace projectId="proj-shell" initialStage="definition" onStageChange={() => {}} />);
     const header = await screen.findByTestId("apple-studio-header");
+    // The assistant panel starts closed below 1680 px; open it from Inspector.
+    fireEvent.click(within(header).getByTestId("inspector-toggle"));
     // The saved stage is "draft", but Blueprint is on screen: the Blueprint assistant answers.
     expect(await screen.findByText("Architect")).toBeInTheDocument();
     fireEvent.click(within(header).getByRole("tab", { name: "Review" }));

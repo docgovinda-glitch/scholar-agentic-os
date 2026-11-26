@@ -31,8 +31,8 @@ function StudioOutline({
   return (
     <nav aria-label="Manuscript outline" className="flex flex-col h-full min-h-0 w-full min-w-0">
       <div className="px-3 pt-3 pb-2 border-b border-[color:var(--border-subtle)] space-y-2">
-        <div className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--text-muted)]">Outline</div>
-        <div role="radiogroup" aria-label="Outline order" className="flex p-0.5 rounded-lg bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] text-[11px] font-semibold">
+        <div className="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)]">Outline</div>
+        <div role="radiogroup" aria-label="Outline order" className="flex p-0.5 rounded-lg bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] text-xs font-semibold">
           {(["manuscript", "writing"] as const).map((o) => (
             <button
               key={o}
@@ -47,7 +47,7 @@ function StudioOutline({
           ))}
         </div>
         {order === "writing" && (
-          <p className="text-[11px] leading-snug text-[color:var(--text-muted)]">
+          <p className="text-xs leading-snug text-[color:var(--text-muted)]">
             Methods and results first, while the work is fresh; the introduction once you know what you found; the abstract last.
           </p>
         )}
@@ -63,7 +63,7 @@ function StudioOutline({
               className={`w-full text-left px-2.5 py-2 rounded-lg text-xs cursor-pointer border ${activeId === UNSORTED_ID ? "border-[color:var(--accent-border)] bg-[color:var(--surface-sunken)]" : "border-transparent hover:bg-[color:var(--surface-hover)]"}`}
             >
               <span className="font-semibold text-[color:var(--text-primary)]">Text from your earlier draft</span>
-              <span className="block text-[10px] text-[color:var(--text-muted)]">{countWords(texts.unsorted)} words not under a section yet</span>
+              <span className="block text-xs text-[color:var(--text-muted)]">{countWords(texts.unsorted)} words not under a section yet</span>
             </button>
           </li>
         )}
@@ -75,12 +75,12 @@ function StudioOutline({
           return (
             <li key={g.sectionId}>
               <div className="flex items-baseline justify-between gap-2 px-2 pb-1">
-                <span className="text-[11px] font-bold text-[color:var(--text-primary)] truncate min-w-0">{g.sectionTitle}</span>
+                <span className="text-xs font-bold text-[color:var(--text-primary)] truncate min-w-0">{g.sectionTitle}</span>
                 <span className="flex items-center gap-1.5 shrink-0">
                   {order === "writing" && ordinal && (
-                    <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-[color:var(--surface-sunken)] text-[color:var(--text-secondary)]">Write {ordinal}</span>
+                    <span className="text-xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-[color:var(--surface-sunken)] text-[color:var(--text-secondary)]">Write {ordinal}</span>
                   )}
-                  <span className="text-[10px] tabular-nums text-[color:var(--text-muted)]">{written}/{target}</span>
+                  <span className="text-xs tabular-nums text-[color:var(--text-muted)]">{written}/{target}</span>
                 </span>
               </div>
               <ul className="space-y-0.5">
@@ -101,7 +101,7 @@ function StudioOutline({
                           <span className={`truncate min-w-0 ${active ? "font-semibold text-[color:var(--text-primary)]" : "text-[color:var(--text-secondary)]"}`}>
                             {u.isWholeSection ? "Whole section" : u.title}
                           </span>
-                          <span className="flex items-center gap-1 text-[10px] tabular-nums text-[color:var(--text-muted)] shrink-0">
+                          <span className="flex items-center gap-1 text-xs tabular-nums text-[color:var(--text-muted)] shrink-0">
                             {done && <Check className="w-3 h-3 text-[color:var(--state-success)]" aria-label="Written" />}
                             {words}/{u.targetWords}
                           </span>

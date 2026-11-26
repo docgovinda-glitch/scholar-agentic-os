@@ -209,7 +209,7 @@ describe("Desk — project list", () => {
 
     fireEvent.click(await screen.findByText("New Project"));
     fireEvent.change(await screen.findByLabelText("Target Publication Type"), { target: { value: "OT-06" } });
-    fireEvent.click(screen.getByRole("button", { name: "Boot Workspace" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create project" }));
 
     fireEvent.click(await screen.findByRole("button", { name: "Document" }));
     expect(await screen.findByRole("heading", { name: "Draft your Manuscript" })).toBeInTheDocument();
@@ -278,9 +278,10 @@ describe("Desk — project shell", () => {
 
     renderDeskApp();
 
-    expect(await screen.findByText("Journal Article")).toBeInTheDocument();
-    expect(screen.getByText(/G0 Definition/)).toBeInTheDocument();
-    expect(screen.getByText(/1 blocking/)).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Journal Article" })).toBeInTheDocument();
+    // The stage and what blocks it are said in words in the status bar (no "G0" code).
+    expect(screen.getByText(/Stage: Definition/)).toBeInTheDocument();
+    expect(screen.getByText(/1 requirement to meet before the next stage/)).toBeInTheDocument();
   });
 
   it("submits pasted plain text as a document and shows real Compliance findings back", async () => {
@@ -398,11 +399,11 @@ describe("Desk — account settings", () => {
     renderDeskApp();
 
     // Click Account Settings in Header
-    fireEvent.click(await screen.findByRole("button", { name: /Account Settings|Settings/i }));
+    fireEvent.click((await screen.findAllByRole("button", { name: /^Account$/ }))[0]);
     expect(await screen.findByRole("heading", { name: "Account Settings" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
-    expect(await screen.findByText("Journal Article")).toBeInTheDocument();
+    expect((await screen.findAllByText("Journal Article")).length).toBeGreaterThan(0);
     // Not just the project — the exact tab it was opened from (Definition, here:
     // G0 isn't signed off in this fixture, so that's the auto-decided tab).
     // Waited for: Close goes back through history, which lands a tick later, and the project

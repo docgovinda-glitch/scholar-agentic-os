@@ -105,6 +105,8 @@ export interface WebsiteAssistantMessage {
   searchedAt?: string;
   attachments?: Array<{ name: string; isImage: boolean; previewUrl?: string }>;
   error?: boolean;
+  /** An expected state (no AI connected, signed out), shown as a calm notice rather than a red error. */
+  notice?: boolean;
   wordCount?: number;
   verifiedSourcesCount?: number;
   peerReviewAudit?: {

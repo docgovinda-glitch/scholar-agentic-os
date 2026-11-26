@@ -190,7 +190,7 @@ export default function ThemeScreenshotCloner({
       <div className="space-y-1">
         <h2 className="text-lg font-bold text-neutral-900 dark:text-white flex items-center gap-2">
           <span>Clone Theme from Screenshot or Image</span>
-          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400">
+          <span className="px-2 py-0.5 rounded-full text-xs font-mono font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400">
             AI Palette Extractor
           </span>
         </h2>
@@ -234,7 +234,7 @@ export default function ThemeScreenshotCloner({
           {isProcessing ? 'Analyzing screenshot colors...' : 'Click to upload screenshot or drag & drop'}
         </p>
         <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-          Supports PNG, JPG, WebP · You can also press <kbd className="px-1.5 py-0.5 rounded bg-neutral-200/80 dark:bg-white/10 font-mono text-[10px]">Cmd+V</kbd> or <kbd className="px-1.5 py-0.5 rounded bg-neutral-200/80 dark:bg-white/10 font-mono text-[10px]">Ctrl+V</kbd> to paste
+          Supports PNG, JPG, WebP · You can also press <kbd className="px-1.5 py-0.5 rounded bg-neutral-200/80 dark:bg-white/10 font-mono text-xs">Cmd+V</kbd> or <kbd className="px-1.5 py-0.5 rounded bg-neutral-200/80 dark:bg-white/10 font-mono text-xs">Ctrl+V</kbd> to paste
         </p>
 
         {/* Quick Sample Action Chips */}
@@ -242,18 +242,18 @@ export default function ThemeScreenshotCloner({
           className="mt-4 flex items-center gap-2"
           onClick={(e) => e.stopPropagation()}
         >
-          <span className="text-[11px] text-neutral-400 font-medium">Or try sample:</span>
+          <span className="text-xs text-neutral-400 font-medium">Or try sample:</span>
           <button
             type="button"
             onClick={() => handleLoadSample('sand')}
-            className="text-[11px] px-2.5 py-1 rounded-lg bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 hover:border-neutral-300 text-neutral-700 dark:text-neutral-300 transition-all cursor-pointer font-medium"
+            className="text-xs px-2.5 py-1 rounded-lg bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 hover:border-neutral-300 text-neutral-700 dark:text-neutral-300 transition-all cursor-pointer font-medium"
           >
             Editorial Ochre
           </button>
           <button
             type="button"
             onClick={() => handleLoadSample('midnight')}
-            className="text-[11px] px-2.5 py-1 rounded-lg bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 hover:border-neutral-300 text-neutral-700 dark:text-neutral-300 transition-all cursor-pointer font-medium"
+            className="text-xs px-2.5 py-1 rounded-lg bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 hover:border-neutral-300 text-neutral-700 dark:text-neutral-300 transition-all cursor-pointer font-medium"
           >
             Midnight Azure
           </button>
@@ -272,7 +272,7 @@ export default function ThemeScreenshotCloner({
                 <span className="text-sm font-bold text-neutral-900 dark:text-white">
                   {extractedPalette.name}
                 </span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full uppercase bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-300 font-bold">
+                <span className="text-xs font-mono px-2 py-0.5 rounded-full uppercase bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-300 font-bold">
                   {extractedPalette.mode}
                 </span>
               </div>
@@ -283,7 +283,7 @@ export default function ThemeScreenshotCloner({
 
             <div className="flex items-center gap-2">
               <span
-                className={`px-3 py-1 rounded-full text-[11px] font-mono font-semibold flex items-center gap-1.5 ${
+                className={`px-3 py-1 rounded-full text-xs font-mono font-semibold flex items-center gap-1.5 ${
                   extractedPalette.isValidWcagAA
                     ? 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border border-emerald-500/20'
                     : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
@@ -307,7 +307,7 @@ export default function ThemeScreenshotCloner({
                 style={{ backgroundColor: extractedPalette.canvasBg }}
               />
               <div className="min-w-0">
-                <span className="text-[10px] uppercase font-bold text-neutral-400 block tracking-wide">
+                <span className="text-xs uppercase font-bold text-neutral-400 block tracking-wide">
                   Canvas
                 </span>
                 <span className="text-xs font-mono font-semibold text-neutral-800 dark:text-neutral-200 truncate block">
@@ -322,7 +322,7 @@ export default function ThemeScreenshotCloner({
                 style={{ backgroundColor: extractedPalette.cardBg }}
               />
               <div className="min-w-0">
-                <span className="text-[10px] uppercase font-bold text-neutral-400 block tracking-wide">
+                <span className="text-xs uppercase font-bold text-neutral-400 block tracking-wide">
                   Card Surface
                 </span>
                 <span className="text-xs font-mono font-semibold text-neutral-800 dark:text-neutral-200 truncate block">
@@ -337,7 +337,7 @@ export default function ThemeScreenshotCloner({
                 style={{ backgroundColor: extractedPalette.textPrimary }}
               />
               <div className="min-w-0">
-                <span className="text-[10px] uppercase font-bold text-neutral-400 block tracking-wide">
+                <span className="text-xs uppercase font-bold text-neutral-400 block tracking-wide">
                   Structural Text
                 </span>
                 <span className="text-xs font-mono font-semibold text-neutral-800 dark:text-neutral-200 truncate block">
@@ -352,7 +352,7 @@ export default function ThemeScreenshotCloner({
                 style={{ backgroundColor: extractedPalette.accent }}
               />
               <div className="min-w-0">
-                <span className="text-[10px] uppercase font-bold text-neutral-400 block tracking-wide">
+                <span className="text-xs uppercase font-bold text-neutral-400 block tracking-wide">
                   Accent Signal
                 </span>
                 <span className="text-xs font-mono font-semibold text-neutral-800 dark:text-neutral-200 truncate block">
@@ -379,7 +379,7 @@ export default function ThemeScreenshotCloner({
               {/* Top Bar with Badge & Color Dots */}
               <div className="flex items-center justify-between relative z-10">
                 <span
-                  className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded font-mono"
+                  className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded font-mono"
                   style={{
                     backgroundColor: `${extractedPalette.accent}20`,
                     color: extractedPalette.accent,
@@ -422,7 +422,7 @@ export default function ThemeScreenshotCloner({
 
               {/* Footer Stamp */}
               <div
-                className="text-[10px] font-mono flex items-center justify-between border-t pt-2 relative z-10"
+                className="text-xs font-mono flex items-center justify-between border-t pt-2 relative z-10"
                 style={{
                   borderColor: extractedPalette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
                   color: extractedPalette.textSecondary,

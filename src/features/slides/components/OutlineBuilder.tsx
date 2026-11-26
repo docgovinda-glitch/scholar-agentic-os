@@ -73,7 +73,7 @@ export default function OutlineBuilder({ cards, onChange, onRegenerate, busy = f
             className="rounded-2xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1C1C1E] p-4 sm:p-5 shadow-xs"
           >
             <div className="flex items-start gap-3">
-              <span className="mt-1.5 text-[11px] font-mono font-semibold text-neutral-400 shrink-0">Slide {String(i + 1).padStart(2, '0')}</span>
+              <span className="mt-1.5 text-xs font-mono font-semibold text-neutral-400 shrink-0">Slide {String(i + 1).padStart(2, '0')}</span>
               <div className="flex-1 min-w-0 space-y-2.5">
                 <div className="flex flex-wrap items-center gap-2">
                   <input
@@ -86,7 +86,7 @@ export default function OutlineBuilder({ cards, onChange, onRegenerate, busy = f
                     aria-label={`Slide ${i + 1} visual type`}
                     value={card.visualType}
                     onChange={(e) => update(card.id, { visualType: e.target.value as VisualType })}
-                    className={`h-7 rounded-full px-2.5 text-[11px] font-semibold border-0 cursor-pointer ${badge[card.visualType] ?? badge['3-Card Grid']}`}
+                    className={`h-7 rounded-full px-2.5 text-xs font-semibold border-0 cursor-pointer ${badge[card.visualType] ?? badge['3-Card Grid']}`}
                   >
                     {VISUAL_TYPES.map((v) => (
                       <option key={v} value={v}>{v}</option>
@@ -119,7 +119,7 @@ export default function OutlineBuilder({ cards, onChange, onRegenerate, busy = f
                   <button
                     type="button"
                     onClick={() => update(card.id, { bullets: [...card.bullets, ''] })}
-                    className="text-[11px] font-semibold text-neutral-500 hover:text-neutral-900 dark:hover:text-white inline-flex items-center gap-1 cursor-pointer"
+                    className="text-xs font-semibold text-neutral-500 hover:text-neutral-900 dark:hover:text-white inline-flex items-center gap-1 cursor-pointer"
                   >
                     <Plus className="w-3 h-3" /> Add point
                   </button>

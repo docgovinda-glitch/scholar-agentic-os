@@ -128,7 +128,7 @@ export default function RevisionRoundPanel({
             placeholder={"Reviewer 1\n1. …\n2. …\n\nReviewer 2\n- …"}
             className={box}
           />
-          <p className="text-[11px] text-[color:var(--text-muted)]">
+          <p className="text-xs text-[color:var(--text-muted)]">
             {pasted.trim()
               ? preview.length
                 ? `${preview.length} comment${preview.length === 1 ? "" : "s"} from ${new Set(preview.map((p) => p.reviewer)).size} reviewer${new Set(preview.map((p) => p.reviewer)).size === 1 ? "" : "s"}. Check them below before starting.`
@@ -136,7 +136,7 @@ export default function RevisionRoundPanel({
               : "Lines like \"Reviewer 1\", \"Referee #2\" or \"Editor\" start a reviewer; numbered or bulleted points become separate comments. Text before the first reviewer is ignored."}
           </p>
           {preview.length > 0 && (
-            <ol className="max-h-56 overflow-y-auto text-[11px] text-[color:var(--text-secondary)] space-y-1 border border-[color:var(--border-subtle)] rounded-lg p-2">
+            <ol className="max-h-56 overflow-y-auto text-xs text-[color:var(--text-secondary)] space-y-1 border border-[color:var(--border-subtle)] rounded-lg p-2">
               {preview.map((p, i) => (
                 <li key={i}>
                   <strong>{p.reviewer}, comment {p.number}:</strong> {p.text}
@@ -159,7 +159,7 @@ export default function RevisionRoundPanel({
       ) : round ? (
         <div className="space-y-4">
           {changes.length > 0 && (
-            <p className="text-[11px] text-[color:var(--text-secondary)]">
+            <p className="text-xs text-[color:var(--text-secondary)]">
               Changed since the reviews arrived: {changes.map((c) => `${c.title} (${c.kind === "changed" ? `${c.wordsBefore}→${c.wordsAfter} words` : c.kind})`).join(", ")}.
             </p>
           )}
@@ -188,7 +188,7 @@ export default function RevisionRoundPanel({
                       className={box}
                     />
                     <div className="flex flex-wrap items-center gap-3">
-                      <label className="text-[11px] text-[color:var(--text-secondary)] flex items-center gap-1.5">
+                      <label className="text-xs text-[color:var(--text-secondary)] flex items-center gap-1.5">
                         Status
                         <select
                           aria-label={`Status of ${reviewer} comment ${c.number}`}
@@ -197,7 +197,7 @@ export default function RevisionRoundPanel({
                             const next = { ...round, comments: round.comments.map((x) => (x.id === c.id ? { ...x, status: e.target.value as RevisionComment["status"] } : x)) };
                             void persist(next);
                           }}
-                          className="text-[11px] p-1 rounded border border-[color:var(--border-control)] bg-[color:var(--surface-canvas)]"
+                          className="text-xs p-1 rounded border border-[color:var(--border-control)] bg-[color:var(--surface-canvas)]"
                         >
                           {STATUS.map((s) => (
                             <option key={s.value} value={s.value}>
@@ -209,7 +209,7 @@ export default function RevisionRoundPanel({
                       {sections.length > 0 && (
                         <fieldset className="flex flex-wrap items-center gap-1.5">
                           <legend className="sr-only">Sections changed for {reviewer} comment {c.number}</legend>
-                          <span className="text-[11px] text-[color:var(--text-secondary)]">Changed in:</span>
+                          <span className="text-xs text-[color:var(--text-secondary)]">Changed in:</span>
                           {sections.map((t) => {
                             const on = c.sections.includes(t);
                             return (
@@ -222,7 +222,7 @@ export default function RevisionRoundPanel({
                                   void persist(next);
                                 }}
                                 title={changedTitles.has(t) ? "Changed since the reviews arrived" : "Not changed since the reviews arrived"}
-                                className={`px-2 py-0.5 rounded-full text-[10px] border cursor-pointer ${on ? "bg-[color:var(--accent-subtle)] border-[color:var(--accent)] text-[color:var(--accent)]" : "border-[color:var(--border-subtle)] text-[color:var(--text-muted)]"}`}
+                                className={`px-2 py-0.5 rounded-full text-xs border cursor-pointer ${on ? "bg-[color:var(--accent-subtle)] border-[color:var(--accent)] text-[color:var(--accent)]" : "border-[color:var(--border-subtle)] text-[color:var(--text-muted)]"}`}
                               >
                                 {t}
                                 {changedTitles.has(t) ? " •" : ""}
@@ -258,11 +258,11 @@ export default function RevisionRoundPanel({
               New round of reviews
             </button>
             {progress && progress.open.length > 0 && (
-              <span className="text-[11px] text-[color:var(--state-warning)]">
+              <span className="text-xs text-[color:var(--state-warning)]">
                 {progress.open.length} comment{progress.open.length === 1 ? "" : "s"} still need{progress.open.length === 1 ? "s" : ""} a reply; the letter marks {progress.open.length === 1 ? "it" : "them"} "Not yet written".
               </span>
             )}
-            {status && <span role="status" className="text-[11px] text-[color:var(--text-muted)]">{status}</span>}
+            {status && <span role="status" className="text-xs text-[color:var(--text-muted)]">{status}</span>}
           </div>
         </div>
       ) : null}

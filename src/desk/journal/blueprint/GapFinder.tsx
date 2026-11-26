@@ -83,7 +83,7 @@ export default function GapFinder({
             {busy ? "Reading recent papers…" : "Find research gaps"}
           </button>
         </div>
-        <p className="text-[11px] text-[color:var(--text-muted)]">
+        <p className="text-xs text-[color:var(--text-muted)]">
           A few words are enough. Recent papers come from OpenAlex or Crossref; your AI reads them and proposes gaps, each quoting the papers it rests on.
         </p>
       </div>
@@ -96,7 +96,7 @@ export default function GapFinder({
 
       {saved && saved.gaps.length > 0 && (
         <div className="space-y-3">
-          <p className="text-[11px] text-[color:var(--text-secondary)]" data-testid="gap-basis">
+          <p className="text-xs text-[color:var(--text-secondary)]" data-testid="gap-basis">
             From {saved.searched} paper{saved.searched === 1 ? "" : "s"} published since {saved.since} on “{saved.interest}”.
             {saved.dropped > 0 ? ` ${saved.dropped} proposed gap${saved.dropped === 1 ? " was" : "s were"} left out because ${saved.dropped === 1 ? "its" : "their"} quotes were not in the papers cited.` : ""}
           </p>
@@ -115,10 +115,10 @@ export default function GapFinder({
                         : "border-[color:var(--border-subtle)] bg-[color:var(--surface-sunken)] hover:border-[color:var(--border-control)]"
                     }`}
                   >
-                    <span className="inline-block mb-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[color:var(--surface-hover)] text-[color:var(--text-secondary)]">
+                    <span className="inline-block mb-1.5 px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-[color:var(--surface-hover)] text-[color:var(--text-secondary)]">
                       {TYPE_LABEL[gap.type] ?? gap.type}
                     </span>
-                    {selected && <span className="ml-2 text-[10px] font-bold text-[color:var(--accent)]">Selected</span>}
+                    {selected && <span className="ml-2 text-xs font-bold text-[color:var(--accent)]">Selected</span>}
                     <span className="block font-semibold text-[color:var(--text-primary)]">{gap.statement}</span>
                     {gap.whyItMatters && <span className="block mt-1 text-[color:var(--text-secondary)]">{gap.whyItMatters}</span>}
                   </button>
@@ -128,7 +128,7 @@ export default function GapFinder({
                       if (!p) return null;
                       const href = p.doi ? `https://doi.org/${p.doi}` : p.url;
                       return (
-                        <li key={e.paperKey} className="text-[11px] text-[color:var(--text-secondary)]">
+                        <li key={e.paperKey} className="text-xs text-[color:var(--text-secondary)]">
                           “{e.quote}” —{" "}
                           {href ? (
                             <a href={href} target="_blank" rel="noopener noreferrer" className="underline inline-flex items-center gap-0.5">

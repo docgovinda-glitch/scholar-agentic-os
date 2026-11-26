@@ -45,7 +45,7 @@ import type { OutputTypeSummary, ProjectView } from "./types";
 import ScholarCoreLogo from "../components/ScholarCoreLogo";
 import ScholarSidebar, { type ScholarSidebarAction, type ScholarSidebarProject } from "../components/navigation/ScholarSidebar";
 import { applyTheme, useTheme } from "../hooks/useTheme";
-import { showAppToast } from "../components/ui/FeedbackSystem";
+import { showAppToast, requestAppPrompt } from "../components/ui/FeedbackSystem";
 import UserAccountMenu from "./components/UserAccountMenu";
 import EmbeddedAuthModal from "./auth/EmbeddedAuthModal";
 // Heavy screens that are not part of the first paint of the landing page.
@@ -524,7 +524,9 @@ export default function ProjectListScreen({
     setError(null);
     setProjectsLoadError(null);
     setProjectsLoadNeedsSignIn(false);
-    if (!userEmail) {
+    // The local-development stand-in user has no server session, so there is
+    // nothing to load and no "session has ended" to report.
+    if (!userEmail || userId === "localhost-dev") {
       setProjects([]);
       return;
     }
@@ -546,7 +548,7 @@ export default function ProjectListScreen({
               : "Couldn't load your projects. Check your connection and try again."
         );
       });
-  }, [userEmail]);
+  }, [userEmail, userId]);
 
 
   useEffect(() => {
@@ -1735,6 +1737,7 @@ export default function ProjectListScreen({
         liveSources: sourcesFound.length ? sourcesFound : undefined,
         searchedAt: sourcesFound.length ? new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : undefined,
         error: true,
+        notice: failure.kind === "no-ai" || failure.kind === "signed-out",
       };
       setGuideMessages((prev) => [...prev, assistantMsg]);
     } finally {
@@ -1861,7 +1864,7 @@ export default function ProjectListScreen({
   const [projectToDelete, setProjectToDelete] = useState<ProjectView | null>(null);
 
 
-  function handleRecentAction(action: ScholarSidebarAction, item: ScholarSidebarProject) {
+  async function handleRecentAction(action: ScholarSidebarAction, item: ScholarSidebarProject) {
     if (action === "share") {
       const shareUrl = `${window.location.origin}${item.projectId ? `/projects/${encodeURIComponent(item.projectId)}` : "/"}`;
       if (navigator.clipboard?.writeText) {
@@ -1877,7 +1880,12 @@ export default function ProjectListScreen({
     } else if (action === "rename") {
       const currentProj = projects?.find((p) => p.projectId === item.projectId);
       const currentDisplayTitle = getProjectDisplayName(currentProj, projects || []);
-      const newTitle = window.prompt("Rename research project:", currentDisplayTitle || item.title);
+      const newTitle = await requestAppPrompt({
+        title: "Rename project",
+        label: "Project name",
+        defaultValue: currentDisplayTitle || item.title,
+        confirmLabel: "Rename",
+      });
       if (newTitle && newTitle.trim() && newTitle.trim() !== currentDisplayTitle && item.projectId) {
         const trimmed = newTitle.trim();
         // Check for duplicate title against other existing projects (case-insensitive)
@@ -2054,7 +2062,7 @@ export default function ProjectListScreen({
         className={`w-full min-h-14 flex items-center gap-3 px-3.5 py-2 rounded-2xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-left cursor-pointer active:scale-[0.99] transition-transform focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 ${extraClass}`}
       >
         <span className="min-w-0 flex-1">
-          <span className="block text-[11px] font-semibold uppercase tracking-wider opacity-70">Resume chat</span>
+          <span className="block text-xs font-semibold uppercase tracking-wider opacity-70">Resume chat</span>
           <span className="block text-[13px] font-medium truncate">{resumeTarget.title}</span>
         </span>
         <ArrowRight className="w-4 h-4 shrink-0" aria-hidden="true" />
@@ -2288,7 +2296,7 @@ export default function ProjectListScreen({
                   else setActiveView("ai-access");
                 }}
                 className={`${isAiSidebarOpen ? "hidden 2xl:inline-flex" : "hidden sm:inline-flex"
-                  } items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-colors border cursor-pointer shadow-2xs ${aiStatus?.connected
+                  } items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors border cursor-pointer shadow-2xs ${aiStatus?.connected
                     ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-500/20"
                     : "border-neutral-200 dark:border-white/10 bg-neutral-100/80 dark:bg-white/5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200/70 dark:hover:bg-white/10"
                   }`}
@@ -2305,7 +2313,7 @@ export default function ProjectListScreen({
               <button
                 type="button"
                 onClick={() => openAuth("signin", "Sign in to configure your personal AI provider.")}
-                className="inline-flex items-center gap-1.5 min-h-9 sm:min-h-0 px-3.5 sm:px-3 py-1 rounded-full text-xs sm:text-[11px] font-medium transition-colors border border-neutral-200 dark:border-white/10 bg-neutral-900/5 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-900/10 dark:hover:bg-white/10 cursor-pointer shadow-2xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
+                className="inline-flex items-center gap-1.5 min-h-9 sm:min-h-0 px-3.5 sm:px-3 py-1 rounded-full text-xs sm:text-xs font-medium transition-colors border border-neutral-200 dark:border-white/10 bg-neutral-900/5 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-900/10 dark:hover:bg-white/10 cursor-pointer shadow-2xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
                 title="Sign in to access AI"
               >
                 <span className="hidden sm:inline-block w-1.5 h-1.5 rounded-full bg-slate-400" />
@@ -2327,7 +2335,8 @@ export default function ProjectListScreen({
             )}
 
             {/* AI Assistant Toggle Button. On a phone it only appears once a chat exists: before that the whole screen is Ask Scholar, so the button had nothing to open. */}
-            {!isAiSidebarOpen && !isPhone && (
+            {/* The open sidebar already has an Ask Scholar entry; this button stands in for it only when the sidebar is collapsed. */}
+            {!isAiSidebarOpen && !isPhone && !isSidebarOpen && (
               <button
                 type="button"
                 onClick={openAskScholar}
@@ -2481,7 +2490,7 @@ export default function ProjectListScreen({
                                 aria-label="Workspaces"
                                 className="absolute left-0 top-full mt-2 w-[min(18rem,calc(100vw-2rem))] p-1.5 rounded-2xl bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/15 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-150 space-y-0.5"
                               >
-                                <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+                                <div className="px-2 py-1 text-xs font-bold uppercase tracking-wider text-neutral-400">
                                   Academic Workspaces
                                 </div>
                                 {FORMAT_TILES.map((tile) => {
@@ -2506,7 +2515,7 @@ export default function ProjectListScreen({
                                           {tile.label}
                                         </span>
                                         {length && (
-                                          <span className="block text-[11px] text-neutral-600 dark:text-neutral-400">
+                                          <span className="block text-xs text-neutral-600 dark:text-neutral-400">
                                             {length}
                                           </span>
                                         )}
@@ -2579,7 +2588,7 @@ export default function ProjectListScreen({
 
                       {visibleRecents.length > 0 && (
                         <div className={hasReturningContent ? "mt-1" : "mt-6"} data-testid="mobile-continue">
-                          <h2 className="px-0.5 mb-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">
+                          <h2 className="px-0.5 mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">
                             Continue where you left off
                           </h2>
                           <ul className="space-y-2">
@@ -2599,7 +2608,7 @@ export default function ProjectListScreen({
                                     <span className="min-w-0 flex-1">
                                       <span className="block text-[13px] font-semibold text-neutral-900 dark:text-white truncate">{item.title}</span>
                                       {item.typeLabel && (
-                                        <span className="block text-[11px] text-neutral-600 dark:text-neutral-400">{item.typeLabel}</span>
+                                        <span className="block text-xs text-neutral-600 dark:text-neutral-400">{item.typeLabel}</span>
                                       )}
                                     </span>
                                     <ArrowRight className="w-4 h-4 shrink-0 text-neutral-400" aria-hidden="true" />
@@ -2676,7 +2685,7 @@ export default function ProjectListScreen({
 
                               {/* Bottom Row: Divider & Actionable Deliverables Spec */}
                               {/* One spec per line: wrapped "a · b · c" stranded dots at line ends and put the dividers at different heights. */}
-                              <ul className="pt-3.5 mt-2 border-t border-neutral-100 dark:border-white/5 flex flex-col gap-0.5 text-[11px] sm:text-[11.5px] text-neutral-600 dark:text-neutral-400 font-sans leading-tight">
+                              <ul className="pt-3.5 mt-2 border-t border-neutral-100 dark:border-white/5 flex flex-col gap-0.5 text-xs sm:text-[11.5px] text-neutral-600 dark:text-neutral-400 font-sans leading-tight">
                                 {((tile.specs || tile.footer).split(" · ")).map((part, idx) => (
                                   <li key={idx} className="font-medium">{part}</li>
                                 ))}
@@ -2693,7 +2702,7 @@ export default function ProjectListScreen({
                       <Lightbulb className="w-5 h-5" />
                     </div>
                     <div>
-                      <h2 className="text-base font-semibold text-neutral-900 dark:text-white">Ask Scholar Copilot Active</h2>
+                      <h2 className="text-base font-semibold text-neutral-900 dark:text-white">Ask Scholar is open</h2>
                       <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-0.5">
                         Your research inquiry is active in full screen.
                       </p>
@@ -2799,7 +2808,7 @@ export default function ProjectListScreen({
                 onClick={item.onClick}
                 aria-label={item.fullName}
                 aria-current={item.active ? "page" : undefined}
-                className={`flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-medium cursor-pointer ${item.active ? "text-neutral-900 dark:text-white" : "text-neutral-600 dark:text-neutral-400"
+                className={`flex flex-col items-center gap-0.5 py-2.5 text-xs font-medium cursor-pointer ${item.active ? "text-neutral-900 dark:text-white" : "text-neutral-600 dark:text-neutral-400"
                   }`}
               >
                 <item.icon className="w-5 h-5" aria-hidden="true" />
@@ -2913,21 +2922,6 @@ export default function ProjectListScreen({
                 </div>
 
                 <div className="flex items-center gap-1.5 sm:gap-2 relative shrink-0">
-                  {!isPhone && (
-                    <>
-                      <CitationStylePicker
-                        value={askCitationStyle}
-                        onChange={handleUpdateCitationStyle}
-                        direction="down"
-                      />
-
-                      <AskScholarSettingsPopover
-                        settings={askUserSettings}
-                        direction="down"
-                        onUpdateSettings={handleAskSettingsUpdate}
-                      />
-                    </>
-                  )}
 
                   {askThreads.length > 0 && (
                     <div ref={askHistoryRef} className="relative">
@@ -2940,12 +2934,12 @@ export default function ProjectListScreen({
                       >
                         <Clock className="w-3.5 h-3.5" />
                         <span className="hidden sm:inline">History</span>
-                        <span className="text-[11px] tabular-nums opacity-70">{askThreads.length}</span>
+                        <span className="text-xs tabular-nums opacity-70">{askThreads.length}</span>
                       </button>
 
                       {isAskHistoryOpen && (
                         <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 rounded-2xl bg-white dark:bg-ink-800 border border-neutral-200 dark:border-white/10 shadow-xl z-40 p-2 space-y-1 text-left">
-                          <div className="flex items-center justify-between px-2 py-1 text-[11px] font-semibold text-neutral-600 dark:text-neutral-400 border-b border-neutral-100 dark:border-white/10">
+                          <div className="flex items-center justify-between px-2 py-1 text-xs font-semibold text-neutral-600 dark:text-neutral-400 border-b border-neutral-100 dark:border-white/10">
                             <span>Recent Conversations</span>
                             <button
                               type="button"
@@ -2977,7 +2971,7 @@ export default function ProjectListScreen({
                                   title={t.title}
                                 >
                                   <div className="truncate">{t.title}</div>
-                                  <div className="text-[10px] text-neutral-400 font-normal">
+                                  <div className="text-xs text-neutral-400 font-normal">
                                     {t.messages.filter((m) => m.sender === "user").length} prompt
                                     {t.messages.filter((m) => m.sender === "user").length === 1 ? "" : "s"}
                                     {t.updatedAt ? ` · ${t.updatedAt}` : ""}
@@ -3103,7 +3097,7 @@ export default function ProjectListScreen({
 
                               {/* Bottom Row: Divider & Actionable Deliverables Spec */}
                               {/* One spec per line: wrapped "a · b · c" stranded dots at line ends and put the dividers at different heights. */}
-                              <ul className="pt-3.5 mt-2 border-t border-neutral-100 dark:border-white/5 flex flex-col gap-0.5 text-[11px] sm:text-[11.5px] text-neutral-600 dark:text-neutral-400 font-sans leading-tight">
+                              <ul className="pt-3.5 mt-2 border-t border-neutral-100 dark:border-white/5 flex flex-col gap-0.5 text-xs sm:text-[11.5px] text-neutral-600 dark:text-neutral-400 font-sans leading-tight">
                                 {((tile.specs || tile.footer).split(" · ")).map((part, idx) => (
                                   <li key={idx} className="font-medium">{part}</li>
                                 ))}
@@ -3148,7 +3142,7 @@ export default function ProjectListScreen({
                               setEditingUserMsgId(msg.id);
                               setEditingUserMsgText(msg.text);
                             }}
-                            className="mb-1 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-neutral-400 opacity-0 transition-opacity hover:text-neutral-700 focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100 dark:hover:text-neutral-200"
+                            className="mb-1 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-neutral-400 opacity-0 transition-opacity hover:text-neutral-700 focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100 dark:hover:text-neutral-200"
                             title="Edit and resubmit message"
                             aria-label="Edit message"
                           >
@@ -3160,6 +3154,8 @@ export default function ProjectListScreen({
                         <div
                           className={`leading-relaxed ${isPhone ? "text-[15px]" : "text-sm"} ${msg.sender === "user"
                             ? "max-w-[88%] rounded-3xl rounded-br-lg bg-neutral-100 px-4 py-2.5 text-neutral-900 dark:bg-white/10 dark:text-neutral-100"
+                            : msg.notice
+                              ? "w-full rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-inset)] px-4 py-3 text-[color:var(--text-primary)]"
                             : msg.error
                               ? "w-full rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-neutral-900 dark:border-red-900/40 dark:bg-red-950/20 dark:text-neutral-200"
                               : "w-full px-0.5 text-neutral-900 dark:text-neutral-100"
@@ -3182,7 +3178,7 @@ export default function ProjectListScreen({
                                   ) : (
                                     <FileText className="w-3.5 h-3.5" />
                                   )}
-                                  <span className="truncate max-w-[150px] font-medium text-[11px]">{att.name}</span>
+                                  <span className="truncate max-w-[150px] font-medium text-xs">{att.name}</span>
                                 </div>
                               ))}
                             </div>
@@ -3215,7 +3211,7 @@ export default function ProjectListScreen({
                                     setEditingUserMsgId(null);
                                     setEditingUserMsgText("");
                                   }}
-                                  className="px-2.5 py-1 rounded-md text-[11px] bg-white/10 dark:bg-neutral-900/10 hover:bg-white/20 dark:hover:bg-neutral-900/20 transition-colors cursor-pointer"
+                                  className="px-2.5 py-1 rounded-md text-xs bg-white/10 dark:bg-neutral-900/10 hover:bg-white/20 dark:hover:bg-neutral-900/20 transition-colors cursor-pointer"
                                 >
                                   Cancel
                                 </button>
@@ -3230,7 +3226,7 @@ export default function ProjectListScreen({
                                     setEditingUserMsgText("");
                                     handleSendGuideMessage(nextText, undefined, undefined, baseHistory);
                                   }}
-                                  className="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-white text-neutral-900 dark:bg-neutral-900 dark:text-white hover:opacity-90 transition-opacity cursor-pointer"
+                                  className="px-2.5 py-1 rounded-md text-xs font-semibold bg-white text-neutral-900 dark:bg-neutral-900 dark:text-white hover:opacity-90 transition-opacity cursor-pointer"
                                 >
                                   Save & Submit
                                 </button>
@@ -3293,7 +3289,7 @@ export default function ProjectListScreen({
                           )}
 
                           {msg.liveSources && msg.liveSources.length === 0 && (
-                            <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-400" data-testid="no-live-sources">
+                            <p className="mt-2 text-xs text-amber-700 dark:text-amber-400" data-testid="no-live-sources">
                               No recent sources were found for this question, so this answer is from the AI's general knowledge. Check it before you rely on it.
                             </p>
                           )}
@@ -3340,9 +3336,10 @@ export default function ProjectListScreen({
                                   )}
                                   {!hasCitations && msg.liveSources && msg.liveSources.length > 0 && (
                                     <LiveSourcesDrawer
+                                      embedded
                                       sources={msg.liveSources}
                                       searchedAt={msg.searchedAt}
-                                      initialExpanded={msg.liveSources.length <= 3}
+                                      initialExpanded={Boolean(msg.error) || msg.liveSources.length <= 3}
                                       onSaveToVault={handleSaveSourceToVault}
                                       savedUrls={savedVaultSourceUrls}
                                     />
@@ -3448,7 +3445,7 @@ export default function ProjectListScreen({
                           )}
 
                           {msg.sender === "assistant" && !msg.error && msg.kind !== "help" && msg.id !== "init" && msg.id !== "reset-assistant" && (
-                            <p className="mt-1.5 hidden px-1 text-[11px] text-neutral-400 sm:block">
+                            <p className="mt-1.5 hidden px-1 text-xs text-neutral-400 sm:block">
                               {[
                                 msg.mode === "deep-research" ? "Deep research" : null,
                                 `${msg.wordCount || msg.text.trim().split(/\s+/).filter(Boolean).length} words`,
@@ -3465,7 +3462,7 @@ export default function ProjectListScreen({
                               <button
                                 type="button"
                                 onClick={() => handleAssistantAction(msg.action!)}
-                                className="inline-flex items-center gap-1 text-[11px] bg-blue-50 dark:bg-white/10 text-blue-600 dark:text-blue-300 border border-blue-200 dark:border-blue-500/30 px-2.5 py-1 rounded-md hover:bg-blue-100 dark:hover:bg-white/15 transition font-medium cursor-pointer"
+                                className="inline-flex items-center gap-1 text-xs bg-blue-50 dark:bg-white/10 text-blue-600 dark:text-blue-300 border border-blue-200 dark:border-blue-500/30 px-2.5 py-1 rounded-md hover:bg-blue-100 dark:hover:bg-white/15 transition font-medium cursor-pointer"
                               >
                                 <span>{msg.action.label}</span>
                               </button>
@@ -3569,12 +3566,12 @@ export default function ProjectListScreen({
                 <div className={isLandingPage ? "w-full max-w-4xl mx-auto" : "w-full"}>
                   {/* A notice appears only when something needs attention; a healthy connection is silent. */}
                   {!isOnline ? (
-                    <p role="status" className="mb-2 flex items-center gap-1.5 px-1 text-[11px] font-medium text-amber-700 dark:text-amber-400">
+                    <p role="status" className="mb-2 flex items-center gap-1.5 px-1 text-xs font-medium text-amber-700 dark:text-amber-400">
                       <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true" />
                       You're offline. Questions will send when you reconnect.
                     </p>
                   ) : aiStatus && !aiStatus.connected ? (
-                    <p className="mb-2 flex items-center gap-1.5 px-1 text-[11px] text-neutral-600 dark:text-neutral-400">
+                    <p className="mb-2 flex items-center gap-1.5 px-1 text-xs text-neutral-600 dark:text-neutral-400">
                       <span className="h-1.5 w-1.5 rounded-full bg-neutral-400" aria-hidden="true" />
                       <span>No AI is connected.</span>
                       <button type="button" onClick={onOpenAiAccess} className="cursor-pointer font-medium text-neutral-900 underline underline-offset-2 hover:opacity-80 dark:text-neutral-100">
@@ -3602,21 +3599,17 @@ export default function ProjectListScreen({
                     sendLabel="Send question"
                     inputRef={guideInputRef}
                   >
-                        {/* Phones: style and preferences live here, next to the box, not crowding the header */}
-                        {isPhone && (
-                          <>
-                            <CitationStylePicker
-                              value={askCitationStyle}
-                              onChange={handleUpdateCitationStyle}
-                              direction="up"
-                            />
-                            <AskScholarSettingsPopover
-                              settings={askUserSettings}
-                              direction="up"
-                              onUpdateSettings={handleAskSettingsUpdate}
-                            />
-                          </>
-                        )}
+                        {/* Citation style and preferences sit in the composer on every width, as on the home screen. */}
+                        <CitationStylePicker
+                          value={askCitationStyle}
+                          onChange={handleUpdateCitationStyle}
+                          direction="up"
+                        />
+                        <AskScholarSettingsPopover
+                          settings={askUserSettings}
+                          direction="up"
+                          onUpdateSettings={handleAskSettingsUpdate}
+                        />
 
                         <button
                           type="button"
@@ -3663,7 +3656,7 @@ export default function ProjectListScreen({
                           <Database className="h-3.5 w-3.5" aria-hidden="true" />
                           <span className="hidden sm:inline">Vault Grounding</span>
                           {userEmail && userVaultItems.length > 0 && (
-                            <span className="text-[11px] tabular-nums opacity-70">
+                            <span className="text-xs tabular-nums opacity-70">
                               {userVaultItems.length}
                             </span>
                           )}
@@ -3675,7 +3668,7 @@ export default function ProjectListScreen({
                             data-testid="propose-deep-research-plan-btn"
                             disabled={!guideInput.trim()}
                             onClick={() => handleProposeDeepResearchPlan(guideInput)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30 hover:bg-indigo-500/20 disabled:opacity-40 transition-colors cursor-pointer whitespace-nowrap"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30 hover:bg-indigo-500/20 disabled:opacity-40 transition-colors cursor-pointer whitespace-nowrap"
                             title="Propose an editable Deep Research plan before searching begins"
                           >
                             <Sparkles className="w-3 h-3" />

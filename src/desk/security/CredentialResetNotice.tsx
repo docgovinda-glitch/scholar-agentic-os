@@ -72,7 +72,7 @@ export default function CredentialResetNotice({ className = "" }: { className?: 
       <button
         type="button"
         onClick={() => void handleDismiss()}
-        className="shrink-0 rounded-lg border border-[color:var(--state-warning)] px-2.5 py-1 text-[11px] font-semibold hover:bg-[color:var(--state-warning)] hover:text-white transition-colors cursor-pointer"
+        className="shrink-0 rounded-lg border border-[color:var(--state-warning)] px-2.5 py-1 text-xs font-semibold hover:bg-[color:var(--state-warning)] hover:text-white transition-colors cursor-pointer"
       >
         Dismiss
       </button>

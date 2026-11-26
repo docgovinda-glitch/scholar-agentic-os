@@ -20,9 +20,9 @@ export default function LiteratureMatrixEditor({
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4" data-testid="thesis-literature-matrix">
       {FIELDS.map((f) => (
         <label key={f.key} className="apple-card p-5 flex flex-col gap-2">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-accent">{f.stream}</span>
+          <span className="text-xs font-bold uppercase tracking-wider text-accent">{f.stream}</span>
           <span className="text-xs font-bold text-primary">{f.title}</span>
-          <span className="text-[11px] text-secondary leading-relaxed">
+          <span className="text-xs text-secondary leading-relaxed">
             {f.hint}
             {f.key === "foundations" && fieldOfStudy.trim() ? ` (${fieldOfStudy.trim()})` : ""}
           </span>

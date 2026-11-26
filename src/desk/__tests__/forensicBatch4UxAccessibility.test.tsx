@@ -196,11 +196,15 @@ describe("Forensic Remediation Batch 4 - UX, Ergonomics & Accessibility Suite", 
     expect(badge).toHaveAttribute("role", "status");
     expect(badge).toHaveAttribute("aria-live", "polite");
     expect(badge).toHaveTextContent(/Saving changes\.\.\./);
-    expect(badge).toHaveTextContent(/v3/);
+    // The revision number is for screen readers only; no "v3" chip on screen.
+    expect(badge).toHaveAttribute("aria-label", expect.stringContaining("version 3"));
+    expect(badge).not.toHaveTextContent(/v3/);
 
     rerender(<WorkspaceAutosaveBadge status="saved" version={3} />);
     expect(badge).toHaveTextContent(/All changes saved/);
-    expect(badge).toHaveTextContent(/v3/);
+    // The revision number is for screen readers only; no "v3" chip on screen.
+    expect(badge).toHaveAttribute("aria-label", expect.stringContaining("version 3"));
+    expect(badge).not.toHaveTextContent(/v3/);
 
     rerender(<WorkspaceAutosaveBadge status="offline" />);
     expect(badge).toHaveTextContent(/Offline Backup/);

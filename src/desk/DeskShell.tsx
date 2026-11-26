@@ -74,6 +74,7 @@ export default function DeskShell({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [trayOpen, setTrayOpen] = useState(false);
+  const [studioOpen, setStudioOpen] = useState(false);
   // Bumped when an evidence approval creates a new Claim–Evidence binding,
   // so ClaimsPanel (which only fetches its graph on mount) remounts and
   // picks it up — the two panels stay decoupled otherwise (see
@@ -235,10 +236,12 @@ export default function DeskShell({
         onOpenVault={onOpenVault}
         onOpenAiAccess={onOpenAiAccess}
         onRenameProject={handleRenameProject}
+        onToggleStudio={() => setStudioOpen((v) => !v)}
+        studioOpen={studioOpen}
         userEmail={session.status === "signed-in" ? session.email : null}
       />
 
-      <nav aria-label="Project view" className="flex gap-1 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-4">
+      <nav aria-label="Project view" className="flex gap-1 overflow-x-auto border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-2 sm:px-4">
         {(["definition", "requirements", "document", "evidence", "manuscript", "progress", "submissions"] as const).map((v) => (
           <button
             key={v}
@@ -246,7 +249,7 @@ export default function DeskShell({
             onClick={() => onViewChange(v)}
             aria-current={view === v ? "page" : undefined}
             className={[
-              "-mb-px border-b-2 px-3 py-2 text-sm transition-colors duration-[var(--motion-fast)] cursor-pointer",
+              "-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm transition-colors duration-[var(--motion-fast)] cursor-pointer",
               view === v
                 ? "border-[color:var(--accent)] text-[color:var(--text-primary)]"
                 : "border-transparent text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]",
@@ -268,7 +271,8 @@ export default function DeskShell({
           </button>
         ))}
       </nav>
-      <div className="flex flex-1 min-h-0 relative overflow-hidden">
+      <main className="flex flex-1 min-h-0 min-w-0 relative overflow-hidden">
+        <h1 className="sr-only">{project.answers?.title || outputType?.label || "Project"}</h1>
         {view === "progress" ? (
           <div className="flex-1 overflow-y-auto">
             <GatesPanel
@@ -340,7 +344,7 @@ export default function DeskShell({
           </div>
         ) : (
           <>
-            <div className="relative shrink-0 border-r border-[color:var(--border-subtle)] flex flex-col">
+            <div className="relative hidden md:flex shrink-0 border-r border-[color:var(--border-subtle)] flex-col">
               <Rail projectId={projectId} document={document} outputTypeId={project.outputTypeId} onJumpToBlock={jumpToBlock} />
             </div>
             <Primary
@@ -355,6 +359,8 @@ export default function DeskShell({
           </>
         )}
         <Aside
+          open={studioOpen}
+          onClose={() => setStudioOpen(false)}
           projectId={projectId}
           rubric={rubric}
           sessionId={`desk-${projectId}`}
@@ -363,7 +369,7 @@ export default function DeskShell({
             setRubric(newRubric);
           }}
         />
-      </div>
+      </main>
       {trayOpen && (
         <Tray projectId={projectId} onClose={() => setTrayOpen(false)} />
       )}
