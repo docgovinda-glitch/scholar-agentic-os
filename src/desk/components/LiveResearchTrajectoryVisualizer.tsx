@@ -1,51 +1,28 @@
 import { classifyResearchPrompt } from "../../config/askScholarConfig";
 import { frameworkForDiscipline } from "../../domain/ask/evidenceFramework";
-import React, { useState, useEffect } from "react";
-import { BarChart3, CheckCircle2, ChevronDown, ChevronUp, Compass, Filter, Loader2, Search, ShieldCheck, Square, Zap } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { BookOpen, Check, ChevronDown, Compass, Loader2, PenLine, Scale, Search, Square } from "lucide-react";
 import type { ResearchStageTelemetry } from "../api/types";
-import ScholarCoreLogo from "../../components/ScholarCoreLogo";
 
 export interface ResearchStageStep {
   id: string;
+  /** One word for the step row ("Search"). */
+  short: string;
   label: string;
   detail: string;
   icon: React.ComponentType<{ className?: string }>;
 }
 
+/** The research a person sees, in five plain steps (the server's seven stages fold into them). */
 export const RESEARCH_PIPELINE_STEPS: ResearchStageStep[] = [
-  {
-    id: "scoping",
-    label: "Query Decomposition & Scoping",
-    detail: "Formulating sub-hypotheses and identifying theoretical variables",
-    icon: Compass,
-  },
-  {
-    id: "harvesting",
-    label: "Multi-Portal Literature Retrieval",
-    detail: "Harvesting OpenAlex, Crossref, Europe PMC and scholarly repositories",
-    icon: Search,
-  },
-  {
-    id: "screening",
-    label: "Quality & Methodological Screening",
-    detail: "Filtering preprints, assessing sample sizes, and screening peer-reviewed venues",
-    icon: Filter,
-  },
-  {
-    id: "extraction",
-    label: "Evidence & Method Extraction",
-    detail: "Reading each source's design, method, findings and limitations as its field defines them",
-    icon: BarChart3,
-  },
-  {
-    id: "synthesis",
-    label: "Epistemic Triangulation & Synthesis",
-    detail: "Resolving contradictory evidence and generating strict inline citation trace",
-    icon: ShieldCheck,
-  },
+  { id: "scoping", short: "Plan", label: "Plan the questions", detail: "Breaking the question into sub-questions to search", icon: Compass },
+  { id: "harvesting", short: "Search", label: "Search the literature", detail: "Scholarly indexes (OpenAlex, Crossref, Europe PMC and others) and the web", icon: Search },
+  { id: "screening", short: "Read", label: "Read the sources", detail: "The strongest sources first, in full where an open copy exists", icon: BookOpen },
+  { id: "extraction", short: "Check", label: "Check the evidence", detail: "Comparing what the sources found and looking for gaps", icon: Scale },
+  { id: "synthesis", short: "Write", label: "Write the report", detail: "A cited report from the sources, each claim traced to them", icon: PenLine },
 ];
 
-/** The pipeline with the extraction stage named for the question's discipline (PICO only for clinical work). */
+/** The steps with the checking step named for the question's discipline (PICO only for clinical work). */
 export function pipelineStepsFor(query?: string): ResearchStageStep[] {
   if (!query?.trim()) return RESEARCH_PIPELINE_STEPS;
   const framework = frameworkForDiscipline(classifyResearchPrompt(query).discipline);
@@ -53,6 +30,14 @@ export function pipelineStepsFor(query?: string): ResearchStageStep[] {
     step.id === "extraction" ? { ...step, label: framework.stageLabel, detail: framework.stageDetail } : step
   );
 }
+
+/** Server stage 1-7 → the step shown: plan, search, read, check (cross-check and the follow-up search), write. */
+const STAGE_TO_STEP = [0, 0, 1, 2, 3, 3, 4, 4];
+
+/** "Stage 2/7: Discovering sources…" → "Discovering sources…": the step row already says where the run is. */
+const plainDetail = (text?: string) => (text || "").replace(/^Stage\s*\d+\s*\/\s*\d+\s*:\s*/i, "").trim();
+
+const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
 export interface LiveResearchTrajectoryVisualizerProps {
   isLive?: boolean;
@@ -66,6 +51,8 @@ export interface LiveResearchTrajectoryVisualizerProps {
   activeStage?: ResearchStageTelemetry | null;
   onStop?: () => void;
   defaultExpanded?: boolean;
+  /** Shown inside the live card under the steps (Deep Research's activity feed). */
+  children?: React.ReactNode;
 }
 
 export const LiveResearchTrajectoryVisualizer: React.FC<LiveResearchTrajectoryVisualizerProps> = ({
@@ -80,254 +67,153 @@ export const LiveResearchTrajectoryVisualizer: React.FC<LiveResearchTrajectoryVi
   activeStage,
   onStop,
   defaultExpanded = false,
+  children,
 }) => {
   const [isExpanded, setIsExpanded] = useState<boolean>(defaultExpanded);
-  const [activeStepIndex, setActiveStepIndex] = useState<number>(0);
   const [secondsElapsed, setSecondsElapsed] = useState<number>(0);
+  const deep = mode === "deep-research" || mode === "deep_research";
+  const steps = pipelineStepsFor(query);
 
-  const isDeepResearch = mode === "deep-research" || mode === "deep_research";
-  const pipelineSteps = pipelineStepsFor(query);
-  const totalSteps = pipelineSteps.length;
-
-  // Live timer during thinking
+  // Elapsed time only: it is shown as a clock and never moves the steps (those follow the server's stages).
   useEffect(() => {
     if (!isLive) return;
-    const interval = setInterval(() => {
-      setSecondsElapsed((s) => s + 1);
-    }, 1000);
+    const interval = setInterval(() => setSecondsElapsed((s) => s + 1), 1000);
     return () => clearInterval(interval);
   }, [isLive]);
 
-  // Synchronize stage based on activeStage, currentStep, and progressive timers
-  useEffect(() => {
-    if (!isLive) return;
+  const stepIndex =
+    activeStage?.stageNumber && activeStage.stageNumber > 0
+      ? STAGE_TO_STEP[Math.min(STAGE_TO_STEP.length - 1, activeStage.stageNumber)]
+      : currentStep === "writing"
+        ? 4
+        : currentStep === "searching"
+          ? 1
+          : 0;
 
-    if (activeStage?.stageNumber && activeStage.stageNumber > 0) {
-      const idx = Math.min(totalSteps - 1, activeStage.stageNumber - 1);
-      setActiveStepIndex(idx);
-      return;
-    }
+  // Deep Research wears its indigo; a quick answer's search stays neutral.
+  const accentText = deep ? "text-[color:var(--research)]" : "text-[color:var(--text-primary)]";
+  const accentFill = deep ? "bg-[color:var(--research-solid)]" : "bg-[color:var(--text-primary)]";
+  const accentTint = deep ? "bg-[color:var(--research-subtle)]" : "bg-[color:var(--surface-inset)]";
 
-    if (currentStep === "writing") {
-      setActiveStepIndex(totalSteps - 1);
-      return;
-    }
+  if (isLive) {
+    const detail =
+      plainDetail(liveDetail || activeStage?.detail) ||
+      (currentStep === "writing" && foundCount > 0 ? `Writing from ${foundCount} sources` : steps[stepIndex].detail);
+    return (
+      <div
+        data-testid="research-trajectory-visualizer"
+        className={`my-2.5 max-w-[72ch] rounded-2xl border bg-[color:var(--surface-raised)] p-4 ${deep ? "border-[color:var(--research-border)]" : "border-[color:var(--border-subtle)]"}`}
+      >
+        <div className="flex items-center gap-3">
+          <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${accentTint} ${accentText}`} aria-hidden="true">
+            <Loader2 className="h-4 w-4 animate-spin" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-baseline gap-2">
+              <span className="text-[15px] font-semibold text-[color:var(--text-primary)]">
+                {deep ? "Researching your question" : "Searching sources"}
+              </span>
+              <span className="text-xs tabular-nums text-[color:var(--text-muted)]" aria-label={`${secondsElapsed} seconds`}>
+                {clock(secondsElapsed)}
+              </span>
+            </div>
+            <p role="status" aria-live="polite" className="mt-0.5 truncate text-[13px] text-[color:var(--text-secondary)]">
+              {detail}
+            </p>
+          </div>
+          {onStop && (
+            <button
+              type="button"
+              onClick={onStop}
+              title="Stop the research"
+              className="inline-flex min-h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-[color:var(--border-default)] px-3 text-[13px] font-medium text-[color:var(--text-primary)] transition-colors hover:bg-[color:var(--surface-hover)]"
+            >
+              <Square className="h-3 w-3 fill-current" aria-hidden="true" />
+              Stop
+            </button>
+          )}
+        </div>
 
-    if (currentStep === "searching") {
-      if (activeStepIndex === 0) {
-        setActiveStepIndex(1);
-      }
-    }
-  }, [isLive, activeStage, currentStep, totalSteps, activeStepIndex]);
+        <ol aria-label="Research steps" className="mt-4 grid grid-cols-5 gap-1.5">
+          {steps.map((step, idx) => {
+            const done = idx < stepIndex;
+            const current = idx === stepIndex;
+            return (
+              <li key={step.id} aria-current={current ? "step" : undefined} title={step.label} className="min-w-0">
+                <span
+                  className={`block h-1 rounded-full ${done || current ? accentFill : "bg-[color:var(--surface-sunken)]"} ${current ? "animate-pulse" : ""}`}
+                  aria-hidden="true"
+                />
+                <span
+                  className={`mt-1.5 flex items-center gap-1 truncate text-xs ${
+                    current ? `font-semibold ${accentText}` : done ? "text-[color:var(--text-primary)]" : "text-[color:var(--text-muted)]"
+                  }`}
+                >
+                  {done && <Check className="h-3 w-3 shrink-0" aria-hidden="true" />}
+                  {step.short}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
 
-  const currentStepData = pipelineSteps[activeStepIndex] || pipelineSteps[0];
-  const progressPercent = Math.min(100, Math.round(((activeStepIndex + 1) / totalSteps) * 100));
+        {children && <div className="mt-4 border-t border-[color:var(--border-subtle)] pt-3">{children}</div>}
+      </div>
+    );
+  }
 
+  // Afterwards: how the answer was researched, folded away until asked for.
+  const recorded = stages.filter((s) => s.detail);
   return (
     <div
       data-testid="research-trajectory-visualizer"
-      className="my-2.5 rounded-2xl bg-neutral-50/90 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 shadow-xs overflow-hidden font-sans text-xs transition-all duration-200"
+      className="my-2.5 max-w-[72ch] rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] text-[13px]"
     >
-      {/* Top Header Row: Unified branding, timer, status, and expand toggle */}
       <button
         type="button"
-        onClick={() => setIsExpanded((prev) => !prev)}
-        className="w-full flex items-center justify-between p-3 hover:bg-neutral-100/50 dark:hover:bg-white/5 transition-colors cursor-pointer text-left gap-2 border-b border-neutral-200/60 dark:border-white/5"
+        onClick={() => setIsExpanded((v) => !v)}
+        aria-expanded={isExpanded}
+        className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-[color:var(--text-secondary)]"
       >
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="relative flex items-center justify-center shrink-0">
-            <div className="w-7 h-7 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20 flex items-center justify-center">
-              {isLive ? (
-                <ScholarCoreLogo size="sm" withText={false} className="scale-75 animate-spin" />
-              ) : (
-                <Compass className="w-4 h-4 text-sky-600 dark:text-sky-400" />
-              )}
-            </div>
-            {isLive && (
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-sky-500 animate-ping" />
-            )}
-          </div>
-
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-semibold text-neutral-900 dark:text-neutral-100 text-[12px] truncate">
-                {isDeepResearch
-                  ? "Autonomous Deep Research Trajectory"
-                  : "Live Multi-Source Literature Retrieval"}
-              </span>
-              <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-xs font-mono font-medium bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20 shrink-0">
-                {isLive ? `${secondsElapsed}s · Active` : `${stages.length || totalSteps} Stages Completed`}
-              </span>
-            </div>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate mt-0.5">
-              {isLive
-                ? currentStep === "searching"
-                  ? "Querying external academic indices and OpenAlex metadata..."
-                  : currentStep === "writing"
-                  ? `Found ${foundCount || "verified"} studies · Synthesizing empirical findings...`
-                  : "Executing multi-step hypothesis decomposition..."
-                : query
-                ? `Inquiry: "${query}"`
-                : "Autonomous literature search and evidence extraction execution trace."}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
-          {isLive && onStop && (
-            <span
-              role="button"
-              tabIndex={0}
-              onClick={(e) => {
-                e.stopPropagation();
-                onStop();
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.stopPropagation();
-                  onStop();
-                }
-              }}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 transition-opacity cursor-pointer shadow-2xs"
-              title="Stop research generation"
-            >
-              <Square className="w-2.5 h-2.5 fill-current" />
-              <span>Stop</span>
-            </span>
-          )}
-
-          <div className="text-neutral-400">
-            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          </div>
-        </div>
+        <Compass className={`h-4 w-4 shrink-0 ${deep ? "text-[color:var(--research)]" : ""}`} aria-hidden="true" />
+        <span className="font-medium text-[color:var(--text-primary)]">How this was researched</span>
+        <span className="min-w-0 flex-1 truncate">
+          {query ? `“${query}”` : `${recorded.length || steps.length} steps`}
+        </span>
+        <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${isExpanded ? "rotate-180" : ""}`} aria-hidden="true" />
       </button>
 
-      {/* Progress Track (shown during live execution) */}
-      {isLive && (
-        <div className="w-full h-1 bg-neutral-200/50 dark:bg-white/5 overflow-hidden">
-          <div
-            className="h-full bg-gradient-to-r from-sky-500 via-indigo-500 to-sky-600 transition-all duration-500 ease-out"
-            style={{ width: `${progressPercent}%` }}
-          />
-        </div>
-      )}
-
-      {/* During live background processing: Single active step appears. When step finishes, next appears! */}
-      {isLive && (
-        <div className="p-3 sm:p-3.5">
-          <div
-            key={`active-step-${activeStepIndex}`}
-            className="p-3 rounded-xl bg-white dark:bg-ink-800/80 border border-sky-500/20 dark:border-sky-500/30 shadow-2xs animate-in fade-in slide-in-from-bottom-1 duration-200"
-          >
-            <div className="flex items-center justify-between gap-2 mb-1.5">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="w-5 h-5 rounded-md bg-sky-500/10 text-sky-600 dark:text-sky-400 font-mono text-xs font-bold flex items-center justify-center shrink-0">
-                  {activeStepIndex + 1}
-                </span>
-                <span className="text-[12.5px] font-semibold text-neutral-900 dark:text-neutral-100 truncate">
-                  Stage {activeStepIndex + 1}: {currentStepData.label}
-                </span>
-              </div>
-              <span className="inline-flex items-center gap-1 text-xs font-mono px-2 py-0.5 rounded-full bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/40 font-medium shrink-0 animate-pulse">
-                <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
-                <span>Running</span>
-              </span>
-            </div>
-
-            <p className="text-[11.5px] text-neutral-600 dark:text-neutral-400 leading-relaxed">
-              {liveDetail || activeStage?.detail || currentStepData.detail}
-            </p>
-
-            {foundCount > 0 && (
-              <div className="mt-2 pt-2 border-t border-neutral-100 dark:border-white/5 flex items-center gap-1.5 text-xs font-medium text-sky-700 dark:text-sky-300">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                <span>
-                  Found {foundCount} verified scholarly candidate{foundCount === 1 ? "" : "s"}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Expanded Interactive Pipeline Map (when user expands or completed) */}
-      {isExpanded && (!isLive || isExpanded) && (
-        <div className="px-3.5 pb-3.5 pt-1 border-t border-neutral-100 dark:border-white/5 space-y-3">
-          {/* Step Progress Nodes */}
-          <div className="space-y-1.5 pt-1">
-            {pipelineSteps.map((step, idx) => {
-              const StepIcon = step.icon;
-              const isPast = !isLive || idx < activeStepIndex;
-              const isCurrent = isLive && idx === activeStepIndex;
-
-              return (
-                <div
-                  key={step.id}
-                  className={`flex items-start gap-2.5 p-2 rounded-xl transition-all ${
-                    isCurrent
-                      ? "bg-sky-500/10 border border-sky-500/30"
-                      : isPast
-                      ? "bg-white/60 dark:bg-white/[0.02] border border-neutral-200/60 dark:border-white/5"
-                      : "opacity-50 border border-transparent"
-                  }`}
-                >
-                  <div className="mt-0.5 shrink-0">
-                    {isPast ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                    ) : isCurrent ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-sky-600 dark:text-sky-400" />
-                    ) : (
-                      <StepIcon className="w-4 h-4 text-neutral-400" />
-                    )}
+      {isExpanded && (
+        <div className="space-y-3 border-t border-[color:var(--border-subtle)] px-3 py-3">
+          <ol className="space-y-2">
+            {(recorded.length > 0
+              ? recorded.map((s) => ({ key: `${s.id}-${s.stageNumber}`, label: s.label, detail: plainDetail(s.detail), skipped: s.status === "skipped" }))
+              : steps.map((s) => ({ key: s.id, label: s.label, detail: s.detail, skipped: false }))
+            ).map((row) => (
+              <li key={row.key} className="flex items-start gap-2">
+                <Check className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${row.skipped ? "text-[color:var(--text-muted)]" : "text-[color:var(--state-success)]"}`} aria-hidden="true" />
+                <div className="min-w-0">
+                  <div className="font-medium text-[color:var(--text-primary)]">
+                    {row.label}
+                    {row.skipped && <span className="ml-1.5 text-xs font-normal text-[color:var(--text-muted)]">(not run)</span>}
                   </div>
-
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <span
-                        className={`text-[11.5px] font-semibold ${
-                          isCurrent
-                            ? "text-sky-950 dark:text-sky-200 font-bold"
-                            : isPast
-                            ? "text-neutral-800 dark:text-neutral-200"
-                            : "text-neutral-400"
-                        }`}
-                      >
-                        Stage {idx + 1}: {step.label}
-                      </span>
-                      {isCurrent && (
-                        <span className="text-xs font-mono px-1.5 py-0.2 rounded-full bg-sky-500/20 text-sky-700 dark:text-sky-300 font-semibold animate-pulse">
-                          Running
-                        </span>
-                      )}
-                      {isPast && (
-                        <span className="text-xs font-mono px-1.5 py-0.2 rounded-full bg-emerald-500/10 text-emerald-800 dark:text-emerald-300">
-                          Complete
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400 mt-0.5 leading-snug">
-                      {step.detail}
-                    </p>
-                  </div>
+                  <p className="text-xs leading-snug text-[color:var(--text-secondary)]">{row.detail}</p>
                 </div>
-              );
-            })}
-          </div>
+              </li>
+            ))}
+          </ol>
 
-          {/* Sub-Questions & Search Plan (if available) */}
-          {plan && plan.length > 0 && (
-            <div className="pt-2 border-t border-neutral-100 dark:border-white/5 space-y-1.5">
-              <span className="text-[10.5px] font-bold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider block">
-                Decomposed Sub-Questions & Search Trajectory:
-              </span>
-              <ul className="space-y-1 text-neutral-600 dark:text-neutral-400 text-xs pl-1">
-                {plan.map((step, sIdx) => (
-                  <li key={sIdx} className="flex items-start gap-1.5">
-                    <Zap className="font-bold shrink-0 w-4 h-4 shrink-0" aria-hidden="true" />
+          {plan && plan.length > 0 && recorded.length === 0 && (
+            <div className="border-t border-[color:var(--border-subtle)] pt-3">
+              <div className="mb-1.5 text-xs font-semibold text-[color:var(--text-primary)]">Research trail</div>
+              <ol className="space-y-1 text-xs text-[color:var(--text-secondary)]">
+                {plan.map((step, i) => (
+                  <li key={i} className="flex gap-2">
+                    <span className={`w-4 shrink-0 tabular-nums ${deep ? "text-[color:var(--research)]" : ""}`}>{i + 1}</span>
                     <span>{step}</span>
                   </li>
                 ))}
-              </ul>
+              </ol>
             </div>
           )}
         </div>

@@ -81,6 +81,7 @@ import {
 import LiteratureDiscoveryWorkspace from "./discovery/LiteratureDiscoveryWorkspace";
 import LiveResearchTrajectoryVisualizer from "./components/LiveResearchTrajectoryVisualizer";
 import { ResearchActivityFeed, type ResearchActivityItem } from "./ask/ResearchActivityFeed";
+import { ResearchReportHeader } from "./ask/ResearchReportHeader";
 import { type CitationGraphNode } from "../services/discovery/snowballSamplingService";
 import { AnswerReviewPanel } from "./AnswerReviewPanel";
 import { SourcesPanel } from "./ask/SourcesPanel";
@@ -193,6 +194,17 @@ function LazyScreenFallback() {
       Loading…
     </div>
   );
+}
+
+
+/** The message that proposes a Deep Research plan (the report is a separate message). */
+function isResearchPlanMessage(msg: { id: string }): boolean {
+  return msg.id.startsWith("assistant-plan-");
+}
+
+/** A Deep Research plan, waiting, running or done: not an answer, so it gets no answer actions. */
+function isPendingResearchPlan(msg: { id: string; deepResearchState?: { phase?: string } }): boolean {
+  return isResearchPlanMessage(msg) || Boolean(msg.deepResearchState && msg.deepResearchState.phase !== "report_ready");
 }
 
 export default function ProjectListScreen({
@@ -616,6 +628,8 @@ export default function ProjectListScreen({
   const [activeResearchStage, setActiveResearchStage] = useState<ResearchStageTelemetry | null>(null);
   /** Deep Research's live feed for the answer being produced (searches, sources read, checks). */
   const [researchActivity, setResearchActivity] = useState<ResearchActivityItem[]>([]);
+  /** The answer being produced is a Deep Research run (its card, steps and feed are shown on every screen). */
+  const isDeepResearchRun = sidebarAiMode === "deep_research" || researchActivity.length > 0;
   const [isMobileWorkspaceMenuOpen, setIsMobileWorkspaceMenuOpen] = useState(false);
   const mobileWorkspaceMenuRef = useRef<HTMLDivElement>(null);
   const chatCanvasRef = useRef<HTMLDivElement | null>(null);
@@ -1258,7 +1272,7 @@ export default function ProjectListScreen({
     const planMsg: WebsiteAssistantMessage = {
       id: `assistant-plan-${Date.now()}`,
       sender: "assistant",
-      text: `### Proposed Deep Research Plan\n\nReview, edit, add, or remove sub-questions below before multi-provider retrieval begins.`,
+      text: `Here is a plan for researching this. Edit the questions if you like, then start.`,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       mode: "deep-research",
       originatingQuestion: query,
@@ -1334,10 +1348,16 @@ export default function ProjectListScreen({
           )
         );
       };
-      updatePhase("plan_approved");
       updatePhase("searching");
       const selection = selectionFrom(targetMsg?.deepResearchState?.previewSources ?? []);
-      await handleSendGuideMessage(baseQuery, undefined, "deep-research", undefined, approvedSubQuestions, selection);
+      // The send rebuilds the thread from the list it is given: give it the plan already marked as running, or the
+      // plan would reappear ready to start (and could be started twice) while the research runs.
+      const withPlanRunning = guideMessages.map((m) =>
+        m.id === planMsgId
+          ? { ...m, deepResearchState: { ...(m.deepResearchState || { subQuestions: approvedSubQuestions }), phase: "searching" as const, subQuestions: approvedSubQuestions } }
+          : m
+      );
+      await handleSendGuideMessage(baseQuery, undefined, "deep-research", withPlanRunning, approvedSubQuestions, selection);
       updatePhase("report_ready");
     },
     [guideMessages]
@@ -1699,7 +1719,8 @@ export default function ProjectListScreen({
             deepResearchState: isDeepMode
               ? {
                 phase: "report_ready",
-                subQuestions: agentResponse.plan ?? [],
+                // The questions the run researched (the ones approved), not the server's stage summaries.
+                subQuestions: approvedSubQuestionsOverride ?? [],
                 searchedCount,
                 readCount,
                 citedCount,
@@ -3235,6 +3256,13 @@ export default function ProjectListScreen({
                           {msg.sender === "assistant" ? (
                             <div className="space-y-3">
                               <div>
+                                {msg.mode === "deep-research" && !msg.error && !isPendingResearchPlan(msg) && (
+                                  <ResearchReportHeader
+                                    found={msg.searchedCount}
+                                    readInFull={(msg.citations || []).filter((c) => c.fullTextRead).length}
+                                    cited={msg.citedCount ?? msg.citations?.length}
+                                  />
+                                )}
                                 {renderFormattedGuideText(
                                   msg.citations && msg.citations.length > 0 ? stripRawReferencesSection(msg.text) : msg.text,
                                   msg.citations && msg.citations.length > 0 ? msg.citations : liveSourcesAsCitations(msg.liveSources),
@@ -3285,7 +3313,8 @@ export default function ProjectListScreen({
                           )}
 
                           {/* Deep Research Explicit State Machine (Section 12) */}
-                          {msg.deepResearchState && (
+                          {/* Once the report is written, the plan message steps back: the report ends with "How this was researched". */}
+                          {msg.deepResearchState && !(isResearchPlanMessage(msg) && msg.deepResearchState.phase === "report_ready") && (
                             <DeepResearchWorkflowCard
                               key={`${msg.id}-${msg.deepResearchState.planSource === "ai" ? "ai" : "plan"}`}
                               planSource={msg.deepResearchState.planSource}
@@ -3453,7 +3482,7 @@ export default function ProjectListScreen({
                             />
                           )}
 
-                          {msg.sender === "assistant" && !msg.error && msg.kind !== "help" && msg.id !== "init" && msg.id !== "reset-assistant" && (
+                          {msg.sender === "assistant" && !msg.error && msg.kind !== "help" && msg.id !== "init" && msg.id !== "reset-assistant" && !isPendingResearchPlan(msg) && (
                             <PostResponseActionBar
                               message={{
                                 ...msg,
@@ -3492,7 +3521,7 @@ export default function ProjectListScreen({
                             />
                           )}
 
-                          {msg.sender === "assistant" && !msg.error && msg.kind !== "help" && msg.id !== "init" && msg.id !== "reset-assistant" && (
+                          {msg.sender === "assistant" && !msg.error && msg.kind !== "help" && msg.id !== "init" && msg.id !== "reset-assistant" && !isPendingResearchPlan(msg) && (
                             <p className="mt-1.5 hidden px-1 text-xs text-neutral-400 sm:block">
                               {[
                                 msg.mode === "deep-research" ? "Deep research" : null,
@@ -3549,7 +3578,8 @@ export default function ProjectListScreen({
 
                     {isGuideThinking && (
                       <div className="flex flex-col gap-2.5 animate-in fade-in">
-                        {isPhone && (
+                        {/* A quick answer on a phone gets one status line (the card on request); Deep Research always shows its card and feed. */}
+                        {isPhone && !isDeepResearchRun && (
                           <div
                             data-testid="mobile-ask-progress"
                             className="flex items-center gap-2 px-1 min-h-10 text-[13px] font-medium text-neutral-700 dark:text-neutral-200"
@@ -3575,18 +3605,21 @@ export default function ProjectListScreen({
                           </div>
                         )}
                         {/* Phones show the full stage-by-stage card only on request; it filled most of a small screen. */}
-                        {(!isPhone || showProgressDetails) && (
-                                                <LiveResearchTrajectoryVisualizer
-                          isLive={true}
-                          currentStep={askPhase?.step}
-                          foundCount={askPhase?.found}
-                          liveDetail={askPhase?.detail}
-                          activeStage={activeResearchStage}
-                          onStop={handleStopGuideGeneration}
-                          mode={sidebarAiMode}
-                        />
+                        {(isDeepResearchRun || !isPhone || showProgressDetails) && (
+                          <LiveResearchTrajectoryVisualizer
+                            isLive={true}
+                            currentStep={askPhase?.step}
+                            foundCount={askPhase?.found}
+                            liveDetail={askPhase?.detail}
+                            activeStage={activeResearchStage}
+                            onStop={handleStopGuideGeneration}
+                            mode={isDeepResearchRun ? "deep-research" : sidebarAiMode}
+                          >
+                            {researchActivity.length > 0 && (
+                              <ResearchActivityFeed items={researchActivity} writing={Boolean(streamingGuideText)} max={isPhone ? 4 : 6} />
+                            )}
+                          </LiveResearchTrajectoryVisualizer>
                         )}
-                        <ResearchActivityFeed items={researchActivity} writing={Boolean(streamingGuideText)} max={isPhone ? 4 : 6} />
                         {/* Live Token Streaming Bubble when tokens are arriving */}
                         {streamingGuideText && (
                           <div data-streaming-answer aria-busy="true" className="w-full px-0.5 leading-relaxed text-neutral-900 dark:text-neutral-100">
@@ -3719,7 +3752,7 @@ export default function ProjectListScreen({
                             data-testid="propose-deep-research-plan-btn"
                             disabled={!guideInput.trim()}
                             onClick={() => handleProposeDeepResearchPlan(guideInput)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30 hover:bg-indigo-500/20 disabled:opacity-40 transition-colors cursor-pointer whitespace-nowrap"
+                            className="inline-flex min-h-9 items-center gap-1 whitespace-nowrap rounded-full border border-[color:var(--research-border)] bg-[color:var(--research-subtle)] px-2.5 text-xs font-semibold text-[color:var(--research)] transition-[filter] hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer sm:min-h-7"
                             title="Propose an editable Deep Research plan before searching begins"
                           >
                             <Sparkles className="w-3 h-3" />

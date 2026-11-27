@@ -69,6 +69,11 @@
   --color-surface-hover: var(--surface-hover);
   --color-card: var(--surface-raised);
   --color-accent: var(--accent);
+  --color-research: var(--research);
+  --color-research-solid: var(--research-solid);
+  --color-research-on-solid: var(--research-on-solid);
+  --color-research-subtle: var(--research-subtle);
+  --color-research-border: var(--research-border);
 }
 
 /* ----------------------------------------------------------------------------
@@ -143,6 +148,12 @@
   --state-danger-subtle:  #FEF2F2;
   --state-info:           #111111;
   --state-info-subtle:    #F4F4F5;
+  /* Deep Research: one restrained indigo, used for its plan, progress and report only. */
+  --research:            #4338CA; /* accent text and icons on any surface */
+  --research-solid:      #4338CA; /* filled button */
+  --research-on-solid:   #FFFFFF; /* label on the filled button */
+  --research-subtle:     #EEF0FB; /* tinted callout and pill */
+  --research-border:     #C9CDF2; /* decorative edge of a research panel */
 
   /* Elevation — soft diffuse ambient elevation */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
@@ -220,6 +231,12 @@
   --state-danger-subtle:  #FEF2F2;
   --state-info:           #111111;
   --state-info-subtle:    #F4F4F5;
+  /* Deep Research: one restrained indigo, used for its plan, progress and report only. */
+  --research:            #4338CA; /* accent text and icons on any surface */
+  --research-solid:      #4338CA; /* filled button */
+  --research-on-solid:   #FFFFFF; /* label on the filled button */
+  --research-subtle:     #EEF0FB; /* tinted callout and pill */
+  --research-border:     #C9CDF2; /* decorative edge of a research panel */
 
   /* Elevation */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
@@ -291,6 +308,12 @@
     --state-danger-subtle:  #2D1515;
     --state-info:           #ECECEC;
     --state-info-subtle:    #262626;
+    /* Deep Research: one restrained indigo, used for its plan, progress and report only. */
+    --research:            #A5B4FC;
+    --research-solid:      #4F46E5;
+    --research-on-solid:   #FFFFFF;
+    --research-subtle:     #1F1E36;
+    --research-border:     #3A3870;
 
     --shadow-sm: none;
     --shadow-md: none;
@@ -358,6 +381,12 @@
   --state-danger-subtle:  #2D1515;
   --state-info:           #ECECEC;
   --state-info-subtle:    #262626;
+  /* Deep Research: one restrained indigo, used for its plan, progress and report only. */
+  --research:            #A5B4FC;
+  --research-solid:      #4F46E5;
+  --research-on-solid:   #FFFFFF;
+  --research-subtle:     #1F1E36;
+  --research-border:     #3A3870;
 
   --shadow-sm: none;
   --shadow-md: none;
@@ -373,6 +402,12 @@
 [data-theme="dark"],
 .dark {
   color-scheme: dark;
+  /* Deep Research: one restrained indigo, used for its plan, progress and report only. */
+  --research:            #A5B4FC;
+  --research-solid:      #4F46E5;
+  --research-on-solid:   #FFFFFF;
+  --research-subtle:     #1F1E36;
+  --research-border:     #3A3870;
   --bg-sidebar: #1C1C1E;
   --focus-ring: #38BDF8;
   --bg-canvas: #171717;

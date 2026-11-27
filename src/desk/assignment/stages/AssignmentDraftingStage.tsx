@@ -343,8 +343,10 @@ export function AssignmentDraftingStage({
 
   // A stopped draft carries on from where it ended.
   const handleResume = useCallback(
-    (section: AssignmentDraftingSection) => {
-      const partial = trimToLastSentence(partialsRef.current[section.id] || "");
+    // `shownText` is the partial the Resume button was drawn from: the ref is synced in an effect, so a click that
+    // lands before that effect ran would otherwise read an empty ref and be dropped.
+    (section: AssignmentDraftingSection, shownText?: string) => {
+      const partial = trimToLastSentence(shownText || partialsRef.current[section.id] || "");
       if (!partial) return;
       void handleStreamSection(section, undefined, { continueFrom: partial });
     },
@@ -554,7 +556,7 @@ export function AssignmentDraftingStage({
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => handleResume(activeSection)}
+              onClick={() => handleResume(activeSection, activePartial)}
               className="px-3 py-1 rounded-full bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] font-medium cursor-pointer"
             >
               Resume

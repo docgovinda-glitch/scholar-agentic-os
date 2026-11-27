@@ -34,6 +34,6 @@ describe("Deep Research plan source preview", () => {
 
   it("says when the preview failed and the run will still search", () => {
     render(<DeepResearchWorkflowCard phase="plan_proposed" subQuestions={["q"]} previewStatus="failed" onApprovePlan={() => undefined} />);
-    expect(screen.getByText(/Source preview unavailable/)).toBeInTheDocument();
+    expect(screen.getByText(/No preview this time\. The run will still search on its own\./)).toBeInTheDocument();
   });
 });

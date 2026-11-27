@@ -176,7 +176,10 @@ export function ScholarFilterBar({ mode, onModeChange, filters, onFiltersChange,
               onClick={() => onModeChange(id)}
               className={`min-h-9 cursor-pointer whitespace-nowrap rounded-full px-2.5 text-xs transition-colors focus-visible:outline-2 focus-visible:outline-sky-500 sm:min-h-7 ${
                 active
-                  ? "bg-white font-semibold text-neutral-900 shadow-xs ring-1 ring-neutral-200 dark:bg-white/15 dark:text-white dark:ring-white/10"
+                  ? id === "deep_research"
+                    ? // Deep Research wears its indigo, so the mode a question will run in is visible at a glance.
+                      "bg-[color:var(--research-subtle)] font-semibold text-[color:var(--research)] shadow-xs ring-1 ring-[color:var(--research-border)]"
+                    : "bg-white font-semibold text-neutral-900 shadow-xs ring-1 ring-neutral-200 dark:bg-white/15 dark:text-white dark:ring-white/10"
                   : "font-medium text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-white"
               }`}
             >

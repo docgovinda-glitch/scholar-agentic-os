@@ -259,9 +259,9 @@ describe("AskScholar Authoritative Specification Compliance (Sections 2–16)", 
     // Verify DeepResearchWorkflowCard appears in `plan_proposed` state with editable sub-questions
     const workflowCard = await screen.findByTestId("deep-research-workflow-card");
     expect(workflowCard).toHaveAttribute("data-workflow-state", "plan_proposed");
-    expect(within(workflowCard).getByTestId("deep-research-state-badge")).toHaveTextContent("Plan Proposed");
+    expect(within(workflowCard).getByTestId("deep-research-state-badge")).toHaveTextContent("Ready to start");
 
-    const subQ1 = within(workflowCard).getByLabelText("Sub-question 1") as HTMLInputElement;
+    const subQ1 = within(workflowCard).getByLabelText("Sub-question 1") as HTMLTextAreaElement;
     fireEvent.change(subQ1, {
       target: { value: "Edited sub-question: Clinical safety and off-target indels in base editing" },
     });
