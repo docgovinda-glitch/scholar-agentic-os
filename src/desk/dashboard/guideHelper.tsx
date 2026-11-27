@@ -1,5 +1,7 @@
-import { claimBefore, findSupportingPassage } from "../../domain/ask/passageMatch";
+import { claimBefore, claimKey, findSupportingPassage } from "../../domain/ask/passageMatch";
 import React, { useState, Fragment } from "react";
+import { createPortal } from "react-dom";
+import { PHONE_SHEET_CLASSES, useIsPhoneSheet } from "../components/usePhoneSheet";
 import { Copy, Check, Scale, Info, Network, ExternalLink, ChevronRight as ChevronRightIcon } from "lucide-react";
 import type { WebsiteAssistantMessage, WebsiteCitationItem } from "./types";
 import {
@@ -264,11 +266,10 @@ export function InlineCitationBadge({
     citation?.credibilityLevel === "preprint - not peer-reviewed" ||
     Boolean(targetUrl && /arxiv\.org|biorxiv\.org|medrxiv\.org/i.test(targetUrl));
 
+  // Only what the record says: a news item about a paper in a journal named "Nature" is not itself peer reviewed.
   const isPeerReviewed =
     !isPreprint &&
-    (citation?.sourceType === "scholarly" ||
-      /nature|science|ieee|acm|neurips|icml|lancet|cell|springer|elsevier|wiley|pnas|oxford|cambridge/i.test(venue) ||
-      (citation?.authorityBadge || "").toLowerCase().includes("peer"));
+    (citation?.sourceType === "scholarly" || (citation?.authorityBadge || "").toLowerCase().includes("peer"));
 
   const isOpenAccess =
     Boolean(citation?.openAccessUrl) ||
@@ -277,46 +278,24 @@ export function InlineCitationBadge({
     citation?.sourceType === "scholarly";
 
   const snippet = citation?.evidenceSnippet || citation?.snippet || citation?.mainFinding;
-  const supporting = claim && snippet ? findSupportingPassage(claim, snippet) : null;
+  // Deep Research traces each cited claim on the server against the source's fuller text; that answer wins.
+  // Otherwise the claim is matched against the excerpt the answer was written from.
+  const traced = claim ? citation?.claimPassages?.find((p) => p.key === claimKey(claim)) : undefined;
+  const supporting = traced
+    ? traced.passage
+      ? { passage: traced.passage, matched: findSupportingPassage(claim!, traced.passage, 1)?.matched ?? [], score: 0 }
+      : null
+    : claim && snippet
+      ? findSupportingPassage(claim, snippet)
+      : null;
+  const noMatch = Boolean(claim) && !supporting && (Boolean(traced) || Boolean(snippet));
 
-  // No side margin: the text already carries the space before a citation, and punctuation follows it directly.
-  return (
-    <span className="relative group/cite inline align-baseline">
-      <a
-        href={targetUrl || `#ref-entry-${num}`}
-        target={targetUrl ? "_blank" : undefined}
-        rel={targetUrl ? "noopener noreferrer" : undefined}
-        data-testid={`citation-chip-${num}`}
-        onClick={(e) => {
-          const refMounted =
-            typeof document !== "undefined" &&
-            Boolean(
-              (messageId && document.getElementById(`ref-entry-${messageId}-${num}`)) ||
-              document.getElementById(`ref-entry-${num}`) ||
-              document.querySelector(`[data-ref-num="${num}"]`)
-            );
-          if (refMounted) {
-            e.preventDefault();
-          }
-          e.stopPropagation();
-          scrollToReferenceEntry(num, messageId);
-        }}
-        className="cursor-pointer font-medium text-[0.92em] text-blue-700 no-underline decoration-blue-300 underline-offset-2 transition-colors hover:underline dark:text-blue-300"
-        title={
-          citation?.title
-            ? `Source ${displayLabel}: ${citation.title}`
-            : `Source ${displayLabel}`
-        }
-      >
-        {displayLabel}
-      </a>
+  // Phones have no hover: a tap opens the card as a sheet (the passage behind the claim), a second tap on its link opens the source.
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const isPhone = useIsPhoneSheet();
 
-      {/* Citation Preview Card on Hover (Section 10) */}
-      {citation && (
-        <span
-          data-testid="citation-micro-card"
-          className="pointer-events-none opacity-0 group-hover/cite:opacity-100 group-hover/cite:pointer-events-auto transition-all duration-200 ease-out absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-80 p-3.5 rounded-2xl bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md border border-neutral-200 dark:border-white/15 shadow-2xl text-left z-50 transform group-hover/cite:translate-y-0 translate-y-1 block select-text font-sans"
-        >
+  const cardBody = citation ? (
+    <>
           {/* Top Venue & Source Type Row */}
           <span className="flex items-center justify-between gap-1.5 mb-2">
             <span className="flex items-center gap-1.5 min-w-0">
@@ -368,27 +347,32 @@ export function InlineCitationBadge({
             </span>
           )}
 
-          {/* Empirical Snippet / Excerpt */}
-          {snippet && supporting && (
+          {/* The passage behind the claim this citation is attached to */}
+          {supporting && (
             <span data-testid="citation-supporting-passage" className="block mb-2.5">
               <span className="block text-[9.5px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 mb-0.5">
-                Supporting passage
+                {/* Word overlap finds the closest sentence, not agreement: the label says only that. */}
+                Closest passage in the source
               </span>
               <span className="block text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed italic bg-emerald-50/70 dark:bg-emerald-950/20 p-1.5 rounded-lg border border-emerald-100 dark:border-emerald-900/40">
                 "{highlightMatched(supporting.passage, supporting.matched)}"
               </span>
             </span>
           )}
-          {snippet && !supporting && (
+          {!supporting && (snippet || traced) && (
             <span className="block mb-2.5">
-              {claim && (
+              {noMatch && (
                 <span data-testid="citation-no-passage" className="block text-[9.5px] text-amber-700 dark:text-amber-400 mb-0.5">
-                  No sentence in the retrieved text clearly matches this claim. Excerpt:
+                  {traced
+                    ? `No sentence in this source's text clearly matches this claim.${snippet ? " Excerpt:" : ""}`
+                    : "No sentence in the retrieved text clearly matches this claim. Excerpt:"}
                 </span>
               )}
-              <span className="block text-xs text-neutral-600 dark:text-neutral-400 line-clamp-2 leading-relaxed italic bg-neutral-50 dark:bg-neutral-800/60 p-1.5 rounded-lg border border-neutral-100 dark:border-white/5">
-                "{snippet}"
-              </span>
+              {snippet && (
+                <span className="block text-xs text-neutral-600 dark:text-neutral-400 line-clamp-2 leading-relaxed italic bg-neutral-50 dark:bg-neutral-800/60 p-1.5 rounded-lg border border-neutral-100 dark:border-white/5">
+                  "{snippet}"
+                </span>
+              )}
             </span>
           )}
 
@@ -425,8 +409,83 @@ export function InlineCitationBadge({
               </a>
             )}
           </span>
+
+    </>
+  ) : null;
+
+  // No side margin: the text already carries the space before a citation, and punctuation follows it directly.
+  return (
+    <span className="relative group/cite inline align-baseline">
+      <a
+        href={targetUrl || `#ref-entry-${num}`}
+        target={targetUrl ? "_blank" : undefined}
+        rel={targetUrl ? "noopener noreferrer" : undefined}
+        data-testid={`citation-chip-${num}`}
+        onClick={(e) => {
+          if (isPhone && citation) {
+            e.preventDefault();
+            e.stopPropagation();
+            setSheetOpen(true);
+            return;
+          }
+          const refMounted =
+            typeof document !== "undefined" &&
+            Boolean(
+              (messageId && document.getElementById(`ref-entry-${messageId}-${num}`)) ||
+              document.getElementById(`ref-entry-${num}`) ||
+              document.querySelector(`[data-ref-num="${num}"]`)
+            );
+          if (refMounted) {
+            e.preventDefault();
+          }
+          e.stopPropagation();
+          scrollToReferenceEntry(num, messageId);
+        }}
+        className="cursor-pointer font-medium text-[0.92em] text-blue-700 no-underline decoration-blue-300 underline-offset-2 transition-colors hover:underline dark:text-blue-300"
+        title={
+          citation?.title
+            ? `Source ${displayLabel}: ${citation.title}`
+            : `Source ${displayLabel}`
+        }
+      >
+        {displayLabel}
+      </a>
+
+      {/* Citation Preview Card on Hover (Section 10) */}
+      {citation && !isPhone && (
+        <span
+          data-testid="citation-micro-card"
+          className="pointer-events-none opacity-0 group-hover/cite:opacity-100 group-hover/cite:pointer-events-auto transition-all duration-200 ease-out absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-80 p-3.5 rounded-2xl bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md border border-neutral-200 dark:border-white/15 shadow-2xl text-left z-50 transform group-hover/cite:translate-y-0 translate-y-1 block select-text font-sans"
+        >
+          {cardBody}
         </span>
       )}
+      {citation && isPhone && sheetOpen && typeof document !== "undefined" &&
+        createPortal(
+          <div className="fixed inset-0 z-[80]" onClick={() => setSheetOpen(false)}>
+            <div className="absolute inset-0 bg-neutral-900/30" aria-hidden="true" />
+            <div
+              role="dialog"
+              aria-label={`Source ${displayLabel}`}
+              data-testid="citation-sheet"
+              onClick={(e) => e.stopPropagation()}
+              className={`${PHONE_SHEET_CLASSES} block rounded-2xl border border-neutral-200 bg-white p-4 text-left font-sans dark:border-white/15 dark:bg-neutral-900`}
+            >
+              <span className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">Source {displayLabel}</span>
+                <button
+                  type="button"
+                  onClick={() => setSheetOpen(false)}
+                  className="min-h-9 cursor-pointer rounded-full px-3 text-xs font-medium text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-white/10"
+                >
+                  Close
+                </button>
+              </span>
+              {cardBody}
+            </div>
+          </div>,
+          document.body
+        )}
     </span>
   );
 }

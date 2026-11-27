@@ -32,3 +32,15 @@ describe("Deep Research report budget", () => {
     expect(picked.map((s) => s.title)).toEqual(["Source 1", "Source 2", "Source 3"]);
   });
 });
+
+describe("a report refused by a per-minute cap", () => {
+  it("waits the stated time when it is within a minute, and not for a daily cap or a long wait", async () => {
+    const { reportRateLimitWaitMs } = await import("../deepResearchEngine.ts");
+    const itpm = "All connected AI models failed. Last error: Rate limit reached for model `m` on input tokens per minute (ITPM): Limit 7000, Used 6139, Requested 5224. Please try again in 37.397142857s.";
+    expect(reportRateLimitWaitMs(new Error(itpm))).toBe(37397);
+    expect(reportRateLimitWaitMs(new Error("Rate limit reached on tokens per day (TPD). Please try again in 20s."))).toBeUndefined();
+    expect(reportRateLimitWaitMs(new Error("Rate limit reached on tokens per minute. Please try again in 2m10s."))).toBeUndefined();
+    expect(reportRateLimitWaitMs(new Error("provider 500"))).toBeUndefined();
+  });
+});
+

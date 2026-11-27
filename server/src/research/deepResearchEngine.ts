@@ -16,6 +16,8 @@ import { z } from "zod";
 import { executeWebSearch, sanitizeUntrustedExternalText, type SearchResultItem } from "./webSearchEngine.ts";
 import { retrieveSources, retrievedToSearchItem } from "../retrieval/retrievalService.ts";
 import { validateAndRefineCitations } from "./citationValidator.ts";
+import { attachClaimPassages, sourceKey } from "./claimPassages.ts";
+import { retryAfterFromMessage } from "../../../src/platform/router/errors.ts";
 import { chunkAndRerankEvidence } from "../services/semanticRagEngine.ts";
 import { excerpt } from "../../../src/shared/askBudget.ts";
 
@@ -34,6 +36,20 @@ const REPORT_RETRY_EXCERPT_CHARS = 300;
 export function isReportTooLarge(err: unknown): boolean {
   const e = err as { code?: string; message?: string } | null;
   return e?.code === "context_overflow" || /too long for every available model|request too large|reduce your (message|request) size|context (length|window)/i.test(e?.message ?? "");
+}
+
+/** Longest wait for a per-minute cap before the report call is tried again (free tiers reset each minute). */
+export const REPORT_RATE_LIMIT_MAX_WAIT_MS = 65_000;
+
+/**
+ * The report was refused by a per-minute cap that frees up soon ("try again in 37.4s"): how long to wait,
+ * or undefined when it is not such a refusal (a daily cap, no stated wait, or a wait too long to hold).
+ */
+export function reportRateLimitWaitMs(err: unknown): number | undefined {
+  const message = (err as { message?: string } | null)?.message ?? "";
+  if (!/rate limit|per minute|\b(?:TPM|ITPM|RPM)\b|too many requests/i.test(message) || /per day|\b(?:TPD|RPD)\b/i.test(message)) return undefined;
+  const wait = retryAfterFromMessage(message);
+  return wait !== undefined && wait <= REPORT_RATE_LIMIT_MAX_WAIT_MS ? wait : undefined;
 }
 
 /** The best DEEP_REPORT_MAX_SOURCES sources (Vault, then scholarly/official, then primary, then those with text), excerpts cut. */
@@ -121,8 +137,16 @@ export type ResearchLlm = (
   systemPrompt: string,
   userPrompt: string,
   responseFormat: "json" | "text",
-  images?: ResearchImage[]
+  images?: ResearchImage[],
+  /** The report call streams: each token as the model writes it, and a reset when the router switched model. */
+  live?: { onToken?: (text: string) => void; onReset?: () => void }
 ) => Promise<string>;
+
+/** One step of the research as it happens, for the live activity feed: a search sent, a source read, a check run. */
+export interface ResearchActivity {
+  kind: "search" | "read" | "check" | "write";
+  text: string;
+}
 
 /**
  * Stage 1: Formulate a multi-vector research plan from user topic, Vault sources, and attachments.
@@ -316,6 +340,11 @@ export interface DeepResearchExecutionOptions {
   /** Works the researcher excluded in the plan step; they are never registered, however they are found. */
   excludedSources?: Array<{ title?: string; doi?: string; url?: string }>;
   onSourcesRetrieved?: (citations: SearchResultItem[], stages: ResearchStageTelemetry[]) => void;
+  /** Each search, source read and check as it happens (the live activity feed). */
+  onActivity?: (activity: ResearchActivity) => void;
+  /** The report's words as the model writes them; `onReportReset` drops what was shown (model switch, smaller retry). */
+  onReportToken?: (text: string) => void;
+  onReportReset?: () => void;
 }
 
 export class DeepResearchBrowserHandOffError extends Error {
@@ -522,15 +551,32 @@ export async function executeDeepResearch(
 
   // 2b. Execute parallel multi-vector searches for each sub-question (cached for 20 min)
   const evidence: SubQuestionEvidence[] = [];
+  const activity = options?.onActivity;
+  // Sources shown as "Reading" in the feed: one line per source, the first few of each search.
+  const announcedReads = new Set<string>();
+  const announceReads = (results: SearchResultItem[], max: number) => {
+    let shown = 0;
+    for (const r of results) {
+      const key = (r.url || r.title || "").toLowerCase();
+      if (!r.title || !key || announcedReads.has(key)) continue;
+      announcedReads.add(key);
+      const where = r.publisher || r.domain;
+      activity?.({ kind: "read", text: `${r.title}${where ? ` · ${where}` : ""}` });
+      if (++shown >= max) break;
+    }
+  };
   const searchOutputs = await Promise.all(
     researchPlan.subQuestions.map(async (sq) => {
+      activity?.({ kind: "search", text: sq.searchQuery });
       const [webRes, scholarly] = await Promise.all([
         cachedDeepWebSearch(sq.searchQuery, 10),
         retrieveSources({ query: sq.searchQuery, mode: "scholarly", limit: 10 })
           .then((r) => r.results.map(retrievedToSearchItem))
           .catch(() => [] as SearchResultItem[]),
       ]);
-      return { sq, results: [...webRes.results, ...scholarly] };
+      const results = [...webRes.results, ...scholarly];
+      announceReads(results, 3);
+      return { sq, results };
     })
   );
 
@@ -594,6 +640,7 @@ export async function executeDeepResearch(
   // The analysis needs the server model. When the answer is being produced in the user's browser
   // (hand-off), this stage is reported as skipped rather than pretending it ran.
   const canAnalyse = !options?.forceBrowserHandOff && !options?.verifyAndReadBrowserResult && allCitations.length > 0;
+  if (canAnalyse) activity?.({ kind: "check", text: `${allCitations.length} sources for agreement, contradictions and gaps` });
   const analysis = canAnalyse ? await analyseEvidence(topic, allCitations, evidence, llm) : null;
   for (const q of analysis?.followUpSearches ?? []) {
     if (gapQueries.length < 4 && !gapQueries.includes(q)) gapQueries.push(q);
@@ -618,8 +665,12 @@ export async function executeDeepResearch(
   if (gapQueries.length > 0) {
     onProgress?.(`Stage 5/7: Conducting iterative follow-up searches for ${gapQueries.length} gap vector(s)...`);
     const followUpResults = await Promise.all(
-      gapQueries.slice(0, 4).map((q) => cachedDeepWebSearch(q, 18))
+      gapQueries.slice(0, 4).map((q) => {
+        activity?.({ kind: "search", text: q });
+        return cachedDeepWebSearch(q, 18);
+      })
     );
+    followUpResults.forEach((res) => announceReads(res.results, 2));
     followUpResults.forEach((res, idx) => {
       for (const src of res.results) {
         if (registerSource(src)) {
@@ -658,6 +709,13 @@ export async function executeDeepResearch(
 
   // Report budget: only the best sources, with short excerpts, go into the report call; the numbering
   // below and the returned citations both use this list, so [n] still maps 1-to-1.
+  // The fuller text of each source (page text or whole abstract), kept before the report's short excerpts,
+  // so each cited sentence can be matched to the passage that backs it (claimPassages below).
+  const fullTextByKey = new Map<string, string>();
+  for (const c of allCitations) {
+    const key = sourceKey(c);
+    if (key && (c.snippet || "").length > (fullTextByKey.get(key)?.length ?? 0)) fullTextByKey.set(key, c.snippet || "");
+  }
   const reportSources = selectReportSources(allCitations);
   allCitations.splice(0, allCitations.length, ...reportSources);
 
@@ -805,6 +863,7 @@ Generate the complete, publication-grade Deep Research Report now.`;
     `Stage 6 (Report Synthesis): Synthesized structured research report grounded in ${allCitations.length} verified sources`,
   ];
 
+  const reportLive = options?.onReportToken || options?.onReportReset ? { onToken: options.onReportToken, onReset: options.onReportReset } : undefined;
   let rawSynthesizedReport: string;
   const verifiedFromBrowser = options?.verifyAndReadBrowserResult
     ? options.verifyAndReadBrowserResult(synthesisSystemPrompt, synthesisUserPrompt)
@@ -824,18 +883,38 @@ Generate the complete, publication-grade Deep Research Report now.`;
     });
   } else {
     try {
-      try {
-        rawSynthesizedReport = await llm(synthesisSystemPrompt, synthesisUserPrompt, "text", images);
-      } catch (sizeErr: any) {
-        // Too big for every connected model (a free tier's per-minute token cap, a small context):
-        // retry once with the strongest sources only and shorter excerpts, and say so.
-        if (!isReportTooLarge(sizeErr) || allCitations.length <= REPORT_RETRY_SOURCES) throw sizeErr;
-        const fewer = allCitations.slice(0, REPORT_RETRY_SOURCES).map((c) => ({ ...c, snippet: excerpt(c.snippet, REPORT_RETRY_EXCERPT_CHARS) }));
-        allCitations.splice(0, allCitations.length, ...fewer);
-        onProgress?.(`The report was too long for your AI, so it is being written from the ${fewer.length} strongest sources.`);
-        evidenceDigest = buildEvidenceDigest();
-        synthesisUserPrompt = userPromptFor(evidenceDigest);
-        rawSynthesizedReport = await llm(synthesisSystemPrompt, synthesisUserPrompt, "text", images);
+      // Up to three tries. Too big for every connected model (a small context, a free tier's cap on one request):
+      // shrink once to the strongest sources with shorter excerpts. Refused by a per-minute cap that frees up within
+      // a minute: wait the stated time, and shrink too (a smaller request fits a free tier's per-minute allowance).
+      // Each step is said in the feed; anything else is a real failure and is thrown.
+      activity?.({ kind: "write", text: `the report from ${allCitations.length} sources` });
+      let reduced = false;
+      for (let attempt = 1; ; attempt++) {
+        try {
+          rawSynthesizedReport = await llm(synthesisSystemPrompt, synthesisUserPrompt, "text", images, reportLive);
+          break;
+        } catch (reportErr: any) {
+          const waitMs = reportRateLimitWaitMs(reportErr);
+          const tooLarge = isReportTooLarge(reportErr);
+          const canShrink = !reduced && allCitations.length > REPORT_RETRY_SOURCES;
+          if (attempt >= 3 || (waitMs === undefined && !(tooLarge && canShrink))) throw reportErr;
+          options?.onReportReset?.();
+          if (waitMs !== undefined) {
+            const seconds = Math.ceil(waitMs / 1000) + 1;
+            onProgress?.(`Your AI's per-minute limit was reached; the report continues in ${seconds} s.`);
+            activity?.({ kind: "write", text: `in ${seconds} s: your AI's per-minute limit was reached` });
+            await new Promise((resolve) => setTimeout(resolve, seconds * 1000));
+          }
+          if (canShrink) {
+            reduced = true;
+            const fewer = allCitations.slice(0, REPORT_RETRY_SOURCES).map((c) => ({ ...c, snippet: excerpt(c.snippet, REPORT_RETRY_EXCERPT_CHARS) }));
+            allCitations.splice(0, allCitations.length, ...fewer);
+            onProgress?.(`The report is being written from the ${fewer.length} strongest sources, so it fits your AI.`);
+            activity?.({ kind: "write", text: `the report from the ${fewer.length} strongest sources, so it fits your AI` });
+            evidenceDigest = buildEvidenceDigest();
+            synthesisUserPrompt = userPromptFor(evidenceDigest);
+          }
+        }
       }
     } catch (llmErr: any) {
       if (llmErr?.name === "LocalModelUnreachableError" || llmErr?.name === "BrowserAiRequiredError" || llmErr?.name === "NoClientAiProviderError" || llmErr?.code === "local_model_unreachable" || llmErr?.code === "no_ai_configured") {
@@ -853,6 +932,8 @@ Generate the complete, publication-grade Deep Research Report now.`;
     }
   }
   const validated = validateAndRefineCitations(rawSynthesizedReport, allCitations, { files, images });
+  // Each cited sentence, matched to the passage in its source that backs it (or nothing, said plainly in the UI).
+  const tracedCitations = attachClaimPassages(validated.text, validated.citations, (c) => fullTextByKey.get(sourceKey(c)) || c.snippet || "");
 
   const s6Telemetry: ResearchStageTelemetry = {
     id: "synthesis",
@@ -902,7 +983,7 @@ Generate the complete, publication-grade Deep Research Report now.`;
     consensusClaims,
     divergentClaims,
     synthesizedReport: validated.text,
-    allCitations: validated.citations,
+    allCitations: tracedCitations,
     followUps,
     completedAt: new Date().toISOString(),
   };

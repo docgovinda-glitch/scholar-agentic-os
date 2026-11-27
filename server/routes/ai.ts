@@ -35,12 +35,20 @@ import { ASK_QUICK_MAX_SOURCES, budgetSourcesForPrompt } from "../../src/shared/
 import { deleteThread, listThreads, parseThreads, saveThreads } from "../src/askThreads/threadStore.ts";
 
 /** Deep research runs each of its AI steps through the request's router chain. */
-const researchLlm = (req: Request): ResearchLlm => (systemPrompt, userPrompt, _format, images) =>
+const researchLlm = (req: Request): ResearchLlm => (systemPrompt, userPrompt, _format, images, live) =>
   routedCompletion(req, {
     task: "reasoning",
     systemPrompt,
     userPrompt,
     images: images?.filter((i) => i.data).map((i) => ({ mediaType: i.mimeType ?? "image/jpeg", data: i.data as string })),
+    ...(live
+      ? {
+          onEvent: (ev: { type: string; text?: string }) => {
+            if (ev.type === "token" && typeof ev.text === "string") live.onToken?.(ev.text);
+            else if (ev.type === "fallback") live.onReset?.();
+          },
+        }
+      : {}),
   });
 
 /**
@@ -514,6 +522,10 @@ export function registerAIRoutes(
               excludedSources: normalizeExcludedSources(req.body?.excludedSources),
               preRetrievedSources: normalizedPreRetrieved,
               onSourcesRetrieved: sse ? (citations, stages) => sse.send({ type: "sources", citations, stages }) : undefined,
+              // The live feed (each search, source read and check) and the report's words as they are written.
+              onActivity: sse ? (a) => sse.send({ type: "activity", kind: a.kind, text: a.text }) : undefined,
+              onReportToken: sse ? (text) => sse.send({ type: "token", text }) : undefined,
+              onReportReset: sse ? () => sse.send({ type: "reset" }) : undefined,
               forceBrowserHandOff: !hasBrowserResult && where !== "server",
               verifyAndReadBrowserResult: hasBrowserResult
                 ? (sys, usr) => readVerifiedBrowserResult(req, sys, usr)

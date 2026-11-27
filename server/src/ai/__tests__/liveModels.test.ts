@@ -132,6 +132,22 @@ describe("free-tier per-minute caps and unsuitable models", () => {
     }
   });
 
+  it("keeps trying the large models while they are only paused by a per-minute cap, instead of a 4k model", async () => {
+    setLiveModelsFetch(
+      list([
+        { id: "acme-chat-5", created: 1_790_000_000, context_window: 131_072 },
+        { id: "tiny-chat-2-7b", created: 1_790_000_000, context_window: 4_096 },
+      ]) as unknown as typeof fetch
+    );
+    markModelLimited({ group: "groq", provider: "groq", model: "acme-chat-5", credential: { apiKey: "k" } } as Parameters<typeof markModelLimited>[0], {
+      kind: "rate_limit",
+      message: "tokens per minute. Please try again in 37s",
+      retryAfterMs: 37_000,
+    });
+    const r = await expandEntry(entry(), "drafting", 4);
+    expect(r.entries.map((e) => e.model)).toEqual(["acme-chat-5"]);
+  });
+
   it("never picks a speech model, and picks a 4k-window model only when nothing larger is listed", async () => {
     setLiveModelsFetch(
       list([

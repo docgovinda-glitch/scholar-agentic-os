@@ -52,6 +52,33 @@ describe("Deep Research stream", () => {
     expect(String(ev.at(-1)!.message)).toMatch(/All connected AI models failed/);
   });
 
+  it("streams the live activity feed and the report's words, then the finished report", async () => {
+    executeDeepResearch.mockReset();
+    executeDeepResearch.mockImplementation(async (_p: string, _llm: unknown, _onStage: unknown, _f: unknown, _i: unknown, _v: unknown, _s: unknown, options: {
+      onActivity?: (a: { kind: string; text: string }) => void;
+      onReportToken?: (t: string) => void;
+      onReportReset?: () => void;
+    }) => {
+      options.onActivity?.({ kind: "search", text: "loyalty schemes retention" });
+      options.onActivity?.({ kind: "read", text: "Loyalty and churn · Journal of Retailing" });
+      options.onReportToken?.("Loyalty ");
+      options.onReportReset?.();
+      options.onReportToken?.("Loyalty schemes raise retention [1].");
+      return {
+        topic: "t", plan: [], researchPlan: { topic: "t", objectives: [], subQuestions: [] }, stages: [], evidence: [],
+        consensusClaims: [], divergentClaims: [], synthesizedReport: "Loyalty schemes raise retention [1].",
+        allCitations: [{ title: "Loyalty and churn", url: "https://example.org/a", snippet: "", domain: "example.org", sourceType: "scholarly", claimPassages: [{ claim: "Loyalty schemes raise retention", key: "k", passage: "Members stayed longer." }] }],
+        followUps: [], completedAt: "2026-11-27T00:00:00Z",
+      };
+    });
+    const res = await request(app()).post("/api/ai/agent").set("Accept", "text/event-stream").send({ prompt: "Effects of loyalty schemes on retention", mode: "deep-research" });
+    const ev = events(res.text);
+    expect(ev.map((e) => e.type)).toEqual(["activity", "activity", "token", "reset", "token", "complete"]);
+    expect(ev[0]).toMatchObject({ kind: "search", text: "loyalty schemes retention" });
+    const payload = ev.at(-1)!.payload as { citations: Array<{ claimPassages?: unknown[] }> };
+    expect(payload.citations[0].claimPassages).toHaveLength(1);
+  });
+
   it("passes the researcher's excluded sources to the engine, trimmed and capped", async () => {
     executeDeepResearch.mockReset();
     executeDeepResearch.mockImplementation(async () => {
