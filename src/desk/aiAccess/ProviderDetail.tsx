@@ -238,7 +238,11 @@ export default function ProviderDetail({
         </Step>
 
         <Step n={2} title="Paste your key">
+          <label htmlFor={`apikey-${spec.id}`} className="sr-only">
+            {spec.name} API key
+          </label>
           <input
+            id={`apikey-${spec.id}`}
             type="password"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}

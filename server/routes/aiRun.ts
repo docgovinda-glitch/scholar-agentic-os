@@ -261,10 +261,21 @@ export function registerAiRunRoutes(app: express.Express, deps: AiRunDeps = {}):
     const asked = entry.model !== "auto" ? entry.model : undefined;
     const askedListed = Boolean(asked && list.ok && list.models.some((m) => m.id === asked));
     // Order to try: what the user asked for (if listed or if the provider cannot say), then the live options.
-    const order = [
+    const first = [
       ...(asked && (askedListed || !list.ok) ? [asked] : []),
       ...(rec?.options.map((o) => o.id) ?? []),
     ].filter((id, i, a) => a.indexOf(id) === i).slice(0, 4);
+    // Free tiers often give quota to some models and none to others (Google's free tier
+    // refuses its newest flagships but serves its flash models). So past the curated
+    // picks, a few more listed text models are tried, fast tier first: a new user's
+    // first connection should land on a model that answers, not stop at the first 429.
+    const extra = list.ok
+      ? curateModels(entry.via ?? entry.provider, list.models, { maxPerProvider: 12, previewMaxAgeDays: 365 })
+          .sort((a, b) => (a.tier === "fast" ? 0 : 1) - (b.tier === "fast" ? 0 : 1))
+          .map((m) => m.id)
+          .filter((id) => !first.includes(id))
+      : [];
+    const order = [...first, ...extra].slice(0, 8);
     if (!order.length) {
       const unsupported = !list.ok && list.unsupported;
       // A list that failed for another reason (rejected key, provider down) is that reason, not "pick a model".
@@ -274,6 +285,7 @@ export function registerAiRunRoutes(app: express.Express, deps: AiRunDeps = {}):
 
     const byId = new Map(list.ok ? list.models.map((m) => [m.id, m]) : []);
     let lastError = "";
+    const quotaRefusals: string[] = [];
     for (const model of order) {
       const m = byId.get(model);
       const [cand] = keyringToCandidates([{ ...entry, model, contextWindow: m?.contextWindow, maxOutputTokens: m?.maxOutputTokens ? Math.min(m.maxOutputTokens, 32_768) : undefined }]);
@@ -292,14 +304,25 @@ export function registerAiRunRoutes(app: express.Express, deps: AiRunDeps = {}):
           recommended: rec?.options.find((o) => o.id === model) ?? rec?.recommended ?? null,
           options: rec?.options ?? [],
           totalListed: rec?.totalListed ?? 0,
-          note: asked && !order.includes(asked) ? `${asked} is not listed by the provider any more.` : model !== (asked ?? model) ? `${asked} did not answer, so ${model} was tested instead.` : undefined,
+          note: asked && !order.includes(asked)
+            ? `${asked} is not listed by the provider any more.`
+            : model !== (asked ?? model)
+              ? `${asked} did not answer, so ${model} was tested instead.`
+              : quotaRefusals.length
+                ? `${quotaRefusals.join(", ")} ${quotaRefusals.length === 1 ? "has" : "have"} no quota on this key, so ${model} was chosen.`
+                : undefined,
         });
         return;
       }
       lastError = failed ?? "The model returned no answer.";
-      // Account-wide problems fail every model the same way: stop and say which.
+      // A rejected key fails every model the same way: stop and say so. Quota is often
+      // per model (free tiers), so a quota refusal moves on to the next model.
       if (failedKind === "auth") { res.json({ ok: false, listed: list.ok, error: `The provider rejected this key (${lastError}).` }); return; }
-      if (failedKind === "quota") { res.json({ ok: false, listed: list.ok, error: `The key is valid but the account has no credit or quota left (${lastError}).`, options: rec?.options ?? [] }); return; }
+      if (failedKind === "quota") quotaRefusals.push(model);
+    }
+    if (quotaRefusals.length === order.length) {
+      res.json({ ok: false, listed: list.ok, error: `The key is valid but the account has no credit or quota left (${lastError}).`, options: rec?.options ?? [] });
+      return;
     }
     res.json({ ok: false, listed: list.ok, error: `The key was accepted but no model answered a test request. Last error: ${lastError}`, options: rec?.options ?? [] });
   });

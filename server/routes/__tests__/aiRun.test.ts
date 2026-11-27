@@ -246,6 +246,23 @@ describe("POST /api/ai/verify", () => {
     expect(res.body.error).toMatch(/no credit or quota/i);
   });
 
+  it("a free tier that refuses some models (429) still connects on a listed model that answers", async () => {
+    // Google's free tier, for example, gives no quota to its newest flagships but serves flash models.
+    setLiveModelsFetch(liveList(["acme-ultra-6", "acme-pro-6", "acme-flash-5"]));
+    const seen: string[] = [];
+    const freeTier: ProviderAdapter = {
+      async *stream(c) {
+        seen.push(c.model);
+        if (c.model !== "acme-flash-5") throw new ProviderHttpError(429, "You exceeded your current quota");
+        yield { type: "text", text: "ready" };
+      },
+    };
+    const res = await verify(appWith(freeTier), { providerId: "groq" });
+    expect(res.body).toMatchObject({ ok: true, tested: { model: "acme-flash-5" } });
+    expect(res.body.note).toMatch(/no quota on this key, so acme-flash-5 was chosen/);
+    expect(seen.length).toBeGreaterThan(1);
+  });
+
   it("a provider that publishes no model list asks for a model, and tests the one given", async () => {
     setLiveModelsFetch(liveList([]));
     const none = await verify(appWith(picky()), { providerId: "qwen" });

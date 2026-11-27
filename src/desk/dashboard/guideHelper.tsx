@@ -279,8 +279,9 @@ export function InlineCitationBadge({
   const snippet = citation?.evidenceSnippet || citation?.snippet || citation?.mainFinding;
   const supporting = claim && snippet ? findSupportingPassage(claim, snippet) : null;
 
+  // No side margin: the text already carries the space before a citation, and punctuation follows it directly.
   return (
-    <span className="relative group/cite inline align-baseline mx-0.5">
+    <span className="relative group/cite inline align-baseline">
       <a
         href={targetUrl || `#ref-entry-${num}`}
         target={targetUrl ? "_blank" : undefined}

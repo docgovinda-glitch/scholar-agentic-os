@@ -90,12 +90,18 @@ function cleanTitleCandidate(raw: string): string {
     return capitalizeTitleWords(words.join(" "));
   }
 
-  const selectedWords = words.slice(0, Math.min(words.length, 7));
+  // Up to 9 words are kept whole, so a phrase is not cut before its last word
+  // ("…Undergraduate Medical" for "…Undergraduate Medical Education"); longer lines keep 7.
+  const selectedWords = words.length <= 9 ? words : words.slice(0, 7);
   let result = selectedWords.join(" ");
   result = result.replace(/\s+(?:and|or|in|of|for|with|to|at|by|from|the|a|an|on)$/i, "");
 
   return capitalizeTitleWords(result);
 }
+
+/** "MED2041 Assessment 2 (Essay, 1,500 words, APA 7)." / "Coursework 1" / "Task 3 – 40%": a label, not a subject. */
+const ASSESSMENT_LABEL_LINE =
+  /^(?:[A-Z]{2,5}\s*-?\s*\d{3,5}\s*[:\-–]?\s*)?(?:summative\s+|formative\s+)?(?:assessment|assignment|coursework|essay|task|project|exam(?:ination)?)\s*\d*\s*(?:\([^)]*\))?\s*(?:[-–:]\s*\d+\s*%)?\s*[.:]?$/i;
 
 /**
  * Fast, deterministic heuristic to extract a concise academic title (3 to 7 words)
@@ -120,6 +126,12 @@ export function deriveHeuristicTitle(rawText: string): string {
       continue;
     }
     if (isClassroomLogisticsLine(line)) {
+      continue;
+    }
+
+    // A label line ("MED2041 Assessment 2 (Essay, 1,500 words, APA 7)") names the task,
+    // not its subject: never a title.
+    if (ASSESSMENT_LABEL_LINE.test(line)) {
       continue;
     }
 
@@ -149,7 +161,7 @@ export function deriveHeuristicTitle(rawText: string): string {
     if (/^(?:assignment\s*(?:brief|question|specification)?|coursework\s*(?:brief|specification)?|syllabus\s*brief|essay\s*prompt)$/i.test(line)) {
       continue;
     }
-    if (isClassroomLogisticsLine(line)) {
+    if (isClassroomLogisticsLine(line) || ASSESSMENT_LABEL_LINE.test(line)) {
       continue;
     }
     const cleaned = cleanTitleCandidate(line);

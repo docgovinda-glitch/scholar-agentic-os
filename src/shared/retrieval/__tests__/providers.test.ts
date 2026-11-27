@@ -49,3 +49,12 @@ describe("isPlausibleRecord (repository spam)", () => {
     expect(isPlausibleRecord({ title: "A dataset with no listed authors", authors: [] })).toBe(true);
   });
 });
+
+describe("titleText", () => {
+  it("drops a 'Title:' label a record carries inside its title, and keeps real titles whole", async () => {
+    const { titleText } = await import("../providers");
+    expect(titleText("Title: Spaced-Repetition Learning as a tool in medical education")).toBe("Spaced-Repetition Learning as a tool in medical education");
+    expect(titleText("<i>Title</i>: Echo chambers")).toBe("Echo chambers");
+    expect(titleText("Title IX and campus policy")).toBe("Title IX and campus policy");
+  });
+});

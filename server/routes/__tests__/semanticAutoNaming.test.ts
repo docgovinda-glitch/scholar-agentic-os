@@ -91,3 +91,12 @@ describe("Semantic Academic Auto-Naming", () => {
     });
   });
 });
+
+describe("deriveHeuristicTitle: assessment label lines", () => {
+  it("skips a label line like 'MED2041 Assessment 2 (Essay, …)' and keeps an 8-word subject whole", async () => {
+    const { deriveHeuristicTitle } = await import("../project/assignment/helpers");
+    const brief =
+      "MED2041 Assessment 2 (Essay, 1,500 words, APA 7).\nCritically evaluate the evidence for spaced repetition in undergraduate medical education.\n(a) Explain the cognitive mechanisms behind the spacing effect. [30 marks]";
+    expect(deriveHeuristicTitle(brief)).toBe("Evidence for Spaced Repetition in Undergraduate Medical Education");
+  });
+});

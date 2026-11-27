@@ -242,12 +242,17 @@ export default function Step03StudioCanvas({ projectId, deck, onUpdateDeck, onPr
         data-testid="step-03-studio-canvas-empty"
       >
         <Sparkles className="w-6 h-6 mx-auto text-neutral-400" />
-        <h3 className="text-base font-semibold text-neutral-900 dark:text-white">No Slides Created Yet</h3>
-        <p className="text-sm text-neutral-500 dark:text-neutral-400">Enter your topic or upload a document in Step 01 to generate your presentation slides.</p>
+        <h3 className="text-base font-semibold text-neutral-900 dark:text-white">No slides yet</h3>
+        <p className="text-sm text-neutral-500 dark:text-neutral-400">
+          {deck.outline?.length
+            ? `Your outline has ${deck.outline.length} slides. Choose a theme in Design, then build them with "Edit slides".`
+            : "Outline your talk in Understand first, or start from a blank card."}
+        </p>
         <div className="flex items-center justify-center gap-2 pt-1">
+          {/* onPrevStep opens Design, so the button says Design (it said "Step 01: Understand"). */}
           <button type="button" onClick={onPrevStep} className={pillBtn}>
             <ArrowLeft className="w-3.5 h-3.5" />
-            Go to Step 01: Understand
+            Back to Design
           </button>
           <button type="button" onClick={() => commit([createBlankCard(1, deck.framework)], 0)} className={pillBtn}>
             <Plus className="w-3.5 h-3.5" />

@@ -327,6 +327,11 @@ export function StructureHeadingCard({ expandedBlueprintHeadings, expandedBluepr
                           ? Math.round((sub.targetWordCount / targetWordCount) * 100)
                           : 0;
                       const isNotesOpen = expandedNotes[sub.id];
+                      // A section that is one writing unit carries the section's own title; the row
+                      // does not repeat it as "1.1 <same heading>".
+                      const sameAsSection =
+                        heading.subheadings.length === 1 &&
+                        sub.title.trim().toLowerCase() === heading.title.trim().toLowerCase();
 
                       return (
                         <div
@@ -343,6 +348,9 @@ export function StructureHeadingCard({ expandedBlueprintHeadings, expandedBluepr
                                 {sub.numberStr}
                               </span>
                               <span className="sr-only">{sub.title}</span>
+                              {sameAsSection ? (
+                                <span className="flex-1 min-w-0 text-xs text-[color:var(--text-muted)]">Whole section, written as one part</span>
+                              ) : (
                               <div className="relative flex-1 min-w-0 flex items-center">
                                 <input
                                   type="text"
@@ -357,6 +365,7 @@ export function StructureHeadingCard({ expandedBlueprintHeadings, expandedBluepr
                                 />
                                 <Edit2 className="w-2.5 h-2.5 text-[color:var(--text-muted)] absolute right-1 pointer-events-none opacity-30 group-hover/sub:opacity-100 transition-opacity" />
                               </div>
+                              )}
                             </div>
 
                             {/* Word Count Adjustment Controls */}

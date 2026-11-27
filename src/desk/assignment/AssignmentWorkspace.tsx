@@ -36,7 +36,10 @@ export function PhaseNavSkeleton() {
 
 export function MainStageSkeleton() {
   return (
-    <div className="max-w-4xl mx-auto p-6 sm:p-8 space-y-8 animate-pulse text-[color:var(--text-muted)]">
+    <div className="max-w-4xl mx-auto p-6 sm:p-8 space-y-4">
+    {/* Grey blocks alone said nothing for up to half a minute; the line says what is happening. */}
+    <p role="status" className="text-sm text-[color:var(--text-secondary)]">Loading this step…</p>
+    <div className="space-y-8 animate-pulse text-[color:var(--text-muted)]">
       <div className="rounded-2xl p-6 sm:p-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-xs space-y-6">
         <div className="border-b border-[color:var(--border-subtle)] pb-4 space-y-2">
           <div className="h-6 w-60 bg-[color:var(--surface-sunken)] rounded-lg" />
@@ -50,6 +53,7 @@ export function MainStageSkeleton() {
           </div>
         </div>
       </div>
+    </div>
     </div>
   );
 }

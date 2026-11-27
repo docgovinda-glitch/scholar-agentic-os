@@ -56,6 +56,14 @@ export function stripMarkup(html: string): string {
     .trim();
 }
 
+/**
+ * Plain text of a title, without a field label some records carry inside the title
+ * itself ("Title: Spaced-Repetition Learning…" from a preprint server).
+ */
+export function titleText(raw: string): string {
+  return stripMarkup(raw).replace(/^(?:article\s+)?title\s*[:：]\s*/i, "");
+}
+
 const STOPWORDS = new Set([
   "why", "what", "how", "when", "where", "who", "which", "whom", "whose",
   "did", "does", "do", "is", "are", "was", "were", "be", "been", "being",
@@ -191,7 +199,7 @@ function mapOpenAlex(works: OpenAlexWork[], sourceType?: string): RawSourceInput
     const journalArticle = w.type === "article" && w.primary_location?.source?.type === "journal";
     return {
       id: w.id ? w.id.split("/").pop() : undefined,
-      title: w.title || w.display_name || "",
+      title: titleText(w.title || w.display_name || ""),
       url: w.doi ?? w.primary_location?.landing_page_url ?? w.id ?? "",
       doi,
       snippet: reconstructOpenAlexAbstract(w.abstract_inverted_index).slice(0, 1800),
@@ -299,7 +307,7 @@ function mapCrossrefItem(item: CrossrefItem): RawSourceInput {
     item["published-online"]?.["date-parts"]?.[0] ||
     item.created?.["date-parts"]?.[0];
   return {
-    title: Array.isArray(item.title) ? stripMarkup(item.title[0] || "") : "",
+    title: Array.isArray(item.title) ? titleText(item.title[0] || "") : "",
     url: item.URL || (doi ? `https://doi.org/${doi}` : ""),
     doi,
     snippet: item.abstract ? stripMarkup(item.abstract).slice(0, 1800) : "",
@@ -381,7 +389,7 @@ export async function searchSemanticScholar(query: string, limit = 15, options: 
         const doi = bareDoi(p.externalIds?.DOI);
         const types = p.publicationTypes ?? [];
         return {
-          title: String(p.title),
+          title: titleText(String(p.title)),
           url: p.url || (doi ? `https://doi.org/${doi}` : ""),
           doi,
           snippet: p.abstract ? p.abstract.slice(0, 1800) : "",
@@ -432,7 +440,7 @@ export async function searchEuropePmc(query: string, pageSize = 12, options: Pro
     const items = (data.resultList?.result ?? []).map((r): RawSourceInput => {
       const doi = bareDoi(r.doi);
       return {
-        title: stripMarkup(r.title || ""),
+        title: titleText(r.title || ""),
         url: doi ? `https://doi.org/${doi}` : r.pmid ? `https://pubmed.ncbi.nlm.nih.gov/${r.pmid}/` : "",
         doi,
         snippet: r.abstractText ? stripMarkup(r.abstractText).slice(0, 1800) : "",
@@ -482,7 +490,7 @@ export async function searchEric(query: string, rows = 12, options: ProviderOpti
     }>(`https://api.ies.ed.gov/eric/?${params.toString()}`, options, "ERIC");
     const items = (data.response?.docs ?? [])
       .map((doc): RawSourceInput => ({
-        title: stripMarkup(doc.title || ""),
+        title: titleText(doc.title || ""),
         url: doc.url || (doc.id ? `https://eric.ed.gov/?id=${encodeURIComponent(doc.id)}` : ""),
         snippet: doc.description ? stripMarkup(doc.description).slice(0, 1800) : "",
         year: doc.publicationdateyear,
@@ -619,7 +627,7 @@ function mapDataCite(attrs: DataCiteAttributes, id?: string): RawSourceInput {
   const venue = attrs.container?.title || attrs.publisher;
   return {
     id,
-    title: stripMarkup(attrs.titles?.[0]?.title || ""),
+    title: titleText(attrs.titles?.[0]?.title || ""),
     url: doi ? `https://doi.org/${doi}` : "",
     doi,
     snippet: attrs.descriptions?.[0]?.description ? stripMarkup(attrs.descriptions[0].description).slice(0, 1800) : "",
