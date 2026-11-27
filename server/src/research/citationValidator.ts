@@ -1,3 +1,4 @@
+import { normalizeCitationMarkers } from "../../../src/shared/citationMarkers.ts";
 /**
  * Citation Validator & Anti-Hallucination Guardrail for Scholar Core
  *
@@ -65,6 +66,8 @@ export function validateAndRefineCitations(
     citationStyle?: string;
   } = {}
 ): ValidationResult {
+  // A model's native citation form (【8†…】) becomes [8] before anything is checked.
+  rawText = normalizeCitationMarkers(rawText);
   if (!rawText || verifiedSources.length === 0) {
     return {
       text: rawText || "",

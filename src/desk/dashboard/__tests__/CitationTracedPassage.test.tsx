@@ -56,4 +56,9 @@ describe("a citation shows the passage that backs its claim", () => {
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(screen.queryByTestId("citation-sheet")).toBeNull();
   });
+
+  it("says when Deep Research read the source in full, not only its abstract", () => {
+    render(<InlineCitationBadge num={1} citation={{ ...citation, fullTextRead: "pmc" }} claim={claim} />);
+    expect(screen.getByTestId("citation-full-text")).toHaveTextContent("Full text read");
+  });
 });

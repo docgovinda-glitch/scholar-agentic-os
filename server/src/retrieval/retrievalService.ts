@@ -260,5 +260,6 @@ export function retrievedToSearchItem(r: RetrievedSource): SearchResultItem {
     doi: r.doi,
     venue: r.venue,
     isPrimary: scholarly,
+    ...(r.openAccessUrl ? { openAccessUrl: r.openAccessUrl } : {}),
   };
 }

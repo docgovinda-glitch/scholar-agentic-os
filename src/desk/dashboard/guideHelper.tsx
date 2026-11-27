@@ -1,4 +1,5 @@
 import { claimBefore, claimKey, findSupportingPassage } from "../../domain/ask/passageMatch";
+import { normalizeCitationMarkers } from "../../shared/citationMarkers";
 import React, { useState, Fragment } from "react";
 import { createPortal } from "react-dom";
 import { PHONE_SHEET_CLASSES, useIsPhoneSheet } from "../components/usePhoneSheet";
@@ -327,7 +328,12 @@ export function InlineCitationBadge({
               >
                 {isPreprint ? "Preprint (Not Peer-Reviewed)" : isPeerReviewed ? "Peer Reviewed" : sourceTypeBadge}
               </span>
-              {isOpenAccess && (
+              {citation.fullTextRead && (
+                <span data-testid="citation-full-text" className="px-1.5 py-0.5 rounded-full font-semibold bg-sky-50 dark:bg-sky-950/60 text-sky-800 dark:text-sky-300 border border-sky-200/50 dark:border-sky-800/40 text-xs">
+                  Full text read
+                </span>
+              )}
+              {isOpenAccess && !citation.fullTextRead && (
                 <span className="px-1.5 py-0.5 rounded-full font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-800/40 text-xs">
                   Open Access
                 </span>
@@ -495,7 +501,7 @@ export function InlineCitationBadge({
  */
 export function sanitizeStreamingMarkdown(rawText: string): string {
   if (!rawText) return "";
-  let cleaned = stripRawReferencesSection(rawText);
+  let cleaned = stripRawReferencesSection(normalizeCitationMarkers(rawText));
   // Balance unclosed bold `**` at the very end of a streaming chunk
   const boldCount = (cleaned.match(/\*\*/g) || []).length;
   if (boldCount % 2 === 1) {

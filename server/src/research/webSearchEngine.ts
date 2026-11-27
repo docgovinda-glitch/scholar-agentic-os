@@ -40,6 +40,10 @@ export interface SearchResultItem {
   venue?: string;
   isPrimary?: boolean;
   stance?: "supporting" | "contradicting" | "mentioning";
+  /** A free full-text copy (open access), when the index reported one. */
+  openAccessUrl?: string;
+  /** Deep Research read this source in full: its snippet holds the passages most relevant to the question. */
+  fullTextRead?: "pmc" | "arxiv" | "publisher";
 }
 
 export interface WebSearchResponse {
