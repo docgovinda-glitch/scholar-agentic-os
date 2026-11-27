@@ -467,6 +467,132 @@ export async function searchEuropePmc(query: string, pageSize = 12, options: Pro
   }
 }
 
+/**
+ * The PubMed Central ids of the open-access articles among these DOIs, in one Europe PMC search (its API can take
+ * many seconds a call, so one batched lookup beats one call per paper). Keys are lower-cased bare DOIs; a DOI with
+ * no open-access PMC copy is absent. An empty map when the call fails.
+ */
+export async function lookupEuropePmcOpenAccessIds(dois: string[], options: ProviderOptions = {}): Promise<Map<string, string>> {
+  const wanted = [...new Set(dois.map((d) => bareDoi(d)?.toLowerCase()).filter((d): d is string => Boolean(d)))].slice(0, 25);
+  const out = new Map<string, string>();
+  if (wanted.length === 0) return out;
+  try {
+    const params = new URLSearchParams({
+      query: wanted.map((d) => `DOI:"${d}"`).join(" OR "),
+      format: "json",
+      pageSize: String(wanted.length * 2),
+      resultType: "lite",
+    });
+    const url = `https://www.ebi.ac.uk/europepmc/webservices/rest/search?${params.toString()}`;
+    type Lite = { resultList?: { result?: Array<{ pmcid?: string; isOpenAccess?: string; doi?: string }> } };
+    // Europe PMC's gateway sometimes answers 503 for a moment: one retry after a short pause.
+    const data = await getJson<Lite>(url, options, "Europe PMC").catch(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 1_500));
+      return getJson<Lite>(url, options, "Europe PMC");
+    });
+    for (const hit of data.resultList?.result ?? []) {
+      const doi = bareDoi(hit.doi)?.toLowerCase();
+      if (doi && hit.pmcid && hit.isOpenAccess === "Y" && wanted.includes(doi)) out.set(doi, hit.pmcid);
+    }
+  } catch {
+    // No lookup: the papers are read from their other open copies, or not at all.
+  }
+  return out;
+}
+
+/** The body of a JATS article (PubMed Central's XML) as plain text: paragraphs and section titles, no figures or tables. */
+export function jatsBodyText(xml: string): string | undefined {
+  const body = xml.match(/<body[\s\S]*<\/body>/i)?.[0];
+  if (!body) return undefined;
+  const text = body
+    .replace(/<(table-wrap|fig|disp-formula|xref)\b[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<\/(p|title|sec|list-item)>/gi, "\n\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#x?[0-9a-f]+;/gi, " ")
+    .replace(/&amp;/g, "&")
+    // Brackets left empty where citation numbers were removed ("[ ]", "[, ]", "( )").
+    .replace(/\[\s*(?:[,;–-]\s*)*\]/g, "")
+    .replace(/\(\s*(?:[,;–-]\s*)*\)/g, "")
+    .replace(/[ \t]+([.,;:])/g, "$1")
+    .replace(/(?<!\.)\.\.(?!\.)/g, ".")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\s*\n\s*\n\s*/g, "\n\n")
+    .trim();
+  return text || undefined;
+}
+
+/** NCBI's tool name on its E-utilities and ID converter calls (no email: no personal data leaves the server). */
+const NCBI_TOOL = "scholar-core";
+
+/**
+ * The PubMed Central ids of these DOIs, in one call to NCBI's ID converter (fast); Europe PMC's search is the
+ * fallback. Keys are lower-cased bare DOIs; a DOI that PMC does not hold is absent. Being in PMC does not mean
+ * the full text may be downloaded: the caller checks that the text it gets is a whole article.
+ */
+export async function lookupPmcIdsByDoi(dois: string[], options: ProviderOptions = {}): Promise<Map<string, string>> {
+  const wanted = [...new Set(dois.map((d) => bareDoi(d)?.toLowerCase()).filter((d): d is string => Boolean(d)))].slice(0, 100);
+  const out = new Map<string, string>();
+  if (wanted.length === 0) return out;
+  try {
+    const params = new URLSearchParams({ ids: wanted.join(","), format: "json", tool: NCBI_TOOL });
+    const data = await getJson<{ records?: Array<{ doi?: string; pmcid?: string; "requested-id"?: string }> }>(
+      `https://pmc.ncbi.nlm.nih.gov/tools/idconv/api/v1/articles/?${params.toString()}`,
+      options,
+      "NCBI ID converter"
+    );
+    for (const r of data.records ?? []) {
+      const doi = bareDoi(r["requested-id"] || r.doi)?.toLowerCase();
+      if (doi && r.pmcid && wanted.includes(doi)) out.set(doi, r.pmcid);
+    }
+    return out;
+  } catch {
+    return lookupEuropePmcOpenAccessIds(wanted, options);
+  }
+}
+
+/**
+ * The full text of a PubMed Central article as plain text with blank lines between paragraphs and section titles
+ * (the article body only: no front matter or reference list). NCBI first (fast), Europe PMC as the fallback.
+ * Undefined when neither has a downloadable full text.
+ */
+export async function fetchPmcFullText(pmcid: string, options: ProviderOptions = {}): Promise<string | undefined> {
+  const id = pmcid.trim().toUpperCase();
+  if (!/^PMC\d+$/.test(id)) return undefined;
+  try {
+    const params = new URLSearchParams({ db: "pmc", id: id.slice(3), rettype: "xml", tool: NCBI_TOOL });
+    const res = await (options.fetchImpl ?? fetch)(`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?${params.toString()}`, {
+      signal: withTimeout(options),
+      headers: { Accept: "application/xml" },
+    });
+    if (res.ok) {
+      const text = jatsBodyText(await res.text());
+      if (text) return text;
+    }
+  } catch {
+    // fall through to Europe PMC
+  }
+  return fetchEuropePmcFullText(id, options);
+}
+
+/** The full text of an open-access article from Europe PMC (the fallback of `fetchPmcFullText`). */
+export async function fetchEuropePmcFullText(pmcid: string, options: ProviderOptions = {}): Promise<string | undefined> {
+  const id = pmcid.trim().toUpperCase();
+  if (!/^PMC\d+$/.test(id)) return undefined;
+  try {
+    const res = await (options.fetchImpl ?? fetch)(`https://www.ebi.ac.uk/europepmc/webservices/rest/${id}/fullTextXML`, {
+      signal: withTimeout(options),
+      headers: { Accept: "application/xml" },
+    });
+    if (!res.ok) return undefined;
+    return jatsBodyText(await res.text());
+  } catch {
+    return undefined;
+  }
+}
+
 export async function searchEric(query: string, rows = 12, options: ProviderOptions = {}): Promise<ProviderResult> {
   try {
     const params = new URLSearchParams({

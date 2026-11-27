@@ -49,6 +49,8 @@ export interface WebsiteCitationItem {
   id?: string;
   /** Deep Research: each cited claim and the passage of this source that backs it (null: no clear match). */
   claimPassages?: import("../domain/ask/passageMatch").ClaimPassage[];
+  /** Deep Research read this source in full (not only its abstract). */
+  fullTextRead?: "pmc" | "arxiv" | "publisher";
   title?: string;
   url?: string;
   snippet?: string;
