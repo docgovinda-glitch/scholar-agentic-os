@@ -30,7 +30,7 @@ import { assignBadges, curateModels, type MeasuredSpeed } from "../../src/platfo
 import { listLiveModels, ModelListError } from "../../src/platform/router/modelListers.ts";
 import type { Candidate, ProviderId, RouteRequest, RouterEvent } from "../../src/platform/router/types.ts";
 import { AiEndpointBlockedError, createAiFetch, screenCandidates, serverAdapters } from "../src/ai/aiEndpointGuard.ts";
-import { entryFromCatalog, expandKeyring, liveModelsFor, quarantineModel } from "../src/ai/liveModels.ts";
+import { entryFromCatalog, expandKeyring, learnFromFailure, liveModelsFor, markModelLimited } from "../src/ai/liveModels.ts";
 import { recommendModels } from "../../src/platform/router/modelRecommendation.ts";
 
 const PROVIDERS = ["openai", "anthropic", "google", "groq", "deepseek", "mistral", "ollama", "lmstudio", "webllm", "custom"] as const;
@@ -199,7 +199,7 @@ export function registerAiRunRoutes(app: express.Express, deps: AiRunDeps = {}):
       for (const n of expanded.notices) {
         yield { type: "candidate_skipped", candidateId: `notice:${n.text.slice(0, 40)}`, label: "AI connection", reason: "no_credential", detail: n.text };
       }
-      const onCandidateFailure = (c: Candidate, f: { kind: string }) => { if (f.kind === "model_unavailable") quarantineModel(c); };
+      const onCandidateFailure = learnFromFailure;
       for await (const ev of route(request, chain, signal, { site: "server", adapters, breaker, breakerKeys: serverBreakerKeys, outputCaps: serverOutputCaps, onCandidateFailure, ...deps.routerOptions })) {
         if (ev.type === "metrics") {
           const c = byId.get(ev.candidateId);
@@ -293,7 +293,7 @@ export function registerAiRunRoutes(app: express.Express, deps: AiRunDeps = {}):
       let text = "";
       let failed: string | undefined;
       let failedKind = "";
-      for await (const ev of route({ requestId: randomUUID(), task: "fast", messages: [{ role: "user", content: "Reply with the single word: ready" }], desiredOutputTokens: 1024, minOutputTokens: 16 }, [cand], new AbortController().signal, { site: "server", adapters, breaker: new CircuitBreaker(new MemoryBreakerStore()), retry: { maxAttempts: 1, baseDelayMs: 0, maxDelayMs: 0, maxWaitMs: 0 }, timeouts: { firstTokenMs: 20_000, idleMs: 15_000 }, maxTotalMs: 25_000, onCandidateFailure: (_c, f) => { failedKind = f.kind; failed = f.message; } })) {
+      for await (const ev of route({ requestId: randomUUID(), task: "fast", messages: [{ role: "user", content: "Reply with the single word: ready" }], desiredOutputTokens: 1024, minOutputTokens: 16 }, [cand], new AbortController().signal, { site: "server", adapters, breaker: new CircuitBreaker(new MemoryBreakerStore()), retry: { maxAttempts: 1, baseDelayMs: 0, maxDelayMs: 0, maxWaitMs: 0 }, timeouts: { firstTokenMs: 20_000, idleMs: 15_000 }, maxTotalMs: 25_000, onCandidateFailure: (c, f) => { failedKind = f.kind; failed = f.message; markModelLimited(c, f); } })) {
         if (ev.type === "token") text += ev.text;
       }
       if (text.trim() && !failed) {

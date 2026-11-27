@@ -51,7 +51,7 @@ export function AiModelSwitcher({ workspace, className = "", compact = false }: 
     setOpen(false);
   }
 
-  const modelName = (e: { model: string; via?: string; provider: string }) => (e.model === "auto" ? "Best available" : e.model);
+  const modelName = (e: { model: string; via?: string; provider: string }) => (e.model === "auto" ? "Chosen per task" : e.model);
   const label = active ? modelName(active) : "No AI connected";
 
   return (
@@ -92,6 +92,17 @@ export function AiModelSwitcher({ workspace, className = "", compact = false }: 
                 <p className="text-xs font-semibold text-[color:var(--text-primary)] capitalize">{p.provider}</p>
                 {p.error && <p className="text-xs text-[color:var(--state-danger)]">{p.error}</p>}
                 <ul className="mt-1 space-y-0.5">
+                  <li>
+                    <button
+                      type="button"
+                      onClick={() => void choose(p.provider, "")}
+                      aria-current={(active?.via ?? active?.provider) === p.provider && active?.model === "auto"}
+                      className={`w-full text-left px-2 py-1.5 rounded-lg text-xs hover:bg-[color:var(--surface-hover)] ${(active?.via ?? active?.provider) === p.provider && active?.model === "auto" ? "bg-[color:var(--surface-hover)] font-semibold" : ""}`}
+                    >
+                      Let Scholar choose for each task
+                      <span className="block text-[color:var(--text-muted)] font-normal">Fast models for quick answers, stronger ones for drafting and research</span>
+                    </button>
+                  </li>
                   {ranked.map((m) => {
                     const isActive = (active?.via ?? active?.provider) === p.provider && active?.model === m.id;
                     return (

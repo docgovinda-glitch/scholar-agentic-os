@@ -30,7 +30,7 @@ export default function ModelSelectField({
           onChange={(e) => onChange(e.target.value)}
           className="w-full rounded-[var(--radius-sm)] border border-[color:var(--border-control)] bg-[color:var(--surface-inset)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
         >
-          <option value="">Best available (chosen from the provider's live list)</option>
+          <option value="">Let Scholar choose for each task (recommended)</option>
           {!hasCurrent && <option value={value}>{value} (current)</option>}
           {models.map((m) => (
             <option key={m.id} value={m.id}>

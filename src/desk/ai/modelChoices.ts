@@ -66,7 +66,10 @@ export async function activeConnection(): Promise<KeyringEntry | undefined> {
 export async function selectModel(catalogProviderId: string, model: string): Promise<{ ok: boolean; error?: string }> {
   const id = catalogProviderId;
   const settings = await loadUserAiSettings();
-  const result = await saveUserAiSettings({ provider: id, preferences: { ...settings.preferences, [`${id}Model`]: model } });
+  // An empty model removes the pin, so each task chooses from the models the key can use.
+  const { [`${id}Model`]: _old, ...rest } = settings.preferences;
+  void _old;
+  const result = await saveUserAiSettings({ provider: id, preferences: model ? { ...rest, [`${id}Model`]: model } : rest });
   return result.success ? { ok: true } : { ok: false, error: result.error };
 }
 

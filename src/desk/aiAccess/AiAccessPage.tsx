@@ -982,7 +982,7 @@ function PreferencesSection({
                     {p.isDefault && <Chip tone="good">Default</Chip>}
                   </div>
                   <p className="mt-0.5 text-xs text-[color:var(--text-muted)]">
-                    {p.selectedModel ? `Model: ${p.selectedModel}` : "Using provider default"}
+                    {p.selectedModel && p.selectedModel !== "auto" ? `Model: ${p.selectedModel} (used for every task)` : "Model: chosen for each task"}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">

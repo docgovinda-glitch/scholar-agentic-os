@@ -212,18 +212,21 @@ export function useAiAccess() {
       await saveKeyToAccount(input.providerId, input.apiKey);
       await addConnection(input.providerId, input.tier, verification.modelsDetected);
 
-      // The model is the person's own pick, else the one that just answered a test request, else the
-      // live recommendation. No model name is ever assumed: with none, the server picks from the live
-      // list on each request, and the screen asks the person to name one.
+      // A key is all that is needed. No model is pinned unless the person picked one: with none, each
+      // request's task chooses from the models this key can use (fast ones for quick answers,
+      // stronger ones for drafting and research; server/src/ai/liveModels.ts). A provider that
+      // publishes no model list still needs a model named, so its saved one is kept.
       const saved = settings.preferences[`${input.providerId}Model`];
       const liveIds = new Set((verification.options ?? []).map((o) => o.id));
-      // A model the person typed that the provider does not list is not kept: the tested one replaces it.
-      const own = input.model && (liveIds.size === 0 || liveIds.has(input.model)) ? input.model : undefined;
-      const model = own || verification.tested?.model || (saved && (liveIds.size === 0 || liveIds.has(saved)) ? saved : verification.options?.[0]?.id) || "";
+      const noList = liveIds.size === 0;
+      const own = input.model && (noList || liveIds.has(input.model)) ? input.model : undefined;
+      const model = own || (noList ? saved || "" : "");
+      const { [`${input.providerId}Model`]: _dropped, ...otherPrefs } = settings.preferences;
+      void _dropped;
       const next: UserAiSettings = {
         provider: input.makeDefault ? input.providerId : settings.provider,
         preferences: {
-          ...settings.preferences,
+          ...otherPrefs,
           ...(model ? { [`${input.providerId}Model`]: model } : {}),
           ...(input.baseUrl ? { [`${input.providerId}BaseUrl`]: input.baseUrl } : {}),
         },
@@ -238,7 +241,8 @@ export function useAiAccess() {
         model: model || undefined,
         options: verification.options,
         tested: verification.tested,
-        needsModel: verification.needsModel || !model,
+        // Only a provider with no model list needs a model named; otherwise the task chooses.
+        needsModel: Boolean(verification.needsModel) && !model,
         note: verification.note,
       };
     },
@@ -303,7 +307,10 @@ export function useAiAccess() {
 
   const setModelFor = useCallback(
     async (providerId: string, model: string) => {
-      const next = { ...settings, preferences: { ...settings.preferences, [`${providerId}Model`]: model } };
+      // An empty model removes the pin: each task then chooses (server/src/ai/liveModels.ts).
+      const { [`${providerId}Model`]: _old, ...rest } = settings.preferences;
+      void _old;
+      const next = { ...settings, preferences: model ? { ...rest, [`${providerId}Model`]: model } : rest };
       await saveUserAiSettings(next);
       setSettings(next);
     },

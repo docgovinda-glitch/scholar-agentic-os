@@ -21,7 +21,7 @@ import { orderChain, ROUTING_HEADER, strictOrderFromHeader } from "../../../src/
 import { serverBreaker, serverBreakerKeys, serverOutputCaps } from "./breaker.ts";
 import type { Candidate, ProviderAdapter, ProviderId, RouteRequest, RouterEvent, TaskClass } from "../../../src/platform/router/types.ts";
 import { keyringToCandidates, parseKeyring, type KeyringEntry } from "../../routes/aiRun.ts";
-import { expandKeyring, quarantineModel } from "./liveModels.ts";
+import { expandKeyring, learnFromFailure } from "./liveModels.ts";
 import { accountKeyring } from "./accountAi.ts";
 import { screenCandidates, serverAdapters } from "./aiEndpointGuard.ts";
 import { BrowserAiRequiredError, LocalModelUnreachableError, NoClientAiProviderError } from "./aiRouteErrors.ts";
@@ -198,7 +198,7 @@ export async function routedResult(req: Request, call: RoutedCall): Promise<Rout
       temperature: call.temperature,
     };
     let text = "";
-    for await (const ev of route(request, chain, call.signal ?? new AbortController().signal, { site: "server", adapters: deps.adapters, breaker: deps.breaker, breakerKeys: serverBreakerKeys, outputCaps: serverOutputCaps, onCandidateFailure: (c, f) => { if (f.kind === "model_unavailable") quarantineModel(c); } })) {
+    for await (const ev of route(request, chain, call.signal ?? new AbortController().signal, { site: "server", adapters: deps.adapters, breaker: deps.breaker, breakerKeys: serverBreakerKeys, outputCaps: serverOutputCaps, onCandidateFailure: learnFromFailure })) {
       summarise(scoped.aiRoute!, ev);
       call.onEvent?.(ev);
       if (ev.type === "token") text += ev.text;
