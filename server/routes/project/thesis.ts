@@ -19,6 +19,7 @@ import { catalog } from "../../../src/app/atlas/atlas.ts";
 import { emptyDocument } from "../../../src/domain/document/model.ts";
 import { appendBlock } from "../../../src/domain/document/ops.ts";
 import { emptyGraph } from "../../../src/domain/claim/graph.ts";
+import { trimToSentenceWithinWords } from "../../src/utils/sectionBudget.ts";
 
 const router = Router({ mergeParams: true });
 
@@ -376,11 +377,21 @@ router.post(
         userPrompt: `${userPromptText}\n\nThesis Title: ${title}\nDegree: ${degreeLevel}\nChapter ${chapterNumber}: ${chapterTitle}`,
         dialect,
         stripCliches: true,
+        // A cap near the target (about 1.3 tokens a word, plus headroom) also turns off the
+        // "continue" follow-ups; without it a 4,000-word request came back at 9,243 words.
+        maxTokens: Math.round(targetWords * 1.7) + 600,
       });
+
+      // The editor shows the chapter's title already: drop a first heading that repeats it
+      // ("# Chapter 1: Introduction"), then end on a whole sentence within ~15% of the target.
+      const chapterText = trimToSentenceWithinWords(
+        stripRepeatedChapterHeading(brainRes.text, chapterNumber, chapterTitle),
+        Math.round(targetWords * 1.15)
+      );
 
       // Scrub citations and format canonical bibliography
       const scrubResult = scholarBrain.scrubAndFormatCitations(
-        brainRes.text,
+        chapterText,
         sourcesForScrubber,
         citationStyle,
         dialect
@@ -407,5 +418,16 @@ router.post(
     }
   })
 );
+
+/** "# Chapter 1: Introduction" / "## Introduction" as the first line, when it repeats the chapter's own title. */
+export function stripRepeatedChapterHeading(text: string, chapterNumber: number | string, chapterTitle: string): string {
+  const lines = (text || "").replace(/^\s+/, "").split("\n");
+  const first = (lines[0] || "").replace(/^#{1,6}\s*/, "").replace(/[*_]/g, "").trim().toLowerCase();
+  const title = chapterTitle.trim().toLowerCase();
+  const repeats =
+    /^#{1,6}\s/.test(lines[0] || "") &&
+    (first === title || first === `chapter ${chapterNumber}: ${title}` || first === `chapter ${chapterNumber} ${title}` || first === `chapter ${chapterNumber}` || first === `${chapterNumber}. ${title}`);
+  return repeats ? lines.slice(1).join("\n").replace(/^\s+/, "") : text;
+}
 
 export default router;

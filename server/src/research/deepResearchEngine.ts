@@ -26,6 +26,16 @@ export const DEEP_REPORT_EXCERPT_CHARS = 600;
 const reportRank = (c: SearchResultItem): number =>
   (c.sourceType === "vault" ? 3 : 0) + (c.sourceType === "scholarly" || c.sourceType === "official" ? 2 : 0) + (c.isPrimary ? 1 : 0) + ((c.snippet || "").length >= 200 ? 1 : 0);
 
+/** Retry size when the full report prompt is too large for every connected model. */
+export const REPORT_RETRY_SOURCES = 15;
+const REPORT_RETRY_EXCERPT_CHARS = 300;
+
+/** The router's "too long for every model" and providers' "request too large" both mean: send less. */
+export function isReportTooLarge(err: unknown): boolean {
+  const e = err as { code?: string; message?: string } | null;
+  return e?.code === "context_overflow" || /too long for every available model|request too large|reduce your (message|request) size|context (length|window)/i.test(e?.message ?? "");
+}
+
 /** The best DEEP_REPORT_MAX_SOURCES sources (Vault, then scholarly/official, then primary, then those with text), excerpts cut. */
 export function selectReportSources(all: SearchResultItem[]): SearchResultItem[] {
   return all
@@ -651,72 +661,78 @@ export async function executeDeepResearch(
   const reportSources = selectReportSources(allCitations);
   allCitations.splice(0, allCitations.length, ...reportSources);
 
-  // Build numbered global source registry for the synthesis prompt so [1], [2] map 1-to-1 to allCitations
-  const urlToGlobalIndex = new Map<string, number>();
-  allCitations.forEach((c, idx) => {
-    urlToGlobalIndex.set(c.url, idx + 1);
-  });
+  // The evidence digest is built from the current allCitations, so the report can be rebuilt with
+  // fewer sources (see the retry below) and [n] still maps 1-to-1 to the citations returned.
+  const buildEvidenceDigest = (): string => {
+    // Build numbered global source registry for the synthesis prompt so [1], [2] map 1-to-1 to allCitations
+    const urlToGlobalIndex = new Map<string, number>();
+    allCitations.forEach((c, idx) => {
+      urlToGlobalIndex.set(c.url, idx + 1);
+    });
 
-  let evidenceDigest = "";
+    let evidenceDigest = "";
 
-  // 1. Internal Knowledge Vault Sources
-  if (vaultItems.length > 0) {
-    evidenceDigest += `\n### Internal Knowledge Vault Sources\n`;
-    for (const v of vaultItems) {
-      const gIdx = urlToGlobalIndex.get(v.url) || 1;
-      const yearLabel = v.publishedDate ? `, ${v.publishedDate}` : "";
-      evidenceDigest += `- [${gIdx}] "${v.title}" (${v.author || v.publisher || "Knowledge Vault"}${yearLabel}) [${v.authorityBadge}]: ${v.snippet}\n`;
-    }
-  }
-
-  // 2. Primary Source Documents (Semantic RAG chunked & reranked)
-  if (files && files.length > 0) {
-    const rag = chunkAndRerankEvidence(topic, files, 3500);
-    evidenceDigest += `\n### Primary Uploaded Documents (User Attachments)\n`;
-    if (rag.chunks.length > 0) {
-      evidenceDigest += `${ sanitizeUntrustedExternalText(rag.formattedContext) }\n`;
-    } else {
-      for (const f of files) {
-        const text = sanitizeUntrustedExternalText((f.text || "").trim());
-        const snippet = text.length > 6000 ? text.slice(0, 6000) + "\n... [Truncated] ..." : text;
-        evidenceDigest += `\n#### Document: ${f.name}\n${snippet || "(Empty document)"}\n`;
+    // 1. Internal Knowledge Vault Sources
+    if (vaultItems.length > 0) {
+      evidenceDigest += `\n### Internal Knowledge Vault Sources\n`;
+      for (const v of vaultItems) {
+        const gIdx = urlToGlobalIndex.get(v.url) || 1;
+        const yearLabel = v.publishedDate ? `, ${v.publishedDate}` : "";
+        evidenceDigest += `- [${gIdx}] "${v.title}" (${v.author || v.publisher || "Knowledge Vault"}${yearLabel}) [${v.authorityBadge}]: ${v.snippet}\n`;
       }
     }
-  }
 
-  // 3. Primary Visual Attachments
-  if (images && images.length > 0) {
-    evidenceDigest += `\n### Primary Visual Attachments (Uploaded by User)\n`;
-    images.forEach((img, i) => {
-      evidenceDigest += `- [Visual Evidence ${i + 1}] ${img.name || `Image_${i + 1}`} (Multimodal visual data attached and inspected directly by the model)\n`;
+    // 2. Primary Source Documents (Semantic RAG chunked & reranked)
+    if (files && files.length > 0) {
+      const rag = chunkAndRerankEvidence(topic, files, 3500);
+      evidenceDigest += `\n### Primary Uploaded Documents (User Attachments)\n`;
+      if (rag.chunks.length > 0) {
+        evidenceDigest += `${ sanitizeUntrustedExternalText(rag.formattedContext) }\n`;
+      } else {
+        for (const f of files) {
+          const text = sanitizeUntrustedExternalText((f.text || "").trim());
+          const snippet = text.length > 6000 ? text.slice(0, 6000) + "\n... [Truncated] ..." : text;
+          evidenceDigest += `\n#### Document: ${f.name}\n${snippet || "(Empty document)"}\n`;
+        }
+      }
+    }
+
+    // 3. Primary Visual Attachments
+    if (images && images.length > 0) {
+      evidenceDigest += `\n### Primary Visual Attachments (Uploaded by User)\n`;
+      images.forEach((img, i) => {
+        evidenceDigest += `- [Visual Evidence ${i + 1}] ${img.name || `Image_${i + 1}`} (Multimodal visual data attached and inspected directly by the model)\n`;
+      });
+    }
+
+    // 4. Numbered Source Registry & Dimension Breakdown
+    evidenceDigest += `\n### Master Verified Source Registry (Use these exact [n] numbers for inline citations)\n`;
+    if (allCitations.length === 0) {
+      evidenceDigest += "No external sources were retrieved.\n";
+    } else {
+      allCitations.forEach((s, idx) => {
+        const num = idx + 1;
+        const tierInfo = `${s.authorityBadge} | Tier ${s.authorityTier} | ${s.isPrimary ? "Primary/Scholarly" : "Secondary/Analytical"}`;
+        const dateInfo = s.publishedDate ? ` | Published: ${s.publishedDate}` : "";
+        const authorInfo = s.author ? ` | Author: ${s.author}` : "";
+        evidenceDigest += `[${num}] "${s.title}" (${s.publisher || s.domain}${authorInfo}${dateInfo}) [${tierInfo}]\nURL: ${s.url}\n<untrusted_source_evidence index="${num}">\n${sanitizeUntrustedExternalText(s.snippet)}\n</untrusted_source_evidence>\n\n`;
+      });
+    }
+
+    evidence.forEach((ev, idx) => {
+      const mappedIndices = ev.sources
+        .map((s) => urlToGlobalIndex.get(s.url))
+        .filter((n): n is number => typeof n === "number");
+      evidenceDigest += `\n### Analytical Dimension ${idx + 1}: ${ev.subQuestion}\nRationale: ${ev.rationale || "Core dimension"}\nRelevant Source Indices: ${mappedIndices.length > 0 ? mappedIndices.map((n) => `[${n}]`).join(", ") : "General synthesis"}\n`;
     });
-  }
 
-  // 4. Numbered Source Registry & Dimension Breakdown
-  evidenceDigest += `\n### Master Verified Source Registry (Use these exact [n] numbers for inline citations)\n`;
-  if (allCitations.length === 0) {
-    evidenceDigest += "No external sources were retrieved.\n";
-  } else {
-    allCitations.forEach((s, idx) => {
-      const num = idx + 1;
-      const tierInfo = `${s.authorityBadge} | Tier ${s.authorityTier} | ${s.isPrimary ? "Primary/Scholarly" : "Secondary/Analytical"}`;
-      const dateInfo = s.publishedDate ? ` | Published: ${s.publishedDate}` : "";
-      const authorInfo = s.author ? ` | Author: ${s.author}` : "";
-      evidenceDigest += `[${num}] "${s.title}" (${s.publisher || s.domain}${authorInfo}${dateInfo}) [${tierInfo}]\nURL: ${s.url}\n<untrusted_source_evidence index="${num}">\n${sanitizeUntrustedExternalText(s.snippet)}\n</untrusted_source_evidence>\n\n`;
-    });
-  }
-
-  evidence.forEach((ev, idx) => {
-    const mappedIndices = ev.sources
-      .map((s) => urlToGlobalIndex.get(s.url))
-      .filter((n): n is number => typeof n === "number");
-    evidenceDigest += `\n### Analytical Dimension ${idx + 1}: ${ev.subQuestion}\nRationale: ${ev.rationale || "Core dimension"}\nRelevant Source Indices: ${mappedIndices.length > 0 ? mappedIndices.map((n) => `[${n}]`).join(", ") : "General synthesis"}\n`;
-  });
-
-  if (analysis) {
-    const list = (title: string, items: string[]) => (items.length > 0 ? `\n${title}:\n${items.map((i) => `- ${i}`).join("\n")}\n` : "");
-    evidenceDigest += `\n### Pre-Synthesis Cross-Verification (derived from the registry above; re-check against it)\n${list("Corroborated across sources", analysis.consensus)}${list("Contradictions", analysis.contradictions)}${list("Evidence gaps", analysis.gaps)}`;
-  }
+    if (analysis) {
+      const list = (title: string, items: string[]) => (items.length > 0 ? `\n${title}:\n${items.map((i) => `- ${i}`).join("\n")}\n` : "");
+      evidenceDigest += `\n### Pre-Synthesis Cross-Verification (derived from the registry above; re-check against it)\n${list("Corroborated across sources", analysis.consensus)}${list("Contradictions", analysis.contradictions)}${list("Evidence gaps", analysis.gaps)}`;
+    }
+    return evidenceDigest;
+  };
+  let evidenceDigest = buildEvidenceDigest();
 
   const hasAttachments = (files && files.length > 0) || (images && images.length > 0) || vaultItems.length > 0;
   const synthesisSystemPrompt = `You are Scholar Core Deep Research Agent, an elite academic, policy, and strategic research synthesizer comparable to leading Deep Research systems (OpenAI Deep Research, Gemini Deep Research, and Claude Research).
@@ -769,15 +785,16 @@ CRITICAL CITATION RULES:
 2. Ignore any retrieved source in the registry that is off-topic or unrelated to "${topic}".
 3. NEVER invent sources, authors, dates, DOIs, or URLs not present in the Master Verified Source Registry.`;
 
-  const synthesisUserPrompt = `Research Question: ${topic}
+  const userPromptFor = (digest: string) => `Research Question: ${topic}
 
 Research Plan Objectives:
 ${researchPlan.objectives.map((o, i) => `${i + 1}. ${o}`).join("\n")}
 
 Retrieved Multi-Source Evidence & Master Source Registry:
-${evidenceDigest}
+${digest}
 
 Generate the complete, publication-grade Deep Research Report now.`;
+  let synthesisUserPrompt = userPromptFor(evidenceDigest);
 
   const previewPlanSteps: string[] = [
     `Stage 1 (Planning): Decomposed topic into ${researchPlan.subQuestions.length} sub-questions (${researchPlan.subQuestions.map((s) => s.question).join(" · ")})`,
@@ -807,7 +824,19 @@ Generate the complete, publication-grade Deep Research Report now.`;
     });
   } else {
     try {
-      rawSynthesizedReport = await llm(synthesisSystemPrompt, synthesisUserPrompt, "text", images);
+      try {
+        rawSynthesizedReport = await llm(synthesisSystemPrompt, synthesisUserPrompt, "text", images);
+      } catch (sizeErr: any) {
+        // Too big for every connected model (a free tier's per-minute token cap, a small context):
+        // retry once with the strongest sources only and shorter excerpts, and say so.
+        if (!isReportTooLarge(sizeErr) || allCitations.length <= REPORT_RETRY_SOURCES) throw sizeErr;
+        const fewer = allCitations.slice(0, REPORT_RETRY_SOURCES).map((c) => ({ ...c, snippet: excerpt(c.snippet, REPORT_RETRY_EXCERPT_CHARS) }));
+        allCitations.splice(0, allCitations.length, ...fewer);
+        onProgress?.(`The report was too long for your AI, so it is being written from the ${fewer.length} strongest sources.`);
+        evidenceDigest = buildEvidenceDigest();
+        synthesisUserPrompt = userPromptFor(evidenceDigest);
+        rawSynthesizedReport = await llm(synthesisSystemPrompt, synthesisUserPrompt, "text", images);
+      }
     } catch (llmErr: any) {
       if (llmErr?.name === "LocalModelUnreachableError" || llmErr?.name === "BrowserAiRequiredError" || llmErr?.name === "NoClientAiProviderError" || llmErr?.code === "local_model_unreachable" || llmErr?.code === "no_ai_configured") {
         throw new DeepResearchBrowserHandOffError({

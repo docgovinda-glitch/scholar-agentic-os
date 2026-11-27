@@ -175,6 +175,24 @@ export function validateAndRefineCitations(
     return c;
   });
 
+  // The text was written against verifiedSources' numbering, but the list returned holds only the
+  // sources actually cited. Renumber [n] to the returned list, or every number after an uncited
+  // source points at the wrong paper (and numbers past its end show as raw "[14]").
+  if (finalCitationsList !== verifiedSources && actuallyCitedSources.size > 0) {
+    const newNumber = new Map<number, number>();
+    verifiedSources.forEach((src, i) => {
+      const at = finalCitationsList.indexOf(src);
+      if (at >= 0) newNumber.set(i + 1, at + 1);
+    });
+    purifiedText = purifiedText.replace(bracketRegex, (_m, numsStr: string) => {
+      const mapped = numsStr
+        .split(",")
+        .map((x) => newNumber.get(parseInt(x.trim(), 10)))
+        .filter((n): n is number => typeof n === "number");
+      return mapped.length ? `[${[...new Set(mapped)].join(", ")}]` : "";
+    });
+  }
+
   if (!hasRefSection && options.requireSourcesSection !== false && finalCitationsList.length > 0) {
     const styleId = (options.citationStyle || "apa").toLowerCase();
     let referencesBlock = "\n\n## References & Evidence Base\n";
