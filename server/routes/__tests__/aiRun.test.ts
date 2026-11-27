@@ -238,6 +238,15 @@ describe("POST /api/ai/verify", () => {
     expect(res.body.needsModel).toBeFalsy();
   });
 
+  it("spent credit stops at the first model: it is the account's, so other models are not tried", async () => {
+    setLiveModelsFetch(liveList(["acme-ultra-6", "acme-pro-6", "acme-flash-5"]));
+    const seen: string[] = [];
+    const broke: ProviderAdapter = { async *stream(c) { seen.push(c.model); throw new ProviderHttpError(402, "Insufficient credits"); } };
+    const res = await verify(appWith(broke), { providerId: "openrouter" });
+    expect(res.body.error).toMatch(/no credit or quota/i);
+    expect(seen).toHaveLength(1);
+  });
+
   it("a key with no credit is reported as valid-but-out-of-credit", async () => {
     setLiveModelsFetch(liveList(["acme-chat-5"]));
     const broke: ProviderAdapter = { async *stream() { throw new ProviderHttpError(402, "Insufficient credits"); } };
@@ -253,13 +262,15 @@ describe("POST /api/ai/verify", () => {
     const freeTier: ProviderAdapter = {
       async *stream(c) {
         seen.push(c.model);
-        if (c.model !== "acme-flash-5") throw new ProviderHttpError(429, "You exceeded your current quota");
+        // Google's real free-tier refusal: a per-model limit, not spent credit.
+        if (c.model !== "acme-flash-5")
+          throw new ProviderHttpError(429, "You exceeded your current quota, please check your plan and billing details. * Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0");
         yield { type: "text", text: "ready" };
       },
     };
     const res = await verify(appWith(freeTier), { providerId: "groq" });
     expect(res.body).toMatchObject({ ok: true, tested: { model: "acme-flash-5" } });
-    expect(res.body.note).toMatch(/no quota on this key, so acme-flash-5 was chosen/);
+    expect(res.body.note).toMatch(/limited on this key right now, so acme-flash-5 was chosen/);
     expect(seen.length).toBeGreaterThan(1);
   });
 
