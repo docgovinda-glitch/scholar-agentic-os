@@ -726,6 +726,7 @@ export async function executeDeepResearch(
         return cachedDeepWebSearch(q, 18);
       })
     );
+    followUpResults.forEach((res) => announceReads(res.results, 2));
     followUpResults.forEach((res, idx) => {
       res.results = res.results.filter((r) => r.sourceType === "scholarly" || sharesQueryTerm(gapQueries[idx] ?? topic, `${r.title} ${r.snippet}`));
       announceReads(res.results, 2);
