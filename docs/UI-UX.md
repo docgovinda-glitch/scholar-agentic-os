@@ -40,7 +40,7 @@ Defined in `src/index.css`:
 | :--- | :--- |
 | Entry and routing | `src/desk/DeskApp.tsx`; auth gates in `src/desk/DeskAuthGate.tsx` |
 | Landing and signed-out home | `src/desk/ScholarCoreLanding.tsx` |
-| Projects list, Ask Scholar and project creation | `src/desk/ProjectListScreen.tsx`, `src/desk/dashboard/` (`OutputTypePicker.tsx`, `constants.ts`), `src/desk/ask/` (composer `AskPromptBox.tsx`, mode toggle `ScholarFilterBar.tsx`, per-answer `SourcesPanel.tsx`) |
+| Projects list, Ask Scholar and project creation | `src/desk/ProjectListScreen.tsx`, `src/desk/dashboard/` (`OutputTypePicker.tsx`, `constants.ts`), `src/desk/ask/` (composer `AskPromptBox.tsx` (on phones one toolbar row: attach, Quick | Deep, an Options tray holding Year, Sources, citation style, settings and Vault, and send), mode toggle `ScholarFilterBar.tsx`, per-answer `SourcesPanel.tsx`) |
 | Sidebar (one component for the main screen and Presentation Studio) | `src/components/navigation/ScholarSidebar.tsx`; theme switch `src/hooks/useTheme.ts` |
 | Document titles and unknown addresses | `src/desk/documentTitle.tsx` (workspaces publish the project name with `useProjectDocumentTitle`; nothing else writes `document.title` in the Desk app), `src/desk/NotFoundScreen.tsx` |
 | Generic project shell | `src/desk/DeskShell.tsx` with regions in `src/desk/regions/` (`Header`, `Rail`, `Primary`, `Aside`, `Tray`, `StatusBar`, `StudioPanel`, `GlobalSearchModal`) |

@@ -233,3 +233,14 @@ describe("a request too big for the model's per-minute cap", () => {
     expect(f.kind).toBe("rate_limit");
   });
 });
+
+describe("a per-minute token cap that says when it frees up", () => {
+  const signal = new AbortController().signal;
+  it("reads Groq's 'try again in 1.695s' and '464.9ms' as the wait, so the same model is retried after it", () => {
+    const tpm = (wait: string) =>
+      classify(new ProviderHttpError(429, `Rate limit reached for model \`openai/gpt-oss-120b\` in organization \`org_x\` service tier \`on_demand\` on tokens per minute (TPM): Limit 8000, Used 3825, Requested 4401. Please try again in ${wait}. Need more tokens?`), signal);
+    expect(tpm("1.695s")).toMatchObject({ kind: "rate_limit", retryable: true, retryAfterMs: 1695 });
+    expect(tpm("464.999999ms")).toMatchObject({ kind: "rate_limit", retryAfterMs: 465 });
+    expect(tpm("1m2.5s").retryAfterMs).toBe(62_500);
+  });
+});

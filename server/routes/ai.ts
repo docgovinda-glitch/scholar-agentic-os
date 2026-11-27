@@ -1,4 +1,4 @@
-import { openSse } from "../src/utils/sse.ts";
+import { openSse, type SseStream } from "../src/utils/sse.ts";
 import express, { Request, Response } from "express";
 import { requireAuth } from "../src/middleware/auth.ts";
 import { readVerifiedBrowserResult, signLlmChallenge, computePromptHash, routedCompletion } from "../src/services/scholarBrain.ts";
@@ -751,6 +751,30 @@ export function registerAIRoutes(
         return;
       }
 
+      // `streamTokens: true`: the answer's words go to the browser as the model writes them (SSE
+      // `token` events, `reset` when the router switched model). The stream opens on the first
+      // token, so a hand-off is still a plain 426; once open, the finished answer (citations
+      // checked, references built) is its last event, `complete`, in place of the JSON body.
+      const wantsTokens = req.body?.streamTokens === true;
+      const answerAbort = new AbortController();
+      res.on("close", () => {
+        if (!res.writableEnded) answerAbort.abort();
+      });
+      const answerStream: { sse: SseStream | null } = { sse: null };
+      const openAnswerStream = (): SseStream => {
+        if (answerStream.sse) return answerStream.sse;
+        const sse = openSse(res);
+        answerStream.sse = sse;
+        res.json = ((body: unknown) => {
+          const b = body as { ok?: boolean; error?: unknown } | null;
+          if (b && b.ok) sse.send({ type: "complete", payload: b });
+          else sse.send({ type: "error", message: typeof b?.error === "string" && b.error ? b.error : "The answer could not be finished." });
+          sse.close();
+          return res;
+        }) as typeof res.json;
+        return sse;
+      };
+
       let result: { text: string; provider: string; model: string };
       if (incomingLlmResult) {
         result = {
@@ -780,6 +804,14 @@ export function registerAIRoutes(
               responseFormat: "text",
               // The browser may be able to run its local model when no cloud connection answers.
               browserFallback: true,
+              voice: "conversational",
+              signal: answerAbort.signal,
+              ...(wantsTokens
+                ? {
+                    onToken: (text: string) => openAnswerStream().send({ type: "token", text }),
+                    onReset: () => answerStream.sse?.send({ type: "reset" }),
+                  }
+                : {}),
             });
             result = { text: brainRes.text, provider: brainRes.provider, model: brainRes.model };
           } else {
@@ -794,6 +826,12 @@ export function registerAIRoutes(
         } catch (execErr: unknown) {
           // No AI, or the user's local model: the browser runs the prompt (426).
           // A provider failure is reported (502), never silently handed off.
+          if (answerStream.sse) {
+            // Words were already streamed: the failure is the stream's last event.
+            answerStream.sse.send({ type: "error", message: execErr instanceof Error ? execErr.message : "The answer could not be finished." });
+            answerStream.sse.close();
+            return;
+          }
           if (execErr instanceof NoClientAiProviderError || execErr instanceof LocalModelUnreachableError || execErr instanceof BrowserAiRequiredError) return chatHandOff();
           return sendAiFailure(res, execErr, "The answer");
         }

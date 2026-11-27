@@ -41,6 +41,8 @@ const LOCAL = new Set(["ollama", "lmstudio", "webllm"]);
  */
 export const LOW_BALANCE_OUTPUT_TOKENS = 6_000;
 const TIER_RANK = { fast: 0, balanced: 1, flagship: 2 } as const;
+/** Smallest context window a model is chosen with automatically (when the provider reports it). */
+export const MIN_AUTO_CONTEXT = 16_384;
 
 export type LiveList = { ok: true; models: LiveModel[] } | { ok: false; error: string; unsupported: boolean };
 
@@ -98,7 +100,9 @@ const LIMITED_SHORT_MS = 2 * 60_000;
 export function markModelLimited(c: Pick<Candidate, "group" | "provider" | "model" | "credential">, f: Pick<Failure, "kind" | "message" | "daily" | "retryAfterMs">): void {
   if (f.kind !== "rate_limit") return;
   const long = f.daily || ZERO_ALLOWANCE.test(f.message);
-  const ms = long ? LIMITED_LONG_MS : Math.max(f.retryAfterMs ?? 0, LIMITED_SHORT_MS);
+  // A per-minute cap that says when it frees up ("try again in 1.7s") is skipped only that long:
+  // holding it back for minutes leaves only a connection's weakest models for the next requests.
+  const ms = long ? LIMITED_LONG_MS : f.retryAfterMs !== undefined ? Math.min(f.retryAfterMs + 1_000, LIMITED_SHORT_MS) : LIMITED_SHORT_MS;
   limited.set(qKey(c.group ?? c.provider, c.credential?.apiKey, c.model), Date.now() + ms);
 }
 export const isLimited = (group: string | undefined, apiKey: string | undefined, model: string): boolean => {
@@ -172,7 +176,11 @@ export async function expandEntry(e: KeyringEntry, task: TaskClass, maxAlternate
   // cannot use now. A model the person chose is kept as their choice (below).
   if (!asked && !balanceLimited) {
     const order = TIER_ORDER_FOR_TASK[task] ?? TIER_ORDER_FOR_TASK.drafting;
-    const pool = curateModels(group, list.models.filter((m) => !exclude.has(m.id)), { maxPerProvider: 12, previewMaxAgeDays: 365 });
+    const curated = curateModels(group, list.models.filter((m) => !exclude.has(m.id)), { maxPerProvider: 12, previewMaxAgeDays: 365 });
+    // A small-window model (a 4k Arabic or speech model on a free tier) cannot hold a grounded prompt
+    // and its answer: chosen automatically only when the provider lists nothing larger.
+    const roomy = curated.filter((m) => m.contextWindow === undefined || m.contextWindow >= MIN_AUTO_CONTEXT);
+    const pool = roomy.length ? roomy : curated;
     const rank = (t: ModelTier) => { const i = order.indexOf(t); return i === -1 ? order.length : i; };
     const recIds = rec.options.map((o) => o.id);
     const ranked = [...pool].sort((a, b) => rank(a.tier) - rank(b.tier) || (recIds.includes(a.id) ? 0 : 1) - (recIds.includes(b.id) ? 0 : 1));

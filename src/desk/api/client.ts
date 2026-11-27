@@ -192,7 +192,7 @@ export async function authedFetch(input: string, init: RequestInit = {}): Promis
   const res = await fetchWithResponseDeadline(input, { ...init, headers }, routeUsesClientAi(input) ? AI_RESPONSE_DEADLINE_MS : API_RESPONSE_DEADLINE_MS);
   if (routeUsesClientAi(input)) {
     inspectAiResponse(res);
-    inspectAiFailure(res);
+    inspectAiFailure(res, input);
   }
   return res;
 }

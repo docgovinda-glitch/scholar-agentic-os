@@ -28,6 +28,15 @@ describe("aiUnavailableNotice", () => {
     off();
   });
 
+  it("leaves an Ask provider failure to the conversation (its own Try again), but still announces a missing AI", async () => {
+    const seen: string[] = [];
+    const off = subscribeAiUnavailable((n) => seen.push(n.code));
+    inspectAiFailure(json(503, { code: "ai_unavailable", error: "rate limited" }), "/api/ai/agent");
+    inspectAiFailure(json(400, { code: "ai_provider_required", error: "connect one" }), "/api/ai/agent");
+    await waitFor(() => expect(seen).toEqual(["ai_provider_required"]));
+    off();
+  });
+
   it("does not repeat the same failure inside the quiet window", () => {
     const fn = vi.fn();
     const off = subscribeAiUnavailable(fn);

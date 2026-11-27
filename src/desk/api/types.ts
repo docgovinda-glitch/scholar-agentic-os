@@ -78,6 +78,8 @@ export interface AgenticQueryRequest {
     notes?: string;
   }>;
   onChunk?: (chunk: string) => void;
+  /** The router switched model mid-answer: the words shown so far were dropped. */
+  onReset?: () => void;
   onStageUpdate?: (update: { status: string; stage?: any }) => void;
 }
 

@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowUp, FileText, Loader2, Paperclip, Square, X } from "lucide-react";
+import { ArrowUp, FileText, Loader2, Paperclip, SlidersHorizontal, Square, X } from "lucide-react";
 import { PromptBarActionMenu, type PromptMode } from "../PromptBarActionMenu";
 import type { AgentAttachmentItem } from "../dashboard";
 import { ScholarFilterBar } from "./ScholarFilterBar";
 import type { ScholarFilters } from "../../domain/ask/scholarFilters";
+import { useIsPhoneSheet } from "../components/usePhoneSheet";
 
 export interface AskPromptBoxProps {
   value: string;
@@ -67,6 +68,11 @@ export function AskPromptBox({
 }: AskPromptBoxProps) {
   const localRef = useRef<HTMLTextAreaElement | null>(null);
   const [dragging, setDragging] = useState(false);
+  // Phones keep the composer to the input and one toolbar row; the filters and settings open in a tray.
+  const phone = useIsPhoneSheet();
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const hasFilters = Boolean(filters && onFiltersChange);
+  const filtersActive = Boolean(filters && (filters.yearPreset !== "any" || filters.scopes.length > 0));
   const canSend = (value.trim().length > 0 || attachments.length > 0) && !isUploading;
 
   const setRefs = useCallback(
@@ -197,14 +203,35 @@ export function AskPromptBox({
         className="prompt-bare-input scholar-scrollbar w-full min-w-0 resize-none overflow-y-auto border-none bg-transparent px-1 text-base font-normal leading-relaxed text-neutral-900 shadow-none outline-none placeholder:text-neutral-500 focus:shadow-none focus:outline-none focus:ring-0 dark:text-neutral-100 dark:placeholder:text-neutral-400 sm:text-sm"
       />
 
-      <div className="mt-2 flex flex-wrap items-center gap-1">
+      {phone && optionsOpen && (
+        <div id="ask-composer-options" className="mt-2 flex flex-wrap items-center gap-1 border-t border-neutral-100 pt-2 dark:border-white/10">
+          {hasFilters && <ScholarFilterBar mode={mode} onModeChange={onModeChange} filters={filters!} onFiltersChange={onFiltersChange!} part="filters" />}
+          {children}
+        </div>
+      )}
+
+      <div className={`mt-2 flex items-center gap-1 ${phone ? "flex-nowrap" : "flex-wrap"}`}>
         <PromptBarActionMenu onAttachFiles={onAttachFiles} />
-        {filters && onFiltersChange && (
-          <ScholarFilterBar mode={mode} onModeChange={onModeChange} filters={filters} onFiltersChange={onFiltersChange} />
+        {hasFilters && <ScholarFilterBar mode={mode} onModeChange={onModeChange} filters={filters!} onFiltersChange={onFiltersChange!} part={phone ? "mode" : "all"} />}
+        {phone && (hasFilters || children) && (
+          <button
+            type="button"
+            onClick={() => setOptionsOpen((v) => !v)}
+            aria-expanded={optionsOpen}
+            aria-controls="ask-composer-options"
+            aria-label="Options"
+            title="Year, sources, citation style and settings"
+            className={`relative flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors ${
+              optionsOpen ? "bg-neutral-100 text-neutral-900 dark:bg-white/10 dark:text-white" : "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-white/10"
+            }`}
+          >
+            <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+            {filtersActive && <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-sky-500" aria-hidden="true" />}
+          </button>
         )}
 
         <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1">
-          {children}
+          {!phone && children}
           <div className="relative group shrink-0">
             {stopping ? (
               <button

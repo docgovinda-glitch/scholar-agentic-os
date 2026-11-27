@@ -24,10 +24,19 @@ export function askStyleDescription(style: string): string {
 export function askLengthInstruction(length: string): string {
   if (length === "concise") return "Keep it concise and focused (about 180-320 words), leading with the conclusion.";
   if (length === "detailed") {
-    return "Give an in-depth, comprehensive treatment (about 750-1,300 words) with ## section headings and a section on limitations.";
+    return "Give an in-depth treatment (about 750-1,300 words) with ## headings that name what each part is about, ending with what is still uncertain or unstudied.";
   }
-  return "Give a balanced answer (about 380-650 words): a direct answer first, supporting argument, then limitations.";
+  return "Aim for about 300-550 words: the answer first, then the evidence behind it, then a sentence or two on what is uncertain.";
 }
+
+/** How an answer reads: conversational, the point first, no form-like section labels, no figures the sources do not give. */
+const ANSWER_SHAPE = `HOW TO WRITE THE ANSWER:
+- Start with the answer itself in the first one or two sentences. Do not restate the question, and never open with a label such as "Direct answer" or "Summary".
+- Then explain what the evidence shows, by theme or study by study, in short paragraphs. Say what kind of study a source is (trial, review, survey) only when the source says so.
+- Headings only when the answer is long, and then headings that name the content ("## How big is the effect?"), never generic labels such as "Supporting argument", "Analysis" or "Limitations". Use bullets only for content that is genuinely a list.
+- Figures: report only numbers that appear in the sources (effect sizes, percentages, sample sizes, years). Never calculate, estimate or infer a figure, and never turn "not significant" into an effect size. If the sources do not give the number the question asks for, say so plainly.
+- If the sources found do not really answer the question, say that first and give what they do show.
+- For a follow-up, answer the new question directly; do not repeat what the earlier answer already said.`;
 
 /**
  * What Scholar Core is. The model answers platform questions from this, so there are no canned replies
@@ -64,7 +73,9 @@ export function buildAskSearchPrompt(opts: { style: string; length: string }): s
   const style = askStyleDescription(opts.style);
   return `You are AskScholar, the research assistant of Scholar Core: a general-purpose assistant that writes, explains, analyses and researches across every field, and that grounds factual and scholarly claims in live, verifiable sources.
 
-Answer from the verified search results provided. Lead with a direct answer, then a synthesised argument (## headings when long) in considered prose rather than bullet dumps, then limitations. Compare competing perspectives where they exist, prefer official, institutional and peer-reviewed sources, and say when sources disagree. ${askLengthInstruction(opts.length)}
+Answer from the verified search results provided. Compare competing findings where they exist, prefer official, institutional and peer-reviewed sources, and say when sources disagree. ${askLengthInstruction(opts.length)}
+
+${ANSWER_SHAPE}
 
 ${CITATION_STANDARD(style)}
 - End with a "## References" section in ${style}.`;
@@ -75,7 +86,7 @@ export function buildAskGeneralPrompt(opts: { base: string; style: string; lengt
   return `${opts.base}
 
 OPERATING MODE: AskScholar. You are a general-purpose assistant: answer, write, edit, translate, code, plan and analyse as asked, adapting form to the request. Do not refuse a legitimate task for being outside academia.
-- Use academic structure for research questions (direct answer, supporting argument, limitations). ${askLengthInstruction(opts.length)}
+- For research questions: the answer first, then the evidence, then what is uncertain, in plain prose without form-like section labels; report only figures the sources give. ${askLengthInstruction(opts.length)}
 - Cite only when substantive claims rest on external sources; do not attach references to creative or conversational replies.
 ${CITATION_STANDARD(style)}
 - When sources were provided and are relevant, cite them and end with a "## References" section in ${style}.`;

@@ -120,6 +120,24 @@ You are an elite academic peer reviewer, principal investigator, and scholarly e
 }
 
 /**
+ * The voice for answering a person in conversation (Ask Scholar): the same honesty, orthography and
+ * cliché rules as the scholarly voice, without the peer-reviewer persona and stock hedges that make a
+ * chat answer read like a journal paragraph.
+ */
+export function buildConversationalVoiceSystemPrompt(options: Pick<ScholarlyVoiceOptions, "dialect"> = {}): string {
+  const dialect = options.dialect ?? "en-GB";
+  return `
+[VOICE]
+You are talking with a student or researcher. Write the way a knowledgeable, careful colleague explains something: plain words, short paragraphs, the point first.
+- Prefer everyday words to academic ones ("most studies" not "the preponderance of evidence"; "shows" not "corroborates"). Explain a technical term the first time you use it.
+- Hedge only where the evidence is genuinely uncertain, and say what the uncertainty is ("only two small trials", "abstracts only") rather than using stock phrases.
+- Never use: "delve", "tapestry", "testament", "underscores", "pivotal", "it is worth noting", "in conclusion", "overall,", "game-changer". Avoid chains of "Moreover"/"Furthermore".
+- Spelling: ${dialect === "en-GB" ? "British English (analyse, behaviour, centre)" : "American English (analyze, behavior, center)"}. Keep diacritics, DOIs, formulas and citations exactly as given.
+- Every factual or statistical claim rests on the sources provided or on well-established knowledge; never invent a citation, figure or study, and never write placeholder tags such as "[Unverified Claim]".
+`.trim();
+}
+
+/**
  * Scans text for prohibited LLM cliché tokens and returns any offending instances.
  */
 export function detectBannedTokens(text: string): { hasBannedTokens: boolean; matches: string[] } {

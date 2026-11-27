@@ -38,8 +38,11 @@ export function resetAiUnavailableNotice(): void {
 }
 
 /** Reads an AI route's failure body without consuming the response; announces the three codes above. */
-export function inspectAiFailure(res: Response): void {
+export function inspectAiFailure(res: Response, url = ""): void {
   if (res.ok || res.status === 426) return;
+  // Ask answers in the conversation itself, with "Try again" in place: a pop-up on top of that only
+  // repeats it. Ask still raises the notice when nothing is connected or a local model is off.
+  const inChat = /\/api\/ai\/agent(?:\?|$)/.test(url);
   try {
     if (!(res.headers?.get?.("content-type") ?? "").includes("application/json")) return;
     res
@@ -47,7 +50,7 @@ export function inspectAiFailure(res: Response): void {
       .json()
       .then((body: unknown) => {
         const b = body as { code?: unknown; error?: unknown } | null;
-        if (b && typeof b.code === "string" && CODES.has(b.code)) {
+        if (b && typeof b.code === "string" && CODES.has(b.code) && !(inChat && b.code === "ai_unavailable")) {
           announceAiUnavailable({ code: b.code as AiUnavailableCode, message: typeof b.error === "string" ? b.error : "" });
         }
       })

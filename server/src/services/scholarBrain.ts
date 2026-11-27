@@ -48,6 +48,7 @@ import {
 import { loadArchetypeModelWeights, type ArchetypeModelWeights } from "../../../src/shared/archetypeModelWeights.ts";
 import {
   buildScholarlyVoiceSystemPrompt,
+  buildConversationalVoiceSystemPrompt,
   sanitizeScholarlyText,
   normalizeUnicodeNFC,
   evaluateBurstiness,
@@ -91,6 +92,8 @@ export interface ScholarBrainCompleteOptions {
   responseFormat?: "text" | "json";
   temperature?: number;
   maxTokens?: number;
+  /** "conversational" for answers to a person (Ask Scholar); the scholarly voice is for drafted prose. */
+  voice?: "scholarly" | "conversational";
   /** Called with each token as the model writes (raw, before the guardrails run on the whole text). */
   onToken?: (text: string) => void;
   /** Called when the router switched model and the partial answer so far was dropped. */
@@ -507,10 +510,13 @@ export const scholarBrain = {
    */
   async complete(options: ScholarBrainCompleteOptions): Promise<ScholarBrainCompleteResult> {
     const dialect = options.dialect ?? "en-GB";
-    const voicePrompt = buildScholarlyVoiceSystemPrompt({
-      dialect,
-      lockedTerms: options.lockedTerms,
-    });
+    const voicePrompt =
+      options.voice === "conversational"
+        ? buildConversationalVoiceSystemPrompt({ dialect })
+        : buildScholarlyVoiceSystemPrompt({
+            dialect,
+            lockedTerms: options.lockedTerms,
+          });
 
     const fullSystemPrompt = options.systemPrompt
       ? `${voicePrompt}\n\n[TASK DIRECTIVES]\n${options.systemPrompt}`

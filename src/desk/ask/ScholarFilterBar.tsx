@@ -10,6 +10,8 @@ interface ScholarFilterBarProps {
   onModeChange: (mode: PromptMode) => void;
   filters: ScholarFilters;
   onFiltersChange: (filters: ScholarFilters) => void;
+  /** Which controls to render: all (one toolbar row), only the answer-mode toggle, or only the filter menus (a phone's options tray). */
+  part?: "all" | "mode" | "filters";
 }
 
 const SCOPES: Array<{ id: SourceScope; label: string }> = [
@@ -26,7 +28,9 @@ const trigger = (on: boolean) =>
   }`;
 
 /** One toolbar filter: a button that shows the current choice and opens its options (a bottom sheet on phones). */
-function FilterMenu({ label, text, active, icon, testId, children }: {
+function FilterMenu({ label, text, active, icon, testId, children, showText = false }: {
+  /** Show the current choice next to the icon on phones too (the options tray has room for it). */
+  showText?: boolean;
   label: string;
   text: string;
   active: boolean;
@@ -91,9 +95,9 @@ function FilterMenu({ label, text, active, icon, testId, children }: {
       >
         {icon}
         {/* Phones show the icon only, so the composer keeps to two rows; the name stays for screen readers. */}
-        <span className="hidden sm:inline">{text}</span>
-        <span className="sr-only sm:hidden">{`${label}: ${text}`}</span>
-        <ChevronDown className="hidden sm:block h-3 w-3 opacity-70" aria-hidden="true" />
+        <span className={showText ? "" : "hidden sm:inline"}>{text}</span>
+        {!showText && <span className="sr-only sm:hidden">{`${label}: ${text}`}</span>}
+        <ChevronDown className={`${showText ? "" : "hidden sm:block "}h-3 w-3 opacity-70`} aria-hidden="true" />
       </button>
       {open && (phone ? createPortal(panel, document.body) : panel)}
     </div>
@@ -124,7 +128,7 @@ const yearText = ({ yearPreset, yearFrom, yearTo }: ScholarFilters) => {
  * The composer's answer-mode toggle (Quick Scholar | Deep Research) and its two filter menus, Year and
  * Sources. Renders a fragment so the controls sit in the prompt box's one toolbar row.
  */
-export function ScholarFilterBar({ mode, onModeChange, filters, onFiltersChange }: ScholarFilterBarProps) {
+export function ScholarFilterBar({ mode, onModeChange, filters, onFiltersChange, part = "all" }: ScholarFilterBarProps) {
   const deep = mode === "deep_research";
   const inverted = filters.yearFrom !== undefined && filters.yearTo !== undefined && filters.yearFrom > filters.yearTo;
   // Checked when the person leaves a year box, not while they are still typing it.
@@ -150,8 +154,12 @@ export function ScholarFilterBar({ mode, onModeChange, filters, onFiltersChange 
     />
   );
 
+  const showMode = part !== "filters";
+  const showFilters = part !== "mode";
+
   return (
     <>
+      {showMode && (
       <div role="group" aria-label="Answer mode" className="flex shrink-0 rounded-full bg-neutral-100 p-0.5 dark:bg-white/5">
         {([
           ["auto", "Quick Scholar"],
@@ -163,6 +171,8 @@ export function ScholarFilterBar({ mode, onModeChange, filters, onFiltersChange 
               key={id}
               type="button"
               aria-pressed={active}
+              // The full name; phones show its first word ("Quick", "Deep"), which it contains.
+              aria-label={label}
               onClick={() => onModeChange(id)}
               className={`min-h-9 cursor-pointer whitespace-nowrap rounded-full px-2.5 text-xs transition-colors focus-visible:outline-2 focus-visible:outline-sky-500 sm:min-h-7 ${
                 active
@@ -170,13 +180,18 @@ export function ScholarFilterBar({ mode, onModeChange, filters, onFiltersChange 
                   : "font-medium text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-white"
               }`}
             >
-              {label}
+              {/* Phones show "Quick" / "Deep" so the composer keeps to one toolbar row. */}
+              {label.split(" ")[0]}
+              <span className="hidden sm:inline">{` ${label.split(" ").slice(1).join(" ")}`}</span>
             </button>
           );
         })}
       </div>
+      )}
 
-      <FilterMenu label="Publication years" testId="scholar-year-filter" text={yearText(filters)} active={filters.yearPreset !== "any"} icon={<Calendar className="h-3.5 w-3.5" aria-hidden="true" />}>
+      {showFilters && (
+      <>
+      <FilterMenu showText={part === "filters"} label="Publication years" testId="scholar-year-filter" text={yearText(filters)} active={filters.yearPreset !== "any"} icon={<Calendar className="h-3.5 w-3.5" aria-hidden="true" />}>
         {(close) => (
           <>
             {(["any", "2020-2026"] as const).map((preset) => (
@@ -206,7 +221,7 @@ export function ScholarFilterBar({ mode, onModeChange, filters, onFiltersChange 
         )}
       </FilterMenu>
 
-      <FilterMenu label="Source filters" testId="scholar-source-filter" text={filters.scopes.length ? `Sources · ${filters.scopes.length}` : "Sources"} active={filters.scopes.length > 0} icon={<ListFilter className="h-3.5 w-3.5" aria-hidden="true" />}>
+      <FilterMenu showText={part === "filters"} label="Source filters" testId="scholar-source-filter" text={filters.scopes.length ? `Sources · ${filters.scopes.length}` : "Sources"} active={filters.scopes.length > 0} icon={<ListFilter className="h-3.5 w-3.5" aria-hidden="true" />}>
         {() =>
           SCOPES.map((s) => (
             <Option key={s.id} selected={filters.scopes.includes(s.id)} onClick={() => toggleScope(s.id)}>
@@ -220,6 +235,8 @@ export function ScholarFilterBar({ mode, onModeChange, filters, onFiltersChange 
         <button type="button" className="min-h-10 cursor-pointer px-1 text-xs text-neutral-500 underline sm:min-h-8" onClick={() => onFiltersChange(DEFAULT_SCHOLAR_FILTERS)}>
           Clear
         </button>
+      )}
+      </>
       )}
     </>
   );

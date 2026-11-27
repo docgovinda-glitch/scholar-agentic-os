@@ -148,7 +148,8 @@ export function PostResponseActionBar({
       className="relative mt-3"
     >
       {/* Single non-wrapping row of the exact 6 post-response actions (Section 8 & Section 13) */}
-      {/* Labels at every width (icons alone were guesswork on phones); the row scrolls sideways if it must. */}
+      {/* On phones Copy, Word, BibTeX, Regenerate and Save are icons (named for screen readers and on hover) and
+          Continue keeps its label, so the row fits a phone without scrolling sideways. */}
       <div className="no-scrollbar -mx-1 flex flex-nowrap items-center gap-0.5 overflow-x-auto whitespace-nowrap">
         {/* 1. Copy */}
         <button
@@ -156,7 +157,7 @@ export function PostResponseActionBar({
           data-testid="action-copy"
           aria-label="Copy response"
           onClick={handleCopy}
-          className="inline-flex min-h-10 min-w-10 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-500 disabled:opacity-50 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white sm:min-h-8 sm:min-w-8"
+          className="inline-flex min-h-10 min-w-10 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-full px-2 text-[12px] sm:px-2.5 font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-500 disabled:opacity-50 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white sm:min-h-8 sm:min-w-8"
           title="Copy formatted response and Reference List"
         >
           {copied ? (
@@ -164,7 +165,7 @@ export function PostResponseActionBar({
           ) : (
             <Copy className="w-3.5 h-3.5" />
           )}
-          <span>{copied ? "Copied" : "Copy"}</span>
+          <span className="hidden sm:inline">{copied ? "Copied" : "Copy"}</span>
         </button>
 
         {/* 2. Export to Word */}
@@ -174,12 +175,11 @@ export function PostResponseActionBar({
           aria-label="Export to Word"
           onClick={handleExportWord}
           disabled={exportingWord}
-          className="inline-flex min-h-10 min-w-10 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-500 disabled:opacity-50 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white sm:min-h-8 sm:min-w-8"
+          className="inline-flex min-h-10 min-w-10 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-full px-2 text-[12px] sm:px-2.5 font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-500 disabled:opacity-50 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white sm:min-h-8 sm:min-w-8"
           title="Export response to Word (.docx) with headings, italics, tables, and hanging indents"
         >
           <FileText className="w-3.5 h-3.5" />
-          <span className="sm:hidden">Word</span>
-          <span className="hidden sm:inline">{exportingWord ? "Exporting…" : "Export to Word"}</span>
+                    <span className="hidden sm:inline">{exportingWord ? "Exporting…" : "Export to Word"}</span>
         </button>
 
         {/* 3. BibTeX (with RIS option) */}
@@ -189,11 +189,11 @@ export function PostResponseActionBar({
             data-testid="action-bibtex"
             aria-label="Export BibTeX"
             onClick={handleExportBibTeX}
-            className="inline-flex min-h-10 min-w-10 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-500 disabled:opacity-50 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white sm:min-h-8 sm:min-w-8"
+            className="inline-flex min-h-10 min-w-10 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-full px-2 text-[12px] sm:px-2.5 font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-500 disabled:opacity-50 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white sm:min-h-8 sm:min-w-8"
             title="Download & copy cited references as BibTeX (.bib)"
           >
             <BookMarked className="w-3.5 h-3.5" />
-            <span>BibTeX</span>
+            <span className="hidden sm:inline">BibTeX</span>
           </button>
           <button
             type="button"
@@ -217,11 +217,11 @@ export function PostResponseActionBar({
           aria-label="Regenerate response"
           onClick={() => onRegenerate(message)}
           disabled={isRegenerating}
-          className="inline-flex min-h-10 min-w-10 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-500 disabled:opacity-50 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white sm:min-h-8 sm:min-w-8"
+          className="inline-flex min-h-10 min-w-10 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-full px-2 text-[12px] sm:px-2.5 font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-500 disabled:opacity-50 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white sm:min-h-8 sm:min-w-8"
           title="Run the pipeline again and write a fresh response"
         >
           <RotateCcw className={`w-3.5 h-3.5 ${isRegenerating ? "animate-spin" : ""}`} />
-          <span>Regenerate</span>
+          <span className="hidden sm:inline">Regenerate</span>
         </button>
 
         {/* 5. Store to Knowledge Vault */}
@@ -230,7 +230,7 @@ export function PostResponseActionBar({
           data-testid="action-store-vault"
           aria-label="Store to Knowledge Vault"
           onClick={() => onStoreToVault(message)}
-          className={"inline-flex min-h-10 min-w-10 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-500 disabled:opacity-50 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white sm:min-h-8 sm:min-w-8"}
+          className={"inline-flex min-h-10 min-w-10 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-full px-2 text-[12px] sm:px-2.5 font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-500 disabled:opacity-50 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white sm:min-h-8 sm:min-w-8"}
           title="Save response, sources, CSL-JSON metadata, and citation style to Knowledge Vault"
         >
           {isSavedToVault ? (
@@ -238,8 +238,7 @@ export function PostResponseActionBar({
           ) : (
             <Database className="w-3.5 h-3.5" />
           )}
-          <span className="sm:hidden">{isSavedToVault ? "Saved" : "Save"}</span>
-          <span className="hidden sm:inline">{isSavedToVault ? "Stored in Vault" : "Store to Knowledge Vault"}</span>
+                    <span className="hidden sm:inline">{isSavedToVault ? "Stored in Vault" : "Store to Knowledge Vault"}</span>
         </button>
 
         {/* 6. Continue */}
@@ -252,7 +251,7 @@ export function PostResponseActionBar({
             setBibMenuOpen(false);
           }}
           aria-expanded={continueOpen}
-          className="inline-flex min-h-10 min-w-10 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-500 disabled:opacity-50 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white sm:min-h-8 sm:min-w-8"
+          className="inline-flex min-h-10 min-w-10 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-full px-2 text-[12px] sm:px-2.5 font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-500 disabled:opacity-50 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white sm:min-h-8 sm:min-w-8"
           title="Continue in a workspace (Coursework & Essays, Journal Article, or Slides & Keynotes)"
         >
           <ArrowRightCircle className="w-3.5 h-3.5" />

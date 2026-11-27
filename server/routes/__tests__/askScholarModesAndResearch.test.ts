@@ -126,6 +126,47 @@ Classical realism and neorealism share core assumptions regarding anarchy, survi
     });
   });
 
+  describe("streamTokens: the answer's words arrive as the model writes them", () => {
+    it("streams token and reset events, then the finished answer as one complete event, in the conversational voice", async () => {
+      const complete = vi.spyOn(scholarBrain, "complete").mockImplementation(async (opts) => {
+        opts.onToken?.("Realism ");
+        opts.onReset?.();
+        opts.onToken?.("Realism and neorealism differ on where conflict comes from.");
+        return { text: "Realism and neorealism differ on where conflict comes from.", rawResponse: "", provider: "groq", model: "m", wordCount: 9 } as Awaited<ReturnType<typeof scholarBrain.complete>>;
+      });
+
+      const res = await request(app)
+        .post("/api/ai/agent")
+        .set(keyringHeader("groq", "test-model", "test-key"))
+        .send({ prompt: "Explain the difference between realism and neorealism in international relations", mode: "normal", streamTokens: true });
+
+      expect(res.status).toBe(200);
+      expect(res.headers["content-type"]).toContain("text/event-stream");
+      const events = res.text
+        .split("\n\n")
+        .filter((b) => b.startsWith("data: "))
+        .map((b) => JSON.parse(b.slice(6)));
+      expect(events.map((e) => e.type)).toEqual(["token", "reset", "token", "complete"]);
+      expect(events[3].payload.ok).toBe(true);
+      expect(events[3].payload.text).toContain("Realism and neorealism differ");
+      expect(complete.mock.calls[0][0].voice).toBe("conversational");
+    });
+
+    it("a failure before any word is still a plain JSON error that names a per-minute limit", async () => {
+      vi.spyOn(scholarBrain, "complete").mockRejectedValue(
+        new Error("All connected AI models failed. Last error: Rate limit reached for model `m` on tokens per minute (TPM): Limit 8000. Please try again in 2s.")
+      );
+      const res = await request(app)
+        .post("/api/ai/agent")
+        .set(keyringHeader("groq", "test-model", "test-key"))
+        .send({ prompt: "Explain the difference between realism and neorealism in international relations", mode: "normal", streamTokens: true });
+      expect(res.status).toBe(503);
+      expect(res.body.code).toBe("ai_unavailable");
+      expect(res.body.reason).toBe("rate_limit");
+      expect(res.body.error).toMatch(/per-minute limit was reached\. Wait a few seconds/);
+    });
+  });
+
   describe("Test 2 — Live Web Search Mode: Nepal-India Diplomatic & Economic Developments", () => {
     it("evaluates Tier A/B authority for South Asian & global portals, extracts HTML metadata, and produces clickable [1], [2] citations", async () => {
       const mofaNepal = evaluateSourceAuthority("https://mofa.gov.np/press-release-nepal-india-joint-commission/");
