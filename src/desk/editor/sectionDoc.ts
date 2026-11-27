@@ -59,7 +59,15 @@ const TABLE_SEP = /^\s*\|(?:\s*:?-{3,}:?\s*\|)+\s*$/;
 export interface TextToDocOptions {
   /** Block quotes ("> ") and pipe tables become real blocks; otherwise they stay as text. */
   richBlocks?: boolean;
+  /**
+   * Keep each heading's level ("## " stays a level-2 heading). Off by default, where every heading
+   * is a "#### " sub-heading (Coursework, Journal); on for Thesis chapters, whose "##"/"###" levels
+   * become sections and subsections in the Word and LaTeX exports.
+   */
+  keepHeadingLevels?: boolean;
 }
+
+const headingLevel = (line: string, keep?: boolean): number => (keep ? Math.min(6, Math.max(1, (line.match(/^#+/)?.[0].length ?? 4))) : 4);
 
 export function textToDoc(text: string, options: TextToDocOptions = {}): PMNode {
   const blocks = (text ?? "").replace(/\r\n/g, "\n").split(/\n{2,}/).map((b) => b.replace(/^\n+|\n+$/g, "")).filter((b) => b.trim().length);
@@ -70,7 +78,7 @@ export function textToDoc(text: string, options: TextToDocOptions = {}): PMNode 
       if (aligned.align) {
         const inner = aligned.text.trim();
         if (HEADING.test(inner) && !inner.includes("\n")) {
-          content.push({ type: "heading", attrs: { level: 4, textAlign: aligned.align }, content: parseInline(inner.replace(HEADING, "$1")) });
+          content.push({ type: "heading", attrs: { level: headingLevel(inner, options.keepHeadingLevels), textAlign: aligned.align }, content: parseInline(inner.replace(HEADING, "$1")) });
         } else {
           content.push({ type: "paragraph", attrs: { textAlign: aligned.align }, content: parseInline(inner) });
         }
@@ -79,7 +87,7 @@ export function textToDoc(text: string, options: TextToDocOptions = {}): PMNode 
     }
     const lines = b.split("\n");
     if (lines.length === 1 && HEADING.test(lines[0])) {
-      content.push({ type: "heading", attrs: { level: 4 }, content: parseInline(lines[0].replace(HEADING, "$1")) });
+      content.push({ type: "heading", attrs: { level: headingLevel(lines[0], options.keepHeadingLevels) }, content: parseInline(lines[0].replace(HEADING, "$1")) });
     } else if (options.richBlocks && lines.every((l) => QUOTE.test(l))) {
       content.push({ type: "blockquote", content: lines.map((l) => ({ type: "paragraph", content: parseInline(l.replace(QUOTE, "$1")) })) });
     } else if (options.richBlocks && lines.length >= 2 && lines.every((l) => TABLE_ROW.test(l))) {
@@ -149,14 +157,17 @@ function listText(list: PMNode, ordered: boolean): string {
     .join("\n");
 }
 
-export function docToText(doc: PMNode): string {
+export function docToText(doc: PMNode, options: { keepHeadingLevels?: boolean } = {}): string {
   const parts: string[] = [];
   for (const b of doc.content ?? []) {
     const align = typeof b.attrs?.textAlign === "string" ? b.attrs.textAlign : null;
     if (b.type === "paragraph") {
       const t = inlineText(b.content);
       if (t.trim()) parts.push(wrapAlign(t, align));
-    } else if (b.type === "heading") parts.push(wrapAlign(`#### ${inlineText(b.content)}`, align));
+    } else if (b.type === "heading") {
+      const level = options.keepHeadingLevels && typeof b.attrs?.level === "number" ? b.attrs.level : 4;
+      parts.push(wrapAlign(`${"#".repeat(level)} ${inlineText(b.content)}`, align));
+    }
     else if (b.type === "bulletList") parts.push(listText(b, false));
     else if (b.type === "orderedList") parts.push(listText(b, true));
     else if (b.type === "blockquote") {

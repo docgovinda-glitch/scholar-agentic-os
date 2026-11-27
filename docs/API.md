@@ -105,7 +105,7 @@ Every body is validated with zod (`schemas.ts`); a bad body is a 400 `{ code: "i
 
 | Mount | Endpoints |
 | :--- | :--- |
-| `/thesis` | POST `/viva-simulate`, `/chapter-audit`, `/draft-chapter`; GET `/gate-status` |
+| `/thesis` | POST `/viva-simulate`, `/chapter-audit`, `/draft-chapter` (JSON, or SSE with `stream: true`); GET `/gate-status` |
 | `/presentation` | POST `/generate-deck`, `/qa-simulate`; GET, PUT `/deck` |
 
 ## 6. AI

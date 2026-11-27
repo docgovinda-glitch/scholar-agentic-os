@@ -63,7 +63,7 @@ const Button = ({ on, label, icon, onClick }: { on: boolean; label: string; icon
   </button>
 );
 
-function Toolbar({ editor, extra, richBlocks }: { editor: Editor; extra?: React.ReactNode; richBlocks?: boolean }) {
+function Toolbar({ editor, extra, richBlocks, subHeadingLevel = 4 }: { editor: Editor; extra?: React.ReactNode; richBlocks?: boolean; subHeadingLevel?: 3 | 4 }) {
   return (
     <div role="toolbar" aria-label="Text formatting" className="flex flex-wrap items-center gap-0.5 px-2 py-1 border-b border-[color:var(--border-subtle)]">
       <Button on={false} label="Undo" icon={<Undo2 className="w-3.5 h-3.5" />} onClick={() => editor.chain().focus().undo().run()} />
@@ -74,7 +74,7 @@ function Toolbar({ editor, extra, richBlocks }: { editor: Editor; extra?: React.
       {richBlocks && (
         <Button on={editor.isActive("underline")} label="Underline" icon={<UnderlineIcon className="w-3.5 h-3.5" />} onClick={() => editor.chain().focus().toggleUnderline().run()} />
       )}
-      <Button on={editor.isActive("heading", { level: 4 })} label="Sub-heading" icon={<Heading4 className="w-3.5 h-3.5" />} onClick={() => editor.chain().focus().toggleHeading({ level: 4 }).run()} />
+      <Button on={editor.isActive("heading", { level: subHeadingLevel })} label="Sub-heading" icon={<Heading4 className="w-3.5 h-3.5" />} onClick={() => editor.chain().focus().toggleHeading({ level: subHeadingLevel }).run()} />
       <Button on={editor.isActive("bulletList")} label="Bulleted list" icon={<List className="w-3.5 h-3.5" />} onClick={() => editor.chain().focus().toggleBulletList().run()} />
       <Button on={editor.isActive("orderedList")} label="Numbered list" icon={<ListOrdered className="w-3.5 h-3.5" />} onClick={() => editor.chain().focus().toggleOrderedList().run()} />
       {richBlocks && (
@@ -140,7 +140,9 @@ const SectionTextEditor = forwardRef<SectionEditorHandle, {
   autoFocus?: boolean;
   /** Underline, block quotes and tables (stored as <u>, "> " and pipe tables); off where exports do not read them. */
   richBlocks?: boolean;
-}>(function SectionTextEditor({ value, onChange, ariaLabel, placeholder, citationLabel, toolbarExtra, contentClassName, autoFocus, richBlocks = false }, ref) {
+  /** Keep "## " / "### " heading levels (Thesis chapters) instead of making every heading a "#### " sub-heading. */
+  keepHeadingLevels?: boolean;
+}>(function SectionTextEditor({ value, onChange, ariaLabel, placeholder, citationLabel, toolbarExtra, contentClassName, autoFocus, richBlocks = false, keepHeadingLevels = false }, ref) {
   const lastEmitted = useRef(normalizeSectionText(value));
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
@@ -148,7 +150,7 @@ const SectionTextEditor = forwardRef<SectionEditorHandle, {
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        heading: { levels: [4] },
+        heading: { levels: keepHeadingLevels ? [1, 2, 3, 4, 5, 6] : [4] },
         code: false,
         codeBlock: false,
         strike: false,
@@ -164,10 +166,10 @@ const SectionTextEditor = forwardRef<SectionEditorHandle, {
       Placeholder.configure({ placeholder: placeholder ?? "" }),
       citationNode(citationLabel),
     ],
-    content: textToDoc(value, { richBlocks }) as unknown as Record<string, unknown>,
+    content: textToDoc(value, { richBlocks, keepHeadingLevels }) as unknown as Record<string, unknown>,
     autofocus: autoFocus ? "end" : false,
     onUpdate: ({ editor: ed }) => {
-      const text = docToText(ed.getJSON() as unknown as PMNode);
+      const text = docToText(ed.getJSON() as unknown as PMNode, { keepHeadingLevels });
       lastEmitted.current = text;
       onChangeRef.current(text);
     },
@@ -187,9 +189,9 @@ const SectionTextEditor = forwardRef<SectionEditorHandle, {
     const next = normalizeSectionText(value);
     if (next !== lastEmitted.current) {
       lastEmitted.current = next;
-      editor.commands.setContent(textToDoc(value, { richBlocks }) as unknown as Record<string, unknown>, { emitUpdate: false });
+      editor.commands.setContent(textToDoc(value, { richBlocks, keepHeadingLevels }) as unknown as Record<string, unknown>, { emitUpdate: false });
     }
-  }, [editor, value, richBlocks]);
+  }, [editor, value, richBlocks, keepHeadingLevels]);
 
   useImperativeHandle(
     ref,
@@ -214,20 +216,20 @@ const SectionTextEditor = forwardRef<SectionEditorHandle, {
         const { from, to, empty } = editor.state.selection;
         if (empty) return null;
         const slice = editor.state.doc.cut(from, to).toJSON() as PMNode;
-        return docToText(slice) || null;
+        return docToText(slice, { keepHeadingLevels }) || null;
       },
       selection: () => {
         if (!editor) return null;
         const { from, to, empty } = editor.state.selection;
         if (empty) return null;
-        const text = docToText(editor.state.doc.cut(from, to).toJSON() as PMNode);
+        const text = docToText(editor.state.doc.cut(from, to).toJSON() as PMNode, { keepHeadingLevels });
         return text ? { text, from, to } : null;
       },
       replaceRange: (from, to, expected, text) => {
         if (!editor) return false;
         const size = editor.state.doc.content.size;
         if (from < 0 || to > size || from >= to) return false;
-        if (docToText(editor.state.doc.cut(from, to).toJSON() as PMNode) !== expected) return false;
+        if (docToText(editor.state.doc.cut(from, to).toJSON() as PMNode, { keepHeadingLevels }) !== expected) return false;
         const blocks = (textToDoc(text, { richBlocks }).content ?? []) as unknown as Array<Record<string, unknown>>;
         // One paragraph goes in inline, so the surrounding paragraph is not split.
         const content =
@@ -235,13 +237,13 @@ const SectionTextEditor = forwardRef<SectionEditorHandle, {
         return editor.chain().focus().insertContentAt({ from, to }, content).run();
       },
     }),
-    [editor, richBlocks]
+    [editor, richBlocks, keepHeadingLevels]
   );
 
   if (!editor) return null;
   return (
     <div className="rounded-2xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] focus-within:border-[color:var(--accent-border)]">
-      <Toolbar editor={editor} extra={toolbarExtra} richBlocks={richBlocks} />
+      <Toolbar editor={editor} extra={toolbarExtra} richBlocks={richBlocks} subHeadingLevel={keepHeadingLevels ? 3 : 4} />
       <EditorContent editor={editor} />
     </div>
   );

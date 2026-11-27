@@ -12,7 +12,22 @@ describe("aiRoute notices", () => {
       answeredBy: { label: "B · your key", lane: "byok" },
       notices: [{ kind: "fallback", text: "Switched from A to B: Upstream exploded (HTTP 500)" }],
     });
-    expect(t).toEqual({ variant: "warning", message: "Answered by B · your key. Switched from A to B: Upstream exploded (HTTP 500)" });
+    expect(t).toEqual({ variant: "info", message: "Answered by B · your key. Another model did not answer, so it moved on." });
+  });
+
+  it("after an answer, routine switches are summarised but a connection problem is kept word for word", () => {
+    const t = describeAiRoute({
+      answeredBy: { label: "C · your key", lane: "byok" },
+      notices: [
+        { kind: "fallback", text: "Switched from A to B: The model returned an empty answer" },
+        { kind: "skipped", text: "Skipped B: Rate limited; retrying in 55 min" },
+        { kind: "skipped", text: "Skipped X: it points to a private or internal address" },
+      ],
+    });
+    expect(t).toEqual({
+      variant: "warning",
+      message: "Answered by C · your key. 2 other models did not answer, so it moved on. Skipped X: it points to a private or internal address.",
+    });
   });
 
   it("the same message is not repeated within ten seconds", () => {

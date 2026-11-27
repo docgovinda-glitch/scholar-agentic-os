@@ -37,3 +37,14 @@ describe("reference list built from real source fields", () => {
     expect(out.text).not.toContain("doi.org");
   });
 });
+
+describe("citation numbers match the returned list", () => {
+  it("renumbers [n] when some sources were not cited, so each number points at the right paper", async () => {
+    const { validateAndRefineCitations } = await import("../citationValidator");
+    const mk = (i: number) => ({ title: `Paper ${i}`, url: `https://example.org/p${i}`, snippet: "", domain: "example.org" }) as never;
+    const sources = [mk(1), mk(2), mk(3), mk(4)];
+    const out = validateAndRefineCitations("First [1]. Then [3]. Also [4] and [3, 4].", sources, { requireSourcesSection: false });
+    expect(out.citations.map((c: { title: string }) => c.title)).toEqual(["Paper 1", "Paper 3", "Paper 4"]);
+    expect(out.text).toBe("First [1]. Then [2]. Also [3] and [2, 3].");
+  });
+});

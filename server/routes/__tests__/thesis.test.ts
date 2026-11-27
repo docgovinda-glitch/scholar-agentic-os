@@ -178,3 +178,18 @@ describe("Thesis Endpoints (/api/projects/:id/thesis)", () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe("stripRepeatedChapterHeading", () => {
+  it("drops a first heading that repeats the chapter title, in the usual forms", async () => {
+    const { stripRepeatedChapterHeading } = await import("../project/thesis");
+    for (const h of ["# Chapter 1: Introduction", "## Introduction", "# Chapter 1", "# **Chapter 1: Introduction**"]) {
+      expect(stripRepeatedChapterHeading(`${h}\n\n## 1.1 Background\n\nText.`, 1, "Introduction")).toBe("## 1.1 Background\n\nText.");
+    }
+  });
+
+  it("keeps a first heading that says something else, and plain text", async () => {
+    const { stripRepeatedChapterHeading } = await import("../project/thesis");
+    expect(stripRepeatedChapterHeading("## 1.1 Background\n\nText.", 1, "Introduction")).toBe("## 1.1 Background\n\nText.");
+    expect(stripRepeatedChapterHeading("Introduction is where it starts.", 1, "Introduction")).toBe("Introduction is where it starts.");
+  });
+});

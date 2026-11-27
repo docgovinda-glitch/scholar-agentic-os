@@ -63,6 +63,11 @@ export function classify(err: unknown, signal: AbortSignal): Failure {
     const code = String(err.code ?? "").toLowerCase();
     if (code.includes("context") || /context.{0,20}(length|window)|too many tokens|maximum context/i.test(msg))
       return f("context_overflow", msg, false, true, { httpStatus: s });
+    // "Request too large … please reduce your message size" (Groq's 413 against a per-minute token cap):
+    // this request is too big for this model, not spent credit, even though the message links to billing.
+    // Treated like an over-long input: the next model is tried and no circuit opens for the connection.
+    if (s === 413 || /request too large|reduce your (message|request) size|limit \d+,\s*requested \d+/i.test(msg))
+      return f("context_overflow", msg, false, true, { httpStatus: s });
     // A per-minute / per-day / free-tier request limit is a rate limit on this model, not spent credit,
     // even when the provider words it "You exceeded your current quota" (Gemini free tier).
     if (s === 429 && RATE_WINDOW.test(`${err.message} ${code}`) && !/insufficient_quota|credit balance|payment required|out of credits?|billing (?:account )?(?:disabled|not enabled)/i.test(`${err.message} ${code}`)) {

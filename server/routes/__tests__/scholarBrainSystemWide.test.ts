@@ -471,6 +471,38 @@ describe("Architectural Unification Step 2: System-Wide scholarBrain Integration
       expect(failed.status).toBe(503);
       expect(failed.body.content).toBeUndefined();
     });
+
+    it("POST /draft-chapter with stream: true sends the words as they are written, then the finished chapter", async () => {
+      const projectId = await createTestThesisProject("proj-thesis-draft-stream-test");
+      mockBrain(undefined, "unused");
+      vi.spyOn(scholarBrain, "complete").mockImplementation(async (opts) => {
+        opts.onToken?.("Calibration has ");
+        opts.onReset?.();
+        opts.onToken?.("Calibration has been studied extensively.");
+        return { text: "Calibration has been studied extensively.", rawResponse: "", provider: "p", model: "m", wordCount: 5 } as Awaited<ReturnType<typeof scholarBrain.complete>>;
+      });
+
+      const res = await request(app)
+        .post(`/api/projects/${projectId}/thesis/draft-chapter`)
+        .set(aiHeaders)
+        .send({ chapterNumber: 2, chapterTitle: "Critical Literature Review", targetWords: 500, stream: true });
+      expect(res.status).toBe(200);
+      expect(res.headers["content-type"]).toContain("text/event-stream");
+      const events = res.text
+        .split("\n\n")
+        .filter((block) => block.startsWith("data: "))
+        .map((block) => JSON.parse(block.slice(6)));
+      expect(events.map((e) => e.type)).toEqual(["token", "reset", "token", "done"]);
+      expect(events[3].content).toContain("Calibration has been studied extensively.");
+
+      // A failure before any word was written is still a plain JSON error (and a 426 hand-off stays possible).
+      vi.spyOn(scholarBrain, "complete").mockRejectedValue(new Error("provider 500"));
+      const failed = await request(app)
+        .post(`/api/projects/${projectId}/thesis/draft-chapter`)
+        .set(aiHeaders)
+        .send({ chapterNumber: 2, chapterTitle: "Critical Literature Review", stream: true });
+      expect(failed.status).toBe(503);
+    });
   });
 
   // Strict Client-Owned BYOK/Local AI Routing

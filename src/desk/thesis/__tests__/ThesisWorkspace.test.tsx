@@ -7,11 +7,22 @@ import ThesisWorkspace from "../ThesisWorkspace";
 
 const draftCalls: string[] = [];
 let lastBody: unknown;
+let draftContent = "Nurse-led triage reorders the queue by clinical need.";
+
+// jsdom has no layout; ProseMirror measures the cursor when it scrolls to it.
+if (typeof Range !== "undefined") {
+  Range.prototype.getClientRects = Range.prototype.getClientRects || (() => ({ length: 0, item: () => null, [Symbol.iterator]: [][Symbol.iterator] }) as unknown as DOMRectList);
+  Range.prototype.getBoundingClientRect = Range.prototype.getBoundingClientRect || (() => ({ x: 0, y: 0, top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0, toJSON: () => ({}) }) as DOMRect);
+}
+if (typeof document !== "undefined" && !document.elementFromPoint) {
+  document.elementFromPoint = () => null;
+}
 
 describe("ThesisWorkspace (OT-07 Thesis & Dissertation Studio)", () => {
   let failNext = false;
   beforeEach(() => {
     failNext = false;
+    draftContent = "Nurse-led triage reorders the queue by clinical need.";
     vi.restoreAllMocks();
     draftCalls.length = 0;
     vi.spyOn(window, "fetch").mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -64,10 +75,15 @@ describe("ThesisWorkspace (OT-07 Thesis & Dissertation Studio)", () => {
 
       if (url.includes("/thesis/draft-chapter")) {
         draftCalls.push(String(lastBody));
-        return new Response(
-          JSON.stringify({ success: true, content: "Nurse-led triage reorders the queue by clinical need.", bibliography: "Okafor, A. (2021) Triage.", wordCount: 8, citedSourcesCount: 1 }),
-          { status: 200, headers: { "Content-Type": "application/json" } }
-        );
+        // The editor asks for the live stream: words first, then the finished chapter.
+        const events = [
+          { type: "token", text: draftContent.slice(0, 10) },
+          { type: "done", success: true, content: draftContent, bibliography: "Okafor, A. (2021) Triage.", wordCount: 8, citedSourcesCount: 1 },
+        ];
+        return new Response(events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join(""), {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        });
       }
 
       if (url.includes("/thesis/viva-simulate")) {
@@ -209,8 +225,8 @@ describe("ThesisWorkspace (OT-07 Thesis & Dissertation Studio)", () => {
     expect(screen.getByRole("heading", { name: /Write Chapters/i })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /^Draft with AI$/i }));
 
-    await waitFor(() => expect(screen.getByDisplayValue(/Nurse-led triage reorders the queue/)).toBeInTheDocument());
-    expect(JSON.parse(draftCalls[0])).toMatchObject({ chapterNumber: 1, chapterTitle: "Introduction" });
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "Chapter 1 text" })).toHaveTextContent(/Nurse-led triage reorders the queue/));
+    expect(JSON.parse(draftCalls[0])).toMatchObject({ chapterNumber: 1, chapterTitle: "Introduction", stream: true });
     expect(screen.getByText(/References cited in this chapter/i)).toBeInTheDocument();
     expect(screen.getAllByText(/8 \/ 2,400 words|8 \/ [\d,]+ words/).length).toBeGreaterThan(0);
   });
@@ -219,9 +235,9 @@ describe("ThesisWorkspace (OT-07 Thesis & Dissertation Studio)", () => {
     await screen.findByDisplayValue("Empirical Systems Dissertation");
     fireEvent.click(screen.getByTestId("generate-structured-blueprint-btn"));
     fireEvent.click(screen.getByRole("button", { name: /4\. Write Chapters/i }));
-    fireEvent.change(screen.getAllByLabelText(/Chapter text/i)[0], {
-      target: { value: "Waits fell, t(28) = 2.20, p = .001. Figure 1.2 shows it before Figure 1.1. The behavior and the behaviour." },
-    });
+    draftContent = "Waits fell, t(28) = 2.20, p = .001. Figure 1.2 shows it before Figure 1.1. The behavior and the behaviour.";
+    fireEvent.click(screen.getAllByRole("button", { name: /^Draft with AI$/i })[0]);
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "Chapter 1 text" })).toHaveTextContent(/Waits fell/));
 
     const fetchesBefore = vi.mocked(window.fetch).mock.calls.length;
     fireEvent.click(screen.getByRole("button", { name: /5\. Discussion & Audit/i }));

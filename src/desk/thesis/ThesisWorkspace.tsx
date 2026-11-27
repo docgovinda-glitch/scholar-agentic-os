@@ -6,6 +6,7 @@ import {
   simulateVivaDefense,
   auditThesisChapters,
   draftThesisChapter,
+  type ThesisChapterDraftStream,
   type VivaSimulationResponse,
   type ThesisChapterAuditResponse,
 } from "../api";
@@ -296,14 +297,18 @@ export default function ThesisWorkspace({
     updateThesisField("chapters", next);
   }
 
-  async function handleDraftChapter(index: number, guidance: string) {
+  async function handleDraftChapter(index: number, guidance: string, live: ThesisChapterDraftStream = {}) {
     const ch = thesisData.chapters[index];
-    const result = await draftThesisChapter(projectId, {
-      chapterNumber: ch.chapterNumber,
-      chapterTitle: ch.title,
-      targetWords: ch.targetWordCount > 0 ? Math.min(ch.targetWordCount, 4000) : 1500,
-      prompt: guidance.trim() || undefined,
-    });
+    const result = await draftThesisChapter(
+      projectId,
+      {
+        chapterNumber: ch.chapterNumber,
+        chapterTitle: ch.title,
+        targetWords: ch.targetWordCount > 0 ? Math.min(ch.targetWordCount, 4000) : 1500,
+        prompt: guidance.trim() || undefined,
+      },
+      live
+    );
     return { content: result.content, bibliography: result.bibliography };
   }
 

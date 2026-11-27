@@ -809,9 +809,11 @@ export function formatCSLInTextSingle(
   item: CSLItem,
   style: SupportedCSLStyle,
   displayNumber: number = 1,
-  locator?: string
+  locator?: string,
+  /** "a", "b", … when two works would otherwise print the same author-date label (APA 2024a / 2024b). */
+  yearSuffix?: string
 ): string {
-  return CitationFormatterFactory.formatInText(style, cslItemToCanonical(item), {
+  return CitationFormatterFactory.formatInText(style, { ...cslItemToCanonical(item), ...(yearSuffix ? { yearSuffix } : {}) }, {
     position: displayNumber,
     ...(locator ? { locator } : {}),
   });
@@ -863,7 +865,8 @@ export function cslItemToCanonical(item: CSLItem): CanonicalReference {
 export function formatCSLBibliographyEntry(
   item: CSLItem,
   style: SupportedCSLStyle,
-  displayNumber: number = 1
+  displayNumber: number = 1,
+  yearSuffix?: string
 ): {
   plainText: string;
   markdownText: string;
@@ -871,7 +874,7 @@ export function formatCSLBibliographyEntry(
   displayNumber: number;
   csl: CSLItem;
 } {
-  const entry = CitationFormatterFactory.formatBibliography(style, cslItemToCanonical(item)).trim();
+  const entry = CitationFormatterFactory.formatBibliography(style, { ...cslItemToCanonical(item), ...(yearSuffix ? { yearSuffix } : {}) }).trim();
   const md = style === "ieee" ? `[${displayNumber}] ${entry}` : style === "vancouver" ? `${displayNumber}. ${entry}` : entry;
   const plainText = md.replace(/\*([^*]+)\*/g, "$1").trim();
   const htmlText = md

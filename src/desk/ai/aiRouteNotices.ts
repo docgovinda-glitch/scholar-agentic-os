@@ -17,10 +17,22 @@ export interface AiRouteSummary {
 export function describeAiRoute(summary: AiRouteSummary): { message: string; variant: ToastVariant } | null {
   const notable = summary.notices.filter((n) => n.kind !== "retry");
   if (notable.length === 0) return null;
+  // An answer arrived: say which model gave it, briefly. Switching between models is the router
+  // doing its job, not a problem, so it is not listed model by model (that read as an error).
+  if (summary.answeredBy) {
+    // A model paused or switched away from is routine; a skipped connection for any other reason
+    // (a blocked address, a missing key) is something the person should fix, so it is kept as is.
+    const routine = (n: { kind: string; text: string }) => n.kind === "fallback" || (n.kind === "skipped" && /retrying in|paused|limit|busy|quota/i.test(n.text));
+    const switched = notable.filter(routine).length;
+    const other = notable.filter((n) => !routine(n));
+    const parts = [`Answered by ${summary.answeredBy.label}.`];
+    if (switched) parts.push(switched === 1 ? "Another model did not answer, so it moved on." : `${switched} other models did not answer, so it moved on.`);
+    for (const n of other.slice(0, 2)) parts.push(/[.!?]$/.test(n.text) ? n.text : `${n.text}.`);
+    return { message: parts.join(" "), variant: other.length ? "warning" : "info" };
+  }
   const lines = notable.slice(0, 3).map((n) => n.text);
   if (notable.length > 3) lines.push(`${notable.length - 3} more`);
-  const by = summary.answeredBy ? `Answered by ${summary.answeredBy.label}. ` : "";
-  return { message: `${by}${lines.join(" · ")}`, variant: "warning" };
+  return { message: lines.join(" · "), variant: "warning" };
 }
 
 const recent = new Map<string, number>();

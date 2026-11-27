@@ -91,6 +91,10 @@ export interface ScholarBrainCompleteOptions {
   responseFormat?: "text" | "json";
   temperature?: number;
   maxTokens?: number;
+  /** Called with each token as the model writes (raw, before the guardrails run on the whole text). */
+  onToken?: (text: string) => void;
+  /** Called when the router switched model and the partial answer so far was dropped. */
+  onReset?: () => void;
   /**
    * When the user's only AI is a local model (which the server cannot reach),
    * hand the exact prompt to their browser with a signed challenge (426) instead
@@ -535,6 +539,14 @@ export const scholarBrain = {
           temperature: options.temperature,
           maxOutputTokens: options.maxTokens,
           signal: options.signal,
+          ...(options.onToken || options.onReset
+            ? {
+                onEvent: (ev: { type: string; text?: string }) => {
+                  if (ev.type === "token" && typeof ev.text === "string") options.onToken?.(ev.text);
+                  else if (ev.type === "fallback") options.onReset?.();
+                },
+              }
+            : {}),
         });
         answeredBy = (req as { aiRoute?: { answeredBy?: { label: string } } }).aiRoute?.answeredBy?.label ?? "router";
       } catch (err) {

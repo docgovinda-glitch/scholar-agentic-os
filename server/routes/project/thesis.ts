@@ -19,6 +19,8 @@ import { catalog } from "../../../src/app/atlas/atlas.ts";
 import { emptyDocument } from "../../../src/domain/document/model.ts";
 import { appendBlock } from "../../../src/domain/document/ops.ts";
 import { emptyGraph } from "../../../src/domain/claim/graph.ts";
+import { trimToSentenceWithinWords } from "../../src/utils/sectionBudget.ts";
+import { openSse, type SseStream } from "../../src/utils/sse.ts";
 
 const router = Router({ mergeParams: true });
 
@@ -367,6 +369,18 @@ router.post(
 
     const systemPrompt = scholarBrain.thesisPrompts.chapterDraftSystemPrompt({ chapterNumber, chapterTitle, degreeLevel, title, theoreticalFramework, methodology, researchQuestions: researchQuestions.length ? `Research questions (the chapter must serve these):\n${researchQuestions.map((q, i) => `RQ${i + 1}. ${q}`).join("\n")}\n` : "", targetWords, dialect, evidenceLedger: evidenceLedger || "No external sources available." });
 
+    // `stream: true`: the model's words go to the browser as they are written (SSE `token`
+    // events, `reset` when the router switched model), then one `done` event with the
+    // finished chapter. The stream opens on the first token, so "your AI runs in the
+    // browser" is still a plain 426 hand-off with the prompt.
+    const wantsStream = req.body?.stream === true;
+    const abort = new AbortController();
+    res.on("close", () => {
+      if (!res.writableEnded) abort.abort();
+    });
+    const live: { sse: SseStream | null } = { sse: null };
+    const stream = () => (live.sse ??= openSse(res));
+
     try {
       const brainRes = await scholarBrain.complete({
         req,
@@ -376,11 +390,28 @@ router.post(
         userPrompt: `${userPromptText}\n\nThesis Title: ${title}\nDegree: ${degreeLevel}\nChapter ${chapterNumber}: ${chapterTitle}`,
         dialect,
         stripCliches: true,
+        // A cap near the target (about 1.3 tokens a word, plus headroom) also turns off the
+        // "continue" follow-ups; without it a 4,000-word request came back at 9,243 words.
+        maxTokens: Math.round(targetWords * 1.7) + 600,
+        signal: abort.signal,
+        ...(wantsStream
+          ? {
+              onToken: (text: string) => stream().send({ type: "token", text }),
+              onReset: () => live.sse?.send({ type: "reset" }),
+            }
+          : {}),
       });
+
+      // The editor shows the chapter's title already: drop a first heading that repeats it
+      // ("# Chapter 1: Introduction"), then end on a whole sentence within ~15% of the target.
+      const chapterText = trimToSentenceWithinWords(
+        stripRepeatedChapterHeading(brainRes.text, chapterNumber, chapterTitle),
+        Math.round(targetWords * 1.15)
+      );
 
       // Scrub citations and format canonical bibliography
       const scrubResult = scholarBrain.scrubAndFormatCitations(
-        brainRes.text,
+        chapterText,
         sourcesForScrubber,
         citationStyle,
         dialect
@@ -388,7 +419,7 @@ router.post(
 
       const formattedWordCount = countExactWords(scrubResult.formattedText);
 
-      return res.json({
+      const payload = {
         success: true,
         chapterNumber,
         chapterTitle,
@@ -401,11 +432,29 @@ router.post(
         strippedCitations: scrubResult.hallucinatedCitationsStripped,
         provider: brainRes.provider,
         model: brainRes.model,
-      });
+      };
+      if (!wantsStream) return res.json(payload);
+      stream().send({ type: "done", ...payload });
+      return live.sse?.close();
     } catch (err) {
-      return sendAiFailure(res, err, "Chapter draft");
+      const sse = live.sse;
+      if (!sse) return sendAiFailure(res, err, "Chapter draft");
+      // The stream is open (words were already sent): the failure goes as an event.
+      sse.send({ type: "error", error: err instanceof Error ? err.message : "The chapter could not be drafted." });
+      return sse.close();
     }
   })
 );
+
+/** "# Chapter 1: Introduction" / "## Introduction" as the first line, when it repeats the chapter's own title. */
+export function stripRepeatedChapterHeading(text: string, chapterNumber: number | string, chapterTitle: string): string {
+  const lines = (text || "").replace(/^\s+/, "").split("\n");
+  const first = (lines[0] || "").replace(/^#{1,6}\s*/, "").replace(/[*_]/g, "").trim().toLowerCase();
+  const title = chapterTitle.trim().toLowerCase();
+  const repeats =
+    /^#{1,6}\s/.test(lines[0] || "") &&
+    (first === title || first === `chapter ${chapterNumber}: ${title}` || first === `chapter ${chapterNumber} ${title}` || first === `chapter ${chapterNumber}` || first === `${chapterNumber}. ${title}`);
+  return repeats ? lines.slice(1).join("\n").replace(/^\s+/, "") : text;
+}
 
 export default router;

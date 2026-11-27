@@ -214,3 +214,22 @@ describe("the router uses the breaker by kind", () => {
     expect(calls).toEqual(["a", "a"]); // still tried the second time
   });
 });
+
+describe("a request too big for the model's per-minute cap", () => {
+  const groq413 =
+    "Request too large for model `openai/gpt-oss-120b` in organization `org_x` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Requested 11713, please reduce your message size and try again. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing";
+  const signal = new AbortController().signal;
+
+  it("is an over-long input for this model, not spent credit: the next model is tried and the connection stays usable", () => {
+    for (const status of [413, 429]) {
+      const f = classify(new ProviderHttpError(status, groq413), signal);
+      expect(f.kind).toBe("context_overflow");
+      expect(f.fallbackWorthy).toBe(true);
+    }
+  });
+
+  it("leaves an ordinary per-minute rate limit as a rate limit", () => {
+    const f = classify(new ProviderHttpError(429, "Rate limit reached for model `llama` on requests per minute (RPM): Limit 30, Used 30, Requested 1. Please try again in 2s."), signal);
+    expect(f.kind).toBe("rate_limit");
+  });
+});
