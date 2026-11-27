@@ -229,12 +229,50 @@ const NUMBERED_STYLES = new Set<SupportedCSLStyle>(["ieee", "vancouver", "chicag
 export function formatAskScholarInText(
   item: WebsiteCitationItem,
   index: number,
-  styleId: string
+  styleId: string,
+  /** The answer's whole citation list: lets two works with the same label get 2024a / 2024b. */
+  all?: WebsiteCitationItem[]
 ): string {
   const style = normalizeCSLStyle(styleId);
   const csl = citationItemToCSL(item, index);
   if (!csl) return "";
-  return formatCSLInTextSingle(csl, style, index + 1);
+  return formatCSLInTextSingle(csl, style, index + 1, undefined, all ? askYearSuffixes(all, style).get(index) : undefined);
+}
+
+const suffixCache = new WeakMap<WebsiteCitationItem[], Map<string, Map<number, string>>>();
+
+/**
+ * Year suffixes for an answer's citations (index → "a", "b", …). Two works that would print the
+ * same author-date label ("Durrani et al., 2024" twice) are told apart as 2024a and 2024b, ordered
+ * by title as APA, Harvard and Chicago do. Numbered styles need none. Pure; cached per list.
+ */
+export function askYearSuffixes(citations: WebsiteCitationItem[], styleId: string): Map<number, string> {
+  const style = normalizeCSLStyle(styleId);
+  const cached = suffixCache.get(citations)?.get(style);
+  if (cached) return cached;
+  const result = new Map<number, string>();
+  if (!NUMBERED_STYLES.has(style)) {
+    const groups = new Map<string, Array<{ index: number; title: string }>>();
+    citations.forEach((c, index) => {
+      const csl = citationItemToCSL(c, index);
+      if (!csl) return;
+      const label = formatCSLInTextSingle(csl, style, index + 1).toLowerCase();
+      if (!/\d{4}/.test(label)) return; // "n.d." and labels without a year are left alone
+      const group = groups.get(label) ?? [];
+      // The same work cited under two entries is not a second work.
+      if (!group.some((g) => g.title === csl.title.toLowerCase())) group.push({ index, title: csl.title.toLowerCase() });
+      groups.set(label, group);
+    });
+    for (const group of groups.values()) {
+      if (group.length < 2) continue;
+      group.sort((a, b) => a.title.localeCompare(b.title));
+      group.forEach((g, i) => result.set(g.index, String.fromCharCode(97 + Math.min(i, 25))));
+    }
+  }
+  const byStyle = suffixCache.get(citations) ?? new Map<string, Map<number, string>>();
+  byStyle.set(style, result);
+  suffixCache.set(citations, byStyle);
+  return result;
 }
 
 export interface FormattedBibliographyEntry {
@@ -296,7 +334,7 @@ export function formatAskScholarBibliography(
   }
 
   return validPairs.map((pair, displayIdx) => {
-    const formatted = formatCSLBibliographyEntry(pair.csl, style, displayIdx + 1);
+    const formatted = formatCSLBibliographyEntry(pair.csl, style, displayIdx + 1, askYearSuffixes(citations, style).get(pair.origIdx));
     const yearStr = String(pair.csl.issued["date-parts"][0][0]);
     const doi = pair.csl.DOI;
     const directUrl = doi
@@ -383,7 +421,7 @@ export function replaceBracketTokensWithDeterministicCitations(
 
       const formattedCites = validNums
         .map((n: number) => {
-          const cite = formatAskScholarInText(sources[n - 1], n - 1, style);
+          const cite = formatAskScholarInText(sources[n - 1], n - 1, style, sources);
           return cite.replace(/^\s*\(\s*(.+?)\s*\)\s*$/, "$1").trim();
         })
         .filter(Boolean);
@@ -413,7 +451,7 @@ export function replaceBracketTokensWithDeterministicCitations(
       if (style === "vancouver") {
         return `(${matchedIdx + 1})`;
       }
-      const cite = formatAskScholarInText(sources[matchedIdx], matchedIdx, style);
+      const cite = formatAskScholarInText(sources[matchedIdx], matchedIdx, style, sources);
       const trimmedCite = cite.replace(/^\s*\(\s*(.+?)\s*\)\s*$/, "$1").trim();
       return trimmedCite ? `(${trimmedCite})` : "";
     }

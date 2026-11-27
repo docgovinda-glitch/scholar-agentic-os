@@ -68,7 +68,7 @@ The same workspace also exposes a five-mode studio, named the same in the header
 
 ## 5. Thesis (`OT-07`)
 
-`ThesisWorkspace` has six steps: 1 Proposal & Framing, 2 Literature Matrix, 3 Methodology & Ethics, 4 Write Chapters, 5 Discussion & Audit, 6 Viva Voce Simulator. Server routes (`server/routes/project/thesis.ts`): `POST /viva-simulate` (examiner questions from the thesis title and research questions), `/chapter-audit`, `GET /gate-status`, `/draft-chapter`. Export: `thesisExport.ts`, `thesisLatex.ts`; references: `thesisReferences.ts`. Thesis routes answer with a browser hand-off when the user's only AI is a local model.
+`ThesisWorkspace` has six steps: 1 Proposal & Framing, 2 Literature Matrix, 3 Methodology & Ethics, 4 Write Chapters, 5 Discussion & Audit, 6 Viva Voce Simulator. Server routes (`server/routes/project/thesis.ts`): `POST /viva-simulate` (examiner questions from the thesis title and research questions), `/chapter-audit`, `GET /gate-status`, `/draft-chapter`. Export: `thesisExport.ts`, `thesisLatex.ts`; references: `thesisReferences.ts`. Thesis routes answer with a browser hand-off when the user's only AI is a local model. Step 4's chapter text is the shared TipTap `SectionTextEditor` with `keepHeadingLevels` (the chapter's `#`/`##`/`###` headings round-trip as written) and `richBlocks`. **Draft with AI** sends `stream: true` to `/draft-chapter`: the stream opens on the model's first token (so a hand-off is still a plain 426), the words show read-only as they arrive (`token`, `reset` when the router switched model), and one `done` event carries the finished chapter (citations formatted, trimmed to the target) that replaces the text; Stop aborts the request and leaves the chapter as it was.
 
 ## 6. Presentation Studio (`OT-22`)
 

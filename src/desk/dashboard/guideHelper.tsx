@@ -573,7 +573,7 @@ export function renderFormattedGuideText(
           const matchedCite =
             citations && num > 0 && num <= citations.length ? citations[num - 1] : undefined;
           const formattedLabel = matchedCite
-            ? formatAskScholarInText(matchedCite, num - 1, citationStyle) || `[${linkTitle}]`
+            ? formatAskScholarInText(matchedCite, num - 1, citationStyle, citations) || `[${linkTitle}]`
             : `[${linkTitle}]`;
 
           nodes.push(
@@ -616,7 +616,7 @@ export function renderFormattedGuideText(
               const matchedCite =
                 citations && num > 0 && num <= citations.length ? citations[num - 1] : undefined;
               const formattedLabel = matchedCite
-                ? formatAskScholarInText(matchedCite, num - 1, citationStyle) || `[${numStr}]`
+                ? formatAskScholarInText(matchedCite, num - 1, citationStyle, citations) || `[${numStr}]`
                 : `[${numStr}]`;
               return (
                 <InlineCitationBadge

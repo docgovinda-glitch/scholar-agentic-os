@@ -504,11 +504,46 @@ export interface ThesisChapterDraftResponse {
   citedSourcesCount: number;
 }
 
-/** Drafts one chapter with the user's AI, grounded in retrieved and Vault sources. */
-export async function draftThesisChapter(projectId: string, payload: ThesisChapterDraftRequest): Promise<ThesisChapterDraftResponse> {
-  const res = await authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/thesis/draft-chapter`, "POST", payload);
+export interface ThesisChapterDraftStream {
+  /** Each piece of text as the model writes it (before citations are formatted). */
+  onToken?: (text: string) => void;
+  /** The router switched model: the text shown so far was dropped. */
+  onReset?: () => void;
+  signal?: AbortSignal;
+}
+
+/**
+ * Drafts one chapter with the user's AI, grounded in retrieved and Vault sources.
+ * With `onToken` the words arrive as they are written; the result is the
+ * finished chapter (citations formatted, trimmed to the target) either way.
+ */
+export async function draftThesisChapter(
+  projectId: string,
+  payload: ThesisChapterDraftRequest,
+  live: ThesisChapterDraftStream = {}
+): Promise<ThesisChapterDraftResponse> {
+  const res = await authedJsonFetch(
+    `/api/projects/${encodeURIComponent(projectId)}/thesis/draft-chapter`,
+    "POST",
+    live.onToken ? { ...payload, stream: true } : payload,
+    { signal: live.signal }
+  );
   if (!res.ok) throw await apiError(res, "The chapter could not be drafted");
-  const body = (await res.json()) as Partial<ThesisChapterDraftResponse>;
+  let body: Partial<ThesisChapterDraftResponse> = {};
+  if (res.headers.get("content-type")?.includes("text/event-stream") && res.body) {
+    let failure = "";
+    await readSse(res.body, (m) => {
+      if (!m.json || !m.data || typeof m.data !== "object") return;
+      const ev = m.data as { type?: string; text?: unknown; error?: unknown } & Partial<ThesisChapterDraftResponse>;
+      if (ev.type === "token" && typeof ev.text === "string") live.onToken?.(ev.text);
+      else if (ev.type === "reset") live.onReset?.();
+      else if (ev.type === "done") body = ev;
+      else if (ev.type === "error") failure = typeof ev.error === "string" && ev.error ? ev.error : "The chapter could not be drafted.";
+    });
+    if (failure) throw new Error(failure);
+  } else {
+    body = (await res.json()) as Partial<ThesisChapterDraftResponse>;
+  }
   if (typeof body.content !== "string" || !body.content.trim()) throw new Error("The AI returned an empty chapter. Nothing was changed.");
   return {
     content: body.content,
