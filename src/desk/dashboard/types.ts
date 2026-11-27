@@ -69,6 +69,8 @@ export interface WebsiteAssistantMessage {
   citations?: Array<{
     id?: string;
     sourceId?: string;
+    /** Deep Research: each cited claim and the passage of this source that backs it (null: no clear match). */
+    claimPassages?: import("../../domain/ask/passageMatch").ClaimPassage[];
     title?: string;
     url?: string;
     snippet?: string;

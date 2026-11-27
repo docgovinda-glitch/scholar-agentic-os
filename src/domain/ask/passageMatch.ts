@@ -16,10 +16,25 @@ export interface SupportingPassage {
 const words = (text: string): string[] =>
   (text.toLowerCase().match(/[\p{L}\p{N}][\p{L}\p{N}'-]{2,}/gu) || []).filter((w) => !STOP.has(w));
 
-/** The sentence that precedes a citation marker (the claim it is attached to). */
+/**
+ * A short key for a claim (its last ten significant words), so the server, which matches claims to passages
+ * in the raw report, and the browser, which renders formatted text, agree on which claim a citation backs.
+ */
+export function claimKey(claim: string): string {
+  return words(claim).slice(-10).join(" ");
+}
+
+/** A cited claim and the passage of the source that backs it; `passage: null` when the source's text has none. */
+export interface ClaimPassage {
+  claim: string;
+  key: string;
+  passage: string | null;
+}
+
+/** The sentence that precedes a citation marker (the claim it is attached to); a line or table cell ends it too. */
 export function claimBefore(text: string, markerIndex: number): string {
   const head = text.slice(0, markerIndex);
-  const parts = head.split(/(?<=[.!?])\s+/);
+  const parts = head.split(/(?<=[.!?])\s+|\n+|\|/);
   return (parts[parts.length - 1] || "").replace(/\[[^\]]*\]/g, "").trim();
 }
 

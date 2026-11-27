@@ -80,6 +80,7 @@ import {
 } from "lucide-react";
 import LiteratureDiscoveryWorkspace from "./discovery/LiteratureDiscoveryWorkspace";
 import LiveResearchTrajectoryVisualizer from "./components/LiveResearchTrajectoryVisualizer";
+import { ResearchActivityFeed, type ResearchActivityItem } from "./ask/ResearchActivityFeed";
 import { type CitationGraphNode } from "../services/discovery/snowballSamplingService";
 import { AnswerReviewPanel } from "./AnswerReviewPanel";
 import { SourcesPanel } from "./ask/SourcesPanel";
@@ -613,6 +614,8 @@ export default function ProjectListScreen({
   const [streamingGuideText, setStreamingGuideText] = useState("");
   const askAbortRef = useRef<boolean>(false);
   const [activeResearchStage, setActiveResearchStage] = useState<ResearchStageTelemetry | null>(null);
+  /** Deep Research's live feed for the answer being produced (searches, sources read, checks). */
+  const [researchActivity, setResearchActivity] = useState<ResearchActivityItem[]>([]);
   const [isMobileWorkspaceMenuOpen, setIsMobileWorkspaceMenuOpen] = useState(false);
   const mobileWorkspaceMenuRef = useRef<HTMLDivElement>(null);
   const chatCanvasRef = useRef<HTMLDivElement | null>(null);
@@ -1043,6 +1046,7 @@ export default function ProjectListScreen({
   const handleStartNewAskThread = useCallback(() => {
     askAbortRef.current = true;
     setStreamingGuideText("");
+    setResearchActivity([]);
     setIsGuideThinking(false);
     setAskPhase(null);
     setActiveResearchStage(null);
@@ -1407,6 +1411,7 @@ export default function ProjectListScreen({
     }
     askAbortRef.current = false;
     setStreamingGuideText("");
+    setResearchActivity([]);
     setIsGuideThinking(true);
     setActiveResearchStage(null);
     // Sources found for this question, kept so a failed answer still shows them.
@@ -1559,6 +1564,9 @@ export default function ProjectListScreen({
                 }
               },
               onReset: () => setStreamingGuideText(""),
+              onActivity: (item) => {
+                if (!askAbortRef.current) setResearchActivity((prev) => [...prev.slice(-40), item]);
+              },
             });
           } catch (serverErr) {
             if (askAbortRef.current) return;
@@ -1748,6 +1756,7 @@ export default function ProjectListScreen({
       setGuideMessages((prev) => [...prev, assistantMsg]);
     } finally {
       setStreamingGuideText("");
+      setResearchActivity([]);
       setIsGuideThinking(false);
       setAskPhase(null);
     }
@@ -3547,7 +3556,9 @@ export default function ProjectListScreen({
                           >
                             <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-neutral-400" aria-hidden="true" />
                             <span role="status" aria-live="polite" className="min-w-0 flex-1 truncate">
-                              {askPhase?.step === "writing"
+                              {researchActivity.length > 0 && !streamingGuideText
+                                ? "Researching…"
+                                : streamingGuideText || askPhase?.step === "writing"
                                 ? "Writing your answer…"
                                 : typeof askPhase?.found === "number" && askPhase.found > 0
                                   ? `Searching scholarly sources… ${askPhase.found} found`
@@ -3575,6 +3586,7 @@ export default function ProjectListScreen({
                           mode={sidebarAiMode}
                         />
                         )}
+                        <ResearchActivityFeed items={researchActivity} writing={Boolean(streamingGuideText)} max={isPhone ? 4 : 6} />
                         {/* Live Token Streaming Bubble when tokens are arriving */}
                         {streamingGuideText && (
                           <div data-streaming-answer aria-busy="true" className="w-full px-0.5 leading-relaxed text-neutral-900 dark:text-neutral-100">

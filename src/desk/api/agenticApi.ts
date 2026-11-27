@@ -80,6 +80,9 @@ export async function executeAgenticQuery(
         req.onChunk?.(parsed.text);
       } else if (parsed.type === "reset") {
         req.onReset?.();
+      } else if (parsed.type === "activity" && typeof parsed.text === "string") {
+        const kind = (m.data as { kind?: unknown }).kind;
+        if (kind === "search" || kind === "read" || kind === "check" || kind === "write") req.onActivity?.({ kind, text: parsed.text });
       } else if (parsed.type === "stage" && req.onStageUpdate) {
         req.onStageUpdate({ status: parsed.status, stage: parsed.stage } as Parameters<NonNullable<typeof req.onStageUpdate>>[0]);
       } else if (parsed.type === "sources" && Array.isArray(parsed.citations)) {

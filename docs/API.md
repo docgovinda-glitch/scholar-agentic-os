@@ -118,7 +118,7 @@ Every body is validated with zod (`schemas.ts`); a bad body is a 400 `{ code: "i
 | POST | `/api/ai/verify` | Yes | Tests a key end to end (live model list + one real request) and recommends a model; key in `x-ai-api-key`; see [`AI-SYSTEM.md`](AI-SYSTEM.md) §2.0 |
 | GET | `/api/ai/status` | Public | AI availability |
 | POST | `/api/ai/deep-research/plan` | Yes | The model's Deep Research plan for a question (`{ question }` → `{ fromModel, subQuestions }`) |
-| POST | `/api/ai/agent` | Yes | Ask Scholar: chat, grounded search and deep research (`mode`); `streamTokens: true` streams the answer (SSE `token`, `reset`, then `complete` with the JSON body, or `error`) |
+| POST | `/api/ai/agent` | Yes | Ask Scholar: chat, grounded search and deep research (`mode`); `streamTokens: true` streams the answer (SSE `token`, `reset`, then `complete` with the JSON body, or `error`); deep research with `Accept: text/event-stream` sends `stage`, `sources`, `activity` (`{ kind: search|read|check|write, text }`), `token`, `reset`, then `complete` (citations carry `claimPassages`) |
 | POST | `/api/ai/ask/plan` | Yes | Ask Scholar: the model decides whether an unclear question needs a search and writes a standalone query (`{ plan: { search, query } \| null }`; null = use the routing rules) |
 | GET, POST | `/api/ai/threads` | Yes | Ask Scholar threads (held in server memory per user, merged by thread id) |
 | POST | `/api/studio/voice-profile`, `/refine` | Yes | Studio voice and refine (`/refine` runs on the keyring) |

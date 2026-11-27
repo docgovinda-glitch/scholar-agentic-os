@@ -24,6 +24,8 @@ export interface SearchResultItem {
   title: string;
   url: string;
   snippet: string;
+  /** Each cited claim in a report and the passage of this source that backs it (claimPassages.ts). */
+  claimPassages?: import("../../../src/domain/ask/passageMatch.ts").ClaimPassage[];
   domain: string;
   publisher?: string;
   sourceType: "official" | "scholarly" | "media" | "web" | "vault";

@@ -80,6 +80,8 @@ export interface AgenticQueryRequest {
   onChunk?: (chunk: string) => void;
   /** The router switched model mid-answer: the words shown so far were dropped. */
   onReset?: () => void;
+  /** Deep research: each search, source read, check and writing step as it happens (the live activity feed). */
+  onActivity?: (activity: { kind: "search" | "read" | "check" | "write"; text: string }) => void;
   onStageUpdate?: (update: { status: string; stage?: any }) => void;
 }
 

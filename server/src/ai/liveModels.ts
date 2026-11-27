@@ -178,9 +178,15 @@ export async function expandEntry(e: KeyringEntry, task: TaskClass, maxAlternate
     const order = TIER_ORDER_FOR_TASK[task] ?? TIER_ORDER_FOR_TASK.drafting;
     const curated = curateModels(group, list.models.filter((m) => !exclude.has(m.id)), { maxPerProvider: 12, previewMaxAgeDays: 365 });
     // A small-window model (a 4k Arabic or speech model on a free tier) cannot hold a grounded prompt
-    // and its answer: chosen automatically only when the provider lists nothing larger.
-    const roomy = curated.filter((m) => m.contextWindow === undefined || m.contextWindow >= MIN_AUTO_CONTEXT);
-    const pool = roomy.length ? roomy : curated;
+    // and its answer: chosen automatically only when the provider lists nothing larger. When the larger
+    // ones are only paused for a moment (a per-minute cap), they are still the ones tried: their refusal
+    // says "try again in 37 s", where a small model's would wrongly say the input is too long.
+    const isRoomy = (m: { contextWindow?: number }) => m.contextWindow === undefined || m.contextWindow >= MIN_AUTO_CONTEXT;
+    const roomy = curated.filter(isRoomy);
+    const pausedRoomy = roomy.length
+      ? []
+      : curateModels(group, list.models.filter((m) => exclude.has(m.id) && !isQuarantined(group, e.apiKey, m.id)), { maxPerProvider: 12, previewMaxAgeDays: 365 }).filter(isRoomy);
+    const pool = roomy.length ? roomy : pausedRoomy.length ? pausedRoomy : curated;
     const rank = (t: ModelTier) => { const i = order.indexOf(t); return i === -1 ? order.length : i; };
     const recIds = rec.options.map((o) => o.id);
     const ranked = [...pool].sort((a, b) => rank(a.tier) - rank(b.tier) || (recIds.includes(a.id) ? 0 : 1) - (recIds.includes(b.id) ? 0 : 1));
