@@ -285,7 +285,7 @@ export function registerAiRunRoutes(app: express.Express, deps: AiRunDeps = {}):
 
     const byId = new Map(list.ok ? list.models.map((m) => [m.id, m]) : []);
     let lastError = "";
-    const quotaRefusals: string[] = [];
+    const limitedModels: string[] = [];
     for (const model of order) {
       const m = byId.get(model);
       const [cand] = keyringToCandidates([{ ...entry, model, contextWindow: m?.contextWindow, maxOutputTokens: m?.maxOutputTokens ? Math.min(m.maxOutputTokens, 32_768) : undefined }]);
@@ -308,21 +308,19 @@ export function registerAiRunRoutes(app: express.Express, deps: AiRunDeps = {}):
             ? `${asked} is not listed by the provider any more.`
             : model !== (asked ?? model)
               ? `${asked} did not answer, so ${model} was tested instead.`
-              : quotaRefusals.length
-                ? `${quotaRefusals.join(", ")} ${quotaRefusals.length === 1 ? "has" : "have"} no quota on this key, so ${model} was chosen.`
+              : limitedModels.length
+                ? `${limitedModels.join(", ")} ${limitedModels.length === 1 ? "is" : "are"} limited on this key right now, so ${model} was chosen.`
                 : undefined,
         });
         return;
       }
       lastError = failed ?? "The model returned no answer.";
-      // A rejected key fails every model the same way: stop and say so. Quota is often
-      // per model (free tiers), so a quota refusal moves on to the next model.
+      // Account-wide problems fail every model the same way: stop and say which. Spent credit
+      // ("quota": OpenAI insufficient_quota, OpenRouter 402, Anthropic low balance) is the
+      // account's. A free-tier 429 is classified as a per-model rate limit, so it moves on.
       if (failedKind === "auth") { res.json({ ok: false, listed: list.ok, error: `The provider rejected this key (${lastError}).` }); return; }
-      if (failedKind === "quota") quotaRefusals.push(model);
-    }
-    if (quotaRefusals.length === order.length) {
-      res.json({ ok: false, listed: list.ok, error: `The key is valid but the account has no credit or quota left (${lastError}).`, options: rec?.options ?? [] });
-      return;
+      if (failedKind === "quota") { res.json({ ok: false, listed: list.ok, error: `The key is valid but the account has no credit or quota left (${lastError}).`, options: rec?.options ?? [] }); return; }
+      if (failedKind === "rate_limit") limitedModels.push(model);
     }
     res.json({ ok: false, listed: list.ok, error: `The key was accepted but no model answered a test request. Last error: ${lastError}`, options: rec?.options ?? [] });
   });
