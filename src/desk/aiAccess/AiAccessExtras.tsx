@@ -69,8 +69,13 @@ export function LiveRouting({ refreshKey, privacy }: { refreshKey: string; priva
           else if ("error" in d) main = d.error;
           else if (d.ok) {
             ok = true;
-            main = `${providerLabel(d.choice.providerId)}${d.choice.modelId ? ` · ${d.choice.modelId}` : ""}`;
-            sub = d.fallbacks.length ? `Then ${d.fallbacks.slice(0, 2).map((f) => providerLabel(f.providerId)).join(", ")}${d.fallbacks.length > 2 ? ` and ${d.fallbacks.length - 2} more` : ""} if it is unavailable` : "No fallback connected";
+            // With no model pinned the task chooses: a fast model for quick work, a stronger one otherwise.
+            const auto = !d.choice.modelId || d.choice.modelId === "auto";
+            main = `${providerLabel(d.choice.providerId)} · ${auto ? (t.type === "simple" ? "a fast model" : "a stronger model") : d.choice.modelId}`;
+            const then = d.fallbacks.length
+              ? `Then ${d.fallbacks.slice(0, 2).map((f) => providerLabel(f.providerId)).join(", ")}${d.fallbacks.length > 2 ? ` and ${d.fallbacks.length - 2} more` : ""} if it is unavailable`
+              : auto ? "" : "No fallback connected";
+            sub = [auto ? "Chosen for this task from the models your key can use; another one if it is busy" : "", then].filter(Boolean).join(". ");
           } else main = d.reasoning;
           return (
             <li key={t.type} className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1">

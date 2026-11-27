@@ -17,10 +17,10 @@
  */
 import { createHash } from "node:crypto";
 import { listModelsFor, ModelListError } from "../../../src/platform/router/modelListers.ts";
-import type { LiveModel } from "../../../src/platform/router/modelCuration.ts";
+import { curateModels, type LiveModel, type ModelTier } from "../../../src/platform/router/modelCuration.ts";
 import { recommendModels } from "../../../src/platform/router/modelRecommendation.ts";
 import { resolveRouterTarget } from "../../../src/platform/router/providerMap.ts";
-import type { Candidate, TaskClass } from "../../../src/platform/router/types.ts";
+import type { Candidate, Failure, TaskClass } from "../../../src/platform/router/types.ts";
 import type { KeyringEntry } from "../../routes/aiRun.ts";
 import { AiEndpointBlockedError, createAiFetch } from "./aiEndpointGuard.ts";
 import { connectionName, serverOutputCaps } from "./breaker.ts";
@@ -84,7 +84,52 @@ export const isQuarantined = (group: string | undefined, apiKey: string | undefi
   if (until < Date.now()) { quarantined.delete(k); return false; }
   return true;
 };
-export const clearLiveModelState = (): void => { lists.clear(); quarantined.clear(); };
+/**
+ * Models this key may not use for now. A free tier often gives some models no allowance at all
+ * ("limit: 0") or a small daily one; such a model is skipped when choosing for later requests
+ * instead of being tried (and failing) first each time. A per-minute limit is remembered briefly.
+ */
+const limited = new Map<string, number>();
+const ZERO_ALLOWANCE = /limit:\s*0\b|free.?tier/i;
+const LIMITED_LONG_MS = 6 * 60 * 60_000;
+const LIMITED_SHORT_MS = 2 * 60_000;
+
+/** Remember a model's refusal on this key: long for a zero or daily allowance, briefly for a per-minute one. */
+export function markModelLimited(c: Pick<Candidate, "group" | "provider" | "model" | "credential">, f: Pick<Failure, "kind" | "message" | "daily" | "retryAfterMs">): void {
+  if (f.kind !== "rate_limit") return;
+  const long = f.daily || ZERO_ALLOWANCE.test(f.message);
+  const ms = long ? LIMITED_LONG_MS : Math.max(f.retryAfterMs ?? 0, LIMITED_SHORT_MS);
+  limited.set(qKey(c.group ?? c.provider, c.credential?.apiKey, c.model), Date.now() + ms);
+}
+export const isLimited = (group: string | undefined, apiKey: string | undefined, model: string): boolean => {
+  const k = qKey(group, apiKey, model);
+  const until = limited.get(k);
+  if (!until) return false;
+  if (until < Date.now()) { limited.delete(k); return false; }
+  return true;
+};
+
+/** What the router learns from a failed model, in one place for every server route. */
+export function learnFromFailure(c: Candidate, f: Failure): void {
+  if (f.kind === "model_unavailable") quarantineModel(c);
+  markModelLimited(c, f);
+}
+
+/**
+ * Model sizes in the order a task wants them when the person has not chosen a model:
+ * quick tasks take the fast tier first; drafting, research and long documents take the
+ * balanced and flagship tiers first. Every tier stays in the list as a backup.
+ */
+export const TIER_ORDER_FOR_TASK: Record<TaskClass, ModelTier[]> = {
+  fast: ["fast", "balanced", "flagship"],
+  vision: ["balanced", "fast", "flagship"],
+  coding: ["balanced", "flagship", "fast"],
+  drafting: ["balanced", "flagship", "fast"],
+  reasoning: ["flagship", "balanced", "fast"],
+  "long-context": ["balanced", "flagship", "fast"],
+};
+
+export const clearLiveModelState = (): void => { lists.clear(); quarantined.clear(); limited.clear(); };
 
 export interface ExpandResult {
   entries: KeyringEntry[];
@@ -113,13 +158,36 @@ export async function expandEntry(e: KeyringEntry, task: TaskClass, maxAlternate
   }
 
   const byId = new Map(list.models.map((m) => [m.id, m]));
-  const usable = (id: string) => byId.has(id) && !isQuarantined(group, e.apiKey, id);
-  const exclude = new Set(list.models.map((m) => m.id).filter((id) => isQuarantined(group, e.apiKey, id)));
+  const blocked = (id: string) => isQuarantined(group, e.apiKey, id) || isLimited(group, e.apiKey, id);
+  const usable = (id: string) => byId.has(id) && !blocked(id);
+  const exclude = new Set(list.models.map((m) => m.id).filter(blocked));
   const rec = recommendModels(group, list.models, { exclude });
 
   const slot = e.slot && e.slot > 1 ? `#${e.slot}` : "";
   const hint = serverOutputCaps.get(balanceHintKey(connectionName(`${group}${slot}`, e.apiKey, e.baseUrl)));
   const balanceLimited = hint !== undefined && hint <= LOW_BALANCE_OUTPUT_TOKENS;
+
+  // No model chosen by the person ("auto"): the task picks. Its preferred size first, then the
+  // other sizes as backups, from a wider pool than the curated picks, skipping models this key
+  // cannot use now. A model the person chose is kept as their choice (below).
+  if (!asked && !balanceLimited) {
+    const order = TIER_ORDER_FOR_TASK[task] ?? TIER_ORDER_FOR_TASK.drafting;
+    const pool = curateModels(group, list.models.filter((m) => !exclude.has(m.id)), { maxPerProvider: 12, previewMaxAgeDays: 365 });
+    const rank = (t: ModelTier) => { const i = order.indexOf(t); return i === -1 ? order.length : i; };
+    const recIds = rec.options.map((o) => o.id);
+    const ranked = [...pool].sort((a, b) => rank(a.tier) - rank(b.tier) || (recIds.includes(a.id) ? 0 : 1) - (recIds.includes(b.id) ? 0 : 1));
+    const picked = ranked.map((m) => m.id).slice(0, 1 + maxAlternates);
+    if (picked.length) {
+      return {
+        entries: picked.map((id): KeyringEntry => {
+          const m = byId.get(id);
+          const out = m?.maxOutputTokens ? Math.min(m.maxOutputTokens, OUTPUT_CAP) : undefined;
+          return { ...e, model: id, contextWindow: e.contextWindow ?? m?.contextWindow, maxOutputTokens: out ?? UNKNOWN_OUTPUT_LIMIT };
+        }),
+        notices,
+      };
+    }
+  }
 
   let primary = asked && usable(asked) ? asked : undefined;
   if (!primary) {
@@ -180,7 +248,13 @@ export function fitCandidateBudget(parts: ExpandResult[], max = MAX_CHAIN_CANDID
 /** Expands a whole keyring, keeping each connection's models together and the user's order. */
 export async function expandKeyring(entries: KeyringEntry[], task: TaskClass): Promise<ExpandResult> {
   const alternates = alternatesPerConnection(entries.length);
-  const parts = fitCandidateBudget(await Promise.all(entries.map((e) => expandEntry(e, task, alternates))));
+  // One or two connections with no model chosen: try a few more of each provider's models. Free tiers
+  // refuse per model and answer such refusals within a second, so this is cheap, and it is often the
+  // difference between an answer and none.
+  const autoAlternates = entries.length <= 2 ? 4 : alternates;
+  const parts = fitCandidateBudget(
+    await Promise.all(entries.map((e) => expandEntry(e, task, e.model && e.model !== "auto" ? alternates : autoAlternates)))
+  );
   return { entries: parts.flatMap((p) => p.entries), notices: parts.flatMap((p) => p.notices) };
 }
 

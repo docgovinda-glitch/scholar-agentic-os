@@ -154,7 +154,7 @@ export default function ProviderDetail({
       // No model is required: an empty one means "best available", chosen live and tested by the server.
       const outcome = await onConnect({ apiKey: apiKey.trim(), model: model.trim(), baseUrl: address, makeDefault, tier });
       setFound(outcome);
-      if (outcome.model) setModel(outcome.model);
+      setModel(outcome.model ?? "");
       if (!outcome.ok) {
         setError(outcome.error ?? "Could not connect.");
         return;
@@ -162,7 +162,7 @@ export default function ProviderDetail({
       setApiKey("");
       setResult(
         outcome.tested
-          ? `Connected. ${outcome.tested.model} answered a test request in ${(outcome.tested.latencyMs / 1000).toFixed(1)}s.`
+          ? `Connected: your key works (${outcome.tested.model} answered in ${(outcome.tested.latencyMs / 1000).toFixed(1)}s).${outcome.model ? "" : " Scholar will choose a model for each task."}`
           : outcome.modelsDetected != null
           ? `Connected. ${outcome.modelsDetected} model${outcome.modelsDetected === 1 ? "" : "s"} available.`
           : "Connected."
@@ -213,7 +213,7 @@ export default function ProviderDetail({
       {view.connected ? (
         <section className="rounded-[var(--radius-md)] border border-[color:var(--state-success)] bg-[color:var(--state-success-subtle)] p-4">
           <p className="text-sm font-medium text-[color:var(--state-success)]">
-            Connected{view.selectedModel ? ` · using ${view.selectedModel}` : ""}
+            Connected{view.selectedModel && view.selectedModel !== "auto" ? ` · ${view.selectedModel} for every task` : " · model chosen for each task"}
           </p>
           <p className="mt-1 text-xs text-[color:var(--text-secondary)]">
             {view.hasKeyOnDevice
@@ -281,7 +281,14 @@ export default function ProviderDetail({
           )}
         </Step>
 
-        <Step n={3} title="Choose a model">
+        <Step n={3} title="Model (optional)">
+          <p className="mb-2 text-xs text-[color:var(--text-secondary)]">
+            You don't need to pick one. Scholar chooses for each task from the models your key can use: a fast
+            model for quick answers and slide copy, a stronger one for drafting and research, and another if one
+            is busy or out of allowance. Pick a model only to use that one everywhere.
+          </p>
+          <details open={Boolean(model) || Boolean(found?.needsModel)}>
+          <summary className="cursor-pointer text-xs font-medium text-[color:var(--text-primary)] mb-1.5">Choose a model myself</summary>
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-xs text-[color:var(--text-muted)]">
               {liveModels.length > 0 ? `${liveModels.length} models, listed by ${spec.name} for your key` : "Models are listed by the provider once your key is entered."}
@@ -321,6 +328,7 @@ export default function ProviderDetail({
               Save model
             </button>
           )}
+          </details>
         </Step>
 
         <Step n={4} title="Test the connection and save">

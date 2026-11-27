@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { clearLiveModelState, expandEntry, expandKeyring, isQuarantined, quarantineModel, setLiveModelsFetch } from "../liveModels";
+import { clearLiveModelState, expandEntry, expandKeyring, isLimited, isQuarantined, markModelLimited, quarantineModel, setLiveModelsFetch } from "../liveModels";
 import { keyringToCandidates, type KeyringEntry } from "../../../routes/aiRun";
 
 const list = (ids: Array<string | Record<string, unknown>>) =>
@@ -84,5 +84,48 @@ describe("live model resolution", () => {
     const e: KeyringEntry = { provider: "ollama", model: "llama-x" };
     expect((await expandEntry(e, "drafting")).entries).toEqual([e]);
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+});
+
+describe("no model chosen: the task picks, and models this key cannot use are skipped", () => {
+  const auto = (): KeyringEntry => ({ provider: "groq", model: "auto", apiKey: "k-auto" });
+  beforeEach(() => {
+    clearLiveModelState();
+    setLiveModelsFetch(list(["acme-pro-5", "acme-chat-5", "acme-flash-5"]) as unknown as typeof fetch);
+  });
+
+  it("a quick task takes the fast model first; drafting and research take a stronger one first, with the others as backups", async () => {
+    const quick = (await expandEntry(auto(), "fast")).entries.map((e) => e.model);
+    expect(quick[0]).toBe("acme-flash-5");
+    const drafting = (await expandEntry(auto(), "drafting")).entries.map((e) => e.model);
+    expect(drafting[0]).toBe("acme-chat-5");
+    expect(drafting).toEqual(expect.arrayContaining(["acme-pro-5", "acme-flash-5"]));
+    expect((await expandEntry(auto(), "reasoning")).entries[0].model).toBe("acme-pro-5");
+  });
+
+  it("a model refused with no allowance on this key ('limit: 0') is left out of later choices", async () => {
+    const [pro] = keyringToCandidates([{ ...auto(), model: "acme-pro-5" }]);
+    markModelLimited(pro, { kind: "rate_limit", message: "Quota exceeded for metric: generate_content_free_tier_requests, limit: 0" });
+    const chain = (await expandEntry(auto(), "reasoning")).entries.map((e) => e.model);
+    expect(chain).not.toContain("acme-pro-5");
+    expect(chain[0]).toBe("acme-chat-5");
+    expect(isLimited("groq", "k-auto", "acme-pro-5")).toBe(true);
+  });
+
+  it("a model the person chose stays first, whatever the task", async () => {
+    const chosen = (await expandEntry({ ...auto(), model: "acme-pro-5" }, "fast")).entries.map((e) => e.model);
+    expect(chosen[0]).toBe("acme-pro-5");
+  });
+});
+
+describe("one connection with no model chosen", () => {
+  it("lines up to five of the provider's models, so a refusal from one or two does not end the request", async () => {
+    clearLiveModelState();
+    setLiveModelsFetch(list(["acme-pro-6", "acme-pro-5", "acme-chat-6", "acme-chat-5", "acme-flash-6", "acme-flash-5", "acme-lite-6"]) as unknown as typeof fetch);
+    const chain = (await expandKeyring([{ provider: "groq", model: "auto", apiKey: "k1" }], "fast")).entries;
+    expect(chain.length).toBeGreaterThan(3);
+    expect(chain.length).toBeLessThanOrEqual(5);
+    const pinned = (await expandKeyring([{ provider: "groq", model: "acme-chat-6", apiKey: "k1" }], "fast")).entries;
+    expect(pinned.length).toBeLessThanOrEqual(3);
   });
 });
