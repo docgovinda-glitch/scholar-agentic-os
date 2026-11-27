@@ -378,7 +378,7 @@ export function DraftingActiveEditor({
             {isStreaming && (
               <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full animate-pulse">
                 <Loader2 className="w-3 h-3 animate-spin" />
-                <span>Streaming Prose</span>
+                <span>Writing</span>
               </span>
             )}
           </div>
@@ -727,11 +727,14 @@ export function DraftingActiveEditor({
               <Sparkles className="w-6 h-6 text-amber-500" />
             </div>
             <div className="max-w-md space-y-1.5">
+              {/* While the AI is starting, "This section is empty" contradicted the "Writing" status above. */}
               <h3 className="text-base font-semibold text-[color:var(--text-primary)]">
-                This section is empty
+                {isStreaming ? "Your AI is writing this section" : "This section is empty"}
               </h3>
               <p className="text-xs text-[color:var(--text-muted)] leading-relaxed">
-                Write it yourself, or let your AI draft it from your approved sources and edit the result.
+                {isStreaming
+                  ? "The text appears here as it is written. You can stop at any time and keep what has arrived."
+                  : "Write it yourself, or let your AI draft it from your approved sources and edit the result."}
               </p>
             </div>
             <div className="flex items-center gap-3 pt-2">
@@ -744,7 +747,7 @@ export function DraftingActiveEditor({
                 {isStreaming ? (
                   <>
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Writing Prose...</span>
+                    <span>Writing…</span>
                   </>
                 ) : (
                   <>

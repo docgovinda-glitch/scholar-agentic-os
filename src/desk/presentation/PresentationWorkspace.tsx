@@ -394,7 +394,7 @@ export default function PresentationWorkspace({
         {/* Single studio header: back, title, steps, save state, assistants */}
         <PresentationHeader
           title={deck.title}
-          onTitleChange={(newTitle) => handleUpdateDeck({ ...deck, title: newTitle, topic: newTitle })}
+          onTitleChange={(newTitle) => handleUpdateDeck({ ...deck, title: newTitle })}
           currentStep={currentStep}
           onStepChange={(step) => setCurrentStep(step)}
           autosaveStatus={autosaveStatus}

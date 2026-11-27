@@ -1,4 +1,5 @@
 import { DEFAULT_CITATION_STYLE } from "../../../domain/assignment/answerKeys";
+import { summariseAiFailure } from "../../ai/aiFailureSummary";
 import { hasLeakedTemplateHeadings } from "../../../domain/assignment/legacyPurge";
 import type { SectionAnalyticalSynthesis } from "../types";
 import OutlineByAiPanel from "../components/OutlineByAiPanel";
@@ -300,7 +301,7 @@ export function AssignmentDraftingStage({
           },
           writingStyle: writingStyle && typeof writingStyle === "object" ? (writingStyle as { preset?: string; customSampleText?: string }) : undefined,
           onFallback: ({ reason }) => {
-            setOfflineNotice(`${reason} Nothing was written into the section. Below is a scaffold built from your outline: try again, or insert it and write the analysis yourself.`);
+            setOfflineNotice(reason);
           },
         });
         return "done";
@@ -580,8 +581,23 @@ export function AssignmentDraftingStage({
       )}
 
       {offlineNotice && (
-        <div role="status" className="text-xs text-[color:var(--text-secondary)] px-1 space-y-2" data-testid="offline-draft-notice">
-          <p>{offlineNotice}</p>
+        <div role="status" className="rounded-xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] p-3 text-xs text-[color:var(--text-secondary)] space-y-2" data-testid="offline-draft-notice">
+          {(() => {
+            const f = summariseAiFailure(offlineNotice);
+            return (
+              <>
+                <p className="text-sm text-[color:var(--text-primary)]">
+                  {f.message} Nothing was written into the section. Below is a scaffold built from your outline: try again, or insert it and write it yourself.
+                </p>
+                {f.detail && (
+                  <details>
+                    <summary className="cursor-pointer">Details</summary>
+                    <p className="mt-1 break-words">{f.detail}</p>
+                  </details>
+                )}
+              </>
+            );
+          })()}
           {offlineScaffold && (
             <details className="rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]/70 px-3 py-2">
               <summary className="cursor-pointer font-medium text-[color:var(--text-primary)]">Scaffold for "{offlineScaffold.title}"</summary>

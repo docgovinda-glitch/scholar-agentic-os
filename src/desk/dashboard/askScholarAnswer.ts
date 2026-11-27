@@ -1,9 +1,9 @@
+import { summariseAiFailure } from "../ai/aiFailureSummary";
 /**
  * Small, pure pieces of how Ask Scholar answers: how the sources it was given become clickable [n] markers, and what the
  * person is told when no answer could be written.
  */
 
-import { truncateAtWord } from "../../shared/truncateAtWord";
 import { cleanVenue, normalizeAuthorList, normalizeAuthorName } from "../../shared/authorNames";
 import type { LiveSearchResult } from "../../services/liveSearchService";
 import type { WebsiteAssistantMessage } from "./types";
@@ -108,10 +108,17 @@ export function askFailureMessage(
       text: `${found ? `${found}no AI is` : "There is no AI"} connected on this device, so I can't write an answer yet. Connect one in AI Access (Google Gemini has a free key) and ask again.`,
     };
   }
-  const detail = raw ? ` (${truncateAtWord(raw, 600).replace(/\.$/, "")})` : "";
+  // The provider's raw text (URLs, metric names, nested "Try again") is reduced to one plain sentence.
+  const summary = raw ? summariseAiFailure(raw) : null;
+  const advice = "Try again in a moment; if it keeps failing, check your AI in AI Access.";
+  const lead = `${found ? `${found}the` : "The"} AI didn't return an answer`;
   return {
     kind: "failed",
-    text: `${found ? `${found}the` : "The"} AI didn't return an answer${detail}. Try again in a moment; if it keeps failing, check your AI in AI Access.`,
+    text: !summary
+      ? `${lead}. ${advice}`
+      : summary.known
+        ? `${lead}. ${summary.message}`
+        : `${lead} (${summary.message.replace(/\.$/, "")}). ${advice}`,
   };
 }
 

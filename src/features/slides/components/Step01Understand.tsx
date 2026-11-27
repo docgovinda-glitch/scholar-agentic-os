@@ -94,9 +94,11 @@ export default function Step01Understand({ projectId, deck, onUpdateDeck, onNext
     persistOutline([{ id: newOutlineId(), title: title || 'Title', visualType: 'Title Hero', bullets: [] }], title);
   };
 
+  // The topic stays what the presenter typed (it may be a whole abstract); the AI's
+  // title goes in the title field only and never replaces it.
   const persistOutline = (next: OutlineCard[], title = deck.title) => {
     setCards(next);
-    onUpdateDeck({ ...deck, title, topic: title, outline: next });
+    onUpdateDeck({ ...deck, title, topic: stripCourseCodes(topic).trim() || deck.topic || title, outline: next });
   };
 
   /** Outline from the server (scholarBrain); a brief-grounded outline when offline or signed out. */
@@ -133,7 +135,6 @@ export default function Step01Understand({ projectId, deck, onUpdateDeck, onNext
           const data = (await res.json()) as { title?: string; slides?: OutlineCard[]; generatedBy?: string };
           if (Array.isArray(data.slides) && data.slides.length) {
             const title = data.title || topicNow || deck.title;
-            setTopic(title);
             persistOutline(data.slides, title);
             if (data.generatedBy !== 'ai-gateway') {
               setNotice('No AI answered, so this outline is built from your document\'s own questions and sections. Connect an AI in AI Access for a fully written outline.');
@@ -462,10 +463,7 @@ export default function Step01Understand({ projectId, deck, onUpdateDeck, onNext
               id="presentation-title"
               aria-label="Presentation title"
               value={deck.title}
-              onChange={(e) => {
-                setTopic(e.target.value);
-                onUpdateDeck({ ...deck, title: e.target.value, topic: e.target.value });
-              }}
+              onChange={(e) => onUpdateDeck({ ...deck, title: e.target.value })}
               className="w-full h-11 rounded-xl border border-neutral-200 dark:border-white/10 bg-transparent px-3 text-base font-semibold"
             />
           </div>

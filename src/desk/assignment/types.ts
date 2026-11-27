@@ -938,7 +938,9 @@ export function structureToInternalSections(structure?: AssignmentStructure | nu
           title: h.subheadings.length === 1 ? numberedHeading(h) : `${s.numberStr} ${stripSectionNumber(s.title)}`,
           targetWordCount: s.targetWordCount,
           currentWordCount: s.currentWordCount || 0,
-          guidance: s.guidance || `Analytical depth for ${s.title}. Notes: ${s.notes || ""}`,
+          // The section's own guidance, else its purpose, else the student's notes; no filler
+          // ("Analytical depth for X. Notes:" with nothing after it was shown as the focus).
+          guidance: s.guidance || s.purpose || h.purpose || (s.notes || "").trim(),
           draftContent: s.draftContent || "",
           status: s.draftStatus || (s.draftContent && s.draftContent.trim().length > 0 ? "completed" : "not_started"),
           keyPoints: s.keyPoints || [],

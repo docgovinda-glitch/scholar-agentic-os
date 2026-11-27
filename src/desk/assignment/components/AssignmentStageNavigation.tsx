@@ -172,7 +172,8 @@ export default function AssignmentStageNavigation({
       </div>
 
       {/* Right-Aligned Live Word Budget Progress Indicator: only once there are drafted words to count. */}
-      {currentWordCount > 0 && (
+      {/* Drafting has its own, fuller word meter; one meter per screen. */}
+      {currentWordCount > 0 && currentPhase !== "drafting" && (
       <div className="flex w-full @min-[72rem]:w-auto items-center justify-between @min-[48rem]:justify-center gap-3 shrink-0 @min-[72rem]:ml-auto @min-[72rem]:pl-2 @min-[72rem]:border-l border-[color:var(--border-subtle)]">
         <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2.5 text-right sm:text-left">
           <div className="flex items-center gap-1.5 text-xs tabular-nums">

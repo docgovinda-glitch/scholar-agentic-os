@@ -148,6 +148,7 @@ export function PostResponseActionBar({
       className="relative mt-3"
     >
       {/* Single non-wrapping row of the exact 6 post-response actions (Section 8 & Section 13) */}
+      {/* Labels at every width (icons alone were guesswork on phones); the row scrolls sideways if it must. */}
       <div className="no-scrollbar -mx-1 flex flex-nowrap items-center gap-0.5 overflow-x-auto whitespace-nowrap">
         {/* 1. Copy */}
         <button
@@ -163,7 +164,7 @@ export function PostResponseActionBar({
           ) : (
             <Copy className="w-3.5 h-3.5" />
           )}
-          <span className="hidden sm:inline">{copied ? "Copied" : "Copy"}</span>
+          <span>{copied ? "Copied" : "Copy"}</span>
         </button>
 
         {/* 2. Export to Word */}
@@ -177,6 +178,7 @@ export function PostResponseActionBar({
           title="Export response to Word (.docx) with headings, italics, tables, and hanging indents"
         >
           <FileText className="w-3.5 h-3.5" />
+          <span className="sm:hidden">Word</span>
           <span className="hidden sm:inline">{exportingWord ? "Exporting…" : "Export to Word"}</span>
         </button>
 
@@ -191,7 +193,7 @@ export function PostResponseActionBar({
             title="Download & copy cited references as BibTeX (.bib)"
           >
             <BookMarked className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">BibTeX</span>
+            <span>BibTeX</span>
           </button>
           <button
             type="button"
@@ -219,7 +221,7 @@ export function PostResponseActionBar({
           title="Run the pipeline again and write a fresh response"
         >
           <RotateCcw className={`w-3.5 h-3.5 ${isRegenerating ? "animate-spin" : ""}`} />
-          <span className="hidden sm:inline">Regenerate</span>
+          <span>Regenerate</span>
         </button>
 
         {/* 5. Store to Knowledge Vault */}
@@ -236,6 +238,7 @@ export function PostResponseActionBar({
           ) : (
             <Database className="w-3.5 h-3.5" />
           )}
+          <span className="sm:hidden">{isSavedToVault ? "Saved" : "Save"}</span>
           <span className="hidden sm:inline">{isSavedToVault ? "Stored in Vault" : "Store to Knowledge Vault"}</span>
         </button>
 
@@ -253,7 +256,7 @@ export function PostResponseActionBar({
           title="Continue in a workspace (Coursework & Essays, Journal Article, or Slides & Keynotes)"
         >
           <ArrowRightCircle className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Continue</span>
+          <span>Continue</span>
           <ChevronDown className="h-3 w-3" aria-hidden="true" />
         </button>
       </div>
