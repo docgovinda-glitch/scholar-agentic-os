@@ -266,11 +266,10 @@ export function InlineCitationBadge({
     citation?.credibilityLevel === "preprint - not peer-reviewed" ||
     Boolean(targetUrl && /arxiv\.org|biorxiv\.org|medrxiv\.org/i.test(targetUrl));
 
+  // Only what the record says: a news item about a paper in a journal named "Nature" is not itself peer reviewed.
   const isPeerReviewed =
     !isPreprint &&
-    (citation?.sourceType === "scholarly" ||
-      /nature|science|ieee|acm|neurips|icml|lancet|cell|springer|elsevier|wiley|pnas|oxford|cambridge/i.test(venue) ||
-      (citation?.authorityBadge || "").toLowerCase().includes("peer"));
+    (citation?.sourceType === "scholarly" || (citation?.authorityBadge || "").toLowerCase().includes("peer"));
 
   const isOpenAccess =
     Boolean(citation?.openAccessUrl) ||

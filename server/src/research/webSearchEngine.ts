@@ -747,6 +747,30 @@ function scholarlyRecordsToItems(
  * Search Google News RSS feed for real-time international, diplomatic, policy, and current-affairs sources.
  * Requires zero API keys and returns verified publication dates and publisher attributions.
  */
+/** RSS carries its HTML entity-encoded (`&lt;a href=…&gt;`): decode first, so the tags can then be removed. */
+function decodeXmlEntities(text: string): string {
+  return text
+    .replace(/<!\[CDATA\[|\]\]>/g, "")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;|&apos;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&");
+}
+
+const looseText = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+
+/**
+ * The text of a news item's description, or "" when it only repeats the headline and publisher (Google News
+ * sends exactly that): a source with no abstract has no snippet, never filler.
+ */
+export function newsDescriptionText(rawDescription: string, title: string, publisher: string): string {
+  const text = cleanHtmlToText(decodeXmlEntities(rawDescription), 360);
+  const rest = looseText(text).replace(looseText(title), "").replace(looseText(publisher), "").trim();
+  return rest.length < 40 ? "" : text;
+}
+
 export async function searchGoogleNewsRss(query: string, maxResults = 5): Promise<SearchResultItem[]> {
   try {
     const clean = query.replace(/[?.,!]/g, " ").trim();
@@ -777,12 +801,12 @@ export async function searchGoogleNewsRss(query: string, maxResults = 5): Promis
       const rawDesc = block.match(/<description>([\s\S]*?)<\/description>/i)?.[1] || "";
 
       const publisherUrl = sourceMatch?.[1]?.trim() || rawLink;
-      const publisherName = cleanHtmlToText(sourceMatch?.[2] || "", 80);
-      let title = cleanHtmlToText(rawTitle.replace(/<!\[CDATA\[|\]\]>/g, ""), 200);
+      const publisherName = cleanHtmlToText(decodeXmlEntities(sourceMatch?.[2] || ""), 80);
+      let title = cleanHtmlToText(decodeXmlEntities(rawTitle), 200);
       if (publisherName && title.endsWith(` - ${publisherName}`)) {
         title = title.slice(0, -(` - ${publisherName}`.length)).trim();
       }
-      const snippetText = cleanHtmlToText(rawDesc.replace(/<!\[CDATA\[|\]\]>/g, ""), 360) || title;
+      const snippetText = newsDescriptionText(rawDesc, title, publisherName);
 
       let isoDate: string | undefined;
       let yearNum: number | undefined;
@@ -801,7 +825,7 @@ export async function searchGoogleNewsRss(query: string, maxResults = 5): Promis
       items.push({
         title,
         url: effectiveUrl,
-        snippet: `${snippetText}${publisherName ? ` (Published by ${publisherName}${isoDate ? ` on ${isoDate}` : ""})` : ""}`,
+        snippet: snippetText ? `${snippetText}${publisherName ? ` (Published by ${publisherName}${isoDate ? ` on ${isoDate}` : ""})` : ""}` : "",
         domain: auth.domain,
         publisher: publisherName || auth.publisher,
         sourceType: auth.sourceType === "web" ? "media" : auth.sourceType,
