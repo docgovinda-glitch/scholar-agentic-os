@@ -760,7 +760,8 @@ export function renderFormattedGuideText(
     | { type: "code_block"; lang: string; code: string }
     | { type: "math_block"; latex: string }
     | { type: "table"; header: string[]; rows: string[][] }
-    | { type: "paragraph"; content: string };
+    | { type: "paragraph"; content: string }
+    | { type: "callout"; title: string; blocks: Block[] };
 
   const blocks: Block[] = [];
   let inCodeBlock = false;
@@ -893,6 +894,29 @@ export function renderFormattedGuideText(
     blocks.push({ type: "code_block", lang: codeBlockLang, code: codeBlockLines.join("\n") });
   }
 
+  // A report's "In short:" (a bold line, a heading, or a bold lead-in on the paragraph itself) and what follows it,
+  // up to the next heading or rule, become one callout: the answer, set apart at the top of the report.
+  const IN_SHORT = /^(?:\*\*|__)?\s*in short\s*:?\s*(?:\*\*|__)?\s*:?\s*/i;
+  for (let i = 0; i < blocks.length; i++) {
+    const b = blocks[i];
+    const marker =
+      (b.type === "paragraph" && IN_SHORT.test(b.content)) || (b.type === "heading" && /^in short\s*:?$/i.test(b.content.trim()));
+    if (!marker) continue;
+    const inner: Block[] = [];
+    const rest = b.type === "paragraph" ? b.content.replace(IN_SHORT, "").trim() : "";
+    if (rest) inner.push({ type: "paragraph", content: rest });
+    let j = i + 1;
+    for (; j < blocks.length; j++) {
+      const next = blocks[j];
+      if (next.type === "heading" || next.type === "hr") break;
+      if (next.type === "empty" && inner.length > 0 && blocks[j + 1]?.type === "empty") break;
+      if (next.type !== "empty") inner.push(next);
+    }
+    if (inner.length === 0) continue;
+    blocks.splice(i, j - i, { type: "callout", title: "In short", blocks: inner });
+    break;
+  }
+
   const headingBlocks = blocks.filter(
     (b): b is Extract<Block, { type: "heading" }> => b.type === "heading"
   );
@@ -931,13 +955,27 @@ export function renderFormattedGuideText(
         </nav>
       )}
 
-      {blocks.map((block, idx) => {
+      {blocks.map(function renderBlock(block: Block, idx: number): React.ReactNode {
+        if (block.type === "callout") {
+          return (
+            <section
+              key={idx}
+              aria-label={block.title}
+              data-testid="report-in-short"
+              className="my-1 rounded-2xl border border-[color:var(--research-border)] bg-[color:var(--research-subtle)] px-4 py-3.5 text-[color:var(--text-primary)]"
+            >
+              <div className="mb-1.5 text-xs font-semibold text-[color:var(--research)]">{block.title}</div>
+              <div className="space-y-2">{block.blocks.map((inner, i) => renderBlock(inner, i))}</div>
+            </section>
+          );
+        }
+
         if (block.type === "empty") {
           return <div key={idx} className="h-1.5" />;
         }
 
         if (block.type === "hr") {
-          return <hr key={idx} className="border-neutral-200 dark:border-white/10 my-2.5" />;
+          return <hr key={idx} className="my-4 border-[color:var(--border-subtle)]" />;
         }
 
         if (block.type === "math_block") {
@@ -955,42 +993,39 @@ export function renderFormattedGuideText(
             lower.includes("uncertaint") ||
             lower.includes("caveat");
 
-          if (isConflict) {
-            return (
-              <div
-                key={idx}
-                id={block.id}
-                className="mt-3 mb-1.5 p-2.5 rounded-xl bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-200"
-              >
-                <div className="flex items-center gap-1.5 font-bold text-xs uppercase tracking-wider mb-1">
-                  <Scale className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                  <span>{parseInline(block.content)}</span>
-                </div>
-              </div>
-            );
-          }
-
-          if (isLimitation) {
-            return (
-              <div
-                key={idx}
-                id={block.id}
-                className="mt-3 mb-1.5 p-2.5 rounded-xl bg-indigo-500/10 dark:bg-indigo-500/15 border border-indigo-500/30 text-indigo-900 dark:text-indigo-200"
-              >
-                <div className="flex items-center gap-1.5 font-bold text-xs uppercase tracking-wider mb-1">
-                  <Info className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                  <span>{parseInline(block.content)}</span>
-                </div>
-              </div>
-            );
-          }
-
-          if (block.level === 1 || block.level === 2) {
+          // Disagreement and uncertainty sections keep a small marker; the heading itself stays a heading.
+          if (isConflict || isLimitation) {
+            const Icon = isConflict ? Scale : Info;
             return (
               <h4
                 key={idx}
                 id={block.id}
-                className="font-semibold text-[17px] sm:text-[16px] text-neutral-900 dark:text-neutral-100 pt-3 tracking-tight"
+                className="flex items-center gap-2 pt-4 text-[18px] font-semibold tracking-tight text-[color:var(--text-primary)] sm:text-[17px]"
+              >
+                <Icon className={`h-4 w-4 shrink-0 ${isConflict ? "text-[color:var(--state-warning)]" : "text-[color:var(--text-muted)]"}`} aria-hidden="true" />
+                <span>{parseInline(block.content)}</span>
+              </h4>
+            );
+          }
+
+          if (block.level === 1) {
+            return (
+              <h3
+                key={idx}
+                id={block.id}
+                className="pt-1 text-[22px] font-semibold leading-tight tracking-tight text-[color:var(--text-primary)] sm:text-[24px]"
+              >
+                {parseInline(block.content)}
+              </h3>
+            );
+          }
+
+          if (block.level === 2) {
+            return (
+              <h4
+                key={idx}
+                id={block.id}
+                className="pt-4 text-[18px] font-semibold tracking-tight text-[color:var(--text-primary)] sm:text-[17px]"
               >
                 {parseInline(block.content)}
               </h4>
@@ -1054,32 +1089,24 @@ export function renderFormattedGuideText(
         }
 
         if (block.type === "table") {
+          // Cells keep a readable width: on a phone the table scrolls sideways instead of squeezing every column.
           return (
-            <div
-              key={idx}
-              className="overflow-x-auto my-2.5 rounded-lg border border-neutral-200 dark:border-white/10 shadow-xs"
-            >
-              <table className="w-full text-left text-xs sm:text-sm text-neutral-700 dark:text-neutral-300">
-                <thead className="bg-neutral-50 dark:bg-white/5 border-b border-neutral-200 dark:border-white/10">
+            <div key={idx} className="scholar-scrollbar my-3 overflow-x-auto rounded-xl border border-[color:var(--border-subtle)]">
+              <table className="min-w-full border-collapse text-left text-[14px] leading-snug text-[color:var(--text-primary)]">
+                <thead className="bg-[color:var(--surface-inset)]">
                   <tr>
                     {block.header.map((h, i) => (
-                      <th
-                        key={i}
-                        className="px-3 py-2 font-semibold text-neutral-900 dark:text-neutral-100 uppercase text-xs tracking-wider"
-                      >
+                      <th key={i} scope="col" className="min-w-[8.5rem] px-3 py-2 align-bottom text-xs font-semibold text-[color:var(--text-secondary)]">
                         {parseInline(h)}
                       </th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-neutral-200 dark:divide-white/5">
+                <tbody className="divide-y divide-[color:var(--border-subtle)]">
                   {block.rows.map((row, rIdx) => (
-                    <tr
-                      key={rIdx}
-                      className="hover:bg-neutral-50/50 dark:hover:bg-white/[0.02] transition-colors"
-                    >
+                    <tr key={rIdx}>
                       {row.map((cell, cIdx) => (
-                        <td key={cIdx} className="px-3 py-2 leading-relaxed">
+                        <td key={cIdx} className={`max-w-[22rem] px-3 py-2.5 align-top ${cIdx === 0 ? "font-medium" : "text-[color:var(--text-secondary)]"}`}>
                           {parseInline(cell)}
                         </td>
                       ))}

@@ -526,7 +526,7 @@ export async function executeDeepResearch(
 
   // ── STAGE 1: RESEARCH PLANNING ──
   const s1Start = Date.now();
-  onProgress?.("Stage 1/7: Interpreting research question & formulating sub-question plan...");
+  onProgress?.("Breaking the question into sub-questions…");
   const cleanApproved = Array.isArray(options?.approvedSubQuestions)
     ? options!.approvedSubQuestions.map((q) => String(q || "").trim()).filter(Boolean)
     : [];
@@ -539,9 +539,9 @@ export async function executeDeepResearch(
   const s1Telemetry: ResearchStageTelemetry = {
     id: "planning",
     stageNumber: 1,
-    label: "Research Planning & Decomposition",
+    label: "Plan the questions",
     status: "completed",
-    detail: `Decomposed inquiry into ${researchPlan.subQuestions.length} analytical sub-questions and ${researchPlan.objectives.length} core objectives.`,
+    detail: `Broke the question into ${researchPlan.subQuestions.length} sub-questions to search.`,
     queriesExecuted: researchPlan.subQuestions.map((sq) => sq.searchQuery),
     durationMs: Math.max(1, Date.now() - s1Start),
   };
@@ -550,7 +550,7 @@ export async function executeDeepResearch(
 
   // ── STAGE 2: MULTI-SOURCE DISCOVERY (Internal Vault + Pre-Retrieved Scholarly + Live Web + Scholarly + Official) ──
   const s2Start = Date.now();
-  onProgress?.(`Stage 2/7: Discovering sources across Knowledge Vault, scholarly indices, and live web...`);
+  onProgress?.("Searching scholarly indexes, the web and your Vault…");
 
   // 2a. Register Internal Knowledge Vault sources and pre-retrieved scholarly sources first
   const vaultItems = convertVaultSourcesToRegistryItems(vaultSources);
@@ -614,9 +614,9 @@ export async function executeDeepResearch(
   const s2Telemetry: ResearchStageTelemetry = {
     id: "discovery",
     stageNumber: 2,
-    label: "Multi-Source Discovery",
+    label: "Search the literature",
     status: "completed",
-    detail: `Searched ${researchPlan.subQuestions.length} research vectors across live web, news, CrossRef, OpenAlex${vaultItems.length > 0 ? `, and ${vaultItems.length} Knowledge Vault record(s)` : ""}, discovering ${allCitations.length} unique sources.`,
+    detail: `Searched ${researchPlan.subQuestions.length} questions across scholarly indexes and the web${vaultItems.length > 0 ? `, and ${vaultItems.length} Vault source${vaultItems.length === 1 ? "" : "s"}` : ""}: ${allCitations.length} sources found.`,
     queriesExecuted: researchPlan.subQuestions.map((sq) => sq.searchQuery),
     sourcesFound: allCitations.length,
     durationMs: Math.max(1, Date.now() - s2Start),
@@ -637,7 +637,7 @@ export async function executeDeepResearch(
     .map((picked) => allCitations.find((c) => sourceKey(c) === sourceKey(picked)))
     .filter((c): c is SearchResultItem => Boolean(c));
   if (toRead.length > 0) {
-    onProgress?.(`Stage 3/7: Looking for open full texts of ${toRead.length} source(s)...`);
+    onProgress?.(`Looking for open full texts of the ${toRead.length} strongest sources…`);
     let open = true;
     const queue = [...toRead];
     // One batched PubMed Central lookup for every candidate's DOI, shared by the readers below.
@@ -670,9 +670,9 @@ export async function executeDeepResearch(
   const s3Telemetry: ResearchStageTelemetry = {
     id: "retrieval",
     stageNumber: 3,
-    label: "Source Retrieval & Metadata Verification",
+    label: "Read the sources",
     status: "completed",
-    detail: `${allCitations.length} unique sources registered (${primaryCount} primary/scholarly/official, ${secondaryCount} policy/news/web). ${fullTexts.size} read in full${toRead.length > 0 ? ` (open copies looked for in ${toRead.length})` : ""}; ${readable} carry an abstract or page text of 200+ characters, ${withDoi} have a DOI; the rest are cited from title and metadata only.`,
+    detail: `${allCitations.length} sources (${primaryCount} scholarly or official, ${secondaryCount} news or web). ${fullTexts.size} read in full${toRead.length > 0 ? ` (open copies looked for in ${toRead.length})` : ""}; ${readable} have an abstract or page text, ${withDoi} have a DOI; the rest are known from title and details only.`,
     sourcesFound: allCitations.length,
     durationMs: Math.max(1, Date.now() - s3Start),
   };
@@ -705,11 +705,11 @@ export async function executeDeepResearch(
   const s4Telemetry: ResearchStageTelemetry = {
     id: "analysis",
     stageNumber: 4,
-    label: "Critical Cross-Verification & Gap Analysis",
+    label: "Check the evidence",
     status: analysis ? "completed" : "skipped",
     detail: analysis
-      ? `Cross-checked ${allCitations.length} sources: ${analysis.consensus.length} corroborated finding(s), ${analysis.contradictions.length} contradiction(s), ${analysis.gaps.length} evidence gap(s); ${gapQueries.length} follow-up search(es) queued.`
-      : `Model-based cross-verification was not run (${canAnalyse ? "the analysis call failed" : "answer is produced in your browser or no sources were found"}). ${gapQueries.length > 0 ? `${gapQueries.length} thin dimension(s) will still be re-searched.` : ""}`.trim(),
+      ? `Compared ${allCitations.length} sources: ${analysis.consensus.length} finding${analysis.consensus.length === 1 ? "" : "s"} they agree on, ${analysis.contradictions.length} disagreement${analysis.contradictions.length === 1 ? "" : "s"}, ${analysis.gaps.length} gap${analysis.gaps.length === 1 ? "" : "s"}.`
+      : `The sources were not compared by the AI (${canAnalyse ? "the check did not return" : "the answer is written in your browser, or no sources were found"}).${gapQueries.length > 0 ? ` ${gapQueries.length} thin question${gapQueries.length === 1 ? "" : "s"} will still be searched again.` : ""}`,
     durationMs: Math.max(1, Date.now() - s4Start),
   };
   stages.push(s4Telemetry);
@@ -719,7 +719,7 @@ export async function executeDeepResearch(
   const s5Start = Date.now();
   let iterativeAddedCount = 0;
   if (gapQueries.length > 0) {
-    onProgress?.(`Stage 5/7: Conducting iterative follow-up searches for ${gapQueries.length} gap vector(s)...`);
+    onProgress?.(`Searching again to fill ${gapQueries.length} gap${gapQueries.length === 1 ? "" : "s"} in the evidence…`);
     const followUpResults = await Promise.all(
       gapQueries.slice(0, 4).map((q) => {
         activity?.({ kind: "search", text: q });
@@ -747,12 +747,12 @@ export async function executeDeepResearch(
   const s5Telemetry: ResearchStageTelemetry = {
     id: "iteration",
     stageNumber: 5,
-    label: "Iterative Gap-Filling Research",
+    label: "Fill the gaps",
     status: gapQueries.length > 0 ? "completed" : "completed",
     detail:
       gapQueries.length > 0
-        ? `Executed ${gapQueries.length} targeted follow-up search(es), adding ${iterativeAddedCount} supplementary verified source(s).`
-        : `Verified sufficient multi-source density (${allCitations.length} sources); no redundant follow-up pass required.`,
+        ? `Searched again ${gapQueries.length} time${gapQueries.length === 1 ? "" : "s"} for the gaps, adding ${iterativeAddedCount} source${iterativeAddedCount === 1 ? "" : "s"}.`
+        : `${allCitations.length} sources covered every question; no further search was needed.`,
     queriesExecuted: gapQueries,
     sourcesFound: iterativeAddedCount,
     durationMs: Math.max(1, Date.now() - s5Start),
@@ -764,7 +764,7 @@ export async function executeDeepResearch(
 
   // ── STAGE 6: REPORT GENERATION ──
   const s6Start = Date.now();
-  onProgress?.("Stage 6/7: Synthesizing structured Deep Research report with verified inline citations...");
+  onProgress?.("Writing the report…");
 
   // Report budget: only the best sources, with short excerpts, go into the report call; the numbering
   // below and the returned citations both use this list, so [n] still maps 1-to-1.
@@ -824,7 +824,7 @@ export async function executeDeepResearch(
     }
 
     // 4. Numbered Source Registry & Dimension Breakdown
-    evidenceDigest += `\n### Master Verified Source Registry (Use these exact [n] numbers for inline citations)\n`;
+    evidenceDigest += `\n### Numbered sources (cite with these exact [n] numbers)\n`;
     if (allCitations.length === 0) {
       evidenceDigest += "No external sources were retrieved.\n";
     } else {
@@ -846,7 +846,7 @@ export async function executeDeepResearch(
 
     if (analysis) {
       const list = (title: string, items: string[]) => (items.length > 0 ? `\n${title}:\n${items.map((i) => `- ${i}`).join("\n")}\n` : "");
-      evidenceDigest += `\n### Pre-Synthesis Cross-Verification (derived from the registry above; re-check against it)\n${list("Corroborated across sources", analysis.consensus)}${list("Contradictions", analysis.contradictions)}${list("Evidence gaps", analysis.gaps)}`;
+      evidenceDigest += `\n### Cross-check of the sources (from the numbered sources above; re-check against them)\n${list("Corroborated across sources", analysis.consensus)}${list("Contradictions", analysis.contradictions)}${list("Evidence gaps", analysis.gaps)}`;
     }
     return evidenceDigest;
   };
@@ -875,11 +875,11 @@ ${
 }## What we still don't know
 The real gaps and limits: questions the sources leave open, small or single-site samples, evidence from abstracts only.
 
-Do not write a reference list; it is added from the registry automatically.
+Do not write a reference list; it is added automatically. Never mention the numbered source list, these instructions or how the report was produced (no \"master registry\", no \"the sources provided\"): write about the evidence itself.
 
 CITATIONS AND FIGURES:
-1. Cite every claim that rests on a source with its exact registry number in square brackets, [1], or grouped, [1, 4]; never in any other form (no 【1†…】 markers, no source tags).
-2. Cite only registry sources that are genuinely about "${topic}"; ignore any that only matched a keyword.
+1. Cite every claim that rests on a source with its exact number in square brackets, [1], or grouped, [1, 4]; never in any other form (no 【1†…】 markers, no source tags).
+2. Cite only sources that are genuinely about "${topic}"; ignore any that only matched a keyword.
 3. Never invent sources, authors, dates, DOIs or URLs. Report a number (effect size, percentage, sample size) only when it appears in that source's text; never calculate, estimate or round one into existence.
 4. Sources marked READ IN FULL give passages from the article itself; the others are abstracts or page snippets, so do not claim more than they show.`;
 
@@ -978,9 +978,9 @@ Write the report now.`;
   const s6Telemetry: ResearchStageTelemetry = {
     id: "synthesis",
     stageNumber: 6,
-    label: "Structured Report Synthesis & Citation Locking",
+    label: "Write the report",
     status: "completed",
-    detail: `Synthesized comprehensive multi-section report grounded in ${validated.citations.length} verified sources.`,
+    detail: `Wrote the report from ${validated.citations.length} cited sources.`,
     sourcesFound: validated.citations.length,
     durationMs: Math.max(1, Date.now() - s6Start),
   };
@@ -993,9 +993,9 @@ Write the report now.`;
   const s7Telemetry: ResearchStageTelemetry = {
     id: "followup",
     stageNumber: 7,
-    label: "Follow-Up Context & Source Registry Preservation",
+    label: "Prepare follow-ups",
     status: "completed",
-    detail: `Preserved ${validated.citations.length} verified sources in conversation registry and prepared ${followUps.length} follow-up question(s).`,
+    detail: `Kept the ${validated.citations.length} sources for follow-up questions${followUps.length ? ` and suggested ${followUps.length}` : ""}.`,
     sourcesFound: validated.citations.length,
     durationMs: Math.max(1, Date.now() - s7Start),
   };

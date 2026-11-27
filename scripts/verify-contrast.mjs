@@ -117,6 +117,12 @@ const CHECKS = [
   // uses the brand accent tint rather than --state-info-subtle's blue, so it
   // reads as Scholar Core rather than a generic info-blue callout.
   ['--accent', ['--accent-subtle'], 4.5, 'AuthNotice callout text'],
+
+  // Deep Research's indigo: accent text and icons, its filled button, and its tinted callouts and pills.
+  ['--research', SURFACES, 4.5, 'Deep Research accent text and icons'],
+  ['--research-on-solid', ['--research-solid'], 4.5, 'label on the Deep Research button'],
+  ['--research', ['--research-subtle'], 4.5, 'Deep Research pill and callout label'],
+  ['--text-primary', ['--research-subtle'], 4.5, 'text in the "In short" callout'],
 ];
 
 /* --- Run ------------------------------------------------------------------ */

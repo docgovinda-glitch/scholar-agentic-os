@@ -21,7 +21,7 @@ export function ResearchActivityFeed({ items, writing, max = 6 }: { items: Resea
 
   if (writing) {
     return (
-      <p data-testid="research-activity-summary" className="px-1 text-xs text-neutral-500 dark:text-neutral-400">
+      <p data-testid="research-activity-summary" className="text-xs text-[color:var(--text-muted)]">
         Researched with {searches} {searches === 1 ? "search" : "searches"} and {reads} {reads === 1 ? "source" : "sources"} read
       </p>
     );
@@ -29,7 +29,7 @@ export function ResearchActivityFeed({ items, writing, max = 6 }: { items: Resea
 
   const shown = items.slice(-max);
   return (
-    <ol data-testid="research-activity-feed" aria-label="Research activity" className="space-y-1.5 px-1">
+    <ol data-testid="research-activity-feed" aria-label="Research activity" className="space-y-1.5">
       {shown.map((item, i) => {
         const latest = i === shown.length - 1;
         const Icon = latest ? Loader2 : ICONS[item.kind];
@@ -37,10 +37,10 @@ export function ResearchActivityFeed({ items, writing, max = 6 }: { items: Resea
           <li
             key={`${items.length - shown.length + i}-${item.text}`}
             className={`flex min-w-0 items-start gap-2 text-[13px] leading-snug transition-opacity duration-300 animate-in fade-in ${
-              latest ? "text-neutral-900 dark:text-neutral-100" : "text-neutral-500 dark:text-neutral-400"
+              latest ? "text-[color:var(--text-primary)]" : "text-[color:var(--text-muted)]"
             }`}
           >
-            <Icon className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${latest ? "animate-spin text-neutral-400" : ""}`} aria-hidden="true" />
+            <Icon className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${latest ? "animate-spin text-[color:var(--research)]" : ""}`} aria-hidden="true" />
             <span className="min-w-0 flex-1 truncate">
               <span className="font-medium">{VERB[item.kind]}</span>{" "}
               {item.kind === "search" ? `“${item.text}”` : item.text}

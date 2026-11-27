@@ -1,110 +1,76 @@
 // @vitest-environment jsdom
 import React from "react";
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
-import LiveResearchTrajectoryVisualizer, {
-  RESEARCH_PIPELINE_STEPS,
-  pipelineStepsFor,
-} from "../LiveResearchTrajectoryVisualizer";
+import LiveResearchTrajectoryVisualizer, { RESEARCH_PIPELINE_STEPS, pipelineStepsFor } from "../LiveResearchTrajectoryVisualizer";
 
-describe("LiveResearchTrajectoryVisualizer (Phase 5)", () => {
+describe("LiveResearchTrajectoryVisualizer", () => {
   afterEach(() => {
     cleanup();
   });
 
-  it("renders 5-stage research trajectory in completed state", () => {
+  it("while live, shows the step the server reports (its 7 stages fold into 5), with the server's own detail in plain words", () => {
+    render(
+      <LiveResearchTrajectoryVisualizer
+        isLive
+        mode="deep-research"
+        liveDetail="Stage 5/7: Searching again to fill 2 gaps in the evidence…"
+        activeStage={{ id: "iteration", stageNumber: 5, label: "Fill the gaps", status: "running", detail: "" } as never}
+      />
+    );
+    expect(screen.getByText("Researching your question")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(/^Searching again to fill 2 gaps in the evidence…$/);
+    const current = screen.getByRole("listitem", { current: "step" });
+    expect(current).toHaveTextContent("Check");
+  });
+
+  it("has a real Stop button (not nested in another control), and shows the activity feed inside the card", () => {
+    const onStop = vi.fn();
+    render(
+      <LiveResearchTrajectoryVisualizer isLive currentStep="searching" onStop={onStop}>
+        <p>Reading a paper</p>
+      </LiveResearchTrajectoryVisualizer>
+    );
+    const stop = screen.getByRole("button", { name: "Stop" });
+    expect(stop.closest("button")?.parentElement?.closest("button")).toBeNull();
+    fireEvent.click(stop);
+    expect(onStop).toHaveBeenCalled();
+    expect(screen.getByText("Reading a paper")).toBeInTheDocument();
+    expect(screen.getByRole("listitem", { current: "step" })).toHaveTextContent("Search");
+  });
+
+  it("afterwards, folds into 'How this was researched' and lists the stages the run recorded", () => {
     render(
       <LiveResearchTrajectoryVisualizer
         isLive={false}
         query="CRISPR gene therapy efficacy"
-        defaultExpanded={true}
+        stages={[
+          { id: "planning", stageNumber: 1, label: "Plan the questions", status: "completed", detail: "Broke the question into 4 sub-questions to search." },
+          { id: "analysis", stageNumber: 4, label: "Check the evidence", status: "skipped", detail: "The sources were not compared by the AI." },
+        ] as never}
       />
     );
-
-    expect(screen.getByTestId("research-trajectory-visualizer")).toBeInTheDocument();
-    expect(
-      screen.getByText(/Autonomous Deep Research Trajectory/i)
-    ).toBeInTheDocument();
-    expect(screen.getByText(/Inquiry: "CRISPR gene therapy efficacy"/i)).toBeInTheDocument();
-
-    // Verify all 5 stages are present
-    pipelineStepsFor("CRISPR gene therapy efficacy").forEach((step) => {
-      expect(screen.getByText(new RegExp(step.label, "i"))).toBeInTheDocument();
-    });
+    const toggle = screen.getByRole("button", { name: /How this was researched/ });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText(/Broke the question/)).toBeNull();
+    fireEvent.click(toggle);
+    expect(screen.getByText(/Broke the question into 4 sub-questions/)).toBeInTheDocument();
+    expect(screen.getByText("(not run)")).toBeInTheDocument();
   });
 
-  it("toggles collapse and expand when header button is clicked", () => {
-    render(
-      <LiveResearchTrajectoryVisualizer
-        isLive={false}
-        defaultExpanded={false}
-      />
-    );
-
-    // Initially collapsed: pipeline steps should not be visible
-    expect(screen.queryByText(/Stage 1: Query Decomposition/i)).not.toBeInTheDocument();
-
-    // Click header to expand
-    const headerBtn = screen.getByRole("button");
-    fireEvent.click(headerBtn);
-
-    expect(screen.getByText(/Stage 1: Query Decomposition/i)).toBeInTheDocument();
-
-    // Click again to collapse
-    fireEvent.click(headerBtn);
-    expect(screen.queryByText(/Stage 1: Query Decomposition/i)).not.toBeInTheDocument();
-  });
-
-  it("renders live progress state when isLive is true", () => {
-    render(
-      <LiveResearchTrajectoryVisualizer
-        isLive={true}
-        currentStep="searching"
-        foundCount={14}
-        defaultExpanded={true}
-      />
-    );
-
-    expect(
-      screen.getByText(/Querying external academic indices and OpenAlex metadata.../i)
-    ).toBeInTheDocument();
-    expect(screen.getByText(/Active/i)).toBeInTheDocument();
-  });
-
-  it("renders decomposed sub-questions when research plan is provided", () => {
-    const plan = [
-      "Analyze viral vector delivery mechanisms in clinical trials",
-      "Evaluate off-target cleavage frequency across long-term cohorts",
-      "Synthesize regulatory benchmarks from FDA/EMA guidance",
-    ];
-
-    render(
-      <LiveResearchTrajectoryVisualizer
-        isLive={false}
-        plan={plan}
-        defaultExpanded={true}
-      />
-    );
-
-    expect(
-      screen.getByText(/Decomposed Sub-Questions & Search Trajectory/i)
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/Analyze viral vector delivery mechanisms in clinical trials/i)
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/Evaluate off-target cleavage frequency across long-term cohorts/i)
-    ).toBeInTheDocument();
+  it("with no recorded stages, shows the research trail it was given", () => {
+    render(<LiveResearchTrajectoryVisualizer isLive={false} plan={["Analyze viral vector delivery", "Evaluate off-target cleavage"]} defaultExpanded />);
+    expect(screen.getByText("Research trail")).toBeInTheDocument();
+    expect(screen.getByText("Analyze viral vector delivery")).toBeInTheDocument();
   });
 });
 
-
 describe("pipelineStepsFor", () => {
-  it("names the extraction stage by discipline, with PICO only for clinical questions", () => {
+  it("names the checking step by discipline, with PICO only for clinical questions", () => {
     const label = (q: string) => pipelineStepsFor(q).find((s) => s.id === "extraction")!.label;
     expect(label("CRISPR gene therapy efficacy in patients")).toMatch(/PICO/);
     expect(label("Compare Wendt and Mearsheimer on regional security in East Asia")).not.toMatch(/PICO/);
-    expect(RESEARCH_PIPELINE_STEPS.length).toBe(5);
+    expect(RESEARCH_PIPELINE_STEPS.map((s) => s.short)).toEqual(["Plan", "Search", "Read", "Check", "Write"]);
   });
 });
