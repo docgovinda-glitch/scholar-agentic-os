@@ -112,9 +112,15 @@ export function sendAiFailure(res: Response, err: unknown, feature: string): voi
     res.status(503).set("Retry-After", AI_RETRY_AFTER_SECONDS).json({ error: err.message, code: "ai_unavailable" });
     return;
   }
-  console.warn(`[${feature}] AI request failed:`, err instanceof Error ? err.message : err);
+  const raw = err instanceof Error ? err.message : String(err);
+  console.warn(`[${feature}] AI request failed:`, raw);
+  // A per-minute cap is the common free-tier failure: say so, so the person waits a moment instead of reconnecting.
+  const rateLimited = /rate limit|tokens per minute|requests per minute|\b(?:TPM|RPM)\b|too many requests/i.test(raw) && !/per day|\bTPD\b|\bRPD\b/i.test(raw);
   res.status(503).set("Retry-After", AI_RETRY_AFTER_SECONDS).json({
-    error: `${feature} could not be generated: the AI provider failed or returned an unusable answer. Nothing was produced. Try again.`,
+    error: rateLimited
+      ? `${feature} could not be generated: your AI provider's per-minute limit was reached. Wait a few seconds and try again.`
+      : `${feature} could not be generated: the AI provider failed or returned an unusable answer. Nothing was produced. Try again.`,
     code: "ai_unavailable",
+    ...(rateLimited ? { reason: "rate_limit" } : {}),
   });
 }

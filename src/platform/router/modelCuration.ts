@@ -52,7 +52,7 @@ export interface CuratedModel extends LiveModel {
   badges: Badge[];
 }
 
-const NON_TEXT = /(embed|embedding|tts|whisper|transcri|audio|speech|realtime|image|imagen|dall-?e|vision-preview|moderation|search|rerank|guard|ocr|veo|sora|lyria|clip|davinci|babbage|instruct-?0|computer-use)/i;
+const NON_TEXT = /(embed|embedding|tts|whisper|orpheus|playai|voice|transcri|audio|speech|realtime|image|imagen|dall-?e|vision-preview|moderation|search|rerank|guard|ocr|veo|sora|lyria|clip|davinci|babbage|instruct-?0|computer-use)/i;
 const DATED_SNAPSHOT = /(-|@)(20\d{2}-?\d{2}-?\d{2}|\d{4}|\d{3,4}-\d{2})$/;
 const PREVIEW = /(preview|exp|experimental|beta|alpha|-rc\d*)/i;
 const FAST = /(flash|mini|nano|haiku|lite|small|instant|tiny|8b|\bfast\b|turbo|spark)/i;

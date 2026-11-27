@@ -14,6 +14,17 @@ export class DeepResearchPartialError extends Error {
   }
 }
 
+/**
+ * The server reached the person's AI and it did not answer (rate limit, no credit, provider down).
+ * Retrying the same key from the browser would meet the same refusal, so callers show this instead.
+ */
+export class AskAiUnavailableError extends Error {
+  constructor(message: string, readonly reason?: string) {
+    super(message);
+    this.name = "AskAiUnavailableError";
+  }
+}
+
 export async function executeAgenticQuery(
   req: AgenticQueryRequest
 ): Promise<AgenticQueryResponse> {
@@ -30,6 +41,8 @@ export async function executeAgenticQuery(
     images: req.images,
     history: req.history,
     vaultSources: req.vaultSources,
+    // A normal answer streams its words as the model writes them (deep research streams stages instead).
+    ...(req.mode !== "deep-research" && req.onChunk ? { streamTokens: true } : {}),
   };
 
   const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -48,39 +61,50 @@ export async function executeAgenticQuery(
     if (res.status === 524 || res.status === 504) {
       throw new Error(`The AI provider took too long to respond (${res.status}), so nothing was produced. Try again, or choose a faster model in AI Access.`);
     }
-    const errorMsg = (errorBody as { error?: string }).error || `AI Request failed with status ${res.status}`;
+    const body = errorBody as { error?: string; code?: string; reason?: string };
+    const errorMsg = body.error || `AI Request failed with status ${res.status}`;
+    if (body.code === "ai_unavailable") throw new AskAiUnavailableError(errorMsg, body.reason);
     throw new Error(errorMsg);
   }
 
   const isEventStream = Boolean(res.headers.get("content-type")?.includes("text/event-stream"));
   if (isEventStream && res.body) {
     // Set from inside the reader's callback.
-    const got: { payload: AgenticQueryResponse | null; error: string; sources: Array<Record<string, unknown>> } = { payload: null, error: "", sources: [] };
+    const got: { payload: AgenticQueryResponse | null; error: string; sources: Array<Record<string, unknown>>; streamed: boolean } = { payload: null, error: "", sources: [], streamed: false };
+    const isDeep = req.mode === "deep-research";
     await readSse(res.body, (m) => {
       if (!m.json || !m.data || typeof m.data !== "object") return;
-      const parsed = m.data as { type?: string; status?: string; stage?: string; payload?: AgenticQueryResponse; message?: unknown; citations?: Array<Record<string, unknown>> };
-      if (parsed.type === "stage" && req.onStageUpdate) {
+      const parsed = m.data as { type?: string; status?: string; stage?: string; text?: unknown; payload?: AgenticQueryResponse; message?: unknown; citations?: Array<Record<string, unknown>> };
+      if (parsed.type === "token" && typeof parsed.text === "string") {
+        got.streamed = true;
+        req.onChunk?.(parsed.text);
+      } else if (parsed.type === "reset") {
+        req.onReset?.();
+      } else if (parsed.type === "stage" && req.onStageUpdate) {
         req.onStageUpdate({ status: parsed.status, stage: parsed.stage } as Parameters<NonNullable<typeof req.onStageUpdate>>[0]);
       } else if (parsed.type === "sources" && Array.isArray(parsed.citations)) {
         got.sources = parsed.citations;
       } else if (parsed.type === "complete" && parsed.payload) {
         got.payload = parsed.payload;
       } else if (parsed.type === "error") {
-        got.error = typeof parsed.message === "string" && parsed.message ? parsed.message : "Deep research stopped before it finished. Try again.";
+        got.error = typeof parsed.message === "string" && parsed.message ? parsed.message : isDeep ? "Deep research stopped before it finished. Try again." : "The answer stopped before it finished. Try again.";
       }
     });
 
     const finalPayload = got.payload;
     const streamError = got.error;
     if (finalPayload) {
-      if (finalPayload.text && req.onChunk) {
+      // Streamed words are replaced by the finished answer; a stages-only stream shows it now.
+      if (finalPayload.text && req.onChunk && !got.streamed) {
         req.onChunk(finalPayload.text);
       }
       return finalPayload;
     }
     // The stream ended without a result: say why (its body is already read).
-    const stopped = streamError || "Deep research stopped before it finished. Try again.";
+    const stopped = streamError || (isDeep ? "Deep research stopped before it finished. Try again." : "The answer stopped before it finished. Try again.");
     if (got.sources.length > 0) throw new DeepResearchPartialError(stopped, { citations: got.sources });
+    // An answer that was streaming and then failed came from the AI itself.
+    if (got.streamed) throw new AskAiUnavailableError(stopped);
     throw new Error(stopped);
   }
 

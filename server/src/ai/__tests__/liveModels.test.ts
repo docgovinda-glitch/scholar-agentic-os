@@ -118,6 +118,37 @@ describe("no model chosen: the task picks, and models this key cannot use are sk
   });
 });
 
+describe("free-tier per-minute caps and unsuitable models", () => {
+  it("a per-minute cap with a stated wait keeps the model out only for that wait", () => {
+    vi.useFakeTimers();
+    try {
+      const c = { group: "groq", provider: "groq", model: "big-chat-5", credential: { apiKey: "k" } } as Parameters<typeof markModelLimited>[0];
+      markModelLimited(c, { kind: "rate_limit", message: "tokens per minute (TPM): Limit 8000. Please try again in 1.7s", retryAfterMs: 1700 });
+      expect(isLimited("groq", "k", "big-chat-5")).toBe(true);
+      vi.advanceTimersByTime(3_000);
+      expect(isLimited("groq", "k", "big-chat-5")).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("never picks a speech model, and picks a 4k-window model only when nothing larger is listed", async () => {
+    setLiveModelsFetch(
+      list([
+        { id: "acme-chat-5", created: 1_790_000_000, context_window: 131_072 },
+        { id: "tiny-chat-2-7b", created: 1_790_000_000, context_window: 4_096 },
+        { id: "canopylabs/orpheus-arabic-saudi", created: 1_790_000_000, context_window: 4_000 },
+      ]) as unknown as typeof fetch
+    );
+    const r = await expandEntry(entry(), "drafting", 4);
+    expect(r.entries.map((e) => e.model)).toEqual(["acme-chat-5"]);
+
+    clearLiveModelState();
+    setLiveModelsFetch(list([{ id: "tiny-chat-2-7b", created: 1_790_000_000, context_window: 4_096 }]) as unknown as typeof fetch);
+    expect((await expandEntry(entry({ apiKey: "k3" }), "drafting", 4)).entries.map((e) => e.model)).toEqual(["tiny-chat-2-7b"]);
+  });
+});
+
 describe("one connection with no model chosen", () => {
   it("lines up to five of the provider's models, so a refusal from one or two does not end the request", async () => {
     clearLiveModelState();

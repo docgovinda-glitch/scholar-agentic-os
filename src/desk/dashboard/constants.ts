@@ -65,6 +65,14 @@ export const STAGE_BREAKDOWNS: Record<string, { phases: string[]; highlights: st
   },
 };
 
+/** Starters for a research question: a tap puts the opening words in the composer for the person to finish. */
+export const ASK_RESEARCH_STARTERS = [
+  { label: "Summarise the evidence", text: "Summarise the evidence on " },
+  { label: "Find recent studies", text: "Find studies from the last five years on " },
+  { label: "Explain a concept", text: "Explain, with sources, " },
+  { label: "Compare two views", text: "Compare the main arguments for and against " },
+] as const;
+
 export const WEBSITE_ASSISTANT_FAQS = [
   {
     question: "How do I set up AI?",

@@ -76,6 +76,7 @@ import {
   ChevronDown,
   Clock,
   PanelLeftOpen,
+  MessageSquare,
 } from "lucide-react";
 import LiteratureDiscoveryWorkspace from "./discovery/LiteratureDiscoveryWorkspace";
 import LiveResearchTrajectoryVisualizer from "./components/LiveResearchTrajectoryVisualizer";
@@ -151,6 +152,7 @@ import {
   isCreatableFormat,
   STAGE_BREAKDOWNS,
   WEBSITE_ASSISTANT_FAQS,
+  ASK_RESEARCH_STARTERS,
   getFormatTileTheme,
   CodeBlockWithCopy,
   InlineCitationBadge,
@@ -1556,9 +1558,13 @@ export default function ProjectListScreen({
                   setStreamingGuideText((prev) => prev + chunk);
                 }
               },
+              onReset: () => setStreamingGuideText(""),
             });
           } catch (serverErr) {
             if (askAbortRef.current) return;
+            // The server reached the AI and the AI refused (rate limit, credit): the same key from this
+            // browser would be refused too, so the failure is shown instead of a second, slower attempt.
+            if (serverErr instanceof Error && serverErr.name === "AskAiUnavailableError") throw serverErr;
             if (!shouldRunClientPreSearch && !isExplicitChatOnly && liveRetrievedSources.length === 0) {
               try {
                 const previousQuestions = priorThreadMessages.filter((m) => m.sender === "user").map((m) => m.text);
@@ -2059,13 +2065,16 @@ export default function ProjectListScreen({
         type="button"
         data-testid="mobile-resume-chat"
         onClick={resumeTarget.open}
-        className={`w-full min-h-14 flex items-center gap-3 px-3.5 py-2 rounded-2xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-left cursor-pointer active:scale-[0.99] transition-transform focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 ${extraClass}`}
+        className={`w-full min-h-14 flex items-center gap-3 px-3 py-2 rounded-2xl bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/10 text-neutral-900 dark:text-white text-left cursor-pointer active:scale-[0.99] transition-transform focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 ${extraClass}`}
       >
-        <span className="min-w-0 flex-1">
-          <span className="block text-xs font-semibold uppercase tracking-wider opacity-70">Resume chat</span>
-          <span className="block text-[13px] font-medium truncate">{resumeTarget.title}</span>
+        <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-neutral-100 text-neutral-700 dark:bg-white/10 dark:text-neutral-200" aria-hidden="true">
+          <MessageSquare className="w-4 h-4" />
         </span>
-        <ArrowRight className="w-4 h-4 shrink-0" aria-hidden="true" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-xs font-medium text-neutral-500 dark:text-neutral-400">Resume chat</span>
+          <span className="block text-[13px] font-semibold truncate">{resumeTarget.title}</span>
+        </span>
+        <ArrowRight className="w-4 h-4 shrink-0 text-neutral-400" aria-hidden="true" />
       </button>
     ) : null;
 
@@ -2619,6 +2628,36 @@ export default function ProjectListScreen({
                           </ul>
                         </div>
                       )}
+
+                      {/* A returning person gets research starters in the free space above the composer (left out on
+                          short screens, so the landing still fits without scrolling). A tap fills the composer. */}
+                      {hasReturningContent && (
+                        <div className="mt-8 [@media(max-height:740px)]:hidden" data-testid="ask-research-starters">
+                          <h2 className="mb-3 text-center text-lg font-semibold tracking-tight text-neutral-900 dark:text-white">
+                            What are you researching today?
+                          </h2>
+                          <div role="group" aria-label="Question starters" className="grid grid-cols-2 gap-2">
+                            {ASK_RESEARCH_STARTERS.map((starter) => (
+                              <button
+                                key={starter.label}
+                                type="button"
+                                onClick={() => {
+                                  setMainPromptInput(starter.text);
+                                  requestAnimationFrame(() => {
+                                    const el = guideTextareaRef.current;
+                                    if (!el) return;
+                                    el.focus();
+                                    el.setSelectionRange(el.value.length, el.value.length);
+                                  });
+                                }}
+                                className="min-h-11 rounded-2xl border border-neutral-200/90 bg-white px-3 py-2 text-left text-[13px] font-medium text-neutral-700 transition-colors active:scale-[0.99] hover:bg-neutral-50 dark:border-white/10 dark:bg-ink-750 dark:text-neutral-200 dark:hover:bg-white/5 cursor-pointer"
+                              >
+                                {starter.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </section>
                   </>
                 ) : !isAiSidebarOpen ? (
@@ -3152,7 +3191,7 @@ export default function ProjectListScreen({
                         )}
 
                         <div
-                          className={`leading-relaxed ${isPhone ? "text-[15px]" : "text-sm"} ${msg.sender === "user"
+                          className={`leading-relaxed ${isPhone ? "text-[16px]" : "text-[15px]"} ${msg.sender === "user"
                             ? "max-w-[88%] rounded-3xl rounded-br-lg bg-neutral-100 px-4 py-2.5 text-neutral-900 dark:bg-white/10 dark:text-neutral-100"
                             : msg.notice
                               ? "w-full rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-inset)] px-4 py-3 text-[color:var(--text-primary)]"
@@ -3538,7 +3577,7 @@ export default function ProjectListScreen({
                         )}
                         {/* Live Token Streaming Bubble when tokens are arriving */}
                         {streamingGuideText && (
-                          <div data-streaming-answer className="w-full px-0.5 leading-relaxed text-neutral-900 dark:text-neutral-100">
+                          <div data-streaming-answer aria-busy="true" className="w-full px-0.5 leading-relaxed text-neutral-900 dark:text-neutral-100">
                             {renderFormattedGuideText(streamingGuideText, undefined, askCitationStyle)}
                           </div>
                         )}
@@ -3562,7 +3601,7 @@ export default function ProjectListScreen({
               </div>
 
               {/* Pinned Floating Input Component (Module 3.4) */}
-              <div className="p-3 sm:p-4 pb-[max(0.875rem,env(safe-area-inset-bottom))] bg-white/95 dark:bg-ink-800/95 backdrop-blur-md border-t border-neutral-200/80 dark:border-white/10 shrink-0">
+              <div className="px-3 pt-2 sm:p-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-white dark:bg-ink-800 shrink-0">
                 <div className={isLandingPage ? "w-full max-w-4xl mx-auto" : "w-full"}>
                   {/* A notice appears only when something needs attention; a healthy connection is silent. */}
                   {!isOnline ? (

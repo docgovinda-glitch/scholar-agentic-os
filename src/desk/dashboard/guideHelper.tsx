@@ -833,7 +833,7 @@ export function renderFormattedGuideText(
   );
 
   return (
-    <div className="max-w-[75ch] space-y-2 text-[13.5px] leading-[1.68] text-inherit">
+    <div className="max-w-[72ch] space-y-3 text-[16px] leading-[1.65] text-inherit sm:text-[15px] sm:leading-[1.7]">
       {/* Automatic Table of Contents for answers with 3 or more headings (Section 10) */}
       {headingBlocks.length >= 3 && (
         <nav aria-label="Table of contents" data-testid="response-toc" className="mb-3">
@@ -925,7 +925,7 @@ export function renderFormattedGuideText(
               <h4
                 key={idx}
                 id={block.id}
-                className="font-bold text-base sm:text-[16px] text-neutral-900 dark:text-neutral-100 pt-3 pb-1 border-b border-neutral-200/60 dark:border-white/10 tracking-tight"
+                className="font-semibold text-[17px] sm:text-[16px] text-neutral-900 dark:text-neutral-100 pt-3 tracking-tight"
               >
                 {parseInline(block.content)}
               </h4>
@@ -936,7 +936,7 @@ export function renderFormattedGuideText(
               <h5
                 key={idx}
                 id={block.id}
-                className="font-semibold text-[14.5px] text-neutral-900 dark:text-neutral-100 pt-2 pb-0.5 tracking-tight"
+                className="font-semibold text-[16px] sm:text-[15px] text-neutral-900 dark:text-neutral-100 pt-2 tracking-tight"
               >
                 {parseInline(block.content)}
               </h5>
